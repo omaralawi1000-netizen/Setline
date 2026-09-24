@@ -20,6 +20,7 @@ export function createWorkout(template = {}, now = Date.now(), id = uid()) {
     id: uid(),
     exerciseId: e.exerciseId,
     ...(e.suggestion ? { suggestion: e.suggestion } : {}),
+    ...(Number.isFinite(e.restSec) ? { restSec: e.restSec } : {}),
     sets: (e.sets || []).slice(0, LIMITS.setsPerExercise).map(s => makeSet({ kg: s.kg ?? null, reps: s.reps ?? null })),
     draft: null
   }));
@@ -100,7 +101,8 @@ export function logSet(w, exIndex, { kg, reps }, now = Date.now(), restSec = 90)
   }
   ex.draft = null;
   next.current = exIndex;
-  next.rest = makeRest(now, restSec);
+  delete next.advancedFrom;
+  next.rest = makeRest(now, ex.restSec ?? restSec);
   return { workout: next, set };
 }
 
@@ -151,7 +153,9 @@ export function setCurrent(w, exIndex) {
   if (!w.exercises.length) return w;
   const i = Math.max(0, Math.min(exIndex, w.exercises.length - 1));
   if (i === w.current) return w;
-  return { ...w, current: i };
+  const next = { ...w, current: i };
+  delete next.advancedFrom;
+  return next;
 }
 
 export function setDraft(w, exIndex, draft) {
@@ -178,10 +182,41 @@ export function restProgress(rest, now = Date.now()) {
   return total <= 0 ? 0 : Math.max(0, Math.min(1, (rest.endsAt - now) / total));
 }
 
+// Adjusting also teaches the current exercise its rest: the next set rests that long.
 export function adjustRest(w, deltaSec, now = Date.now()) {
   if (!w.rest || restRemaining(w.rest, now) <= 0) return w;
   const endsAt = Math.max(now, w.rest.endsAt + deltaSec * 1000);
-  return { ...w, rest: { ...w.rest, endsAt, duration: Math.round((endsAt - w.rest.startedAt) / 1000) } };
+  const duration = Math.round((endsAt - w.rest.startedAt) / 1000);
+  const next = { ...w, rest: { ...w.rest, endsAt, duration } };
+  const ex = w.exercises[w.current];
+  if (ex) {
+    const learned = Math.min(LIMITS.restMax, Math.max(LIMITS.restMin, Math.round(duration / 15) * 15));
+    next.exercises = w.exercises.map((x, i) => (i === w.current ? { ...x, restSec: learned } : x));
+  }
+  return next;
+}
+
+// After a log finished the last planned set of exercise idx, move on to the next untouched exercise.
+// before: the workout before the log. Returns the workout unchanged when there's nothing to move to.
+export function advanceAfterLog(before, after, idx) {
+  const b = before.exercises[idx], a = after.exercises[idx];
+  if (!b || !a || firstPlannedIndex(b) === -1 || firstPlannedIndex(a) !== -1) return after;
+  for (let j = 1; j < after.exercises.length; j++) {
+    const k = (idx + j) % after.exercises.length;
+    const e = after.exercises[k];
+    if (!e.sets.some(s => s.done) && e.sets.length) return { ...after, current: k, advancedFrom: idx };
+  }
+  return after;
+}
+
+// Rest for an exercise: what this workout learned, then the saved per-exercise rest, then the default.
+export const restFor = (ex, restByEx = {}, fallback = 90) => ex?.restSec ?? restByEx?.[ex?.exerciseId] ?? fallback;
+
+// Per-exercise rest learned in a workout, to merge into settings.restByEx.
+export function learnedRest(w) {
+  const out = {};
+  for (const ex of w.exercises) if (Number.isFinite(ex.restSec)) out[ex.exerciseId] = ex.restSec;
+  return out;
 }
 
 export function startRest(w, sec, now = Date.now()) {
@@ -212,11 +247,12 @@ export const elapsedSec = (w, now = Date.now()) => Math.max(0, Math.floor(((w.fi
 export function finishWorkout(w, now = Date.now()) {
   const next = clone(w);
   next.exercises = next.exercises
-    .map(ex => ({ id: ex.id, exerciseId: ex.exerciseId, sets: ex.sets.filter(s => s.done) }))
+    .map(ex => ({ id: ex.id, exerciseId: ex.exerciseId, ...(ex.restSec ? { restSec: ex.restSec } : {}), sets: ex.sets.filter(s => s.done) }))
     .filter(ex => ex.sets.length);
   next.finishedAt = now;
   next.rest = null;
   delete next.current;
+  delete next.advancedFrom;
   return next;
 }
 

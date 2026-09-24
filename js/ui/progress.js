@@ -10,6 +10,7 @@ import { esc } from './dom.js';
 import { I } from './icons.js';
 import { barChart, lineChart } from './charts.js';
 import { sparkline } from '../stats.js';
+import { balanceHTML } from './today.js';
 
 let range = 12;
 export const setRange = r => { range = r; };
@@ -46,6 +47,8 @@ export function renderProgress(root) {
     ${bw && bw.series.length >= 2 ? `<div class="chartcard solid">
       <div class="chead"><span class="label">${t('body.weight')}</span><span class="cval"><b>${kg(bw.latest.kg)}</b> ${u()}</span></div>
       ${lineChart(bw.series, { h: 110, fmt: v => kg(v) })}</div>` : ''}
+
+    ${state.history.length ? balanceHTML({ always: true }) : ''}
 
     ${lifts.length ? `<div class="section"><span class="label">${t('progress.lifts')}</span></div>
     <ul class="lifts">${lifts.map(l => {

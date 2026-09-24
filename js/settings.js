@@ -30,7 +30,11 @@ export const DEFAULTS = Object.freeze({
   proteinPerKg: 1.8,
   readiness: true,
   suggestions: true,
-  restAlerts: false
+  restAlerts: false,
+  restByEx: {},        // exerciseId → seconds, learned when rest is adjusted
+  autoAdvance: true,   // move to the next exercise when its planned sets are done
+  deloadUntil: 0,      // timestamp: deload week running until then
+  deloadSnoozed: 0     // timestamp: don't suggest a deload before then
 });
 
 // Gemini prebuilt voices and how they sound.
@@ -53,6 +57,14 @@ export function sanitize(input) {
   if (typeof input.readiness === 'boolean') s.readiness = input.readiness;
   if (typeof input.suggestions === 'boolean') s.suggestions = input.suggestions;
   if (typeof input.restAlerts === 'boolean') s.restAlerts = input.restAlerts;
+  if (typeof input.autoAdvance === 'boolean') s.autoAdvance = input.autoAdvance;
+  for (const k of ['deloadUntil', 'deloadSnoozed']) if (Number.isFinite(input[k]) && input[k] >= 0) s[k] = input[k];
+  if (input.restByEx && typeof input.restByEx === 'object') {
+    s.restByEx = {};
+    for (const [k, v] of Object.entries(input.restByEx).slice(-200)) {
+      if (typeof k === 'string' && k.length <= 80 && Number.isFinite(v)) s.restByEx[k] = Math.min(LIMITS.restMax, Math.max(LIMITS.restMin, Math.round(v / 15) * 15));
+    }
+  }
   if (['auto', 'da', 'en'].includes(input.voiceLang)) s.voiceLang = input.voiceLang;
   if (['hold', 'tap'].includes(input.micMode)) s.micMode = input.micMode;
   if (['off', 'minimal', 'full'].includes(input.spoken)) s.spoken = input.spoken;

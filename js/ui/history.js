@@ -95,5 +95,7 @@ export function renderDetail(root, id) {
     ${prs ? `<div class="prs solid"><span class="tag">${t('history.newPrs')}</span><ul>${prs}</ul></div>` : ''}
     ${w.exercises.map(ex => `<div class="exblock solid"><h3><button data-ex="${esc(ex.exerciseId)}">${esc(state.catalog.name(ex.exerciseId, lang))} <span class="chev">›</span></button></h3><ol>
       ${ex.sets.map((s, k) => `<li><span class="idx">${k + 1}</span><span class="val"><b>${weight(s.kg, state.settings.unit, lang)}</b> ${u()} × <b>${s.reps}</b></span>${prSets.has(s.id) ? `<span class="tag sm">${t('workout.pr')}</span>` : '<span></span>'}</li>`).join('')}
-    </ol></div>`).join('')}`;
+    </ol></div>`).join('')}
+    ${w.exercises.length ? `<button class="log again" data-act="repeat-workout" data-id="${esc(w.id)}">${I.play}<span>${t('history.again')}</span></button>
+    <p class="hint">${t('history.againSub')}</p>` : ''}`;
 }

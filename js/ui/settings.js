@@ -81,8 +81,10 @@ export function renderSettings(root) {
     </div><p class="snote">${t('settings.privacy')}</p></div>
 
     <div class="sgroup"><h2>${t('settings.workout')}</h2><div class="slist solid">
-      <div class="srow"><span class="l"><strong>${t('settings.rest')}</strong></span>
+      <div class="srow"><span class="l"><strong>${t('settings.rest')}</strong><small>${t('settings.restSub')}</small></span>
         <div class="stepper"><button class="step" data-act="rest-default" data-d="-15" aria-label="−15 s" ${s.restSec <= LIMITS.restMin ? 'disabled' : ''}>−</button><b>${t('seconds', { n: s.restSec })}</b><button class="step" data-act="rest-default" data-d="15" aria-label="+15 s" ${s.restSec >= LIMITS.restMax ? 'disabled' : ''}>+</button></div></div>
+      <div class="srow"><span class="l"><strong>${t('settings.autoAdvance')}</strong><small>${t('settings.autoAdvanceSub')}</small></span>
+        <button class="toggle" role="switch" aria-checked="${s.autoAdvance}" aria-label="${t('settings.autoAdvance')}" data-act="toggle" data-key="autoAdvance"></button></div>
       <div class="srow"><span class="l"><strong>${t('alerts.title')}</strong><small>${t('alerts.sub')}</small></span>
         <button class="toggle" role="switch" aria-checked="${s.restAlerts}" aria-label="${t('alerts.title')}" data-act="rest-alerts"></button></div>
       <div class="srow"><span class="l"><strong>${t('settings.readiness')}</strong><small>${t('settings.readinessSub')}</small></span>

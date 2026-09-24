@@ -13,15 +13,18 @@ import { renderToday } from './ui/today.js';
 import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav } from './ui/workout.js';
 import { renderHistory, renderDetail } from './ui/history.js';
 import { renderSettings, initSettings } from './ui/settings.js';
-import { initVoice, orbHTML, voiceHandlePop, closeVoice, isVoiceOpen } from './ui/voice.js';
+import { initVoice, orbHTML, voiceHandlePop, closeVoice, isVoiceOpen, openVoice } from './ui/voice.js';
 import { renderCoach, initCoach, ask as askCoach, ensureModels } from './ui/coach.js';
-import { initCardio, setCardioNav, tickCardio, renderCardioDetail } from './ui/cardio.js';
+import { initCardio, setCardioNav, tickCardio, renderCardioDetail, syncGps, startCardioSession, pickTypeSheet } from './ui/cardio.js';
 import { initBody } from './ui/body.js';
 import { initRoutine, setRoutineNav, renderRoutine, editRoutine, programsSheet, startRoutine } from './ui/routine.js';
 import { setHistoryFilter } from './ui/history.js';
 import { renderProgress, renderExercise, setRange } from './ui/progress.js';
 import { countAll, burst } from './ui/fx.js';
 import { cardioElapsed, cardioName } from './cardio.js';
+import { weekStart } from './stats.js';
+import { nextRoutine } from './routines.js';
+import { repeatTemplate } from './insights.js';
 
 const TABS = ['today', 'workout', 'coach', 'history'];
 const SUB = ['detail', 'settings', 'routine', 'progress', 'exercise'];
@@ -184,6 +187,14 @@ Object.assign(actions, {
   'open-settings': () => pushSub('settings'),
   detail: el => pushSub('detail', { detailId: el.dataset.id, detailKind: el.dataset.kind || 'workout' }),
   'start-routine': el => startRoutine(el.dataset.id),
+  'repeat-workout': el => {
+    const w = state.history.find(x => x.id === el.dataset.id);
+    if (!w) return;
+    if (state.active || state.activeCardio) return go('workout');
+    store.startWorkout(repeatTemplate(w));
+    haptic('success');
+    go('workout');
+  },
   'start-empty': () => {
     if (state.activeCardio) return go('workout');
     if (!state.active) store.startWorkout({});
@@ -220,7 +231,21 @@ app.addEventListener('click', e => {
   const f = e.target.closest('[data-hfilter]');
   if (f) { setHistoryFilter(f.dataset.hfilter); haptic('tap'); renderScreen('history'); return; }
   if (e.target.closest('[data-review=ask]')) { go('coach'); askCoach(state.t('review.prompt')); }
+  const dl = e.target.closest('[data-deload]');
+  if (dl) {
+    haptic('tap');
+    const k = dl.dataset.deload, now = Date.now();
+    if (k === 'start') { store.setSettings({ deloadUntil: weekEnd(now), deloadSnoozed: 0 }); toast({ title: esc(state.t('deload.started')), sub: esc(state.t('deload.sub')) }); }
+    else if (k === 'later') store.setSettings({ deloadSnoozed: now + 14 * 86_400_000 });
+    else if (k === 'end') store.setSettings({ deloadUntil: 0, deloadSnoozed: now + 21 * 86_400_000 });
+  }
 });
+
+// A deload runs to the end of next Sunday if started late in the week, else to this Sunday.
+function weekEnd(now) {
+  const end = weekStart(now) + 7 * 86_400_000;
+  return end - now < 3 * 86_400_000 ? end + 7 * 86_400_000 : end;
+}
 
 app.addEventListener('click', e => {
   const el = e.target.closest('[data-act]');
@@ -251,6 +276,7 @@ function scheduleRestAlert() {
 
 store.subscribe(reason => {
   keepAwake(!!state.active || !!state.activeCardio);
+  syncGps();
   scheduleRestAlert();
   if (reason === 'draft') return syncNums($('#s-workout'));
   if (reason === 'chat' && view.screen !== 'coach') return;
@@ -336,6 +362,24 @@ async function boot() {
   startClock();
   initSW();
   ensureModels();
+  shortcut();
+}
+
+// Home-screen shortcuts (long-press the icon): ?go=next | cardio | talk
+function shortcut() {
+  const q = new URLSearchParams(location.search);
+  const to = q.get('go');
+  if (!to) return;
+  q.delete('go');
+  history.replaceState(history.state, '', location.pathname + (q.size ? `?${q}` : ''));
+  if (to === 'next') {
+    if (state.active || state.activeCardio) return go('workout');
+    const r = nextRoutine([...state.routines].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)), state.history);
+    if (r) startRoutine(r.id);
+  } else if (to === 'cardio') {
+    if (state.active || state.activeCardio) return go('workout');
+    pickTypeSheet({ onPick: startCardioSession });
+  } else if (to === 'talk') setTimeout(openVoice, 250);
 }
 
 boot();

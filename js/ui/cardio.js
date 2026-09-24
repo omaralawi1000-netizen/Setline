@@ -10,6 +10,7 @@ import { esc } from './dom.js';
 import { I } from './icons.js';
 import { toast } from './toast.js';
 import { openSheet, closeTop } from './sheet.js';
+import { GPS_TYPES, MAX_ACCURACY, newTrack, addFix, trackKm } from '../gps.js';
 
 let nav = { go: () => {}, showDetail: () => {} };
 export const setCardioNav = n => { nav = n; };
@@ -86,10 +87,84 @@ export function renderLiveCardio(root) {
       </div>
       <button class="cpause" data-cardio="pause" aria-label="${t(paused ? 'cardio.resume' : 'cardio.pause')}">${paused ? I.play : '<svg class="i" viewBox="0 0 24 24"><path d="M9 6v12M15 6v12"/></svg>'}<span>${t(paused ? 'cardio.resume' : 'cardio.pause')}</span></button>
     </div>
-    <p class="chint">${t('cardio.zoneHint')}</p>
+    ${gpsHTML(a)}
+    <p class="chint">${t(a.gps?.on ? 'cardio.gpsHint' : 'cardio.zoneHint')}</p>
     <div class="card solid cweek"><span class="label">${t('label.cardio')}</span>
       <div class="cbar"><i style="transform:scaleX(${Math.min(1, week.minutes / state.settings.cardioGoal)})"></i></div>
       <span class="cweek-t">${esc(t('cardio.minutesWeek', { min: week.minutes, goal: state.settings.cardioGoal }))}</span></div>`;
+}
+
+// ---------- GPS distance (outdoor types, opt-in, only while Setline is open) ----------
+
+const PIN = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg>';
+const gps = { id: null, acc: null };
+
+function gpsHTML(a) {
+  const { t } = state;
+  if (!GPS_TYPES.includes(a.type) || !('geolocation' in navigator)) return '';
+  if (!a.gps?.on) return `<button class="cgps solid" data-cardio="gps">${PIN}<span>${t('cardio.gps')}</span></button>`;
+  return `<div class="cgps solid on" id="cgps">
+      <span class="gdot${gpsLive(a) ? ' fix' : ''}" id="gdot"></span>
+      <div class="gnum"><b id="gkm">${esc(num(trackKm(a.gps), state.lang, 2))}</b><span>km</span></div>
+      <span class="gsub" id="gsub">${esc(gpsSub(a))}</span>
+      <button class="chip" data-cardio="gps-off">${t('cardio.gpsOff')}</button>
+    </div>`;
+}
+
+const gpsLive = a => a.gps?.fixes > 0 && gps.acc != null && gps.acc <= MAX_ACCURACY;
+function gpsSub(a) {
+  const { t, lang } = state;
+  if (a.pausedAt) return t('cardio.paused');
+  if (!a.gps.fixes) return t('cardio.gpsWait');
+  if (gps.acc != null && gps.acc > MAX_ACCURACY) return t('cardio.gpsWeak');
+  const km = trackKm(a.gps);
+  return km >= 0.05 ? paceText({ type: a.type, durationSec: cardioElapsed(a), distanceKm: km }, lang) || '' : t('cardio.gpsMoving');
+}
+
+function onFix(p) {
+  const a = state.activeCardio;
+  if (!a?.gps?.on) return;
+  gps.acc = p.coords.accuracy;
+  if (!a.pausedAt) {
+    const next = addFix(a.gps, { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, t: p.timestamp || Date.now() }, a.type);
+    if (next !== a.gps) store.setCardioGps({ ...next, on: true });
+  }
+  paintGps();
+}
+
+function onGpsError(e) {
+  const { t } = state;
+  if (e.code !== 1) { gps.acc = Infinity; return paintGps(); }
+  stopGps();
+  store.setCardioGps({ ...(state.activeCardio?.gps || newTrack()), on: false }, { quiet: false });
+  haptic('error');
+  toast({ title: esc(t('cardio.gpsDenied')), sub: esc(t('cardio.gpsDeniedSub')), error: true, ms: 6000 });
+}
+
+function stopGps() {
+  if (gps.id != null) navigator.geolocation.clearWatch(gps.id);
+  gps.id = null;
+  gps.acc = null;
+}
+
+// Keep the watcher in step with the live session: on while GPS is on, off otherwise.
+export function syncGps() {
+  const on = !!state.activeCardio?.gps?.on;
+  if (on && gps.id == null && 'geolocation' in navigator) {
+    gps.id = navigator.geolocation.watchPosition(onFix, onGpsError, { enableHighAccuracy: true, maximumAge: 0, timeout: 30_000 });
+  } else if (!on && gps.id != null) stopGps();
+}
+
+function paintGps() {
+  const a = state.activeCardio;
+  const root = document.getElementById('cgps');
+  if (!a?.gps?.on || !root) return;
+  const km = root.querySelector('#gkm'), sub = root.querySelector('#gsub');
+  const txt = num(trackKm(a.gps), state.lang, 2);
+  if (km.textContent !== txt) { km.textContent = txt; km.classList.remove('bump'); void km.offsetWidth; km.classList.add('bump'); }
+  const st = gpsSub(a);
+  if (sub.textContent !== st) sub.textContent = st;
+  root.querySelector('#gdot').classList.toggle('fix', gpsLive(a));
 }
 
 // Called by the app clock: the clock text and a ring that sweeps once a minute.
@@ -99,6 +174,7 @@ export function tickCardio(root) {
   const sec = cardioElapsed(a);
   const c = root.querySelector('#cclock');
   if (c) c.textContent = durTxt(sec);
+  if (a.gps?.on && sec % 5 === 0) paintGps();
   const arc = root.querySelector('#carc');
   if (arc && !a.pausedAt) arc.style.strokeDashoffset = C * (1 - (sec % 60 || (sec ? 60 : 0)) / 60);
 }
@@ -120,11 +196,12 @@ export function finishSheet() {
   const a = state.activeCardio;
   if (!a) return;
   const hasDistance = cardioType(a.type).metric != null;
+  const gpsKm = a.gps?.m >= 50 ? trackKm(a.gps) : null;
   let zone = null;
   openSheet((el, api) => {
     el.insertAdjacentHTML('beforeend', `<div class="sbody">
       <h2>${t('cardio.finishTitle')}</h2><p class="lead">${esc(cardioName(a.type, lang))} · ${durTxt(cardioElapsed(a))}</p>
-      ${hasDistance ? `<div class="field"><label for="ckm">${t('cardio.distanceOpt')}</label><input id="ckm" inputmode="decimal" placeholder="0,0" autocomplete="off"></div>` : ''}
+      ${hasDistance ? `<div class="field"><label for="ckm">${t(gpsKm ? 'cardio.distanceGps' : 'cardio.distanceOpt')}</label><input id="ckm" inputmode="decimal" placeholder="0,0" autocomplete="off" value="${gpsKm ? esc(num(gpsKm, lang, 2)) : ''}"></div>` : ''}
       <div class="field"><label>${t('cardio.effort')}</label>${zoneChips(null)}</div>
       <div class="err" id="cerr"></div>
       <div class="acts"><button class="log" data-k="save">${I.check}<span>${t('cardio.save')}</span></button>
@@ -224,7 +301,23 @@ export function renderCardioDetail(root, id) {
     </div>
     ${c.zone ? `<div class="card solid czone"><span class="zone z${c.zone} on"><b>${c.zone}</b></span><span><strong>${t('cardio.zone', { n: c.zone })} · ${t('cardio.zoneName.' + c.zone)}</strong></span></div>` : ''}
     ${c.records?.length ? `<div class="prs solid"><span class="tag">${t('history.newPrs')}</span><ul>${c.records.map(r => `<li><span><b>${t('cardio.record.' + r)}</b></span><span class="v">${esc(r === 'distance' ? kmTxt(c.distanceKm) : r === 'duration' ? durTxt(c.durationSec) : pace)}</span></li>`).join('')}</ul></div>` : ''}
+    <button class="log again" data-cardio="again" data-id="${esc(c.id)}">${I.plus}<span>${t('cardio.again')}</span></button>
     <div class="row2" style="grid-template-columns:1fr"><button class="btn2 solid danger" data-cardio="delete" data-id="${esc(c.id)}">${I.trash}<span>${t('cardio.delete')}</span></button></div>`;
+}
+
+// One tap: the same session again, ending now. Undo in the toast.
+export async function repeatCardio(id) {
+  const { t, lang } = state;
+  const c = state.cardio.find(x => x.id === id);
+  if (!c) return;
+  const session = makeCardioSession({ type: c.type, startedAt: Date.now() - c.durationSec * 1000, durationSec: c.durationSec, distanceKm: c.distanceKm, zone: c.zone });
+  const saved = await store.addCardio(session);
+  haptic('success');
+  toast({
+    title: `${esc(cardioName(c.type, lang))} <span class="v">${esc(c.distanceKm ? kmTxt(c.distanceKm) : durTxt(c.durationSec))}</span>`,
+    sub: saved.records?.length ? saved.records.map(r => t('cardio.record.' + r)).join(' · ') : t('cardio.savedAgain'),
+    action: t('common.undo'), onAction: () => store.deleteCardio(saved.id)
+  });
 }
 
 export function initCardio() {
@@ -237,6 +330,9 @@ export function initCardio() {
     else if (k === 'more') pickTypeSheet({ onPick: startCardioSession });
     else if (k === 'log') logSheet();
     else if (k === 'pause') { store.toggleCardioPause(); haptic('tap'); }
+    else if (k === 'gps') { store.setCardioGps({ ...newTrack(), ...(state.activeCardio?.gps || {}), last: null, on: true }, { quiet: false }); haptic('tap'); }
+    else if (k === 'gps-off') { store.setCardioGps({ ...state.activeCardio.gps, on: false }, { quiet: false }); haptic('tap'); }
+    else if (k === 'again') repeatCardio(b.dataset.id);
     else if (k === 'finish') finishSheet();
     else if (k === 'delete') {
       openSheet(el => {

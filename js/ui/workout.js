@@ -18,6 +18,7 @@ import { openPicker } from './picker.js';
 import { startCardsHTML, workoutTitle } from './today.js';
 import { renderLiveCardio } from './cardio.js';
 import { suggest } from '../progression.js';
+import { usualMinutes, timeStatus } from '../insights.js';
 
 const C = 157.08; // ring circumference, r=25
 const REST_LINGER = 4000; // keep the card up after rest ends
@@ -52,7 +53,7 @@ export function renderWorkout(root) {
 
   const header = `<header class="top">
       <button class="iconbtn" data-act="go" data-to="today" aria-label="${t('common.back')}">${I.back}</button>
-      <div class="ttl"><strong>${esc(workoutTitle(w))}</strong><span><span data-elapsed>${clock(W.elapsedSec(w))}</span>${w.easy ? ` · <em class="easy">${t('ready.easyBadge')}</em>` : ''}</span></div>
+      <div class="ttl"><strong>${esc(workoutTitle(w))}</strong><span><span data-elapsed>${clock(W.elapsedSec(w))}</span><span class="tgoal${goalOver(w, Date.now()) ? ' over' : ''}" data-tgoal>${goalText(w, Date.now())}</span>${w.deload ? ` · <em class="easy">${t('deload.badge')}</em>` : w.easy ? ` · <em class="easy">${t('ready.easyBadge')}</em>` : ''}</span></div>
       <button class="pillbtn" data-act="finish">${t('workout.finish')}</button>
     </header>`;
 
@@ -130,10 +131,38 @@ export function renderWorkout(root) {
   ui.seenDone = new Set(w.exercises.flatMap(e => e.sets.filter(x => x.done).map(x => x.id)));
 }
 
+// ---------- session length ----------
+
+function usualFor(w) {
+  if (ui.usual?.id !== w.id) {
+    const r = state.routines.find(x => x.id === w.routineId) || null;
+    ui.usual = { id: w.id, val: usualMinutes(state.history, w.routineId, r) };
+  }
+  return ui.usual.val;
+}
+
+function goalText(w, now) {
+  const st = timeStatus(W.elapsedSec(w, now), usualFor(w));
+  if (!st) return '';
+  return st.state === 'over' ? ` · ${esc(state.t('workout.over', { over: st.over }))}` : ` / ${esc(state.t('workout.usual', { min: st.usual }))}`;
+}
+
+const goalOver = (w, now) => timeStatus(W.elapsedSec(w, now), usualFor(w))?.state === 'over';
+
+// One gentle nudge per workout, 10 minutes past the usual length.
+function checkOvertime(w, now) {
+  const st = timeStatus(W.elapsedSec(w, now), usualFor(w));
+  if (!st || st.state !== 'over' || st.over < 10 || ui.overToast === w.id) return;
+  ui.overToast = w.id;
+  haptic('tap');
+  toast({ title: esc(state.t('toast.overTime', { over: st.over, usual: st.usual })), sub: esc(state.t('toast.overTimeSub')) });
+}
+
 // Why the planned weight is what it is: shown until the first set of the exercise is logged.
 function suggestionHTML(ex) {
   const { t } = state;
   if (ex.sets.some(s => s.done)) return '';
+  if (state.active?.deload) return `<p class="sug easy"><span class="sbadge">−15%</span><span>${esc(t('deload.sub'))}</span></p>`;
   let sg = ex.suggestion;
   if (!sg && state.settings.suggestions) {
     const e = state.catalog.get(ex.exerciseId);
@@ -206,6 +235,7 @@ function restNext(w) {
   const { t } = state;
   const ex = w.exercises[w.current];
   if (!ex) return '';
+  if (!ex.sets.some(s => s.done) && Number.isInteger(w.advancedFrom)) return t('workout.nextUp', { name: exName(ex.exerciseId) });
   const nextEx = w.exercises[w.current + 1];
   if (W.firstPlannedIndex(ex) === -1 && ex.sets.length && nextEx) return t('workout.nextUp', { name: exName(nextEx.exerciseId) });
   return t('workout.setNext', { n: W.nextSetNumber(ex) });
@@ -232,7 +262,14 @@ function restHTML(w, now) {
 // Called by the app clock. Updates the ring in place; swaps the card when its state changes.
 export function tickWorkout(root, now) {
   const w = state.active;
-  if (!w || !w.exercises.length) return;
+  if (!w) return;
+  const tg = root.querySelector('[data-tgoal]');
+  if (tg) {
+    const txt = goalText(w, now);
+    if (tg.innerHTML !== txt) { tg.innerHTML = txt; tg.classList.toggle('over', goalOver(w, now)); }
+    checkOvertime(w, now);
+  }
+  if (!w.exercises.length) return;
   const st = restState(w, now);
   const slot = root.querySelector('#restslot');
   if (!slot) return;
@@ -368,7 +405,7 @@ function doLog(kg, reps) {
   const n = W.nextSetNumber(ex);
   let set;
   try {
-    update(cur => { const r = W.logSet(cur, idx, { kg, reps }, Date.now(), state.settings.restSec); set = r.set; return r.workout; }, { undo: 'log', reason: 'log' });
+    update(cur => { const r = W.logSet(cur, idx, { kg, reps }, Date.now(), W.restFor(cur.exercises[idx], state.settings.restByEx, state.settings.restSec)); set = r.set; return state.settings.autoAdvance ? W.advanceAfterLog(cur, r.workout, idx) : r.workout; }, { undo: 'log', reason: 'log' });
   } catch (e) {
     haptic('error');
     return toast({ title: esc(t('toast.limit')), error: true });
@@ -385,7 +422,7 @@ function doLog(kg, reps) {
   });
   toast({
     title: `${pr ? `<span class="tag sm">${t('workout.pr')}</span> ` : ''}${esc(exName(ex.exerciseId))} <span class="v">${esc(setText(kg, reps))}</span>`,
-    sub: t('toast.logged', { n }),
+    sub: state.active.current !== idx ? `${t('toast.logged', { n })} · ${t('workout.nextUp', { name: exName(state.active.exercises[state.active.current].exerciseId) })}` : t('toast.logged', { n }),
     action: t('common.undo'),
     onAction: () => { undo(); haptic('tap'); }
   });

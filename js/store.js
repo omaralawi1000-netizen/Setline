@@ -4,12 +4,13 @@ import { createCatalog } from './catalog.js';
 import { starterRoutines } from './routines.js';
 import { loadSettings, saveSettings, sanitize, SETTINGS_KEY } from './settings.js';
 import { resolveLang, translator } from './i18n.js';
-import { createWorkout, finishWorkout, doneSetCount } from './workout.js';
+import { createWorkout, finishWorkout, doneSetCount, learnedRest } from './workout.js';
 import { applyWorkout } from './pr.js';
 import { clearKeys } from './keys.js';
 import { startCardio, pauseCardio, resumeCardio, finishCardio, cardioRecords } from './cardio.js';
 import { upsertBodyweight, addProtein, dateKey } from './body.js';
 import { easyDay } from './progression.js';
+import { deloadDay } from './insights.js';
 
 const listeners = new Set();
 const UNDO_MAX = 20;
@@ -90,9 +91,11 @@ export const flush = () => writing;
 
 export function startWorkout(template, { readiness = null, easy = false } = {}) {
   if (state.active) return state.active;
-  state.active = createWorkout(easy ? easyDay(template) : template);
+  const deload = !!template.deload || !!(state.settings.deloadUntil && Date.now() < state.settings.deloadUntil && template.exercises?.length);
+  state.active = createWorkout(template.deload ? template : deload ? deloadDay(template) : easy ? easyDay(template) : template);
   if (readiness) state.active.readiness = readiness;
-  if (easy) state.active.easy = true;
+  if (deload) state.active.deload = true;
+  else if (easy) state.active.easy = true;
   state.undo = [];
   persistActive();
   emit('start');
@@ -141,6 +144,11 @@ export async function finish() {
   state.undo = [];
   state.prs = records;
   state.history = [done, ...state.history].sort((a, b) => b.startedAt - a.startedAt);
+  const learned = learnedRest(w);
+  if (Object.keys(learned).length) {
+    state.settings = sanitize({ ...state.settings, restByEx: { ...state.settings.restByEx, ...learned } });
+    saveSettings(state.settings);
+  }
   computeUsage();
   emit('finish');
   return done;
@@ -168,8 +176,17 @@ export function toggleCardioPause() {
   const a = state.activeCardio;
   if (!a) return;
   state.activeCardio = a.pausedAt ? resumeCardio(a) : pauseCardio(a);
+  if (state.activeCardio.gps) state.activeCardio = { ...state.activeCardio, gps: { ...state.activeCardio.gps, last: null } };
   saveActiveCardio();
   emit('cardio');
+}
+// GPS track of the live session: {on, m, last, fixes}. Quiet: the live screen updates itself.
+let gpsSaved = 0;
+export function setCardioGps(gps, { quiet = true } = {}) {
+  if (!state.activeCardio) return;
+  state.activeCardio = { ...state.activeCardio, gps };
+  if (!quiet || Date.now() - gpsSaved > 10_000) { gpsSaved = Date.now(); saveActiveCardio(); }
+  if (!quiet) emit('cardio');
 }
 export async function endCardio(details) {
   const a = state.activeCardio;

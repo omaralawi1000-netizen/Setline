@@ -11,6 +11,7 @@ import { thisWeek, lastSessionSummary, latestPR, sparkline, weekStreak, weekRevi
 import { cardioMinutes, cardioName, cardioElapsed, paceText } from '../cardio.js';
 import { bodyTrend, proteinTarget, dateKey } from '../body.js';
 import { cardioIcon, favouriteTypes } from './cardio.js';
+import { muscleBalance, deloadStatus } from '../insights.js';
 
 const MIC = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.6 11.5a6.4 6.4 0 0 0 12.8 0M12 18v3"/></svg>';
 const C = 157.08; // ring r=25
@@ -70,7 +71,17 @@ function cardioRowHTML() {
   const { t, lang } = state;
   return `<div class="section"><span class="label">${t('label.cardio')}</span><button class="textbtn" data-cardio="log">${t('cardio.logPast')}</button></div>
     <div class="crow">${favouriteTypes(4).map(id => `<button class="cstart solid" data-cardio="start" data-type="${id}">${cardioIcon(id)}<span>${esc(cardioName(id, lang))}</span></button>`).join('')}
-      <button class="cstart solid more" data-cardio="more"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="18" cy="12" r="1.2"/></svg><span>${t('cardio.more')}</span></button></div>`;
+      <button class="cstart solid more" data-cardio="more"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="18" cy="12" r="1.2"/></svg><span>${t('cardio.more')}</span></button></div>
+    ${againChip()}`;
+}
+
+// One tap repeats the last cardio session (not when it was already today).
+function againChip() {
+  const { t, lang } = state;
+  const c = state.cardio[0];
+  if (!c || dateKey(c.startedAt) === dateKey()) return '';
+  const what = c.distanceKm ? `${num(c.distanceKm, lang, c.distanceKm % 1 ? 1 : 0)} km` : t('min', { n: Math.round(c.durationSec / 60) });
+  return `<button class="againchip" data-cardio="again" data-id="${esc(c.id)}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.6L4 15.5M4 20v-4.5h4.5"/></svg><span>${esc(t('cardio.sameAgain', { name: cardioName(c.type, lang), what }))}</span></button>`;
 }
 
 function routinesHTML() {
@@ -132,6 +143,32 @@ function weekCardsHTML() {
   return html;
 }
 
+// Sets per muscle group this week against a rough target. Bars grow in; the group most behind is named.
+export function balanceHTML({ always = false } = {}) {
+  const { t } = state;
+  const recent = state.history.some(w => w.startedAt > Date.now() - 28 * DAY);
+  if (!recent && !always) return '';
+  const b = muscleBalance(state.history, state.catalog);
+  const note = b.behind ? t('balance.behind', { group: t('group.' + b.behind.group), n: b.behind.sets, target: b.behind.target })
+    : b.total ? t('balance.ok') : t('balance.none');
+  return `<div class="mbal solid"><div class="rhead"><span class="label">${t('balance.title')}</span><span class="mnote${b.behind ? ' warn' : ''}">${esc(note)}</span></div>
+    <div class="mrows">${b.rows.map((r, i) => `<div class="mrow${b.behind?.group === r.group ? ' behind' : ''}${r.pct >= 1 ? ' full' : ''}" style="--i:${i}"><span>${esc(t('group.' + r.group))}</span><i><b style="transform:scaleX(${r.pct.toFixed(3)})"></b></i><em>${num(r.sets, state.lang, r.sets % 1 ? 1 : 0)}<small>/${r.target}</small></em></div>`).join('')}</div>
+  </div>`;
+}
+
+// Deload: offered after 6 steady weeks, shown while running.
+function deloadHTML() {
+  const { t, lang } = state;
+  const d = deloadStatus(state.history, state.settings);
+  if (!d) return '';
+  if (d.state === 'active') {
+    const until = new Intl.DateTimeFormat(lang === 'da' ? 'da-DK' : 'en-GB', { weekday: 'long' }).format(d.until - 1);
+    return `<div class="dlcard solid on"><span class="dicon">${I.flame}</span><div class="l"><strong>${t('deload.activeTitle')}</strong><span>${esc(t('deload.activeSub', { day: until }))}</span></div><button class="textbtn" data-deload="end">${t('deload.end')}</button></div>`;
+  }
+  return `<div class="dlcard glass"><div class="l"><span class="label">${t('deload.label')}</span><strong>${esc(t('deload.dueTitle', { n: d.weeks }))}</strong><span>${t('deload.dueSub')}</span></div>
+    <div class="row2"><button class="log" data-deload="start"><span>${t('deload.start')}</span></button><button class="btn2 solid" data-deload="later">${t('deload.later')}</button></div></div>`;
+}
+
 function bodyHTML() {
   const { t, lang, settings } = state;
   const unit = settings.unit, u = t(`unit.${unit}`);
@@ -190,10 +227,12 @@ export function renderToday(root) {
     </header>
     <h1 class="greet">${t(greetingKey(hour)).split(' ').map((w, i) => `<span class="gw" style="--i:${i}">${esc(w)}</span>`).join(' ')}</h1>
     <p class="sub${!busy && weekStreak(state.history, state.cardio, state.settings.weeklyGoal).streak ? ' streak' : ''}">${esc(subline())}</p>
+    ${busy ? '' : deloadHTML()}
     ${busy ? resumeHTML() : upNextHTML()}
     ${busy ? '' : cardioRowHTML()}
     <div class="section"><span class="label">${t('today.thisWeek')}</span><button class="textbtn" data-progress>${t('progress.link')} →</button></div>
     ${weekCardsHTML()}
+    ${balanceHTML()}
     ${bodyHTML()}
     ${reviewHTML()}
     ${busy ? '' : routinesHTML()}`;

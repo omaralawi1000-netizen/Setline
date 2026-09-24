@@ -48,6 +48,13 @@ export function resolve(intent, snap, t, lang) {
     return cmd('ask', { title: t('voice.noWorkout'), sub: t('voice.noWorkoutSub'), choices, say: say(t('voice.noWorkout')) });
   };
   const cur = () => (w && w.exercises[w.current]) || null;
+  // "same again", "correct that", "delete that" right after an auto-advance mean the exercise just finished
+  const tIdx = () => {
+    if (!w) return -1;
+    const c = w.exercises[w.current], a = w.advancedFrom;
+    return c && !c.sets.some(s => s.done) && Number.isInteger(a) && w.exercises[a]?.sets.some(s => s.done) ? a : w.current;
+  };
+  const tgt = () => (w && w.exercises[tIdx()]) || null;
   const lastDone = ex => { const i = ex ? W.lastDoneIndex(ex) : -1; return i === -1 ? null : { i, set: ex.sets[i] }; };
 
   // one or more sets on an exercise (adds the exercise if it isn't in the workout)
@@ -63,14 +70,15 @@ export function resolve(intent, snap, t, lang) {
     const fn = (cw, now) => {
       let x = cw, i = exerciseId ? cw.exercises.findIndex(e => e.exerciseId === exerciseId) : cw.current;
       if (i === -1) { x = W.addExercise(x, exId); i = x.exercises.length - 1; }
-      for (let k = 0; k < count; k++) x = W.logSet(x, i, { kg, reps }, now, settings.restSec).workout;
-      return x;
+      const b = x;
+      for (let k = 0; k < count; k++) x = W.logSet(x, i, { kg, reps }, now, W.restFor(x.exercises[i], settings.restByEx, settings.restSec)).workout;
+      return settings.autoAdvance ? W.advanceAfterLog(b, x, i) : x;
     };
     const value = count > 1 ? `${count} × ${setTxt(kg, reps)}` : setTxt(kg, reps);
     const sub = subText ?? (count > 1 ? t('voice.heardSets', { text: heard, from: n, to: n + count - 1 }) : t('voice.heardSet', { text: heard, n }));
     const spoken = count > 1
       ? t('say.logMany', { count, reps, kg: kgTxt(kg), unit: sayUnit })
-      : say(t('say.log.minimal', { kg: kgTxt(kg), reps }), t('say.log.full', { name: sayName(exId), kg: kgTxt(kg), unit: sayUnit, reps, n, rest: restWords(settings.restSec) }));
+      : say(t('say.log.minimal', { kg: kgTxt(kg), reps }), t('say.log.full', { name: sayName(exId), kg: kgTxt(kg), unit: sayUnit, reps, n, rest: restWords(W.restFor(idx >= 0 ? w.exercises[idx] : { exerciseId: exId }, settings.restByEx, settings.restSec)) }));
     return cmd(check.confirm.length ? 'confirm' : 'auto', {
       title: name(exId), value, sub: check.confirm.length ? t('voice.checkNumbers') : sub,
       say: settings.spoken === 'off' ? '' : spoken, run: { op: 'update', fn, nav: 'workout' }
@@ -91,8 +99,9 @@ export function resolve(intent, snap, t, lang) {
     const fn = (cw, now) => {
       let x = cw, i = exerciseId ? cw.exercises.findIndex(e => e.exerciseId === exerciseId) : cw.current;
       if (i === -1) { x = W.addExercise(x, exId); i = x.exercises.length - 1; }
-      for (const s of sets) x = W.logSet(x, i, s, now, settings.restSec).workout;
-      return x;
+      const b = x;
+      for (const s of sets) x = W.logSet(x, i, s, now, W.restFor(x.exercises[i], settings.restByEx, settings.restSec)).workout;
+      return settings.autoAdvance ? W.advanceAfterLog(b, x, i) : x;
     };
     const same = sets.every(s => s.kg === sets[0].kg);
     const value = same ? `${kgTxt(sets[0].kg)} ${u} × ${sets.map(s => s.reps).join(', ')}` : sets.map(s => setTxt(s.kg, s.reps)).join(', ');
@@ -105,13 +114,13 @@ export function resolve(intent, snap, t, lang) {
 
   // change the last done set of the current exercise
   const editCommand = (kg, reps) => {
-    const ex = cur();
+    const ex = tgt(), ti = tIdx();
     const last = lastDone(ex);
     if (!last) return err('voice.noSetYet');
     const check = W.validateSet(kg, reps);
     if (!check.ok) return err('voice.didntCatch', null, { title: t(check.error === 'kg' ? 'invalid.kg' : 'invalid.reps', { max: kgTxt(W.LIMITS.kgMax), unit: u }) });
     const setId = last.set.id;
-    const fn = cw => W.editSet(cw, cw.current, setId, { kg, reps });
+    const fn = cw => W.editSet(cw, ti, setId, { kg, reps });
     return cmd(check.confirm.length ? 'confirm' : 'auto', {
       title: name(ex.exerciseId), value: setTxt(kg, reps),
       sub: t('voice.was', { n: last.i + 1, old: setTxt(last.set.kg, last.set.reps) }),
@@ -133,14 +142,14 @@ export function resolve(intent, snap, t, lang) {
     }
     case 'RepeatLast': {
       const need = needWorkout(); if (need) return need;
-      const ex = cur();
+      const ex = tgt();
       const last = lastDone(ex);
       if (!last) return err('voice.nothingRepeat');
-      return logCommand(last.set.kg, last.set.reps, intent.count || 1, null);
+      return logCommand(last.set.kg, last.set.reps, intent.count || 1, tIdx() !== w.current ? ex.exerciseId : null);
     }
     case 'AdjustLast': {
       const need = needWorkout(); if (need) return need;
-      const last = lastDone(cur());
+      const last = lastDone(tgt());
       if (!last) return err('voice.noSetYet');
       const kg = Math.max(0, Math.round((last.set.kg + (intent.kgDelta || 0)) * 1000) / 1000);
       const reps = last.set.reps + (intent.repsDelta || 0);
@@ -148,19 +157,19 @@ export function resolve(intent, snap, t, lang) {
     }
     case 'EditLast': {
       const need = needWorkout(); if (need) return need;
-      const last = lastDone(cur());
+      const last = lastDone(tgt());
       if (!last) return err('voice.noSetYet');
       return editCommand(intent.kg ?? last.set.kg, intent.reps ?? last.set.reps);
     }
     case 'DeleteLast': {
       const need = needWorkout(); if (need) return need;
-      const ex = cur();
+      const ex = tgt(), ti = tIdx();
       const last = lastDone(ex);
       if (!last) return err('voice.noSetYet');
       const setId = last.set.id;
       return cmd('confirm', {
         title: t('voice.deleteLast'), value: null, sub: `${name(ex.exerciseId)}, ${t('workout.editSet', { n: last.i + 1 })}: ${setTxt(last.set.kg, last.set.reps)}`,
-        say: say(t('voice.deleteLast')), run: { op: 'update', fn: cw => W.deleteSet(cw, cw.current, setId), nav: 'workout', done: t('say.deleted') }
+        say: say(t('voice.deleteLast')), run: { op: 'update', fn: cw => W.deleteSet(cw, ti, setId), nav: 'workout', done: t('say.deleted') }
       });
     }
     case 'Undo':
