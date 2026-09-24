@@ -1095,3 +1095,68 @@ p.ckwarn{margin:6px 0 0}
 .ckadd .chip[aria-expanded=true]{border-color:rgba(198,187,250,.5)}
 .ckextra{animation:rise .35s var(--ease)}
 .ckextra .chip.done{background:rgba(198,187,250,.18);color:var(--ink)}
+
+/* ---------- 1.8: barcode scanner ---------- */
+.mealwrap{margin-top:12px;display:flex;gap:8px}
+.mealwrap .mealrow{margin-top:0;flex:1;min-width:0}
+.mscanbtn{width:64px;flex:none;border-radius:22px;display:grid;place-items:center;color:var(--accent)}
+.mscanbtn .i{width:26px;height:26px}
+.mscan{margin-top:16px;width:100%;display:flex;align-items:center;gap:14px;padding:16px;border-radius:24px;text-align:left}
+.mscan > .i:first-child{width:30px;height:30px;color:var(--accent);flex:none}
+.mscan span{flex:1;display:grid;gap:2px}
+.mscan strong{font-size:16px;font-weight:800}
+.mscan small{font-size:13px;color:var(--muted);font-weight:600}
+.mscan > .i:last-child{color:var(--dim)}
+.sheet.scansheet{top:0;max-height:none;height:100%;border-radius:0;padding:0;background:#05060A;border:0}
+.sheet.scansheet .grab{position:absolute;z-index:3;left:0;right:0;top:calc(var(--safe-top) + 6px)}
+.sheet.scansheet .sin{height:100%;display:flex;flex-direction:column}
+.scanview{position:relative;flex:1;overflow:hidden;background:#000}
+.scanview video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:fadein .5s}
+.scanwin{position:absolute;left:50%;top:42%;width:min(78vw,320px);height:170px;margin:-85px 0 0 calc(min(78vw,320px) / -2);border-radius:26px;box-shadow:0 0 0 100vmax rgba(5,6,10,.58);translate:var(--tx,0) var(--ty,0);scale:var(--sx,1) var(--sy,1);transition:translate .42s cubic-bezier(.34,1.3,.5,1),scale .42s cubic-bezier(.34,1.3,.5,1),box-shadow .4s}
+.scanwin .c{position:absolute;width:34px;height:34px;border:3.5px solid #fff;border-radius:4px;filter:drop-shadow(0 0 6px rgba(198,187,250,.8));transition:border-color .3s;animation:corner 1.6s ease-in-out infinite}
+.scanwin .tl{left:-2px;top:-2px;border-right:0;border-bottom:0;border-top-left-radius:24px}
+.scanwin .tr{right:-2px;top:-2px;border-left:0;border-bottom:0;border-top-right-radius:24px;animation-delay:.1s}
+.scanwin .bl{left:-2px;bottom:-2px;border-right:0;border-top:0;border-bottom-left-radius:24px;animation-delay:.2s}
+.scanwin .br{right:-2px;bottom:-2px;border-left:0;border-top:0;border-bottom-right-radius:24px;animation-delay:.3s}
+@keyframes corner{50%{scale:1.08}}
+.scanwin .laser{position:absolute;left:14px;right:14px;top:50%;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,#E4DEFF 20%,#fff 50%,#E4DEFF 80%,transparent);box-shadow:0 0 16px 3px rgba(198,187,250,.75);animation:laser 1.8s cubic-bezier(.45,0,.55,1) infinite alternate}
+@keyframes laser{from{translate:0 -62px}to{translate:0 62px}}
+.scanwin.locked{box-shadow:0 0 0 100vmax rgba(5,6,10,.75)}
+.scanwin.locked .c{border-color:#6FE3A5;animation:none;filter:drop-shadow(0 0 10px rgba(111,227,165,.9))}
+.scanwin.locked .laser{opacity:0;transition:opacity .15s}
+.scanwin.locked::after{content:"";position:absolute;inset:0;border-radius:inherit;background:rgba(111,227,165,.25);animation:lockflash .5s ease-out forwards}
+@keyframes lockflash{from{opacity:1}to{opacity:0}}
+.scantop{position:absolute;left:16px;right:16px;top:calc(var(--safe-top) + 30px);display:flex;align-items:center;justify-content:center;gap:10px;z-index:2}
+.scanhint{height:36px;line-height:36px;padding:0 16px;border-radius:999px;background:rgba(20,22,30,.45);-webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%);border:1px solid rgba(255,255,255,.14);font-size:14px;font-weight:800}
+.glassbtn{position:absolute;right:0;background:rgba(20,22,30,.45);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border-color:rgba(255,255,255,.14)}
+.glassbtn.is-on{background:rgba(255,236,170,.9);color:#2A2106}
+.scanbar{position:absolute;left:16px;right:16px;bottom:calc(var(--safe-bottom) + 24px);display:flex;gap:10px;justify-content:center;z-index:2}
+.glasspill{height:48px;padding:0 18px;border-radius:999px;display:inline-flex;align-items:center;gap:8px;background:rgba(20,22,30,.5);-webkit-backdrop-filter:blur(20px) saturate(160%);backdrop-filter:blur(20px) saturate(160%);border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.18);font-weight:800;font-size:14px;color:var(--ink)}
+.glasspill .i{width:19px;height:19px}
+.pwrap{flex:1;display:flex;flex-direction:column;justify-content:flex-end;padding:calc(var(--safe-top) + 40px) 14px calc(var(--safe-bottom) + 16px);background:radial-gradient(120% 70% at 50% 0%,rgba(122,103,242,.28),transparent 60%),#07080D;overflow-y:auto}
+.pcard{padding:18px;border-radius:30px;display:grid;gap:14px}
+.pcard.in{animation:cardup .6s cubic-bezier(.2,1.2,.3,1)}
+@keyframes cardup{from{opacity:0;transform:translateY(40px) scale(.97);filter:blur(8px)}}
+.pcard h2{margin:0}
+.phead{display:flex;align-items:center;gap:14px}
+.phead img,.picon{width:64px;height:64px;flex:none;border-radius:18px;object-fit:contain;background:#fff;box-shadow:0 10px 24px -10px rgba(0,0,0,.8)}
+.picon{display:grid;place-items:center;background:rgba(255,255,255,.06);color:var(--accent)}
+.phead div{display:grid;gap:3px;min-width:0}
+.phead strong{font-size:19px;line-height:1.2;letter-spacing:-.01em}
+.phead span{font-size:12.5px;color:var(--muted);font-weight:650}
+.pcard .mnums{margin-top:0}
+.mnum b.tick{animation:tickUp .3s var(--ease)}
+.amounts{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.amounts .chip[aria-pressed=true]{background:rgba(198,187,250,.2);border-color:rgba(198,187,250,.5);color:var(--ink)}
+.gram{display:inline-flex;align-items:center;gap:4px;height:34px;padding:0 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid var(--line)}
+.gram input{width:52px;background:none;border:0;outline:none;color:var(--ink);font-weight:800;font-size:14px}
+.gram span{font-size:12px;color:var(--dim);font-weight:800}
+.pcard .log{margin-top:0}
+.pcard .linkbtn{justify-self:center}
+.pcard.loading{min-height:230px;align-content:start}
+.sk{border-radius:14px;background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.12),rgba(255,255,255,.05));background-size:200% 100%;animation:shimmer 1.2s linear infinite}
+.sk.a{height:64px;width:64px;border-radius:18px}.sk.b{height:22px;width:70%}.sk.c{height:72px}
+@keyframes shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+.scode{font-size:13px;color:var(--dim);font-weight:700;letter-spacing:.08em;text-align:center}
+.mnum span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gram input:placeholder-shown + span{display:none}

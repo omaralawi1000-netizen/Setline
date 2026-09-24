@@ -43,9 +43,21 @@
       ]
     },
     {
-      "name": "Start cardio",
-      "short_name": "Cardio",
-      "url": "./?go=cardio",
+      "name": "Scan food",
+      "short_name": "Scan",
+      "url": "./?go=scan",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Log a meal",
+      "short_name": "Meal",
+      "url": "./?go=meal",
       "icons": [
         {
           "src": "icons/icon-192.png",

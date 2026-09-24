@@ -11,6 +11,7 @@ import { esc } from './dom.js';
 import { I } from './icons.js';
 import { toast } from './toast.js';
 import { openSheet, closeTop } from './sheet.js';
+import { openScanner, scanIcon } from './scan.js';
 
 const PORTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const FRAC = { 0.5: '½', 0.75: '¾', 1: '1', 1.25: '1¼', 1.5: '1½', 2: '2' };
@@ -58,6 +59,7 @@ export function openMealSheet({ text = '' } = {}) {
     const chooser = () => {
       box.innerHTML = `<div class="sbody meal">
         <h2>${t('meal.title')}</h2><p class="lead">${t('meal.sub')}</p>
+        <button class="mscan glass" data-m="scan">${scanIcon}<span><strong>${t('scan.title')}</strong><small>${t('scan.sub')}</small></span>${I.fwd}</button>
         <div class="mpick">
           <label class="mbig glass">${I.camera}<span>${t('meal.photo')}</span><input type="file" accept="image/*" capture="environment" hidden data-m="file"></label>
           <label class="mbig solid">${I.image}<span>${t('meal.gallery')}</span><input type="file" accept="image/*" hidden data-m="file"></label>
@@ -142,6 +144,7 @@ export function openMealSheet({ text = '' } = {}) {
       const del = e.target.closest('[data-meal-del]');
       if (del) { await store.deleteMeal(del.dataset.mealDel); haptic('tap'); return chooser(); }
       const k = e.target.closest('[data-m]')?.dataset.m;
+      if (k === 'scan') { await closeTop(); return openScanner(); }
       if (k === 'cancel') { s.ctl?.abort(); s.ctl = null; return chooser(); }
       if (k === 'again') { s.image = null; s.text = ''; s.draft = null; return chooser(); }
       if (k === 'retry') return estimate();

@@ -10,6 +10,7 @@ import { I } from './icons.js';
 import { toast } from './toast.js';
 import { openSheet, closeTop } from './sheet.js';
 import { openMealSheet } from './meal.js';
+import { openScanner } from './scan.js';
 
 function weightSheet() {
   const { t, lang, settings } = state;
@@ -54,5 +55,6 @@ export function initBody() {
     if (b.dataset.body === 'weight') weightSheet();
     else if (b.dataset.body === 'protein') addProteinQuick(Number(b.dataset.g));
     else if (b.dataset.body === 'meal') openMealSheet();
+    else if (b.dataset.body === 'scan') openScanner();
   });
 }

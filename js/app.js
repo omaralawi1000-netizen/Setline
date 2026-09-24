@@ -26,6 +26,8 @@ import { autoBackup } from './ui/drive.js';
 import { initHandsFree } from './ui/handsfree.js';
 import { onCheckinClick } from './ui/checkin.js';
 import { renderBody, initBodyScreen } from './ui/bodyscreen.js';
+import { openScanner } from './ui/scan.js';
+import { openMealSheet } from './ui/meal.js';
 import { cardioElapsed, cardioName } from './cardio.js';
 import { weekStart } from './stats.js';
 import { nextRoutine } from './routines.js';
@@ -394,6 +396,8 @@ function shortcut() {
     if (state.active || state.activeCardio) return go('workout');
     pickTypeSheet({ onPick: startCardioSession });
   } else if (to === 'talk') setTimeout(openVoice, 250);
+  else if (to === 'scan') setTimeout(openScanner, 250);
+  else if (to === 'meal') setTimeout(() => openMealSheet(), 250);
 }
 
 boot();
