@@ -36,7 +36,11 @@ export const DEFAULTS = Object.freeze({
   suggestions: true,
   restAlerts: false,
   restByEx: {},        // exerciseId → seconds, learned when rest is adjusted
+  monthSeen: '',       // the latest monthly photo pair you've opened (its after-photo id)
+  photoNudge: '',      // the month (YYYY-MM) the photo-day reminder was shown
+  plateauSnooze: {},   // exerciseId → until when a stall isn't brought up again
   autoAdvance: true,   // move to the next exercise when its planned sets are done
+  autoWarmup: true,    // put warm-up sets in front of the first lift for each muscle
   deloadUntil: 0,      // timestamp: deload week running until then
   deloadSnoozed: 0,    // timestamp: don't suggest a deload before then
   favMeals: [],        // starred meal names
@@ -61,11 +65,16 @@ export const DEFAULTS = Object.freeze({
 export const ACCENTS = ['violet', 'ocean', 'jade', 'ember', 'rose'];
 export const FOOD_PARTS = ['calories', 'carbs', 'fat', 'water', 'favourites', 'quickProtein', 'week'];
 export const FOOD_ORDER = ['favourites', 'quickProtein', 'water', 'meals', 'week'];
-export const TODAY_ORDER = ['checkin', 'upnext', 'goals', 'cardio', 'week', 'balance', 'body', 'review', 'routines'];
-const order = (list, all) => { const seen = [...new Set((Array.isArray(list) ? list : []).filter(x => all.includes(x)))]; return [...seen, ...all.filter(x => !seen.includes(x))]; };
+export const TODAY_ORDER = ['checkin', 'upnext', 'plateau', 'goals', 'cardio', 'week', 'balance', 'body', 'review', 'routines'];
+const order = (list, all) => {
+  const out = [...new Set((Array.isArray(list) ? list : []).filter(x => all.includes(x)))];
+  if (!out.length) return [...all];
+  all.forEach((x, i) => { if (!out.includes(x)) { const prev = all.slice(0, i).reverse().find(p => out.includes(p)); out.splice(prev ? out.indexOf(prev) + 1 : 0, 0, x); } }); // a new card lands by its neighbour
+  return out;
+};
 export const foodOrderOf = s => order(s.foodOrder, FOOD_ORDER);
 export const todayOrderOf = s => order(s.todayOrder, TODAY_ORDER);
-export const TODAY_PARTS = ['checkin', 'goals', 'cardio', 'week', 'balance', 'body', 'review', 'routines'];
+export const TODAY_PARTS = ['checkin', 'plateau', 'goals', 'cardio', 'week', 'balance', 'body', 'review', 'routines'];
 
 // Gemini prebuilt voices and how they sound.
 export const VOICES = ['Achird', 'Sulafat', 'Callirrhoe', 'Puck', 'Aoede', 'Despina', 'Zubenelgenubi', 'Leda', 'Kore', 'Charon'];
@@ -88,6 +97,7 @@ export function sanitize(input) {
   if (typeof input.suggestions === 'boolean') s.suggestions = input.suggestions;
   if (typeof input.restAlerts === 'boolean') s.restAlerts = input.restAlerts;
   if (typeof input.autoAdvance === 'boolean') s.autoAdvance = input.autoAdvance;
+  if (typeof input.autoWarmup === 'boolean') s.autoWarmup = input.autoWarmup;
   if (input.profile) s.profile = sanitizeProfile(input.profile);
   if (Array.isArray(input.goals)) s.goals = sanitizeGoals(input.goals);
   if (Number.isFinite(input.profileAsked)) s.profileAsked = input.profileAsked;
@@ -105,6 +115,12 @@ export function sanitize(input) {
   if (Array.isArray(input.todayHide)) s.todayHide = [...new Set(input.todayHide.filter(x => TODAY_PARTS.includes(x)))];
   if (Array.isArray(input.favMeals)) s.favMeals = input.favMeals.filter(x => typeof x === 'string' && x.length <= 60).slice(0, 30);
   for (const k of ['deloadUntil', 'deloadSnoozed']) if (Number.isFinite(input[k]) && input[k] >= 0) s[k] = input[k];
+  if (typeof input.monthSeen === 'string' && input.monthSeen.length <= 80) s.monthSeen = input.monthSeen;
+  if (typeof input.photoNudge === 'string' && /^(\d{4}-\d{2})?$/.test(input.photoNudge)) s.photoNudge = input.photoNudge;
+  if (input.plateauSnooze && typeof input.plateauSnooze === 'object') {
+    s.plateauSnooze = {};
+    for (const [k, v] of Object.entries(input.plateauSnooze).slice(-100)) if (typeof k === 'string' && k.length <= 80 && Number.isFinite(v) && v > 0) s.plateauSnooze[k] = v;
+  }
   if (input.restByEx && typeof input.restByEx === 'object') {
     s.restByEx = {};
     for (const [k, v] of Object.entries(input.restByEx).slice(-200)) {

@@ -3,7 +3,9 @@
 import * as store from '../store.js';
 import { state } from '../store.js';
 import { bodyTrend, dateKey } from '../body.js';
-import { SITES, POSES, measureSummary, photoDays, comparePair, validCm } from '../measures.js';
+import { SITES, POSES, measureSummary, photoDays, comparePair, validCm, monthlyPair, changeBetween } from '../measures.js';
+import { getKey } from '../keys.js';
+import { toDisplay } from '../units.js';
 import { parseNumber } from '../units.js';
 import { weight, day } from '../format.js';
 import { haptic } from '../haptics.js';
@@ -18,6 +20,31 @@ const urls = new Map(); // photo id → object URL for the full image
 
 const cm = (v, lang) => new Intl.NumberFormat(lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: 1 }).format(v);
 const u = () => state.t(`unit.${state.settings.unit}`);
+
+// This month, side by side: the latest photo and the one from about a month before, with what the
+// scale and the tape say changed in between. Numbers only go to the Coach; photos stay here.
+export function monthly() {
+  const pair = monthlyPair(state.photos);
+  if (!pair) return null;
+  return { ...pair, change: changeBetween(state.bodyweight, state.measures, pair.before.date, pair.after.date) };
+}
+const signed = (v, f) => `${v > 0 ? '+' : v < 0 ? '−' : '±'}${f(Math.abs(v))}`;
+function monthHTML(m) {
+  const { t, lang } = state;
+  const unit = state.settings.unit;
+  const stats = [
+    m.change.kg ? `<div><b class="${m.change.kg.change < 0 ? 'down' : m.change.kg.change > 0 ? 'up' : ''}">${signed(toDisplay(m.change.kg.change, unit), v => weight(v, 'kg', lang))}</b><span>${t('body.weight')}, ${u()}</span></div>` : '',
+    m.change.waist ? `<div><b class="${m.change.waist.change < 0 ? 'down' : m.change.waist.change > 0 ? 'up' : ''}">${signed(m.change.waist.change, v => cm(v, lang))}</b><span>${t('site.waist')}, cm</span></div>` : '',
+    `<div><b>${m.days}</b><span>${t('month.days')}</span></div>`
+  ].join('');
+  return `<div class="mcard solid" data-part="month"><div class="chead"><span class="label">${t('month.title')}</span><span class="cval">${t('pose.' + m.after.pose)}</span></div>
+    <button class="mpair" data-bx="month" aria-label="${t('bodyx.compare')}">
+      <figure><img src="${esc(m.before.thumb)}" alt=""><figcaption>${esc(day(m.before.t, lang))}</figcaption></figure>
+      <figure><img src="${esc(m.after.thumb)}" alt=""><figcaption>${esc(day(m.after.t, lang))}</figcaption></figure></button>
+    <div class="mstats">${stats}</div>
+    ${getKey('google') ? `<button class="btn2 soft" data-month="coach">${I.chat}<span>${t('month.ask')}</span></button>` : ''}
+    ${m.change.waist ? '' : `<p class="bnote">${t('month.noWaist')}</p>`}</div>`;
+}
 
 export function renderBody(root) {
   const { t, lang } = state;
@@ -45,6 +72,7 @@ export function renderBody(root) {
     </button>`).join('')}</div>
     ${cur?.series?.length >= 2 ? `<div class="chartcard solid"><div class="chead"><span class="label">${t('site.' + site)}</span></div>${lineChart(cur.series, { h: 110, fmt: v => `${cm(v, lang)}` })}</div>` : ''}
 
+    ${(m => (m ? monthHTML(m) : ''))(monthly())}
     <div class="section"><span class="label">${t('bodyx.photos')}</span>${days.length > 1 || state.photos.length > 1 ? `<button class="textbtn" data-bx="compare">${t('bodyx.compare')}</button>` : ''}</div>
     <div class="row2 one"><button class="log" data-bx="add">${I.camera}<span>${t('bodyx.add')}</span></button></div>
     ${days.length ? days.map(d => `<div class="phday"><span class="pdate">${esc(day(Date.parse(d.date), lang))}</span>
@@ -153,9 +181,9 @@ function viewSheet(id) {
 }
 
 // Before/after: the newer photo sits on top and is revealed by dragging the handle.
-function compareSheet() {
+function compareSheet(given = null) {
   const { t, lang } = state;
-  const pair = comparePair(state.photos);
+  const pair = given || comparePair(state.photos);
   if (!pair) return;
   let [a, b] = pair;
   const sorted = [...state.photos].sort((x, y) => x.t - y.t);
@@ -200,5 +228,6 @@ export function initBodyScreen(root) {
     else if (k === 'add') addSheet();
     else if (k === 'view') viewSheet(b.dataset.id);
     else if (k === 'compare') compareSheet();
+    else if (k === 'month') { const m = monthly(); if (m) { haptic('tap'); compareSheet([m.before, m.after]); } }
   });
 }

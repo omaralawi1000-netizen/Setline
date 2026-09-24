@@ -557,7 +557,7 @@ export function handleText(text, { typed = false } = {}) {
 
 // Hands-free: speech the app overheard. It acts only on what reads as a workout command, or on
 // anything said after "Coach"/"Setline"; everything else (chat, music, the gym) is ignored.
-const HF_OK = new Set(['LogSet', 'LogSets', 'LogRel', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
+const HF_OK = new Set(['LogSet', 'LogSets', 'AddWarmup', 'WarmupDone', 'LogRel', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
   'StartRest', 'AdjustRest', 'SkipRest', 'Query', 'AddExercise', 'SwapExercise', 'LogProtein', 'LogBodyweight']);
 export const WAKE = /^\s*(?:hey |hej |ok |okay )?(?:coach|setline|set line|sætlajn)\b[\s,.:!-]*/i;
 export function handleAmbient(text) {

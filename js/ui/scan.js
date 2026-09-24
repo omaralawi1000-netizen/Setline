@@ -28,7 +28,7 @@ export const canDetect = async () => {
 async function recentHTML() {
   const list = (await products()).filter(p => p.name).slice(0, 8);
   if (!list.length) return '';
-  return `<div class="scanrecent">${list.map((p, i) => `<button class="srchip" data-s="recent" data-code="${esc(p.code)}" style="--i:${i}">${p.image ? `<img src="${esc(p.image)}" alt="" loading="lazy">` : `<span class="pi">${BARCODE}</span>`}<span>${esc(p.name)}</span></button>`).join('')}</div>`;
+  return `<div class="scanrecent">${list.map((p, i) => `<button class="srchip" data-s="recent" data-code="${esc(p.code)}" style="--i:${i}">${p.image ? `<img src="${esc(p.image)}" alt="" loading="lazy">` : `<span class="pi">${p.source === 'dk' ? I.meal : BARCODE}</span>`}<span>${esc(p.name)}</span></button>`).join('')}</div>`;
 }
 
 async function products() { return (await db.get('meta', 'products').catch(() => null)) || []; }
@@ -48,7 +48,7 @@ async function thumbOf(url) {
   } catch { return undefined; }
 }
 
-export function openScanner() {
+export function openScanner({ product = null } = {}) {
   const { t } = state;
   const s = { stream: null, det: null, timer: 0, last: null, seen: 0, done: false, product: null, grams: 100, code: '', pending: null, thumb: null };
   const stop = () => { clearTimeout(s.timer); cancelAnimationFrame(s.timer); s.stream?.getTracks().forEach(x => x.stop()); s.stream = null; };
@@ -167,10 +167,10 @@ export function openScanner() {
     function paintProduct(first = false) {
       const p = s.product, n = forAmount(p, s.grams);
       const choices = amountChoices(p);
-      const label = c => (c.kind === 'serving' ? t('scan.serving', { g: c.g }) : c.kind === 'pack' ? t('scan.pack', { g: c.g }) : '100 g');
+      const label = c => (c.kind === 'serving' ? (p.servingLabel ? `${p.servingLabel} (${c.g} g)` : t('scan.serving', { g: c.g })) : c.kind === 'pack' ? t('scan.pack', { g: c.g }) : '100 g');
       const html = `<div class="pwrap"><div class="fcard glass${first ? ' in' : ''}">
-        <div class="fhead">${p.image ? `<img src="${esc(p.image)}" alt="">` : `<span class="picon">${BARCODE}</span>`}
-          <div><strong>${esc(p.name || t('scan.unnamed'))}</strong><span>${esc([p.brand, t('scan.per100', { p: p.per100.protein, k: p.per100.kcal })].filter(Boolean).join(' · '))}</span></div></div>
+        <div class="fhead">${p.image ? `<img src="${esc(p.image)}" alt="">` : `<span class="picon">${p.source === 'dk' ? I.meal : BARCODE}</span>`}
+          <div><strong>${esc(p.name || t('scan.unnamed'))}</strong><span>${esc([p.brand || (p.source === 'dk' ? t('search.typical') : ''), t('scan.per100', { p: p.per100.protein, k: p.per100.kcal })].filter(Boolean).join(' · '))}</span></div></div>
         <div class="mnums">
           <div class="mnum hot"><b>${n.protein}</b><span>${t('meal.protein')}</span></div>
           <div class="mnum"><b>${n.kcal}</b><span>kcal</span></div>
@@ -180,7 +180,7 @@ export function openScanner() {
         <div class="amounts">${choices.map(c => `<button class="chip" data-g="${c.g}" aria-pressed="${c.g === s.grams}">${esc(label(c))}</button>`).join('')}
           <label class="gram"><input inputmode="numeric" data-s="grams" value="${choices.some(c => c.g === s.grams) ? '' : s.grams}" placeholder="${esc(t('scan.grams'))}" aria-label="${esc(t('scan.grams'))}"><span>g</span></label></div>
         <button class="log" data-s="add">${I.check}<span>${t('meal.save', { g: n.protein })}</span></button>
-        <button class="linkbtn muted" data-s="again">${t('scan.again')}</button>
+        ${product ? '' : `<button class="linkbtn muted" data-s="again">${t('scan.again')}</button>`}
       </div></div>`;
       if (first) return render(html);
       // update numbers and chips in place
@@ -250,7 +250,7 @@ export function openScanner() {
         e.target.closest('button').disabled = true;
         const name = `${p.name || t('scan.unnamed')} · ${s.grams} g`;
         const thumb = s.thumb?.code === p.code ? await Promise.race([s.thumb.p, new Promise(r => setTimeout(r, 600))]) : undefined;
-        const meal = await store.logMeal({ name, ...n, source: 'barcode', thumb });
+        const meal = await store.logMeal({ name, ...n, source: p.source === 'dk' ? 'text' : 'barcode', thumb });
         if (p.code) keep({ ...p, lastGrams: s.grams });
         await closeTop();
         haptic('success');
@@ -269,7 +269,7 @@ export function openScanner() {
       e.target.code.blur();
       find(code);
     });
-    camera();
+    if (product) { s.done = true; s.code = product.code; show(product); } else camera();
   }, { label: t('scan.title'), onClose: stop });
   api.sheet.classList.add('scansheet');
   document.addEventListener('visibilitychange', function hide() {

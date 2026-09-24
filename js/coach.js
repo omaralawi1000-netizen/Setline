@@ -11,6 +11,7 @@ import { profileText } from './profile.js';
 import { deloadStatus, muscleBalance, usualMinutes } from './insights.js';
 import { measureSummary } from './measures.js';
 import { nextRoutine } from './routines.js';
+import { stalledLifts } from './plateau.js';
 
 export const MAX_CONTEXT_CHARS = 22000; // ~6k tokens
 export const CHAT_TURNS = 12;
@@ -42,7 +43,7 @@ export const APP_GUIDE = [
   'Headphones button on the workout screen: hands-free mode listens for sets and speaks rest cues.',
   'Workout screen: steppers and Log set, rest timer (+15/-15 teaches that exercise its rest), warm-up ramp, plate calculator, swipe a set left to delete, tap a set to edit, auto-advance after the last planned set, Finish.',
   'Tabs: Today, Workout, the orb in the middle, Food, Coach. History is the clock button on the Workout tab (and Last session on Today).',
-  'Today: one-tap morning check-in (how you feel, sleep, sore spots → readiness), Up next routine, cardio start and "again" chip, week ring and cardio minutes, muscles this week, deload suggestion after 6 steady weeks, bodyweight, a Food card (calories left, protein) that opens the Food tab. Food tab: calorie ring and protein/carbs/fat against daily targets (from the profile, editable by tapping the ring), Scan barcode / Photo / Say it / Type, favourite meals, quick add buttons (calories or protein, your own amounts), water glasses, meals by breakfast/lunch/dinner/snacks (tap to move, log again, favourite, delete), a 7-day chart.',
+  'Workout: smart warm-ups are added before the first lift for each muscle (Settings → Workout → Smart warm-ups), spoken in hands-free; say "warm up" to add them, "warm-up done" to tick one off. Today: one-tap morning check-in (how you feel, sleep, sore spots → readiness), Up next routine, cardio start and "again" chip, week ring and cardio minutes, muscles this week, deload suggestion after 6 steady weeks, a Plateau card when a planned lift stalls (one tap switches its rep range or swaps it for a close variation in every routine, with undo), bodyweight, a Food card (calories left, protein) that opens the Food tab. Food tab: calorie ring and protein/carbs/fat against daily targets (from the profile, editable by tapping the ring), Scan barcode / Photo / Say it / Search (a built-in list of ~250 common Danish foods with typical values, plus Danish products from Open Food Facts while online; tap one to pick the amount; anything not found can be estimated by AI), favourite meals, quick add buttons (calories or protein, your own amounts), water glasses, meals by breakfast/lunch/dinner/snacks (tap to move, log again, favourite, delete), a 7-day chart.',
   'Plans: asking for one in plain words here ("I need a 5-day plan", "make my plan 4 days") builds a plan card right away, with Replace my routines or Add.',
   'History: every workout and cardio session, "Do this again". Progress: volume, cardio, bodyweight, sleep, muscles, lifts with e1RM curves and records. Body & photos: measurements, progress photos (on the phone only), before/after compare.',
   'Customize (Today and Food): show/hide and reorder sections; Food can track calories or only protein, carbs, fat, water. Tap a meal → Edit to fix an estimate or scale the portion. Daily targets shows the real maintenance worked out from 2+ weeks of food and weight. Settings → Workout → Weight steps sets the −/+ step for barbells, dumbbells and machines.',
@@ -125,6 +126,8 @@ export function buildContext(snap) {
     out.push('', 'ROUTINES:');
     for (const r of snap.routines) out.push(`- ${r.name}: ${r.exercises.map(e => `${name(e.exerciseId)} ${e.sets.length}x${e.sets[0]?.reps ?? '?'}`).join(', ')}`);
   }
+  const stalls = snap.routines?.length && snap.catalog ? stalledLifts(hist, snap.routines, { catalog: snap.catalog, now }) : [];
+  if (stalls.length) out.push('', 'STALLED LIFTS (no new e1RM in the last 3 sessions over 2+ weeks):', ...stalls.map(x => `- ${name(x.exerciseId)}: best e1RM ${x.best} kg, planned ${x.sets}x${x.reps}${x.swapTo ? `, variation: ${name(x.swapTo)}` : ''}`));
 
   // cardio: weekly minutes and recent sessions
   const cardio = [...(snap.cardio || [])].sort((a, b) => b.startedAt - a.startedAt);

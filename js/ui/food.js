@@ -14,6 +14,7 @@ import { toast } from './toast.js';
 import { openSheet, closeTop } from './sheet.js';
 import { openMealSheet, favRowHTML, toggleStar } from './meal.js';
 import { openScanner, scanIcon } from './scan.js';
+import { openFoodSearch } from './foodsearch.js';
 import { talkNow } from './voice.js';
 import { mealKey } from '../meals.js';
 import { openFoodCustomize } from './customize.js';
@@ -120,7 +121,7 @@ export function renderFood(root) {
       <button class="ftile" data-f="scan" style="--i:0">${scanIcon}<span>${t('food.scan')}</span></button>
       <button class="ftile" data-f="snap" style="--i:1">${I.camera}<span>${t('food.snap')}</span></button>
       <button class="ftile" data-f="say" style="--i:2">${I.mic}<span>${t('food.say')}</span></button>
-      <button class="ftile" data-f="type" style="--i:3">${I.pen}<span>${t('food.type')}</span></button>
+      <button class="ftile" data-f="search" style="--i:3">${I.search}<span>${t('food.search')}</span></button>
     </div>` : `<button class="btn2 solid fback" data-f="today">${t('food.backToday')}</button>`}
     ${foodOrderOf(state.settings).map(k => part[k]()).join('')}
     <p class="fnote">${t(state.settings.foodTargets ? 'food.targetsCustom' : 'food.targetsAuto')}</p>
@@ -311,6 +312,7 @@ export function initFood(root) {
     if (k === 'meal') return mealSheet(b.dataset.id);
     if (k === 'scan') return openScanner();
     if (k === 'snap') return openMealSheet();
+    if (k === 'search') { openFoodSearch(); return; }
     if (k === 'type') { openMealSheet(); setTimeout(() => document.querySelector('.sheet.show .mdesc input')?.focus(), 420); return; }
     if (k === 'say') return talkNow();
     if (k === 'water') {

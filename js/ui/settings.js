@@ -160,6 +160,8 @@ export function renderSettings(root) {
       <button class="srow" data-act="kg-steps"><span class="l"><strong>${t('steps.title')}</strong><small>${esc(stepsSummary())}</small></span>${I.fwd}</button>
       <div class="srow"><span class="l"><strong>${t('settings.autoAdvance')}</strong><small>${t('settings.autoAdvanceSub')}</small></span>
         <button class="toggle" role="switch" aria-checked="${s.autoAdvance}" aria-label="${t('settings.autoAdvance')}" data-act="toggle" data-key="autoAdvance"></button></div>
+      <div class="srow"><span class="l"><strong>${t('settings.autoWarmup')}</strong><small>${t('settings.autoWarmupSub')}</small></span>
+        <button class="toggle" role="switch" aria-checked="${s.autoWarmup}" aria-label="${t('settings.autoWarmup')}" data-act="toggle" data-key="autoWarmup"></button></div>
       <div class="srow"><span class="l"><strong>${t('alerts.title')}</strong><small>${t('alerts.sub')}</small></span>
         <button class="toggle" role="switch" aria-checked="${s.restAlerts}" aria-label="${t('alerts.title')}" data-act="rest-alerts"></button></div>
       <div class="srow"><span class="l"><strong>${t('settings.readiness')}</strong><small>${t('settings.readinessSub')}</small></span>

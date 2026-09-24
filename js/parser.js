@@ -13,7 +13,7 @@ import { lbToKg, round } from './units.js';
 import { CARDIO_TYPES } from './cardio.js';
 
 export const INTENTS = ['LogSet', 'LogSets', 'LogBatch', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'CheckIn', 'LogRel', 'SetGoal', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
-  'AddExercise', 'SwapExercise', 'StartRoutine', 'StartEmpty', 'Finish', 'Discard', 'StartRest', 'AdjustRest', 'SkipRest',
+  'AddWarmup', 'WarmupDone', 'AddExercise', 'SwapExercise', 'StartRoutine', 'StartEmpty', 'Finish', 'Discard', 'StartRest', 'AdjustRest', 'SkipRest',
   'Query', 'Cancel', 'Help', 'Ask', 'Unknown'];
 
 // ---------- text cleanup ----------
@@ -540,6 +540,12 @@ function parseOne(text, ctx = {}) {
       /^(im |i am )?(done|finished)( with( the| this| my)? (workout|session|training))?$/.test(s) ||
       /^(afslut|stop|slut|færdig|jeg er færdig|vi er færdige)( med)?( træningen| træning)?$/.test(s) ||
       /^(finish|afslut) (workout|træning|træningen)( now| nu)?$/.test(s)) return out('Finish');
+
+  // --- warm-ups ---
+  if (/^((ok |okay )?(next|done|finished)( with)?( the| my)? warm ?ups?( set)?|warm ?ups?( set)? (done|finished|complete|ok|klar))$/.test(s) ||
+      /^((opvarmning(en)?|opvarmningssæt(tet)?) (færdig|klar|done|ok)|færdig med opvarmning(en|ssættet)?|næste opvarmning(ssæt)?)$/.test(s)) return out('WarmupDone');
+  if (/^((add|give me|do|start|lets do|i need)( a| the| some| my)? )?warm ?ups?( sets?)?( please| first)?$/.test(s) || /^(let me |lets |i need to |i want to )warm up( first)?$/.test(s) ||
+      /^((tilføj|giv mig|lav|start)( en| nogle)? )?(opvarmning|opvarmningssæt)( først)?$/.test(s) || /^(jeg skal |lad mig |lad os )?varme op( først)?$/.test(s)) return out('AddWarmup');
 
   // --- rest ---
   if (/^(skip|stop|end|drop|cancel|no|kill)( the)? (rest|timer|pause|break|breast|test|chest)$/.test(s) || /^skip( it)?$/.test(s) ||

@@ -3,6 +3,7 @@
 // "ten seconds", then what's next. Off whenever the workout ends or the app is hidden.
 import { state, subscribe } from '../store.js';
 import * as W from '../workout.js';
+import { pendingWarmup } from '../warmup.js';
 import { audioContext, unlockAudio } from '../audio.js';
 import { createVad, toWav } from '../vad.js';
 import { transcribe, buildPrompt } from '../stt.js';
@@ -117,6 +118,8 @@ function cueText() {
   const w = state.active;
   const ex = w?.exercises[w.current];
   if (!ex) return t('hf.go');
+  const wu = warmCue(ex);
+  if (wu) return wu;
   const bw = state.catalog.get(ex.exerciseId)?.equipment === 'bodyweight';
   const v = W.suggestNext(ex, W.lastSession(state.history, ex.exerciseId), bw ? 0 : 20);
   const name = state.catalog.name(ex.exerciseId, lang);
@@ -124,6 +127,24 @@ function cueText() {
   const unit = t(`say.${state.settings.unit}`);
   const next = !ex.sets.some(s => s.done);
   return t(next ? 'hf.cueNext' : 'hf.cue', { name, n: W.nextSetNumber(ex), kg, unit, reps: v.reps, bw: bw && !v.kg });
+}
+
+// "Warm-up, 60 kilos for 5" while warm-up sets are still to do.
+function warmCue(ex, first = false) {
+  const s = pendingWarmup(ex);
+  if (!s) return '';
+  const { t, lang } = state;
+  const kg = weight(s.kg, state.settings.unit, lang);
+  const left = ex.sets.filter(x => x.type === 'warmup' && !x.done).length;
+  return t('hf.cueWarm', { name: first ? state.catalog.name(ex.exerciseId, lang) : '', kg, unit: t(`say.${state.settings.unit}`), reps: s.reps, left });
+}
+
+// Warm-ups were just put in front of this lift: say the first one.
+export function announceWarmup() {
+  if (!hf.on) return;
+  const ex = state.active?.exercises[state.active.current];
+  const text = ex && warmCue(ex, true);
+  if (text) speakCue(text);
 }
 
 function cues() {

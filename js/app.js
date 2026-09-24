@@ -10,8 +10,9 @@ import { $, esc } from './ui/dom.js';
 import { I } from './ui/icons.js';
 import { toast } from './ui/toast.js';
 import { handlePop } from './ui/sheet.js';
-import { renderToday } from './ui/today.js';
-import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav } from './ui/workout.js';
+import { renderToday, currentStall } from './ui/today.js';
+import { applyPlateauFix } from './plateau.js';
+import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav, autoWarmup } from './ui/workout.js';
 import { renderHistory, renderDetail } from './ui/history.js';
 import { renderSettings, initSettings } from './ui/settings.js';
 import { initVoice, orbHTML, voiceHandlePop, closeVoice, isVoiceOpen, openVoice } from './ui/voice.js';
@@ -28,7 +29,8 @@ import { openCustomize } from './ui/customize.js';
 import { autoBackup } from './ui/drive.js';
 import { initHandsFree } from './ui/handsfree.js';
 import { onCheckinClick } from './ui/checkin.js';
-import { renderBody, initBodyScreen } from './ui/bodyscreen.js';
+import { renderBody, initBodyScreen, monthly } from './ui/bodyscreen.js';
+import { dateKey } from './body.js';
 import { renderFood, initFood, openFoodDay } from './ui/food.js';
 import { openScanner } from './ui/scan.js';
 import { openMealSheet } from './ui/meal.js';
@@ -272,6 +274,18 @@ app.addEventListener('click', e => {
   if (e.target.closest('[data-weekly]')) { haptic('tap'); go('coach'); }
   const ck = e.target.closest('[data-ck]');
   if (ck && !ck.disabled) { onCheckinClick(ck, () => { renderScreen('today'); }); return; }
+  const mo = e.target.closest('[data-month]');
+  if (mo) {
+    haptic('tap');
+    const k = mo.dataset.month, m = monthly();
+    if (k === 'coach' && m) { go('coach'); askCoach(monthPrompt(m)); return; }
+    if (k === 'open') store.setSettings({ monthSeen: mo.dataset.id });
+    if (k === 'photo') store.setSettings({ photoNudge: dateKey().slice(0, 7) });
+    pushSub('body');
+    return;
+  }
+  const pl = e.target.closest('[data-plateau]');
+  if (pl) { onPlateau(pl.dataset.plateau, pl.dataset.pex); return; }
   const dl = e.target.closest('[data-deload]');
   if (dl) {
     haptic('tap');
@@ -281,6 +295,36 @@ app.addEventListener('click', e => {
     else if (k === 'end') store.setSettings({ deloadUntil: 0, deloadSnoozed: now + 21 * 86_400_000 });
   }
 });
+
+// The Coach's take on the month: numbers only (the photos never leave the phone).
+function monthPrompt(m) {
+  const { t } = state;
+  const c = m.change;
+  return t('month.prompt', { days: m.days, from: m.before.date, to: m.after.date,
+    kg: c.kg ? `${c.kg.from} → ${c.kg.to} kg (${c.kg.change > 0 ? '+' : ''}${c.kg.change})` : t('month.unknown'),
+    waist: c.waist ? `${c.waist.from} → ${c.waist.to} cm (${c.waist.change > 0 ? '+' : ''}${c.waist.change})` : t('month.unknown') });
+}
+
+// Stalled lift: change the plan (with undo), ask the Coach, or not now.
+async function onPlateau(kind, exerciseId) {
+  const { t, lang } = state;
+  const stall = currentStall();
+  if (!stall || stall.exerciseId !== exerciseId) return;
+  haptic('tap');
+  const snooze = days => ({ ...state.settings.plateauSnooze, [exerciseId]: Date.now() + days * 86_400_000 });
+  const name = state.catalog.name(exerciseId, lang);
+  if (kind === 'later') { store.setSettings({ plateauSnooze: snooze(14) }); return; }
+  if (kind === 'coach') { go('coach'); askCoach(t('plateau.prompt', { name, n: stall.sessions, reps: stall.reps })); return; }
+  const before = state.settings.plateauSnooze;
+  const old = await store.replaceRoutines(applyPlateauFix(state.routines, stall, kind));
+  store.setSettings({ plateauSnooze: snooze(42) }); // give the change six weeks
+  haptic('success');
+  toast({
+    title: esc(kind === 'swap' ? t('plateau.swapped', { name: state.catalog.name(stall.swapTo, lang) }) : t('plateau.changed', { sets: stall.sets, reps: stall.toReps })),
+    sub: esc(t('plateau.inPlan')), action: t('common.undo'), ms: 6000,
+    onAction: async () => { await store.replaceRoutines(old); store.setSettings({ plateauSnooze: before }); }
+  });
+}
 
 // A deload runs to the end of next Sunday if started late in the week, else to this Sunday.
 function weekEnd(now) {
@@ -340,6 +384,7 @@ store.subscribe(reason => {
   syncGps();
   scheduleRestAlert();
   if (reason === 'draft') return syncNums($('#s-workout'));
+  if (state.active && reason !== 'warmup-auto' && reason !== 'error') autoWarmup(); // re-emits (and renders) when it adds sets
   if (reason === 'chat' && view.screen !== 'coach') return;
   if (reason === 'reset' && isVoiceOpen()) closeVoice();
   // a re-render mid-entrance would restart the stagger; let the entrance end instead

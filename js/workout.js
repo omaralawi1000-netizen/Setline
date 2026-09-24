@@ -65,11 +65,12 @@ export function nextSetNumber(ex) {
 export const setNumberAt = (ex, k) => ex.sets.slice(0, k + 1).filter(s => s.type !== 'warmup').length;
 
 // Put a warm-up ramp in front of an exercise's working sets (once).
-export function addWarmups(w, exIndex, ramp) {
+export function addWarmups(w, exIndex, ramp, { force = false } = {}) {
   const ex = w.exercises[exIndex];
-  if (!ex || !ramp.length || ex.sets.some(s => s.type === 'warmup')) return w;
+  if (!ex || !ramp.length || (ex.warmed && !force) || ex.sets.some(s => s.type === 'warmup')) return w;
   const next = clone(w);
   next.exercises[exIndex].sets = [...ramp.map(s => makeSet({ kg: s.kg, reps: s.reps, type: 'warmup' })), ...next.exercises[exIndex].sets];
+  next.exercises[exIndex].warmed = true;
   return next;
 }
 
@@ -89,6 +90,8 @@ export function logSet(w, exIndex, { kg, reps }, now = Date.now(), restSec = 90)
   const next = clone(w);
   const ex = next.exercises[exIndex];
   if (!ex) throw new RangeError('no exercise');
+  // the first working set: warm-ups not ticked off by now were skipped
+  if (!ex.sets.some(s => s.done && s.type !== 'warmup')) ex.sets = ex.sets.filter(s => s.type !== 'warmup' || s.done);
   const i = firstPlannedIndex(ex);
   let set;
   if (i !== -1) {

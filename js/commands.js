@@ -19,6 +19,7 @@ import { mergeCheckin, readiness, routineGroups } from './checkin.js';
 import { weight as fmtW } from './format.js';
 import { cardioName, validateCardio, makeCardioSession, paceText } from './cardio.js';
 import { suggest } from './progression.js';
+import { warmupsFor, pendingWarmup } from './warmup.js';
 import { validBodyweight, proteinTarget, dateKey, bodyTrend } from './body.js';
 
 export const AUTO_MS = 1500;
@@ -161,9 +162,25 @@ export function resolve(intent, snap, t, lang) {
 
   const exerciseCtx = id => id || cur()?.exerciseId || null;
 
+  // tick off a warm-up set, and say what comes next (the next warm-up or the first real set)
+  const warmupDoneCommand = (ex, pend) => {
+    const later = ex.sets.filter(x => x.type === 'warmup' && !x.done && x.id !== pend.id);
+    const bw = snap.catalog.get(ex.exerciseId)?.equipment === 'bodyweight';
+    const first = W.suggestNext(ex, W.lastSession(snap.history || [], ex.exerciseId), bw ? 0 : 20);
+    const spoken = later.length ? t('say.warmNext', { kg: kgTxt(later[0].kg), reps: later[0].reps }) : t('say.warmFirst', { kg: kgTxt(first.kg), unit: sayUnit, reps: first.reps, bw: bw && !first.kg });
+    return cmd('auto', {
+      title: t('warmup.done'), value: setTxt(pend.kg, pend.reps), sub: later.length ? t('say.warmNext', { kg: kgTxt(later[0].kg), reps: later[0].reps }) : name(ex.exerciseId),
+      say: say(spoken), run: { op: 'update', fn: (cw, now) => W.completeWarmup(cw, cw.current, pend.id, now), nav: 'workout' }
+    });
+  };
+
   switch (intent.type) {
     case 'LogSet': {
       const need = needWorkout(); if (need) return need;
+      // "20 for 10" while that warm-up is next: it's the warm-up, not a working set
+      const wex = !intent.exerciseId || intent.exerciseId === cur()?.exerciseId ? cur() : null;
+      const pend = wex && (intent.count || 1) === 1 && pendingWarmup(wex);
+      if (pend && intent.kg != null && Math.abs(intent.kg - pend.kg) < 0.01 && (intent.reps == null || intent.reps <= pend.reps + 2)) return warmupDoneCommand(wex, pend);
       return logCommand(intent.kg, intent.reps, intent.count, intent.exerciseId || null);
     }
     case 'LogBatch': {
@@ -247,6 +264,27 @@ export function resolve(intent, snap, t, lang) {
         title: t('voice.nowOn'), value: name(exId), sub: t('workout.exerciseOf', { i: to + 1, n: w.exercises.length }),
         say: say(t('say.next', { name: sayName(exId) })), run: { op: 'update', fn: cw => W.setCurrent(cw, to), nav: 'workout' }
       });
+    }
+    case 'AddWarmup': {
+      const need = needWorkout(); if (need) return need;
+      const ex = cur();
+      if (!ex) return err('voice.noExercise');
+      const pend = pendingWarmup(ex);
+      if (pend) return cmd('info', { title: t('warmup.add'), value: setTxt(pend.kg, pend.reps), say: say(t('say.warmAdded', { kg: kgTxt(pend.kg), unit: sayUnit, reps: pend.reps })) });
+      const ramp = warmupsFor(w, w.current, { catalog: snap.catalog, history: snap.history, force: true });
+      if (!ramp.length) return cmd('info', { title: t('warmup.none'), value: name(ex.exerciseId), say: say(t('warmup.none')) });
+      return cmd('auto', {
+        title: t('warmup.added'), value: ramp.map(r => kgTxt(r.kg)).join(' · ') + ` ${u}`, sub: name(ex.exerciseId),
+        say: say(t('say.warmAdded', { kg: kgTxt(ramp[0].kg), unit: sayUnit, reps: ramp[0].reps })),
+        run: { op: 'update', fn: cw => W.addWarmups(cw, cw.current, ramp, { force: true }), nav: 'workout' }
+      });
+    }
+    case 'WarmupDone': {
+      const need = needWorkout(); if (need) return need;
+      const ex = cur();
+      const pend = pendingWarmup(ex);
+      if (!pend) return err('warmup.noneLeft');
+      return warmupDoneCommand(ex, pend);
     }
     case 'AddExercise': {
       const need = needWorkout(); if (need) return need;

@@ -18,6 +18,8 @@ import { muscleBalance, deloadStatus } from '../insights.js';
 import { driveNudgeHTML } from './drive.js';
 import { checkinHTML } from './checkin.js';
 import { goalCardsHTML } from './goals.js';
+import { stalledLifts } from '../plateau.js';
+import { monthly } from './bodyscreen.js';
 
 const MIC = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.6 11.5a6.4 6.4 0 0 0 12.8 0M12 18v3"/></svg>';
 const C = 157.08; // ring r=25
@@ -163,6 +165,43 @@ export function balanceHTML({ always = false } = {}) {
 }
 
 // Deload: offered after 6 steady weeks, shown while running.
+// A lift in your plan that stopped moving, and a concrete change to make, applied in one tap.
+export const currentStall = () => stalledLifts(state.history, state.routines, { catalog: state.catalog, snooze: state.settings.plateauSnooze })[0] || null;
+function plateauHTML() {
+  const { t, lang } = state;
+  const s = currentStall();
+  if (!s) return '';
+  const name = state.catalog.name(s.exerciseId, lang);
+  const since = new Intl.DateTimeFormat(lang === 'da' ? 'da-DK' : 'en-GB', { day: 'numeric', month: 'short' }).format(s.since);
+  return `<div class="dlcard plcard glass" data-part="plateau"><div class="l"><span class="label">${t('plateau.label')}</span><strong>${esc(t('plateau.title', { name }))}</strong>
+      <span>${esc(t('plateau.sub', { n: s.sessions, since, best: weight(s.best, state.settings.unit, lang), unit: t('unit.' + state.settings.unit) }))}</span></div>
+    <div class="plopts">
+      <button class="plopt" data-plateau="reps" data-pex="${esc(s.exerciseId)}"><span class="l"><strong>${esc(t('plateau.reps', { sets: s.sets, reps: s.toReps }))}</strong><small>${esc(t(s.toReps > s.reps ? 'plateau.repsUp' : 'plateau.repsDown', { from: s.reps }))}</small></span>${I.check}</button>
+      ${s.swapTo ? `<button class="plopt" data-plateau="swap" data-pex="${esc(s.exerciseId)}"><span class="l"><strong>${esc(t('plateau.swap', { name: state.catalog.name(s.swapTo, lang) }))}</strong><small>${esc(t('plateau.swapSub'))}</small></span>${I.check}</button>` : ''}
+    </div>
+    <div class="plfoot">${getKey('google') ? `<button class="textbtn" data-plateau="coach" data-pex="${esc(s.exerciseId)}">${I.chat}<span>${t('plateau.ask')}</span></button>` : '<span></span>'}<button class="textbtn dim" data-plateau="later" data-pex="${esc(s.exerciseId)}">${t('plateau.later')}</button></div></div>`;
+}
+
+// A new month side by side (until opened), or a nudge when the last progress photo is a month old.
+function monthCardHTML() {
+  const { t, lang, settings } = state;
+  if (!state.photos.length) return '';
+  const m = monthly();
+  if (m && Date.now() - m.after.t < 10 * 86_400_000 && settings.monthSeen !== m.after.id) {
+    const bits = [m.change.kg && `${m.change.kg.change > 0 ? '+' : m.change.kg.change < 0 ? '−' : '±'}${weight(Math.abs(m.change.kg.change), settings.unit, lang)} ${t('unit.' + settings.unit)}`,
+      m.change.waist && `${t('site.waist').toLowerCase()} ${m.change.waist.change > 0 ? '+' : m.change.waist.change < 0 ? '−' : '±'}${num(Math.abs(m.change.waist.change), lang, 1)} cm`].filter(Boolean);
+    return `<button class="mtoday solid" data-month="open" data-id="${esc(m.after.id)}"><span class="mth"><img src="${esc(m.before.thumb)}" alt=""><img src="${esc(m.after.thumb)}" alt=""></span>
+      <span class="l"><strong>${t('month.ready')}</strong><small>${esc(bits.length ? bits.join(' · ') : t('month.readySub', { n: m.days }))}</small></span>${I.fwd}</button>`;
+  }
+  const last = Math.max(...state.photos.map(p => p.t));
+  const ym = dateKey().slice(0, 7);
+  if (Date.now() - last >= 28 * 86_400_000 && settings.photoNudge !== ym) {
+    return `<button class="mtoday solid" data-month="photo"><span class="mth ic">${I.camera}</span>
+      <span class="l"><strong>${t('month.photoDay')}</strong><small>${t('month.photoDaySub')}</small></span>${I.fwd}</button>`;
+  }
+  return '';
+}
+
 function deloadHTML() {
   const { t, lang } = state;
   const d = deloadStatus(state.history, state.settings);
@@ -248,6 +287,7 @@ export function renderToday(root) {
   const part = {
     checkin: () => (busy || !on('checkin') ? '' : checkinHTML()),
     upnext: () => (busy ? '' : upNextHTML({ more: !on('routines') })),
+    plateau: () => (busy || !on('plateau') ? '' : plateauHTML()),
     goals: () => (on('goals') ? goalCardsHTML() : ''),
     cardio: () => (busy || !on('cardio') ? '' : cardioRowHTML()),
     week: () => (on('week') ? `<div class="section"><span class="label">${t('today.thisWeek')}</span><button class="textbtn" data-progress>${t('progress.link')} →</button></div>${weekCardsHTML()}` : ''),
@@ -265,6 +305,7 @@ export function renderToday(root) {
     ${busy ? '' : driveNudgeHTML({ stale: true })}
     ${busy ? resumeHTML() : weeklyCardHTML()}
     ${busy ? '' : deloadHTML()}
+    ${busy ? '' : monthCardHTML()}
     ${todayOrderOf(state.settings).map(k => part[k]()).join('')}
     <button class="custom" data-act="customize">${I.settings}<span>${t('cust.open')}</span></button>`;
   nameParts(root);

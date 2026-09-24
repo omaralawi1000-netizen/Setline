@@ -11,7 +11,7 @@ import { I } from './icons.js';
 import { toast } from './toast.js';
 import { burst } from './fx.js';
 import { openPlates } from './plates.js';
-import { warmupRamp } from '../warmup.js';
+import { warmupsFor } from '../warmup.js';
 import { getKey } from '../keys.js';
 import { openSheet, closeTop } from './sheet.js';
 import { openPicker } from './picker.js';
@@ -22,7 +22,7 @@ import { suggest, userStep } from '../progression.js';
 // the − / + step for the exercise in front of you (Settings → Workout → Weight steps)
 const curStep = () => { const w = state.active; const ex = w?.exercises[w.current]; return userStep(ex && state.catalog.get(ex.exerciseId)); };
 import { usualMinutes, timeStatus } from '../insights.js';
-import { handsFreeOn, hfPillHTML, toggleHandsFree } from './handsfree.js';
+import { handsFreeOn, hfPillHTML, toggleHandsFree, announceWarmup } from './handsfree.js';
 import { goalAimHTML } from './goals.js';
 import { figureHTML } from './figure.js';
 
@@ -622,6 +622,16 @@ function finishSheet() {
 
 // ---------- wiring ----------
 
+// Smart warm-ups: when you land on the first lift for a muscle, its warm-up sets are already there.
+export function autoWarmup() {
+  const w = state.active;
+  if (!w?.exercises.length || !state.settings.autoWarmup) return;
+  const ramp = warmupsFor(w, w.current, { catalog: state.catalog, history: state.history });
+  if (!ramp.length) return;
+  update(cur => W.addWarmups(cur, cur.current, ramp), { reason: 'warmup-auto' });
+  announceWarmup();
+}
+
 export function initWorkout(root, actions) {
   Object.assign(actions, {
     handsfree: () => toggleHandsFree(),
@@ -639,9 +649,10 @@ export function initWorkout(root, actions) {
     noop: () => {},
     plates: () => { const w = state.active; if (w) openPlates(readInputs(root).kg ?? values(w).kg); },
     warmup: () => {
-      const w = state.active;
-      const kg = values(w).kg;
-      update(cur => W.addWarmups(cur, cur.current, warmupRamp(kg)), { undo: 'warmup' });
+      const ramp = warmupsFor(state.active, state.active.current, { catalog: state.catalog, history: state.history, force: true });
+      if (!ramp.length) { toast({ title: esc(state.t('warmup.none')) }); return; }
+      update(cur => W.addWarmups(cur, cur.current, ramp, { force: true }), { undo: 'warmup' });
+      announceWarmup();
       haptic('success');
       toast({ title: esc(state.t('warmup.added')), action: state.t('common.undo'), onAction: () => undo() });
     },
