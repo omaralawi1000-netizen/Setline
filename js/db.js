@@ -1,6 +1,6 @@
 // Small IndexedDB wrapper. Schema version + ordered migrations.
 const NAME = 'setline';
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 const MIGRATIONS = {
   1(db) {
@@ -16,10 +16,15 @@ const MIGRATIONS = {
   // v2: cached replies from 1.1/1.2 had the style prompt spoken into them
   2(db, tx) {
     tx.objectStore('ttsCache').clear();
+  },
+  // v3: cardio sessions and daily nutrition
+  3(db) {
+    db.createObjectStore('cardio', { keyPath: 'id' }).createIndex('startedAt', 'startedAt');
+    db.createObjectStore('nutrition', { keyPath: 'date' });
   }
 };
 
-export const STORES = ['exercises', 'workouts', 'routines', 'prs', 'bodyweight', 'chat', 'ttsCache', 'meta'];
+export const STORES = ['exercises', 'workouts', 'routines', 'prs', 'bodyweight', 'chat', 'ttsCache', 'meta', 'cardio', 'nutrition'];
 
 const req = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
 

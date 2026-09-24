@@ -13,6 +13,8 @@ import { getKey } from '../keys.js';
 import { openSheet, closeTop } from './sheet.js';
 import { openPicker } from './picker.js';
 import { startCardsHTML, workoutTitle } from './today.js';
+import { renderLiveCardio } from './cardio.js';
+import { suggest } from '../progression.js';
 
 const C = 157.08; // ring circumference, r=25
 const REST_LINGER = 4000; // keep the card up after rest ends
@@ -37,16 +39,17 @@ function values(w = state.active) {
 export function renderWorkout(root) {
   const { t } = state;
   const w = state.active;
+  if (!w && state.activeCardio) { ui.restVisible = false; return renderLiveCardio(root); }
   if (!w) {
     ui.restVisible = false;
-    root.innerHTML = `<div class="tabtop"></div>
-      <h1 class="greet">${t('workout.noneTitle')}</h1><p class="sub">${t('workout.noneSub')}</p>${startCardsHTML()}`;
+    root.innerHTML = `<header class="bar"><span class="bt">${t('tab.workout')}</span></header>
+      <h1 class="greet tabh">${t('workout.noneTitle')}</h1><p class="sub">${t('workout.noneSub')}</p>${startCardsHTML()}`;
     return;
   }
 
   const header = `<header class="top">
       <button class="iconbtn" data-act="go" data-to="today" aria-label="${t('common.back')}">${I.back}</button>
-      <div class="ttl"><strong>${esc(workoutTitle(w))}</strong><span data-elapsed>${clock(W.elapsedSec(w))}</span></div>
+      <div class="ttl"><strong>${esc(workoutTitle(w))}</strong><span><span data-elapsed>${clock(W.elapsedSec(w))}</span>${w.easy ? ` · <em class="easy">${t('ready.easyBadge')}</em>` : ''}</span></div>
       <button class="pillbtn" data-act="finish">${t('workout.finish')}</button>
     </header>`;
 
@@ -96,6 +99,7 @@ export function renderWorkout(root) {
           <div class="row3"><button class="step" data-act="reps-" aria-label="${t('workout.fewer')}">−</button><input class="num" id="in-reps" inputmode="numeric" enterkeyhint="done" autocomplete="off" aria-label="${t('workout.reps')}" value="${v.reps}"><button class="step" data-act="reps+" aria-label="${t('workout.more')}">+</button></div></div>
       </div>
       <div class="ghost">${ghost}</div>
+      ${suggestionHTML(ex)}
       ${logButton(ex)}
     </div>
 
@@ -117,6 +121,24 @@ export function renderWorkout(root) {
   ui.lastCurrent = i;
   ui.seenWorkout = w.id;
   ui.seenDone = new Set(w.exercises.flatMap(e => e.sets.filter(x => x.done).map(x => x.id)));
+}
+
+// Why the planned weight is what it is: shown until the first set of the exercise is logged.
+function suggestionHTML(ex) {
+  const { t } = state;
+  if (ex.sets.some(s => s.done)) return '';
+  let sg = ex.suggestion;
+  if (!sg && state.settings.suggestions) {
+    const e = state.catalog.get(ex.exerciseId);
+    const s = e && suggest(state.history, e, ex.sets.find(x => !x.done)?.reps ?? null);
+    if (s) sg = { reason: s.reason, from: s.from, kg: s.kg };
+  }
+  if (!sg) return '';
+  if (state.active?.easy) return `<p class="sug easy"><span class="sbadge">−10%</span><span>${esc(t('ready.easySub'))}</span></p>`;
+  const step = sg.reason === 'up' && sg.kg != null ? sg.kg - sg.from.kg : null;
+  const badge = sg.reason === 'up' ? `↑ ${step != null ? weight(step, unit(), state.lang) + ' ' + u() : ''}`.trim()
+    : sg.reason === 'deload' ? t('suggest.badge.deload') : sg.reason === 'reps' ? t('suggest.badge.reps') : '=';
+  return `<p class="sug ${sg.reason}"><span class="sbadge">${esc(badge)}</span><span>${esc(t('suggest.' + sg.reason, { from: setText(sg.from.kg, sg.from.reps) }))}</span></p>`;
 }
 
 function logButton(ex) {

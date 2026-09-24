@@ -7,6 +7,7 @@ import { I } from './icons.js';
 import { toast } from './toast.js';
 import { openSheet, closeTop } from './sheet.js';
 import { esc } from './dom.js';
+import { num } from '../format.js';
 import { getKey, setKey, mask } from '../keys.js';
 import { VOICES, DEFAULT_TTS_MODEL, ttsModelId } from '../settings.js';
 import { testGroqKey } from '../stt.js';
@@ -72,6 +73,17 @@ export function renderSettings(root) {
     <div class="sgroup"><h2>${t('settings.workout')}</h2><div class="slist solid">
       <div class="srow"><span class="l"><strong>${t('settings.rest')}</strong></span>
         <div class="stepper"><button class="step" data-act="rest-default" data-d="-15" aria-label="−15 s" ${s.restSec <= LIMITS.restMin ? 'disabled' : ''}>−</button><b>${t('seconds', { n: s.restSec })}</b><button class="step" data-act="rest-default" data-d="15" aria-label="+15 s" ${s.restSec >= LIMITS.restMax ? 'disabled' : ''}>+</button></div></div>
+      <div class="srow"><span class="l"><strong>${t('settings.readiness')}</strong><small>${t('settings.readinessSub')}</small></span>
+        <button class="toggle" role="switch" aria-checked="${s.readiness}" aria-label="${t('settings.readiness')}" data-act="toggle" data-key="readiness"></button></div>
+      <div class="srow"><span class="l"><strong>${t('settings.suggestions')}</strong><small>${t('settings.suggestionsSub')}</small></span>
+        <button class="toggle" role="switch" aria-checked="${s.suggestions}" aria-label="${t('settings.suggestions')}" data-act="toggle" data-key="suggestions"></button></div>
+    </div></div>
+
+    <div class="sgroup"><h2>${t('settings.goals')}</h2><div class="slist solid">
+      <div class="srow"><span class="l"><strong>${t('settings.cardioGoal')}</strong><small>${t('settings.cardioGoalSub')}</small></span>
+        <div class="stepper"><button class="step" data-act="num" data-key="cardioGoal" data-d="-15" aria-label="−15" ${s.cardioGoal <= 30 ? 'disabled' : ''}>−</button><b>${s.cardioGoal}</b><button class="step" data-act="num" data-key="cardioGoal" data-d="15" aria-label="+15" ${s.cardioGoal >= 900 ? 'disabled' : ''}>+</button></div></div>
+      <div class="srow"><span class="l"><strong>${t('settings.protein')}</strong><small>${t('settings.proteinSub')}</small></span>
+        <div class="stepper"><button class="step" data-act="num" data-key="proteinPerKg" data-d="-0.2" aria-label="−0.2" ${s.proteinPerKg <= 1.2 ? 'disabled' : ''}>−</button><b>${num(s.proteinPerKg, state.lang, 1)}</b><button class="step" data-act="num" data-key="proteinPerKg" data-d="0.2" aria-label="+0.2" ${s.proteinPerKg >= 2.6 ? 'disabled' : ''}>+</button></div></div>
       <div class="srow"><span class="l"><strong>${t('settings.weeklyGoal')}</strong><small>${t('settings.weeklyGoalSub')}</small></span>
         <div class="stepper"><button class="step" data-act="goal" data-d="-1" aria-label="−1" ${s.weeklyGoal <= 1 ? 'disabled' : ''}>−</button><b>${s.weeklyGoal}</b><button class="step" data-act="goal" data-d="1" aria-label="+1" ${s.weeklyGoal >= 7 ? 'disabled' : ''}>+</button></div></div>
     </div></div>
@@ -137,6 +149,8 @@ export function initSettings(actions, root) {
       speak(state.t('settings.previewText'), { key: getKey('google'), model: ttsModelId(state.settings), voice: state.settings.voice, lang: state.lang, canSpeak: () => true });
     },
     set: el => { setSettings({ [el.dataset.key]: el.dataset.v }); haptic('tap'); },
+    toggle: el => { setSettings({ [el.dataset.key]: !state.settings[el.dataset.key] }); haptic('tap'); },
+    num: el => { setSettings({ [el.dataset.key]: Math.round((state.settings[el.dataset.key] + Number(el.dataset.d)) * 10) / 10 }); haptic('tap'); },
     goal: el => { setSettings({ weeklyGoal: state.settings.weeklyGoal + Number(el.dataset.d) }); haptic('tap'); },
     'rest-default': el => { setSettings({ restSec: state.settings.restSec + Number(el.dataset.d) }); haptic('tap'); },
     'toggle-haptics': () => { setSettings({ haptics: !state.settings.haptics }); haptic('tap'); },

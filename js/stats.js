@@ -84,3 +84,38 @@ export function sparkline(series, w = 116, h = 56, pad = 9) {
   const line = pts.map(p => `${p.x},${p.y}`).join(' ');
   return { line, area: `M${pts.map(p => `${p.x} ${p.y}`).join(' ')}V${h}H0Z`, last: pts[pts.length - 1] };
 }
+
+// Weeks in a row that met the goal (strength workouts + cardio sessions of 20+ min).
+// The current week counts once it's met; an unfinished current week doesn't break the streak.
+export function weekStreak(history, cardio, goal, now = Date.now()) {
+  const count = (from, to) => history.filter(w => w.startedAt >= from && w.startedAt < to).length +
+    cardio.filter(c => c.startedAt >= from && c.startedAt < to && c.durationSec >= 1200).length;
+  const start = weekStart(now);
+  const thisWeek = count(start, start + 7 * DAY);
+  let streak = thisWeek >= goal ? 1 : 0;
+  for (let i = 1; i < 104; i++) {
+    const from = weekStart(start - i * 7 * DAY + DAY);
+    if (count(from, from + 7 * DAY) >= goal) streak++; else break;
+  }
+  return { streak, thisWeek, goal };
+}
+
+// Last full week against the one before.
+export function weekReview(history, cardio, now = Date.now()) {
+  const cur = weekStart(now);
+  const lastFrom = weekStart(cur - DAY), prevFrom = weekStart(lastFrom - DAY);
+  const inRange = (list, from, to) => list.filter(x => x.startedAt >= from && x.startedAt < to);
+  const lw = inRange(history, lastFrom, cur), pw = inRange(history, prevFrom, lastFrom);
+  const vol = list => Math.round(list.reduce((a, w) => a + volume(w), 0));
+  const cmin = list => Math.round(list.reduce((a, c) => a + c.durationSec / 60, 0));
+  const lc = inRange(cardio, lastFrom, cur), pc = inRange(cardio, prevFrom, lastFrom);
+  if (!lw.length && !lc.length) return null;
+  const pct = (a, b) => (b ? Math.round(((a - b) / b) * 100) : null);
+  return {
+    from: lastFrom,
+    workouts: lw.length, cardioSessions: lc.length,
+    volume: vol(lw), volumeChange: pct(vol(lw), vol(pw)),
+    cardioMin: cmin(lc), cardioChange: pct(cmin(lc), cmin(pc)),
+    prs: lw.reduce((a, w) => a + (w.prs?.length || 0), 0)
+  };
+}

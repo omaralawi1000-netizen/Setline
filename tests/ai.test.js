@@ -133,3 +133,21 @@ test('AI can log several different sets', () => {
   assert.equal(validateAI({ type: 'LogSets', sets: [{ kg: 100, reps: 0 }] }, ctx), null);
   assert.equal(validateAI({ type: 'LogSet', sets: [{ kg: 60, reps: 10 }, { kg: 60, reps: 9 }] }, ctx).type, 'LogSets');
 });
+
+import { isPlanRequest, validatePlan, planToRoutines } from '../js/coach.js';
+test('plan requests are recognised and validated against the catalog', () => {
+  assert.ok(isPlanRequest('make me a 4-day upper/lower, 60 minutes, focus chest, dumbbells only'));
+  assert.ok(isPlanRequest('lav en træningsplan med 3 dage'));
+  assert.ok(!isPlanRequest("how's my bench progressing?"));
+  const p = validatePlan({ name: 'UL', perWeek: 4, summary: 'x', days: [
+    { name: 'Upper A', exercises: [{ exercise: 'Dumbbell bench press', sets: 4, reps: 10 }, { exercise: 'Laser curls', sets: 3, reps: 10 }, { exercise: 'Dumbbell row', sets: 99, reps: 10 }] },
+    { name: 'Lower A', exercises: [{ exercise: 'Goblet squat', sets: 3, reps: 12 }] }] }, catalog);
+  assert.equal(p.days.length, 2);
+  assert.deepEqual(p.days[0].exercises.map(e => e.exerciseId), ['dumbbell-bench-press', 'dumbbell-row'], 'unknown exercise dropped');
+  assert.equal(p.days[0].exercises[1].sets, 8, 'sets clamped');
+  assert.equal(validatePlan({ days: [{ name: 'x', exercises: [{ exercise: 'Nope', sets: 3, reps: 3 }] }] }, catalog), null);
+  const rs = planToRoutines(p, 1);
+  assert.equal(rs.length, 2);
+  assert.equal(rs[0].exercises[0].sets.length, 4);
+  assert.equal(rs[0].exercises[0].sets[0].reps, 10);
+});

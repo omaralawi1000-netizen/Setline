@@ -17,7 +17,10 @@ import { $, esc } from './dom.js';
 import { I } from './icons.js';
 import { hideToast } from './toast.js';
 import { aiCommand, withFallback } from '../ai.js';
-import { isQuestion } from '../coach.js';
+import { isQuestion, isPlanRequest } from '../coach.js';
+import { startCardioSession, finishSheet as cardioFinishSheet } from './cardio.js';
+import { dateKey } from '../body.js';
+import { planFor } from './routine.js';
 import { ask as askCoach, ensureModels } from './coach.js';
 import { cmdModels } from '../settings.js';
 
@@ -55,7 +58,8 @@ function parseCtx() {
 }
 
 const snapshot = () => ({
-  nameLang: state.lang, active: state.active, history: state.history, prs: state.prs, routines: state.routines,
+  nameLang: state.lang, planFor, active: state.active, cardio: state.cardio, activeCardio: state.activeCardio,
+  bodyweight: state.bodyweight, nutrition: state.nutrition, history: state.history, prs: state.prs, routines: state.routines,
   undoCount: state.undo.length, settings: state.settings, catalog: state.catalog, now: Date.now()
 });
 
@@ -340,7 +344,7 @@ export function handleText(text, { typed = false } = {}) {
   if (v.open) showWords(text);
   const intent = parse(text, parseCtx());
   if (intent.type === 'Unknown') {
-    if (isQuestion(text)) return toCoach(text);
+    if (isQuestion(text) || isPlanRequest(text)) return toCoach(text);
     if (getKey('google')) return aiFallback(text, intent, { typed });
   }
   present(intent, { typed });
@@ -528,6 +532,18 @@ async function execute(run, cmd) {
     return true;
   }
   if (run.op === 'undo') { store.undo(); return true; }
+  if (run.op === 'cardio-log') { const s = await store.addCardio(run.session); card.undoOp = { op: 'cardio-del', id: s.id }; return true; }
+  if (run.op === 'cardio-start') { startCardioSession(run.type); card.undoOp = { op: 'cardio-discard' }; return true; }
+  if (run.op === 'cardio-finish') { dismissCard(); if (v.open) await closeVoice(); nav.go('workout'); cardioFinishSheet(); return false; }
+  if (run.op === 'cardio-discard') { await store.discardCardio(); nav.go('today'); card.hideTimer = setTimeout(() => dismissCard(), 1500); return false; }
+  if (run.op === 'bodyweight') {
+    const date = dateKey();
+    const prev = state.bodyweight.find(e => e.date === date)?.kg ?? null;
+    await store.logBodyweight(run.kg, date);
+    card.undoOp = { op: 'bw', date, prev };
+    return true;
+  }
+  if (run.op === 'protein') { await store.logProtein(run.grams); card.undoOp = { op: 'protein', grams: run.grams }; return true; }
   if (run.op === 'discard') {
     await store.discard();
     card.hideTimer = setTimeout(() => dismissCard(), 1500);
@@ -555,7 +571,11 @@ function undoCard() {
     return;
   }
   const u = card.undoOp;
-  if (u?.op === 'undo') store.undo();
+  if (u?.op === 'cardio-del') store.deleteCardio(u.id);
+  else if (u?.op === 'cardio-discard') { store.discardCardio(); nav.go('today'); }
+  else if (u?.op === 'bw') { if (u.prev == null) store.deleteBodyweight(u.date); else store.logBodyweight(u.prev, u.date); }
+  else if (u?.op === 'protein') store.undoProtein(u.grams);
+  else if (u?.op === 'undo') store.undo();
   else if (u?.op === 'discardStart' && state.active?.id === u.id) { store.discard(); nav.go('today'); }
   dismissCard({ keepPending: false });
 }

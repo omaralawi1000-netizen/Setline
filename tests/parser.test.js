@@ -218,3 +218,35 @@ test('several sets at once: reps list with a weight', () => {
   assert.equal(ctxKg.sets[0].kg, 80, 'weight from the last set');
   is('3 sets 9 and 8 reps at 100', { type: 'Unknown' }, undefined);
 });
+
+// ---------- cardio, body, protein ----------
+const noWorkout = { current: null, workoutExerciseIds: [] };
+test('EN cardio: zone 2 bike, 5k with time, rowing meters', () => {
+  is('30 minutes zone 2 on the bike', { type: 'LogCardio', cardioType: 'bike', durationSec: 1800, zone: 2 }, noWorkout);
+  is('5k run in 24:30', { type: 'LogCardio', cardioType: 'run', durationSec: 1470, distanceKm: 5 }, noWorkout);
+  is('I rowed 2000 meters in 8 minutes', { type: 'LogCardio', cardioType: 'row', durationSec: 480, distanceKm: 2 }, noWorkout);
+  is('ran a half marathon 21.1 km in 1:52:30', { type: 'LogCardio', durationSec: 6750, distanceKm: 21.1 }, noWorkout);
+  is('easy walk for an hour', { type: 'LogCardio', cardioType: 'walk', durationSec: 3600, zone: 2 }, noWorkout);
+  is('3 miles run 27 minutes', { type: 'LogCardio', durationSec: 1620 }, noWorkout);
+});
+test('DA cardio: løb, cykling, motionscykel', () => {
+  is('løb 5 km på 25 minutter', { type: 'LogCardio', cardioType: 'run', durationSec: 1500, distanceKm: 5, lang: 'da' }, noWorkout);
+  is('halvanden time cykling', { type: 'LogCardio', cardioType: 'bike', durationSec: 5400 }, noWorkout);
+  is('en time på motionscykel', { type: 'LogCardio', cardioType: 'spin', durationSec: 3600 }, noWorkout);
+  is('svømning 1 km 30 min', { type: 'LogCardio', cardioType: 'swim', distanceKm: 1 }, noWorkout);
+});
+test('cardio start, missing time, and no clash with barbell row', () => {
+  is('start a run', { type: 'StartCardio', cardioType: 'run' }, noWorkout);
+  is('start løbetur', { type: 'StartCardio', cardioType: 'run' }, noWorkout);
+  is('run 5 km', { type: 'Ask', reason: 'duration' }, noWorkout);
+  is('barbell row 60 for 8', { type: 'LogSet', exerciseId: 'barbell-row', kg: 60 });
+  is('row 60 kg 8 reps', { type: 'LogSet', exerciseId: 'barbell-row' });
+});
+test('bodyweight, protein and what to lift', () => {
+  is('I weigh 82.5', { type: 'LogBodyweight', kg: 82.5 });
+  is('jeg vejer 82,5 kilo', { type: 'LogBodyweight', kg: 82.5 });
+  is('40 grams of protein', { type: 'LogProtein', grams: 40 });
+  is('30 gram protein', { type: 'LogProtein', grams: 30 });
+  is('what should I lift', { type: 'Query', what: 'suggest' });
+  is('hvad skal jeg løfte', { type: 'Query', what: 'suggest' });
+});

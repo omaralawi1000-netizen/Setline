@@ -16,6 +16,9 @@ import * as W from './workout.js';
 import { bestsFrom, e1rm } from './pr.js';
 import { routineName, estimateMinutes } from './routines.js';
 import { weight as fmtW } from './format.js';
+import { cardioName, validateCardio, makeCardioSession, paceText } from './cardio.js';
+import { suggest } from './progression.js';
+import { validBodyweight, proteinTarget, dateKey, bodyTrend } from './body.js';
 
 export const AUTO_MS = 1500;
 
@@ -205,7 +208,7 @@ export function resolve(intent, snap, t, lang) {
       if (w) return err('voice.alreadyRunning');
       const r = snap.routines.find(x => x.id === intent.routineId);
       if (!r) return err('voice.didntCatch');
-      const template = W.planFromHistory(r, snap.history);
+      const template = snap.planFor ? snap.planFor(r) : W.planFromHistory(r, snap.history);
       return cmd('auto', {
         title: t('voice.starting'), value: routineName(r, lang), sub: t('today.exercisesAbout', { n: r.exercises.length, min: estimateMinutes(r) }),
         say: say(t('say.start', { name: routineName(r, lang) })), run: { op: 'start', template, then: intent.then || null }
@@ -215,6 +218,7 @@ export function resolve(intent, snap, t, lang) {
       if (w) return err('voice.alreadyRunning');
       return cmd('auto', { title: t('voice.starting'), value: t('voice.emptyWorkout'), sub: t('voice.heard', { text: heard }), say: say(t('say.start', { name: t('voice.emptyWorkout') })), run: { op: 'start', template: {}, then: intent.then || null } });
     case 'Finish': {
+      if (snap.activeCardio && !w) return cmd('confirm', { title: t('cardio.finishTitle'), sub: cardioName(snap.activeCardio.type, snap.nameLang || lang), say: say(t('cardio.finishTitle')), run: { op: 'cardio-finish' } });
       const need = needWorkout(); if (need) return need;
       const sets = W.doneSetCount(w);
       if (!sets) return cmd('confirm', { title: t('discard.title'), sub: t('finish.nothing'), say: say(t('finish.nothing')), run: { op: 'discard' } });
@@ -225,6 +229,7 @@ export function resolve(intent, snap, t, lang) {
       });
     }
     case 'Discard': {
+      if (snap.activeCardio && !w) return cmd('confirm', { title: t('cardio.discardTitle'), sub: t('discard.body'), say: say(t('cardio.discardTitle')), run: { op: 'cardio-discard' } });
       const need = needWorkout(); if (need) return need;
       return cmd('confirm', { title: t('discard.title'), sub: t('discard.body'), say: say(t('discard.title')), run: { op: 'discard' } });
     }
@@ -251,6 +256,41 @@ export function resolve(intent, snap, t, lang) {
       if (!W.restRemaining(w.rest, snap.now)) return err('voice.noRest');
       return cmd('auto', { title: t('voice.restSkipped'), sub: t('voice.heard', { text: heard }), say: say(t('say.skip')), run: { op: 'update', fn: cw => W.skipRest(cw), nav: 'workout' } });
     }
+    case 'LogCardio': {
+      if (!intent.durationSec) return cmd('ask', { title: t('voice.askDuration'), sub: t('voice.askSub'), say: say(t('voice.askDuration')), choices: [] });
+      const v = validateCardio({ type: intent.cardioType, durationSec: intent.durationSec, distanceKm: intent.distanceKm ?? null, zone: intent.zone ?? null });
+      if (!v.ok) return err('voice.cardioInvalid');
+      const session = makeCardioSession({ type: intent.cardioType, startedAt: (snap.now ?? Date.now()) - intent.durationSec * 1000, durationSec: intent.durationSec, distanceKm: intent.distanceKm ?? null, zone: intent.zone ?? null, source: 'voice' });
+      const parts = [durTxt(intent.durationSec)];
+      if (session.distanceKm) parts.unshift(`${fmtW(session.distanceKm, 'kg', lang)} km`);
+      const pace = paceText(session, lang);
+      return cmd('auto', {
+        title: cardioName(session.type, snap.nameLang || lang), value: parts.join(' · '),
+        sub: [pace, intent.zone ? t('cardio.zone', { n: intent.zone }) : '', t('voice.heard', { text: heard })].filter(Boolean).join(' · '),
+        say: say(t('say.cardio', { name: cardioName(session.type, lang), time: durWords(intent.durationSec) })),
+        run: { op: 'cardio-log', session }
+      });
+    }
+    case 'StartCardio': {
+      if (snap.activeCardio) return err('voice.cardioRunning');
+      if (w) return cmd('info', { title: t('voice.cardioAfter'), sub: t('voice.cardioAfterSub'), say: say(t('voice.cardioAfter')) });
+      return cmd('auto', { title: t('voice.starting'), value: cardioName(intent.cardioType, snap.nameLang || lang), sub: t('voice.heard', { text: heard }), say: say(t('say.start', { name: cardioName(intent.cardioType, lang) })), run: { op: 'cardio-start', type: intent.cardioType } });
+    }
+    case 'LogBodyweight': {
+      if (!validBodyweight(intent.kg)) return err('voice.bwInvalid');
+      return cmd('auto', { title: t('body.weight'), value: `${kgTxt(intent.kg)} ${u}`, sub: t('voice.heard', { text: heard }), say: say(t('say.bw', { kg: kgTxt(intent.kg), unit: sayUnit })), run: { op: 'bodyweight', kg: intent.kg } });
+    }
+    case 'LogProtein': {
+      if (!(intent.grams > 0 && intent.grams <= 300)) return err('voice.didntCatch');
+      const today = (snap.nutrition || []).find(n => n.date === dateKey(snap.now))?.protein || 0;
+      const bw = bodyTrend(snap.bodyweight || [])?.latest.kg;
+      const target = proteinTarget(bw, settings.proteinPerKg);
+      const total = today + intent.grams;
+      return cmd('auto', {
+        title: t('body.protein'), value: `+${intent.grams} g`, sub: target ? t('body.proteinOf', { g: total, target }) : t('body.proteinToday', { g: total }),
+        say: say(target ? t('say.protein', { g: total, left: Math.max(0, target - total) }) : t('say.proteinNoTarget', { g: total })), run: { op: 'protein', grams: intent.grams }
+      });
+    }
     case 'Query': return query();
     case 'Cancel': return cmd('cancel', { title: t('voice.cancelled'), say: '' });
     case 'Help': return cmd('info', { title: t('voice.help'), sub: ['voice.hint.log', 'voice.hint.same', 'voice.hint.add', 'voice.hint.skip', 'voice.hint.next', 'voice.hint.last'].map(k => t(k)).join(' · '), say: '' });
@@ -261,11 +301,21 @@ export function resolve(intent, snap, t, lang) {
           choices: intent.choices.map(id => ({ label: name(id), intent: { ...intent.then, exerciseId: id, heard } }))
         });
       }
+      if (intent.reason === 'duration') return cmd('ask', { title: t('voice.askDuration'), sub: t('voice.askSub'), say: say(t('voice.askDuration')), choices: [] });
       const key = intent.reason === 'weight' ? 'askWeight' : 'askReps';
       return cmd('ask', { title: t(`voice.${key}`), sub: t('voice.askSub'), say: say(t(`say.${key}`)), choices: [] });
     }
     default:
       return cmd('error', { title: t('voice.didntCatch'), sub: heard ? t('voice.heard', { text: heard }) : '', say: say(t('say.didnt')), retry: true });
+  }
+
+  function durTxt(sec) {
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+  }
+  function durWords(sec) {
+    const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+    return h ? t('say.hm', { h, m }) : t('say.min', { m, s: 0 });
   }
 
   function restClock(sec) { return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; }
@@ -290,6 +340,17 @@ export function resolve(intent, snap, t, lang) {
       });
     }
     if (!exId) return err('voice.noExercise');
+    if (intent.what === 'suggest') {
+      const e = snap.catalog.get(exId);
+      const ex = cur();
+      const target = ex?.sets.find(s => !s.done)?.reps ?? null;
+      const sg = e ? suggest(snap.history, e, target) : null;
+      if (!sg) return cmd('info', { title: t('q.noHistory', { name: name(exId) }), say: say(t('q.noHistory', { name: name(exId) })) });
+      return cmd('info', {
+        title: name(exId), value: setTxt(sg.kg, sg.reps), sub: t(`suggest.${sg.reason}`, { from: setTxt(sg.from.kg, sg.from.reps) }),
+        say: say(t('say.suggest', { kg: kgTxt(sg.kg), unit: sayUnit, reps: sg.reps, why: t(`suggest.${sg.reason}`, { from: `${kgTxt(sg.from.kg)} ${sayUnit} ${t('say.for')} ${sg.from.reps}` }) }))
+      });
+    }
     if (intent.what === 'pr') {
       const b = bestsFrom(snap.prs, exId);
       if (!b.e1rm) return cmd('info', { title: t('q.noPr', { name: name(exId) }), say: say(t('q.noPr', { name: name(exId) })) });

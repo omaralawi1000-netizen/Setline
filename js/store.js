@@ -7,6 +7,9 @@ import { resolveLang, translator } from './i18n.js';
 import { createWorkout, finishWorkout, doneSetCount } from './workout.js';
 import { applyWorkout } from './pr.js';
 import { clearKeys } from './keys.js';
+import { startCardio, pauseCardio, resumeCardio, finishCardio, cardioRecords } from './cardio.js';
+import { upsertBodyweight, addProtein, dateKey } from './body.js';
+import { easyDay } from './progression.js';
 
 const listeners = new Set();
 const UNDO_MAX = 20;
@@ -24,6 +27,9 @@ export const state = {
   active: null,
   chat: [],        // coach thread, oldest first
   bodyweight: [],
+  cardio: [],      // finished cardio sessions, newest first
+  activeCardio: null,
+  nutrition: [],
   undo: [],
   error: null
 };
@@ -48,6 +54,10 @@ export async function init() {
     db.getAll('exercises'), db.getAll('routines'), db.getAll('workouts'), db.getAll('prs'), db.get('meta', 'activeWorkout'),
     db.getAll('chat'), db.getAll('bodyweight')
   ]);
+  const [cardio, activeCardio, nutrition] = await Promise.all([db.getAll('cardio'), db.get('meta', 'activeCardio'), db.getAll('nutrition')]);
+  state.cardio = cardio.sort((a, b) => b.startedAt - a.startedAt);
+  state.activeCardio = activeCardio || null;
+  state.nutrition = nutrition;
   state.chat = chat.sort((a, b) => a.at - b.at);
   state.bodyweight = bodyweight;
   state.custom = custom;
@@ -78,9 +88,11 @@ function persistActive() {
 }
 export const flush = () => writing;
 
-export function startWorkout(template) {
+export function startWorkout(template, { readiness = null, easy = false } = {}) {
   if (state.active) return state.active;
-  state.active = createWorkout(template);
+  state.active = createWorkout(easy ? easyDay(template) : template);
+  if (readiness) state.active.readiness = readiness;
+  if (easy) state.active.easy = true;
   state.undo = [];
   persistActive();
   emit('start');
@@ -141,6 +153,98 @@ export async function discard() {
   emit('discard');
 }
 
+// ---- cardio ----
+const saveActiveCardio = () => (state.activeCardio ? db.put('meta', state.activeCardio, 'activeCardio') : db.del('meta', 'activeCardio'))
+  .catch(() => { state.error = 'storage'; emit('error'); });
+
+export function beginCardio(type) {
+  if (state.activeCardio) return state.activeCardio;
+  state.activeCardio = startCardio(type);
+  saveActiveCardio();
+  emit('cardio');
+  return state.activeCardio;
+}
+export function toggleCardioPause() {
+  const a = state.activeCardio;
+  if (!a) return;
+  state.activeCardio = a.pausedAt ? resumeCardio(a) : pauseCardio(a);
+  saveActiveCardio();
+  emit('cardio');
+}
+export async function endCardio(details) {
+  const a = state.activeCardio;
+  if (!a) return null;
+  const session = finishCardio(a, details);
+  session.records = cardioRecords(session, state.cardio);
+  await db.tx(['cardio', 'meta'], 'readwrite', s => { s.cardio.put(session); s.meta.delete('activeCardio'); });
+  state.activeCardio = null;
+  state.cardio = [session, ...state.cardio].sort((x, y) => y.startedAt - x.startedAt);
+  emit('cardio');
+  return session;
+}
+export async function discardCardio() {
+  state.activeCardio = null;
+  await saveActiveCardio();
+  emit('cardio');
+}
+export async function addCardio(session) {
+  const s = { ...session, records: cardioRecords(session, state.cardio) };
+  await db.put('cardio', s);
+  state.cardio = [s, ...state.cardio.filter(c => c.id !== s.id)].sort((x, y) => y.startedAt - x.startedAt);
+  emit('cardio');
+  return s;
+}
+export async function deleteCardio(id) {
+  await db.del('cardio', id);
+  state.cardio = state.cardio.filter(c => c.id !== id);
+  emit('cardio');
+}
+
+// ---- body ----
+export async function logBodyweight(kg, date = dateKey()) {
+  state.bodyweight = upsertBodyweight(state.bodyweight, date, kg);
+  await db.put('bodyweight', state.bodyweight.find(e => e.date === date));
+  emit('body');
+}
+export async function deleteBodyweight(date) {
+  state.bodyweight = state.bodyweight.filter(e => e.date !== date);
+  await db.del('bodyweight', date);
+  emit('body');
+}
+export async function logProtein(grams, date = dateKey()) {
+  state.nutrition = addProtein(state.nutrition, date, grams);
+  const e = state.nutrition.find(x => x.date === date);
+  if (e) await db.put('nutrition', e);
+  emit('body');
+}
+export async function undoProtein(grams, date = dateKey()) {
+  const e = state.nutrition.find(x => x.date === date);
+  if (!e) return;
+  const next = { date, protein: Math.max(0, e.protein - grams) };
+  state.nutrition = [...state.nutrition.filter(x => x.date !== date), next];
+  await db.put('nutrition', next);
+  emit('body');
+}
+
+// ---- routines ----
+export async function saveRoutine(r) {
+  await db.put('routines', r);
+  const i = state.routines.findIndex(x => x.id === r.id);
+  state.routines = i === -1 ? [...state.routines, r] : state.routines.map(x => (x.id === r.id ? r : x));
+  emit('routines');
+}
+export async function saveRoutines(list) {
+  await db.tx('routines', 'readwrite', s => { for (const r of list) s.routines.put(r); });
+  const ids = new Set(list.map(r => r.id));
+  state.routines = [...state.routines.filter(r => !ids.has(r.id)), ...list];
+  emit('routines');
+}
+export async function deleteRoutine(id) {
+  await db.del('routines', id);
+  state.routines = state.routines.filter(r => r.id !== id);
+  emit('routines');
+}
+
 // ---- coach thread ----
 export function addChat(role, text, extra = {}) {
   const msg = { id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`, role, text, at: Date.now(), ...extra };
@@ -192,6 +296,10 @@ export async function resetAll() {
   state.prs = [];
   state.custom = [];
   state.chat = [];
+  state.cardio = [];
+  state.activeCardio = null;
+  state.nutrition = [];
+  state.bodyweight = [];
   await init();
   emit('reset');
 }

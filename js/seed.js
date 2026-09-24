@@ -1,6 +1,8 @@
 // Dev-only sample history, loaded only with ?seed=1. Runs once per database.
 import * as db from './db.js';
 import { makeSet } from './workout.js';
+import { makeCardioSession } from './cardio.js';
+import { dateKey } from './body.js';
 
 const DAY = 86_400_000;
 
@@ -31,5 +33,11 @@ export async function seed(store) {
     });
   }
   await store.importHistory(workouts);
+  const runs = [[1, 'run', 1680, 5.2, 2], [3, 'bike', 2700, 18, 2], [6, 'run', 1500, 5, 3], [9, 'row', 900, 3.4, 4], [12, 'walk', 3000, 4.1, 1]];
+  for (const [d, type, sec, km, zone] of runs.reverse()) {
+    await store.addCardio(makeCardioSession({ type, startedAt: now - d * DAY - 7 * 3600_000, durationSec: sec, distanceKm: km, zone }));
+  }
+  for (let d = 30; d >= 0; d -= 3) await store.logBodyweight(83.4 - (30 - d) * 0.04 + (d % 2) * 0.2, dateKey(now - d * DAY));
+  await store.logProtein(95);
   await db.put('meta', true, 'devSeeded');
 }

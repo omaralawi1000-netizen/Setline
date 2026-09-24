@@ -8,9 +8,9 @@ Source: SPEC.md section 7. Work one phase at a time; stop after each and wait fo
 | --- | --- |
 | 1. Foundation and touch workout loop (no AI) | Done |
 | 2. Voice | Done (1.2.1 fixes after phone test) |
-| 3. AI brain and Coach | Done, awaiting phone test |
-| 4. Routines and plans | Not started |
-| 5. Progress and extras | Not started |
+| 3. AI brain and Coach | Done (1.3.1 model fixes after phone test) |
+| 4. Routines and plans | Done, awaiting phone test |
+| 5. Progress and extras | Partly pulled forward (see below) |
 
 ## Phase 1: Foundation and touch workout loop (no AI)
 
@@ -89,11 +89,25 @@ Fixes shipped alongside (from phone testing of phase 2):
 
 ## Phase 4: Routines and plans
 
-Routine editor, starter routines, voice plan builder.
+- [x] Routine editor: rename, add, remove, drag to reorder, sets × reps per exercise, duplicate, delete (confirmed), start
+- [x] Starter programs: Push / Pull / Legs, Upper / Lower, Full body 3× (one tap, sets the weekly goal)
+- [x] Coach plan builder: "make me a 4-day upper/lower, 60 minutes, focus chest, dumbbells only" → JSON plan checked against the catalog → plan card → Save as routines
+- [x] "Up next" on Today: the routine done least recently
+
+Added on request (not in the original spec), 1.4.0:
+- [x] Cardio as a first-class part of the app: 11 types, live session with pause (timestamps only), log a past session, distance/pace/speed/splits, zones 1–5, records (distance, duration, pace), weekly minutes goal, History, Coach context, voice ("30 minutes zone 2 on the bike", "løb 5 km på 25 minutter", "start a run")
+- [x] Next-set suggestions (double progression, stall detection, 10% deload; 5 kg steps for big lower-body lifts, 2 kg for dumbbells) in planned weights with the reason shown; "what should I lift?"
+- [x] Readiness check before a routine (1–5); 1–2 offers an easy day (−10%, one set fewer)
+- [x] Weekly streak (strength workouts + cardio of 20+ min against the weekly goal)
+- [x] Bodyweight log (one per day, trend, 30-day change) and a protein target from bodyweight with quick +20/+30/+40 g and voice
+- [x] Last week review card with a Coach check-in button
+- [x] Multi-set logging: "9, 8 and 8 reps at 100 kg" (parser and AI)
+- [x] Design pass: film grain, scroll-aware blurred top bars, small-caps labels, calmer surfaces
+- Decisions: live cardio can't run during a strength workout (log it afterwards instead); voice starts skip the readiness check to stay hands-free; a live session must be at least 1 minute and pass a speed sanity check.
 
 ## Phase 5: Progress and extras
 
-SVG progress charts, bodyweight log, plate calculator, backup export/import, polish pass.
+SVG progress charts, plate calculator, backup export/import, polish pass. (Bodyweight log and Today cards were pulled forward.)
 
 ## Notes
 

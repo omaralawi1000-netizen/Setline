@@ -1,6 +1,6 @@
 // Service worker: precached app shell, runtime cache for Google Fonts.
 // Bump VERSION on every release (keep js/version.js in sync).
-const VERSION = '1.3.1';
+const VERSION = '1.4.0';
 const CACHE = 'setline-' + VERSION;
 const FONTS = 'setline-fonts';
 const SHELL = [
@@ -13,6 +13,8 @@ const SHELL = [
   'js/ai.js',
   'js/app.js',
   'js/audio.js',
+  'js/body.js',
+  'js/cardio.js',
   'js/coach.js',
   'js/commands.js',
   'js/keys.js',
@@ -27,6 +29,7 @@ const SHELL = [
   'js/haptics.js',
   'js/i18n.js',
   'js/pr.js',
+  'js/progression.js',
   'js/routines.js',
   'js/settings.js',
   'js/store.js',
@@ -34,6 +37,8 @@ const SHELL = [
   'js/version.js',
   'js/wakelock.js',
   'js/workout.js',
+  'js/ui/body.js',
+  'js/ui/cardio.js',
   'js/ui/coach.js',
   'js/ui/dom.js',
   'js/ui/icons.js',
@@ -42,6 +47,7 @@ const SHELL = [
   'js/ui/today.js',
   'js/ui/workout.js',
   'js/ui/picker.js',
+  'js/ui/routine.js',
   'js/ui/history.js',
   'js/ui/settings.js',
   'js/ui/voice.js',

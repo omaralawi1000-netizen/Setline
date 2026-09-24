@@ -75,7 +75,7 @@ async function post(path, key, body, { timeout = 0, signal } = {}) {
 
 // ---------- command fallback ----------
 
-const QUERY = ['last', 'pr', 'setsLeft', 'restLeft'];
+const QUERY = ['last', 'pr', 'setsLeft', 'restLeft', 'suggest'];
 const AI_TYPES = INTENTS.filter(t => !['Ask', 'Unknown'].includes(t)).concat('question');
 
 export const COMMAND_SCHEMA = {
@@ -91,6 +91,11 @@ export const COMMAND_SCHEMA = {
     repsDelta: { type: 'INTEGER', nullable: true },
     sec: { type: 'INTEGER', nullable: true, description: 'seconds, for rest' },
     what: { type: 'STRING', nullable: true, enum: QUERY },
+    cardioType: { type: 'STRING', nullable: true, enum: ['run', 'walk', 'hike', 'bike', 'spin', 'row', 'swim', 'elliptical', 'stairs', 'hiit', 'other'] },
+    durationSec: { type: 'INTEGER', nullable: true },
+    distanceKm: { type: 'NUMBER', nullable: true },
+    zone: { type: 'INTEGER', nullable: true, description: 'effort zone 1-5' },
+    grams: { type: 'INTEGER', nullable: true, description: 'protein grams' },
     sets: { type: 'ARRAY', nullable: true, description: 'for LogSets: each set in order', items: { type: 'OBJECT', properties: { kg: { type: 'NUMBER' }, reps: { type: 'INTEGER' } }, required: ['kg', 'reps'] } }
   },
   required: ['type']
@@ -116,6 +121,8 @@ const SYSTEM_COMMAND = 'You map a gym voice command to one intent for a workout 
   'Use only the given types and fields. Fill kg and reps from context only when the user clearly refers to it ("same weight", "10 reps"). ' +
   'Never invent numbers. If it is a question or conversation rather than a command, return type "question". ' +
   'Use LogSets with a sets array when several sets with different reps or weights are described in one go. ' +
+  'LogCardio logs finished cardio (cardioType, durationSec, optional distanceKm and zone); StartCardio starts a live cardio timer. ' +
+  'LogBodyweight uses kg; LogProtein uses grams. Query.what "suggest" asks what weight to use next. ' +
   'AdjustLast changes the last logged set by kgDelta or repsDelta. EditLast sets its kg or reps. Query.what is one of last, pr, setsLeft, restLeft.';
 
 const num = (v, lo, hi) => (typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi ? v : null);
@@ -175,6 +182,17 @@ export function validateAI(raw, ctx) {
       return r ? { type: t, routineId: r.id } : null;
     }
     case 'StartRest': return { type: t, sec: int(raw.sec, 10, 900) };
+    case 'LogCardio': {
+      const durationSec = int(raw.durationSec, 60, 12 * 3600);
+      const cardioType = COMMAND_SCHEMA.properties.cardioType.enum.includes(raw.cardioType) ? raw.cardioType : null;
+      if (!durationSec || !cardioType) return null;
+      const distanceKm = raw.distanceKm == null ? null : num(raw.distanceKm, 0.05, 400);
+      if (raw.distanceKm != null && distanceKm == null) return null;
+      return { type: t, cardioType, durationSec, distanceKm, zone: int(raw.zone, 1, 5) };
+    }
+    case 'StartCardio': return COMMAND_SCHEMA.properties.cardioType.enum.includes(raw.cardioType) ? { type: t, cardioType: raw.cardioType } : null;
+    case 'LogBodyweight': { const kg = num(raw.kg, 20, 400); return kg ? { type: t, kg } : null; }
+    case 'LogProtein': { const grams = int(raw.grams, 1, 300); return grams ? { type: t, grams } : null; }
     case 'AdjustRest': { const sec = int(raw.sec, -600, 600); return sec ? { type: t, sec } : null; }
     case 'Query': {
       if (!QUERY.includes(raw.what)) return null;
@@ -251,4 +269,17 @@ export async function withFallback(models, fn) {
     try { return await fn(m); } catch (e) { last = e; if (!retryable(e)) throw e; }
   }
   throw last;
+}
+
+// Structured plan from the Coach model (JSON schema output).
+export async function aiPlan({ key, model, system, prompt, schema, signal }) {
+  const { res, done } = await post(`models/${encodeURIComponent(model)}:generateContent`, key, {
+    systemInstruction: { parts: [{ text: system }] },
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.4, responseMimeType: 'application/json', responseSchema: schema, maxOutputTokens: 2500 }
+  }, { timeout: 25000, signal });
+  try {
+    const data = await res.json();
+    try { return JSON.parse(textOf(data)); } catch { throw new AiError('invalid'); }
+  } finally { done(); }
 }

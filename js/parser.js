@@ -8,8 +8,9 @@
 // Intent shapes are shared with the AI fallback (phase 3).
 import { normalize } from './catalog.js';
 import { lbToKg, round } from './units.js';
+import { CARDIO_TYPES } from './cardio.js';
 
-export const INTENTS = ['LogSet', 'LogSets', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
+export const INTENTS = ['LogSet', 'LogSets', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
   'AddExercise', 'SwapExercise', 'StartRoutine', 'StartEmpty', 'Finish', 'Discard', 'StartRest', 'AdjustRest', 'SkipRest',
   'Query', 'Cancel', 'Help', 'Ask', 'Unknown'];
 
@@ -18,6 +19,7 @@ export const INTENTS = ['LogSet', 'LogSets', 'RepeatLast', 'AdjustLast', 'EditLa
 export function clean(text) {
   let s = String(text || '').toLowerCase().normalize('NFC');
   s = s.replace(/[’'`´]/g, '');
+  s = s.replace(/(\d):(?=\d\d)/g, '$1\u0002');                        // times: 24:30, 1:05:30
   s = s.replace(/(\d)[,.](\d)/g, '$1\u0001$2');                     // decimals: 82,5 / 82.5 ("10, 9" stays a list)
   s = s.replace(/[−–—]/g, '-');
   s = s.replace(/(^|\s)\+\s*(\d)/g, '$1plus $2').replace(/(^|\s)-\s*(\d)/g, '$1minus $2');
@@ -25,8 +27,8 @@ export function clean(text) {
   s = s.replace(/(\d)\s*x\s*(\d)/g, '$1 x $2').replace(/(^|\s)x(\d)/g, '$1x $2');
   s = s.replace(/(\d)([a-zæøå]+)/g, '$1 $2');                       // 80kg -> 80 kg
   s = s.replace(/@/g, ' at ');
-  s = s.replace(/[^\p{L}\p{N}\u0001\s]/gu, ' ');                    // punctuation, hyphens
-  s = s.replace(/\u0001/g, '.');
+  s = s.replace(/[^\p{L}\p{N}\u0001\u0002\s]/gu, ' ');              // punctuation, hyphens
+  s = s.replace(/\u0001/g, '.').replace(/\u0002/g, ':');
   return s.replace(/\s+/g, ' ').trim();
 }
 
@@ -36,7 +38,8 @@ const DA_WORDS = new Set(('gentagelser gentagelse gentagelserne sæt samme igen 
   'spring over færdig afslut og af med hvad hvor mange sidst sidste gang tilbage lavede jeg er det var faktisk ret slet fjern tilføj ' +
   'skift byt træning træningen tom ny fortryd annuller glem hjælp sekunder sekund minutter minut halv halvt halvandet komma tre fem seks ' +
   'syv otte ni ti elleve tolv tretten fjorten femten seksten sytten atten nitten tyve tredive fyrre halvtreds tres halvfjerds firs ' +
-  'halvfems hundrede på rekord bedste kassér kasser gør lige tag træk fra kiloene pund færre videre begynd kør nu så gerne min mit en et').split(' '));
+  'halvfems hundrede på rekord bedste kassér kasser gør lige tag træk fra kiloene pund færre videre begynd kør nu så gerne min mit en et ' +
+  'halvanden halvandet timer løb løbetur løbede cykling cyklede cykel svømning svømmede gåtur gik vejer vægt romaskine motionscykel crosstrainer intervaller').split(' '));
 const EN_WORDS = new Set(('same again add more less next previous exercise rest skip finish done the for and what how many much ' +
   'last time left did do is was actually correct delete remove swap switch change workout empty new undo cancel never mind help ' +
   'seconds second minutes minute half point one two three four five six seven eight nine ten eleven twelve twenty thirty forty fifty ' +
@@ -261,6 +264,55 @@ function readDuration(s) {
   return Math.round(TIME_MIN.has(m[2]) ? v * 60 : v);
 }
 
+// ---------- cardio ----------
+
+const CARDIO_WORDS = (() => {
+  const list = [];
+  for (const c of CARDIO_TYPES) for (const w of [c.en, c.da, ...c.aliases]) list.push([w.toLowerCase(), c.id]);
+  return list.sort((a, b) => b[0].length - a[0].length); // longest first: "indoor bike" before "bike"
+})();
+
+export function findCardioType(s) {
+  for (const [w, id] of CARDIO_WORDS) if (new RegExp(`(^|\\s)${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`).test(s)) return { id, word: w };
+  return null;
+}
+
+// Duration in seconds from "30 minutes", "1 hour", "1.5 timer", "24:30", "1:05:30", "45 min".
+export function readCardioDuration(s) {
+  let m;
+  if (/\b(an? )?hour and a half\b|\b1 and a half hours?\b/.test(s)) return 5400;
+  if (/\bhalf an? hour\b|\bhalv time\b|\b0\.5 time\b/.test(s)) return 1800;
+  if (/\b(an|a|one|1) hour\b/.test(s) && !/\d+ ?(minutes?|mins?)/.test(s)) return 3600;
+  if ((m = /(?:^|\s)(\d+):(\d\d):(\d\d)(?:\s|$)/.exec(s))) return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
+  if ((m = /(?:^|\s)(\d+):(\d\d)(?:\s|$)/.exec(s))) return Number(m[1]) * 60 + Number(m[2]);
+  let sec = 0, hit = false;
+  const h = /(\d+(?:\.\d+)?) ?(hours?|hrs?|h|timer|time|timers)\b/.exec(s);
+  if (h) { sec += Number(h[1]) * 3600; hit = true; }
+  const mm = /(\d+(?:\.\d+)?) ?(minutes?|mins?|minutter|minut|m)\b(?! ?(?:meter|meters))/.exec(s);
+  if (mm && !/(\d+) ?m\b/.test(s.replace(mm[0], '')) ) { sec += Number(mm[1]) * 60; hit = true; }
+  else if (mm) { sec += Number(mm[1]) * 60; hit = true; }
+  const ss = /(\d+) ?(seconds?|secs?|sekunder)\b/.exec(s);
+  if (ss && hit) sec += Number(ss[1]);
+  return hit ? Math.round(sec) : null;
+}
+
+// Distance in km from "5 km", "5k", "10 kilometer", "3 miles", "2000 meter", "400 m".
+export function readCardioDistance(s) {
+  let m;
+  if ((m = /(\d+(?:\.\d+)?) ?(km|kilometers?|kilometer|kilometre|kilometres|k)\b/.exec(s))) return Number(m[1]);
+  if ((m = /(\d+(?:\.\d+)?) ?(miles?)\b/.exec(s))) return round(Number(m[1]) * 1.609344, 3);
+  if ((m = /(\d+) ?(meters?|meter|metres?|m)\b/.exec(s)) && Number(m[1]) >= 50) return Number(m[1]) / 1000;
+  return null;
+}
+
+function readZone(s) {
+  const m = /\b(?:zone|zon) ?([1-5])\b/.exec(s);
+  if (m) return Number(m[1]);
+  if (/\b(easy|recovery|rolig|roligt|let|nem)\b/.test(s)) return 2;
+  if (/\b(hard|hårdt|hård|tempo|threshold)\b/.test(s)) return 4;
+  return null;
+}
+
 // ---------- main ----------
 
 const R = (re, s) => re.exec(s);
@@ -351,6 +403,34 @@ export function parse(text, ctx = {}) {
     const hit = phrase ? exercise(phrase) : null;
     if (!phrase || hit?.exerciseId) return out('Query', { what: 'last', exerciseId: hit?.exerciseId ?? null });
     if (hit?.choices) return out('Ask', { reason: 'exercise', choices: hit.choices, then: { type: 'Query', what: 'last' } });
+  }
+
+  // --- bodyweight and protein ---
+  if ((m = R(/^(?:i )?(?:weigh|weighed|weight|my weight is|my weight|bodyweight|body weight|jeg vejer|vejer|vægt|min vægt er|kropsvægt)(?: is| er| i dag| today)? (\d+(?:\.\d+)?) ?(kg|kilo|kilos|lb|lbs|pounds|pund)?$/, s))) {
+    const v = Number(m[1]);
+    return out('LogBodyweight', { kg: m[2] && /^(lb|lbs|pounds|pund)$/.test(m[2]) || (!m[2] && ctx.unit === 'lb') ? round(lbToKg(v), 2) : v });
+  }
+  if ((m = R(/^(?:log |add |ate |had |spiste |fik )?(\d+) ?(?:g|gram|grams|gr) (?:of )?protein$|^protein (\d+) ?(?:g|gram|grams)?$/, s))) {
+    return out('LogProtein', { grams: Number(m[1] ?? m[2]) });
+  }
+
+  // --- what to lift next ---
+  if (/^(what should i (lift|do|use|go for)|what weight( should i use| next| now)?|what s next|whats next|hvad skal jeg løfte|hvad skal jeg tage|hvilken vægt( skal jeg tage)?|hvad nu)$/.test(s)) return out('Query', { what: 'suggest' });
+
+  // --- cardio ---
+  {
+    const ct = findCardioType(s);
+    if (ct) {
+      if ((m = R(/^(?:start|begin|begynd|start en|start 1|start a|start an)(?: new| ny)? (.+)$/, s)) && !/\d/.test(m[1]) && findCardioType(m[1])?.id === ct.id) {
+        return out('StartCardio', { cardioType: ct.id });
+      }
+      const durationSec = readCardioDuration(s);
+      const distanceKm = readCardioDistance(s);
+      if (durationSec) return out('LogCardio', { cardioType: ct.id, durationSec, distanceKm, zone: readZone(s) });
+      if (distanceKm) return out('Ask', { reason: 'duration', then: { type: 'LogCardio', cardioType: ct.id, distanceKm, zone: readZone(s) } });
+    } else if (/^(start|begin|begynd) (?:some |en |1 )?(cardio|kondition|konditionstræning)$/.test(s)) {
+      return out('StartCardio', { cardioType: 'other' });
+    }
   }
 
   // --- navigation ---

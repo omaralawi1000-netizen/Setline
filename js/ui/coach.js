@@ -1,8 +1,8 @@
 // Coach tab: chat thread, composer, streamed answers, spoken when complete.
 import * as store from '../store.js';
 import { state } from '../store.js';
-import { streamChat, listModelsText, AiError, withFallback } from '../ai.js';
-import { buildContext, chatContents, systemPrompt, formatAnswer, speakable } from '../coach.js';
+import { streamChat, listModelsText, AiError, withFallback, aiPlan } from '../ai.js';
+import { buildContext, chatContents, systemPrompt, formatAnswer, speakable, isPlanRequest, PLAN_SCHEMA, planSystem, validatePlan, planToRoutines } from '../coach.js';
 import { getKey } from '../keys.js';
 import { coachModels, ttsModelId } from '../settings.js';
 import * as tts from '../tts.js';
@@ -26,7 +26,17 @@ function bubble(m) {
     return `<li class="msg ai err" data-id="${m.id}"><div class="bub"><p>${esc(errorText(m.error, t))}</p>
       ${m.error === 'badkey' || m.error === 'nokey' || m.error === 'nomodel' ? `<button class="chip" data-coach="settings">${t('voice.openSettings')}</button>` : `<button class="chip" data-coach="retry" data-q="${esc(m.q || '')}">${t('coach.retry')}</button>`}</div></li>`;
   }
+  if (m.plan) return `<li class="msg ai plan" data-id="${m.id}"><div class="bub">${planCard(m)}</div></li>`;
   return `<li class="msg ai${m.streaming ? ' live' : ''}" data-id="${m.id}"><div class="bub">${m.text ? formatAnswer(m.text) : '<span class="dots"><i></i><i></i><i></i></span>'}</div></li>`;
+}
+
+function planCard(m) {
+  const { t, lang } = state;
+  const p = m.plan;
+  return `<div class="pcard"><div class="phead"><strong>${esc(p.name)}</strong><span class="tag sm soft">${t('plan.days', { n: p.days.length })}</span></div>
+    ${p.summary ? `<p>${esc(p.summary)}</p>` : ''}
+    ${p.days.map(d => `<div class="pday"><b>${esc(d.name)}</b><ul>${d.exercises.map(e => `<li><span>${esc(state.catalog.name(e.exerciseId, lang))}</span><span class="psr">${e.sets} × ${e.reps}</span></li>`).join('')}</ul></div>`).join('')}
+    ${m.saved ? `<p class="psaved">${I.check}${t('plan.saved')}</p>` : `<button class="log" data-coach="saveplan" data-id="${m.id}">${I.plus}<span>${t('plan.save')}</span></button>`}</div>`;
 }
 
 export function renderCoach(root) {
@@ -44,7 +54,7 @@ export function renderCoach(root) {
   } else {
     body = `<ol class="thread" id="thread">${chat.map(bubble).join('')}</ol>`;
   }
-  root.innerHTML = `<div class="tabtop"></div>
+  root.innerHTML = `<header class="bar"><span class="bt">${t('coach.title')}</span></header>
     <header class="coachhead"><div><h1 class="h1">${t('coach.title')}</h1><p class="sub">${t('coach.sub')}</p></div>
       ${chat.length ? `<button class="iconbtn" data-coach="clear" aria-label="${t('coach.clear')}">${I.trash}</button>` : ''}</header>
     ${body}`;
@@ -84,9 +94,10 @@ export async function ask(question, { root = $('#s-coach') } = {}) {
   inflight = { ctl, id: reply.id };
   syncButton();
   await ensureModels();
+  if (isPlanRequest(question)) return buildPlan(question, reply, { key, lang, ctl, root });
   const context = buildContext({
     active: state.active, history: state.history, routines: state.routines, prs: state.prs, bodyweight: state.bodyweight,
-    catalog: state.catalog, settings: state.settings
+    cardio: state.cardio, activeCardio: state.activeCardio, nutrition: state.nutrition, catalog: state.catalog, settings: state.settings
   });
   try {
     let last = 0;
@@ -115,6 +126,41 @@ export async function ask(question, { root = $('#s-coach') } = {}) {
   }
 }
 
+// "make me a 4-day upper/lower, 60 minutes, dumbbells only" → an editable plan card
+async function buildPlan(question, reply, { key, lang, ctl, root }) {
+  const { t } = state;
+  const context = buildContext({ active: state.active, history: state.history, routines: state.routines, prs: state.prs, bodyweight: state.bodyweight, cardio: state.cardio, nutrition: state.nutrition, catalog: state.catalog, settings: state.settings });
+  try {
+    const raw = await withFallback(coachModels(state.settings), model => aiPlan({
+      key, model, system: planSystem(lang, state.catalog), schema: PLAN_SCHEMA, signal: ctl.signal,
+      prompt: `Training data:\n${context}\n\nRequest: ${question}`
+    }));
+    const plan = validatePlan(raw, state.catalog);
+    if (!plan) store.updateChat(reply.id, { streaming: false, text: t('plan.invalid') }, { persist: true });
+    else {
+      store.updateChat(reply.id, { streaming: false, text: plan.summary || plan.name, plan }, { persist: true });
+      haptic('success');
+      if (plan.summary && state.settings.spoken !== 'off') tts.speak(speakable(plan.summary), { key, model: ttsModelId(state.settings), voice: state.settings.voice, lang, canSpeak: () => !isRecording() });
+    }
+  } catch (e) {
+    const code = e instanceof AiError ? e.code : 'failed';
+    store.updateChat(reply.id, { streaming: false, ...(code === 'aborted' ? {} : { error: code === 'failed' && e.status ? String(e.status) : code === 'invalid' ? 'failed' : code }) }, { persist: true });
+  } finally {
+    if (inflight?.id === reply.id) inflight = null;
+    syncButton();
+    requestAnimationFrame(() => scrollDown(root));
+  }
+}
+
+async function savePlan(id) {
+  const m = state.chat.find(x => x.id === id);
+  if (!m?.plan || m.saved) return;
+  await store.saveRoutines(planToRoutines(m.plan));
+  if (m.plan.perWeek && state.settings.weeklyGoal !== m.plan.perWeek) store.setSettings({ weeklyGoal: m.plan.perWeek });
+  store.updateChat(id, { saved: true }, { persist: true });
+  haptic('success');
+}
+
 function syncButton() {
   const b = $('#composer button');
   if (b) { b.innerHTML = inflight ? I.stop : I.fwd; b.classList.toggle('stop', !!inflight); }
@@ -139,6 +185,7 @@ export function initCoach(n) {
     if (!b) return;
     const k = b.dataset.coach;
     if (k === 'ask' || k === 'retry') { haptic('tap'); ask(b.dataset.q, { root }); }
+    else if (k === 'saveplan') { b.disabled = true; savePlan(b.dataset.id); }
     else if (k === 'settings') nav.openSettings();
     else if (k === 'clear') {
       const { t } = state;

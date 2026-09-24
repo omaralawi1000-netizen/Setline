@@ -19,6 +19,7 @@ export function createWorkout(template = {}, now = Date.now(), id = uid()) {
   const exercises = (template.exercises || []).slice(0, LIMITS.exercisesPerWorkout).map(e => ({
     id: uid(),
     exerciseId: e.exerciseId,
+    ...(e.suggestion ? { suggestion: e.suggestion } : {}),
     sets: (e.sets || []).slice(0, LIMITS.setsPerExercise).map(s => makeSet({ kg: s.kg ?? null, reps: s.reps ?? null })),
     draft: null
   }));
@@ -223,18 +224,21 @@ export function suggestNext(ex, last, fallbackKg = 20) {
   return { kg, reps };
 }
 
-// Fill planned kg for a routine from the last session of each exercise.
-export function planFromHistory(routine, history) {
+// Fill planned kg for a routine: a suggestion per exercise if given (next-set suggestions),
+// otherwise the last session's weights.
+export function planFromHistory(routine, history, suggestFor = null) {
   return {
     name: routine.name,
     routineId: routine.id,
     exercises: routine.exercises.map(e => {
       const last = lastSession(history, e.exerciseId);
+      const sg = suggestFor?.(e.exerciseId, e.sets[0]?.reps ?? null) || null;
       return {
         exerciseId: e.exerciseId,
+        suggestion: sg ? { reason: sg.reason, from: sg.from, kg: sg.kg } : null,
         sets: e.sets.map((s, i) => ({
-          reps: s.reps,
-          kg: s.kg ?? last?.sets[Math.min(i, last.sets.length - 1)]?.kg ?? null
+          reps: sg && sg.reason === 'reps' ? sg.reps : s.reps,
+          kg: s.kg ?? (sg ? sg.kg : last?.sets[Math.min(i, last.sets.length - 1)]?.kg ?? null)
         }))
       };
     })

@@ -1,7 +1,7 @@
 // Entry point: navigation, dock, clock, service worker updates.
 import * as store from './store.js';
 import { state } from './store.js';
-import { planFromHistory, elapsedSec } from './workout.js';
+import { elapsedSec } from './workout.js';
 import { clock } from './format.js';
 import { setHapticsGate, haptic } from './haptics.js';
 import { keepAwake } from './wakelock.js';
@@ -14,11 +14,16 @@ import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav } from
 import { renderHistory, renderDetail } from './ui/history.js';
 import { renderSettings, initSettings } from './ui/settings.js';
 import { initVoice, orbHTML, voiceHandlePop, closeVoice, isVoiceOpen } from './ui/voice.js';
-import { renderCoach, initCoach } from './ui/coach.js';
+import { renderCoach, initCoach, ask as askCoach } from './ui/coach.js';
+import { initCardio, setCardioNav, tickCardio, renderCardioDetail } from './ui/cardio.js';
+import { initBody } from './ui/body.js';
+import { initRoutine, setRoutineNav, renderRoutine, editRoutine, programsSheet, startRoutine } from './ui/routine.js';
+import { setHistoryFilter } from './ui/history.js';
+import { cardioElapsed, cardioName } from './cardio.js';
 
 const TABS = ['today', 'workout', 'coach', 'history'];
-const SUB = ['detail', 'settings'];
-const view = { screen: 'today', detailId: null, parent: 'history' };
+const SUB = ['detail', 'settings', 'routine'];
+const view = { screen: 'today', detailId: null, detailKind: 'workout', parent: 'history' };
 const actions = {};
 const app = $('#app');
 
@@ -32,7 +37,8 @@ function renderScreen(name = view.screen) {
   else if (name === 'workout') renderWorkout(root);
   else if (name === 'history') renderHistory(root);
   else if (name === 'coach') renderCoach(root);
-  else if (name === 'detail') renderDetail(root, view.detailId);
+  else if (name === 'detail') (view.detailKind === 'cardio' ? renderCardioDetail : renderDetail)(root, view.detailId);
+  else if (name === 'routine') renderRoutine(root);
   else if (name === 'settings') renderSettings(root);
 }
 
@@ -62,10 +68,15 @@ function renderDock() {
 
 function renderMini() {
   const w = state.active;
-  const show = !!w && view.screen !== 'workout' && !SUB.includes(view.screen);
+  const a = state.activeCardio;
+  const show = !!(w || a) && view.screen !== 'workout' && !SUB.includes(view.screen);
   app.classList.toggle('has-mini', show);
   const el = $('#minibar');
   el.tabIndex = show ? 0 : -1;
+  if (!w && a) {
+    el.innerHTML = `<span class="dot${a.pausedAt ? ' paused' : ''}"></span><span class="l"><strong>${esc(cardioName(a.type, state.lang))}</strong><span data-cclock>${clock(cardioElapsed(a))}</span></span><span class="go">${I.up}</span>`;
+    return;
+  }
   if (!w) return;
   const cur = w.exercises[w.current];
   el.innerHTML = `<span class="dot"></span><span class="l"><strong>${esc(cur ? state.catalog.name(cur.exerciseId, state.lang) : state.t('workout.emptyTitle'))}</strong><span data-elapsed>${clock(elapsedSec(w))}</span></span><span class="go">${I.up}</span>`;
@@ -80,7 +91,7 @@ function renderAll() {
 }
 
 // Direction for the transition: tabs by position, sub screens push in from the right.
-const ORDER = { today: 0, workout: 1, coach: 2, history: 3, detail: 4, settings: 4 };
+const ORDER = { today: 0, workout: 1, coach: 2, history: 3, detail: 4, settings: 4, routine: 4 };
 function show(name, { back = false } = {}) {
   const prev = view.screen;
   view.screen = name;
@@ -102,7 +113,7 @@ function show(name, { back = false } = {}) {
     }
     s.inert = !on;
   }
-  app.classList.toggle('sub', SUB.includes(name));
+  app.classList.toggle('is-sub', SUB.includes(name));
   app.classList.toggle('coaching', name === 'coach');
   renderAll();
 }
@@ -124,20 +135,21 @@ function pushSub(name, extra = {}) {
   show(name);
 }
 
-function showDetail(id, { fromFinish = false } = {}) {
+function showDetail(id, { fromFinish = false, kind = 'workout' } = {}) {
+  view.detailKind = kind;
   if (fromFinish) {
     // After finishing, land in History with the detail on top.
     history.replaceState({ screen: 'history' }, '');
     view.screen = 'history';
   }
-  pushSub('detail', { detailId: id });
+  pushSub('detail', { detailId: id, detailKind: kind });
 }
 
 addEventListener('popstate', e => {
   if (handlePop()) return;
   if (voiceHandlePop()) return;
   const s = e.state || { screen: 'today' };
-  if (s.detailId) view.detailId = s.detailId;
+  if (s.detailId) { view.detailId = s.detailId; view.detailKind = s.detailKind || 'workout'; }
   const next = TABS.includes(s.screen) || SUB.includes(s.screen) ? s.screen : 'today';
   show(next, { back: SUB.includes(view.screen) && !SUB.includes(next) });
 });
@@ -148,15 +160,10 @@ Object.assign(actions, {
   go: el => { if (el.closest('#dock')) haptic('tap'); go(el.dataset.to); },
   back: () => history.back(),
   'open-settings': () => pushSub('settings'),
-  detail: el => pushSub('detail', { detailId: el.dataset.id }),
-  'start-routine': el => {
-    const r = state.routines.find(r => r.id === el.dataset.id);
-    if (!r || state.active) return go('workout');
-    store.startWorkout(planFromHistory(r, state.history));
-    haptic('success');
-    go('workout');
-  },
+  detail: el => pushSub('detail', { detailId: el.dataset.id, detailKind: el.dataset.kind || 'workout' }),
+  'start-routine': el => startRoutine(el.dataset.id),
   'start-empty': () => {
+    if (state.activeCardio) return go('workout');
     if (!state.active) store.startWorkout({});
     haptic('success');
     go('workout');
@@ -167,6 +174,26 @@ initSettings(actions, $('#s-settings'));
 setWorkoutNav({ go, showDetail });
 initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings') });
 initCoach({ openSettings: () => pushSub('settings') });
+setCardioNav({ go, showDetail });
+initCardio();
+initBody();
+setRoutineNav({ go, openRoutine: () => pushSub('routine'), back: () => history.back() });
+initRoutine($('#s-routine'));
+
+// buttons shared across screens
+app.addEventListener('click', e => {
+  const r = e.target.closest('[data-routine]');
+  if (r) {
+    haptic('tap');
+    if (r.dataset.routine === 'new') editRoutine(null);
+    else if (r.dataset.routine === 'edit') editRoutine(r.dataset.id);
+    else if (r.dataset.routine === 'programs') programsSheet();
+    return;
+  }
+  const f = e.target.closest('[data-hfilter]');
+  if (f) { setHistoryFilter(f.dataset.hfilter); haptic('tap'); renderScreen('history'); return; }
+  if (e.target.closest('[data-review=ask]')) { go('coach'); askCoach(state.t('review.prompt')); }
+});
 
 app.addEventListener('click', e => {
   const el = e.target.closest('[data-act]');
@@ -176,7 +203,7 @@ app.addEventListener('click', e => {
 });
 
 store.subscribe(reason => {
-  keepAwake(!!state.active);
+  keepAwake(!!state.active || !!state.activeCardio);
   if (reason === 'draft') return syncNums($('#s-workout'));
   if (reason === 'chat' && view.screen !== 'coach') return;
   if (reason === 'reset' && isVoiceOpen()) closeVoice();
@@ -193,6 +220,12 @@ store.subscribe(reason => {
 
 let ticker = 0;
 function tick() {
+  const a = state.activeCardio;
+  if (a) {
+    const txt = clock(cardioElapsed(a));
+    for (const el of document.querySelectorAll('[data-cclock]')) if (el.textContent !== txt) el.textContent = txt;
+    if (view.screen === 'workout' && !state.active) tickCardio($('#s-workout'));
+  }
   const w = state.active;
   if (!w) return;
   const now = Date.now();
@@ -249,7 +282,7 @@ async function boot() {
     const { seed } = await import('./seed.js');
     await seed(store);
   }
-  const start = state.active ? 'workout' : 'today';
+  const start = state.active || state.activeCardio ? 'workout' : 'today';
   history.replaceState({ screen: start }, '');
   show(start);
   startClock();
@@ -260,6 +293,11 @@ boot();
 
 addEventListener('pageshow', e => { if (e.persisted) renderAll(); });
 addEventListener('resize', () => renderDock());
+
+// Large titles hand over to a small, blurred bar once you scroll.
+for (const s of document.querySelectorAll('.screen')) {
+  s.addEventListener('scroll', () => s.classList.toggle('scrolled', s.scrollTop > 36), { passive: true });
+}
 
 // Android keeps the layout size when the keyboard opens; lift the composer above it and hide the dock.
 if (globalThis.visualViewport) {

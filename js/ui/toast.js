@@ -8,7 +8,7 @@ export function toast({ title, sub = '', action = null, onAction = null, ms = 40
   const el = $('#toast');
   clearTimeout(timer);
   el.classList.remove('show');
-  el.classList.toggle('err', error);
+  el.classList.toggle('is-err', error);
   el.style.setProperty('--ms', ms + 'ms');
   el.innerHTML = `<div class="ic">${error ? I.alert : I.check}</div>
     <div><b>${title}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>

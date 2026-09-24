@@ -22,7 +22,11 @@ export const DEFAULTS = Object.freeze({
   cmdOverride: '',
   coachOverride: '',
   cmdAlt: '',          // runner-up models, tried on 503/429/404
-  coachAlt: ''
+  coachAlt: '',
+  cardioGoal: 150,     // minutes per week
+  proteinPerKg: 1.8,
+  readiness: true,
+  suggestions: true
 });
 
 export const VOICES = ['Kore', 'Puck', 'Aoede', 'Charon', 'Leda', 'Orus', 'Zephyr', 'Fenrir'];
@@ -38,6 +42,10 @@ export function sanitize(input) {
   if (typeof input.haptics === 'boolean') s.haptics = input.haptics;
   if (['auto', 'on', 'off'].includes(input.motion)) s.motion = input.motion;
   if (Number.isInteger(input.weeklyGoal) && input.weeklyGoal >= 1 && input.weeklyGoal <= 7) s.weeklyGoal = input.weeklyGoal;
+  if (Number.isFinite(input.cardioGoal)) s.cardioGoal = Math.min(900, Math.max(30, Math.round(input.cardioGoal / 15) * 15));
+  if (Number.isFinite(input.proteinPerKg)) s.proteinPerKg = Math.min(2.6, Math.max(1.2, Math.round(input.proteinPerKg * 10) / 10));
+  if (typeof input.readiness === 'boolean') s.readiness = input.readiness;
+  if (typeof input.suggestions === 'boolean') s.suggestions = input.suggestions;
   if (['auto', 'da', 'en'].includes(input.voiceLang)) s.voiceLang = input.voiceLang;
   if (['hold', 'tap'].includes(input.micMode)) s.micMode = input.micMode;
   if (['off', 'minimal', 'full'].includes(input.spoken)) s.spoken = input.spoken;
