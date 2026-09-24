@@ -20,7 +20,9 @@ export const DEFAULTS = Object.freeze({
   cmdModel: '',        // Flash-Lite text model for command fallback (picked on key test)
   coachModel: '',      // Flash text model for the Coach
   cmdOverride: '',
-  coachOverride: ''
+  coachOverride: '',
+  cmdAlt: '',          // runner-up models, tried on 503/429/404
+  coachAlt: ''
 });
 
 export const VOICES = ['Kore', 'Puck', 'Aoede', 'Charon', 'Leda', 'Orus', 'Zephyr', 'Fenrir'];
@@ -41,12 +43,15 @@ export function sanitize(input) {
   if (['off', 'minimal', 'full'].includes(input.spoken)) s.spoken = input.spoken;
   if (VOICES.includes(input.voice)) s.voice = input.voice;
   if (['fast', 'accurate'].includes(input.stt)) s.stt = input.stt;
-  for (const k of ['ttsModel', 'ttsOverride', 'cmdModel', 'coachModel', 'cmdOverride', 'coachOverride']) if (typeof input[k] === 'string' && (input[k] === '' || MODEL_ID.test(input[k].trim()))) s[k] = input[k].trim();
+  for (const k of ['ttsModel', 'ttsOverride', 'cmdModel', 'coachModel', 'cmdOverride', 'coachOverride', 'cmdAlt', 'coachAlt']) if (typeof input[k] === 'string' && (input[k] === '' || MODEL_ID.test(input[k].trim()))) s[k] = input[k].trim();
   return s;
 }
 
-export const cmdModelId = s => s.cmdOverride || s.cmdModel || 'gemini-2.5-flash-lite';
-export const coachModelId = s => s.coachOverride || s.coachModel || 'gemini-2.5-flash';
+export const cmdModelId = s => s.cmdOverride || s.cmdModel || 'gemini-flash-lite-latest';
+export const coachModelId = s => s.coachOverride || s.coachModel || 'gemini-flash-latest';
+// the order to try: chosen, runner-up, rolling alias
+export const cmdModels = s => [cmdModelId(s), s.cmdOverride ? '' : s.cmdAlt, 'gemini-flash-lite-latest'];
+export const coachModels = s => [coachModelId(s), s.coachOverride ? '' : s.coachAlt, 'gemini-flash-latest'];
 export const ttsModelId = s => s.ttsOverride || s.ttsModel || DEFAULT_TTS_MODEL;
 export const sttModelId = s => (s.stt === 'accurate' ? 'whisper-large-v3' : 'whisper-large-v3-turbo');
 

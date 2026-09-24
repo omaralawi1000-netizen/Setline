@@ -205,3 +205,16 @@ test('chatter is unknown, not guessed', () => {
   is('should I deload next week', { type: 'Unknown' });
   is('', { type: 'Unknown' });
 });
+
+test('several sets at once: reps list with a weight', () => {
+  const r = is('9, 8 and 8 reps at 100 kg', { type: 'LogSets' });
+  assert.deepEqual(r.sets, [{ kg: 100, reps: 9 }, { kg: 100, reps: 8 }, { kg: 100, reps: 8 }]);
+  const d = is('tre sæt 9 8 og 8 gentagelser med 100 kilo', { type: 'LogSets' });
+  assert.deepEqual(d.sets.map(s => s.reps), [9, 8, 8]);
+  assert.equal(d.sets[0].kg, 100);
+  const bench = is('bench press 10 10 and 8 reps at 60', { type: 'LogSets', exerciseId: 'bench-press' });
+  assert.equal(bench.sets.length, 3);
+  const ctxKg = is('10, 9 and 8 reps', { type: 'LogSets' });
+  assert.equal(ctxKg.sets[0].kg, 80, 'weight from the last set');
+  is('3 sets 9 and 8 reps at 100', { type: 'Unknown' }, undefined);
+});

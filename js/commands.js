@@ -74,6 +74,32 @@ export function resolve(intent, snap, t, lang) {
     });
   };
 
+  // several different sets at once: "9, 8 and 8 reps at 100 kg"
+  const logManyCommand = (sets, exerciseId) => {
+    for (const s of sets) {
+      const check = W.validateSet(s.kg, s.reps);
+      if (!check.ok) return err('voice.didntCatch', null, { title: t(check.error === 'kg' ? 'invalid.kg' : 'invalid.reps', { max: kgTxt(W.LIMITS.kgMax), unit: u }) });
+    }
+    const exId = exerciseId || cur()?.exerciseId;
+    if (!exId) return err('voice.noExercise');
+    const idx = exerciseId ? w.exercises.findIndex(e => e.exerciseId === exerciseId) : w.current;
+    const n = W.nextSetNumber(idx >= 0 ? w.exercises[idx] : { sets: [] });
+    const heavy = sets.some(s => W.validateSet(s.kg, s.reps).confirm.length);
+    const fn = (cw, now) => {
+      let x = cw, i = exerciseId ? cw.exercises.findIndex(e => e.exerciseId === exerciseId) : cw.current;
+      if (i === -1) { x = W.addExercise(x, exId); i = x.exercises.length - 1; }
+      for (const s of sets) x = W.logSet(x, i, s, now, settings.restSec).workout;
+      return x;
+    };
+    const same = sets.every(s => s.kg === sets[0].kg);
+    const value = same ? `${kgTxt(sets[0].kg)} ${u} × ${sets.map(s => s.reps).join(', ')}` : sets.map(s => setTxt(s.kg, s.reps)).join(', ');
+    return cmd(heavy ? 'confirm' : 'auto', {
+      title: name(exId), value, sub: heavy ? t('voice.checkNumbers') : t('voice.heardSets', { text: heard, from: n, to: n + sets.length - 1 }),
+      say: say(t('say.logList', { n: sets.length, kg: kgTxt(sets[0].kg), unit: sayUnit, reps: sets.map(s => s.reps).join(', ') })),
+      run: { op: 'update', fn, nav: 'workout' }
+    });
+  };
+
   // change the last done set of the current exercise
   const editCommand = (kg, reps) => {
     const ex = cur();
@@ -97,6 +123,10 @@ export function resolve(intent, snap, t, lang) {
     case 'LogSet': {
       const need = needWorkout(); if (need) return need;
       return logCommand(intent.kg, intent.reps, intent.count, intent.exerciseId || null);
+    }
+    case 'LogSets': {
+      const need = needWorkout(); if (need) return need;
+      return logManyCommand(intent.sets, intent.exerciseId || null);
     }
     case 'RepeatLast': {
       const need = needWorkout(); if (need) return need;

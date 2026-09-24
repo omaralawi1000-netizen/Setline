@@ -22,18 +22,19 @@ export function stop() {
 
 // ---------- model choice (pure) ----------
 
-const version = id => (id.match(/(\d+(?:\.\d+)?)/) || [0, 0])[1] * 1;
-const unstable = id => /(preview|exp|experimental|latest)/.test(id);
+import { rankModels } from './ai.js';
 
-// Pick the newest stable Flash-Lite TTS model, else the newest Flash TTS model.
+// Pick the newest Flash-Lite TTS model, else the newest Flash TTS model.
 export function pickTtsModel(models, preferred) {
   const ids = models
     .filter(x => typeof x === 'string' || !x.supportedGenerationMethods || x.supportedGenerationMethods.includes('generateContent'))
     .map(x => String(x.name || x).replace(/^models\//, ''))
     .filter(id => /tts/.test(id));
-  if (preferred && ids.includes(preferred)) return preferred;
-  const best = list => list.sort((a, b) => unstable(a) - unstable(b) || version(b) - version(a) || a.length - b.length)[0] || null;
-  return best(ids.filter(id => /flash-lite/.test(id))) || best(ids.filter(id => /flash/.test(id))) || best(ids);
+  const best = list => rankModels(list)[0] || null;
+  const pick = best(ids.filter(id => /flash-lite/.test(id))) || best(ids.filter(id => /flash/.test(id))) || best(ids);
+  // the configured default only wins if nothing newer is listed
+  if (preferred && ids.includes(preferred) && rankModels([preferred, pick])[0] === preferred) return preferred;
+  return pick;
 }
 
 export async function listModels(key) {

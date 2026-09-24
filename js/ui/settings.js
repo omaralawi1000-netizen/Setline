@@ -113,7 +113,7 @@ async function testKey(name, root) {
       st = r.status;
       if (st === 'ok') {
         const text = pickTextModels(r.models);
-        setSettings({ ttsModel: pickTtsModel(r.models, DEFAULT_TTS_MODEL) || '', cmdModel: text.command || '', coachModel: text.coach || '' });
+        setSettings({ ttsModel: pickTtsModel(r.models, DEFAULT_TTS_MODEL) || '', cmdModel: text.command || '', coachModel: text.coach || '', cmdAlt: text.commandAlt || '', coachAlt: text.coachAlt || '' });
       }
     } catch { st = 'offline'; }
   }

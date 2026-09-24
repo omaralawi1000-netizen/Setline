@@ -9,7 +9,7 @@
 import { normalize } from './catalog.js';
 import { lbToKg, round } from './units.js';
 
-export const INTENTS = ['LogSet', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
+export const INTENTS = ['LogSet', 'LogSets', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
   'AddExercise', 'SwapExercise', 'StartRoutine', 'StartEmpty', 'Finish', 'Discard', 'StartRest', 'AdjustRest', 'SkipRest',
   'Query', 'Cancel', 'Help', 'Ask', 'Unknown'];
 
@@ -18,7 +18,7 @@ export const INTENTS = ['LogSet', 'RepeatLast', 'AdjustLast', 'EditLast', 'Delet
 export function clean(text) {
   let s = String(text || '').toLowerCase().normalize('NFC');
   s = s.replace(/[’'`´]/g, '');
-  s = s.replace(/(\d)\s*[,.]\s*(\d)/g, '$1\u0001$2');             // decimals: 82,5 / 82.5
+  s = s.replace(/(\d)[,.](\d)/g, '$1\u0001$2');                     // decimals: 82,5 / 82.5 ("10, 9" stays a list)
   s = s.replace(/[−–—]/g, '-');
   s = s.replace(/(^|\s)\+\s*(\d)/g, '$1plus $2').replace(/(^|\s)-\s*(\d)/g, '$1minus $2');
   s = s.replace(/[×*]/g, ' x ');
@@ -414,6 +414,42 @@ export function parse(text, ctx = {}) {
       const last = ctx.current?.lastSet;
       const asReps = Number.isInteger(n) && n <= 30 && (!last || Math.abs(n - last.reps) <= 5 || Math.abs(n - last.kg) > Math.abs(n - last.reps));
       return out('EditLast', asReps ? { reps: n, kg: null } : { kg: kgDelta(n, null), reps: null });
+    }
+  }
+
+  // --- several sets with different reps: "9, 8 and 8 reps at 100 kg" / "9 8 og 8 gentagelser med 100 kilo" ---
+  {
+    const tk = s.split(' ');
+    const ri = tk.findIndex((w, i) => REPS.has(w) && isNum(tk[i - 1] ?? ''));
+    if (ri > 0) {
+      const reps = [];
+      let i = ri - 1;
+      while (i >= 0 && (isNum(tk[i]) || ['and', 'og', 'then', 'så', 'x'].includes(tk[i]))) { if (isNum(tk[i])) reps.unshift(Number(tk[i])); i--; }
+      const listStart = i + 1;
+      if (reps.length >= 2 && reps.length <= 10 && reps.every(r => Number.isInteger(r) && r >= 1 && r <= 300)) {
+        const rest = [...tk.slice(0, listStart), ...tk.slice(ri + 1)];
+        // weight: a labeled number, or one after at/with/med/på
+        let kg = null, unitWord = null;
+        const kept = [];
+        for (let k = 0; k < rest.length; k++) {
+          if (isNum(rest[k]) && (KG.has(rest[k + 1]) || LB.has(rest[k + 1]))) { unitWord = rest[k + 1]; kg = Number(rest[k]); k++; continue; }
+          if (isNum(rest[k]) && ['at', 'with', 'med', 'på'].includes(rest[k - 1]) && kg == null) { kg = Number(rest[k]); kept.pop(); continue; }
+          kept.push(rest[k]);
+        }
+        const leftover = trimFiller(kept.filter(w => !SETS.has(w) && !isNum(w) && !['of', 'af', 'sets', 'sæt'].includes(w)));
+        const counted = kept.find(isNum);
+        if (!counted || Number(counted) === reps.length) {
+          let exerciseId = null, ok = true;
+          if (leftover.length) { const hit = exercise(leftover.join(' ')); if (hit?.exerciseId) exerciseId = hit.exerciseId; else ok = false; }
+          if (ok) {
+            if (kg != null) kg = unitWord && LB.has(unitWord) || (!unitWord && ctx.unit === 'lb') ? round(lbToKg(kg), 4) : kg;
+            const sameEx = !exerciseId || exerciseId === ctx.current?.exerciseId;
+            kg ??= sameEx ? (ctx.current?.lastSet?.kg ?? ctx.current?.planned?.kg ?? null) : null;
+            if (kg == null) return out('Ask', { reason: 'weight', then: { type: 'LogSets', sets: reps.map(r => ({ kg: null, reps: r })), exerciseId } });
+            return out('LogSets', { sets: reps.map(r => ({ kg, reps: r })), exerciseId });
+          }
+        }
+      }
     }
   }
 

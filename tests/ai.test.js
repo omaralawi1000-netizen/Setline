@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickTextModels, parseSSE, textOf, validateAI, commandPrompt } from '../js/ai.js';
+import { pickTextModels, parseSSE, textOf, validateAI, commandPrompt, withFallback, AiError } from '../js/ai.js';
 import { buildContext, chatContents, isQuestion, formatAnswer, speakable, systemPrompt, MAX_CONTEXT_CHARS } from '../js/coach.js';
 import { createCatalog } from '../js/catalog.js';
 import { starterRoutines } from '../js/routines.js';
@@ -25,9 +25,13 @@ test('text models: newest stable flash-lite for commands, flash for the coach', 
     { name: 'models/gemini-3.1-pro', supportedGenerationMethods: g },
     { name: 'models/text-embedding-004', supportedGenerationMethods: ['embedContent'] }
   ];
-  assert.deepEqual(pickTextModels(models), { command: 'gemini-3.1-flash-lite', coach: 'gemini-3.1-flash' });
-  assert.deepEqual(pickTextModels([]), { command: null, coach: null });
-  assert.equal(pickTextModels([{ name: 'models/gemini-3.5-flash-preview' }]).coach, 'gemini-3.5-flash-preview', 'preview only if nothing stable');
+  const p = pickTextModels(models);
+  assert.equal(p.command, 'gemini-3.1-flash-lite');
+  assert.equal(p.commandAlt, 'gemini-2.5-flash-lite');
+  assert.equal(p.coach, 'gemini-3.5-flash-preview', 'a newer generation beats an older stable one');
+  assert.equal(p.coachAlt, 'gemini-3.1-flash');
+  assert.equal(pickTextModels([]).coach, null);
+  assert.equal(pickTextModels(['gemini-3.1-flash-preview', 'gemini-3.1-flash', 'gemini-flash-latest']).coach, 'gemini-3.1-flash', 'same generation: stable first, alias last');
 });
 
 test('SSE parsing keeps the unfinished tail', () => {
@@ -109,4 +113,23 @@ test('answers are formatted safely and spoken without markup', () => {
   assert.equal(formatAnswer('**Good** progress.\n- one\n- two'), '<p><b>Good</b> progress.</p><ul><li>one</li><li>two</li></ul>');
   assert.equal(formatAnswer('<img src=x onerror=alert(1)>'), '<p>&lt;img src=x onerror=alert(1)&gt;</p>');
   assert.equal(speakable('**Good** progress.\n- one\n- two'), 'Good progress. one two');
+});
+
+test('fallback tries the runner-up on 503 but not on a bad key', async () => {
+  const tried = [];
+  const r = await withFallback(['a', 'b', 'c'], async m => { tried.push(m); if (m === 'a') throw new AiError('busy', 503); return m; });
+  assert.equal(r, 'b');
+  assert.deepEqual(tried, ['a', 'b']);
+  await assert.rejects(withFallback(['a', 'b'], async () => { throw new AiError('badkey', 403); }), e => e.code === 'badkey');
+  const seen = [];
+  await assert.rejects(withFallback(['x', 'x', '', 'y'], async m => { seen.push(m); throw new AiError('nomodel', 404); }));
+  assert.deepEqual(seen, ['x', 'y'], 'deduped, blanks skipped');
+});
+
+test('AI can log several different sets', () => {
+  const r = validateAI({ type: 'LogSets', exercise: 'bench', sets: [{ kg: 100, reps: 9 }, { kg: 100, reps: 8 }, { kg: 100, reps: 8 }] }, ctx);
+  assert.deepEqual(r, { type: 'LogSets', exerciseId: 'bench-press', sets: [{ kg: 100, reps: 9 }, { kg: 100, reps: 8 }, { kg: 100, reps: 8 }] });
+  assert.equal(validateAI({ type: 'LogSets' }, ctx), null);
+  assert.equal(validateAI({ type: 'LogSets', sets: [{ kg: 100, reps: 0 }] }, ctx), null);
+  assert.equal(validateAI({ type: 'LogSet', sets: [{ kg: 60, reps: 10 }, { kg: 60, reps: 9 }] }, ctx).type, 'LogSets');
 });

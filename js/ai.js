@@ -6,27 +6,29 @@ import { normalize } from './catalog.js';
 import { listModels } from './tts.js';
 
 const API = 'https://generativelanguage.googleapis.com/v1beta';
-export const FALLBACK_MODELS = { command: 'gemini-2.5-flash-lite', coach: 'gemini-2.5-flash' };
+// Google's rolling aliases always point at the newest Flash / Flash-Lite: a safe last resort.
+export const FALLBACK_MODELS = { command: 'gemini-flash-lite-latest', coach: 'gemini-flash-latest' };
 
 // ---------- model choice (pure) ----------
 
 const id = m => String(m?.name || m).replace(/^models\//, '');
 const canGenerate = m => typeof m === 'string' || !m.supportedGenerationMethods || m.supportedGenerationMethods.includes('generateContent');
 const version = s => Number((s.match(/(\d+(?:\.\d+)?)/) || [0, 0])[1]);
-const unstable = s => /(preview|exp|experimental|latest)/.test(s);
+// newest generation wins; within a generation stable beats preview; experimental and aliases last
+const tier = s => (/(exp|experimental)/.test(s) ? 3 : /latest/.test(s) ? 2 : /preview/.test(s) ? 1 : 0);
 const SPECIAL = /(tts|image|live|audio|embedding|aqa|vision|thinking|learnlm|robotics|computer|nano|gemma|imagen|veo)/;
 
-function newest(list) {
-  return [...list].sort((a, b) => unstable(a) - unstable(b) || version(b) - version(a) || a.length - b.length)[0] || null;
+export function rankModels(list) {
+  return [...list].sort((a, b) => (tier(a) >= 2) - (tier(b) >= 2) || version(b) - version(a) || tier(a) - tier(b) || a.length - b.length);
 }
+const newest = list => rankModels(list)[0] || null;
+const second = list => rankModels(list)[1] || null;
 
 // {command: newest stable Flash-Lite text model, coach: newest stable Flash (not lite) text model}
 export function pickTextModels(models) {
   const ids = models.filter(canGenerate).map(id).filter(s => /^gemini/.test(s) && !SPECIAL.test(s));
-  return {
-    command: newest(ids.filter(s => /flash-lite/.test(s))),
-    coach: newest(ids.filter(s => /flash/.test(s) && !/lite/.test(s)))
-  };
+  const lite = ids.filter(s => /flash-lite/.test(s)), flash = ids.filter(s => /flash/.test(s) && !/lite/.test(s));
+  return { command: newest(lite), coach: newest(flash), commandAlt: second(lite), coachAlt: second(flash) };
 }
 
 // ---------- SSE (pure) ----------
@@ -66,7 +68,7 @@ async function post(path, key, body, { timeout = 0, signal } = {}) {
   }
   if (res.status === 400 || res.status === 401 || res.status === 403) { clearTimeout(timer); throw new AiError(res.status === 400 ? 'badrequest' : 'badkey', res.status); }
   if (res.status === 404) { clearTimeout(timer); throw new AiError('nomodel', 404); }
-  if (res.status === 429) { clearTimeout(timer); throw new AiError('busy', 429); }
+  if (res.status === 429 || res.status === 503) { clearTimeout(timer); throw new AiError('busy', res.status); }
   if (!res.ok) { clearTimeout(timer); throw new AiError('failed', res.status); }
   return { res, done: () => clearTimeout(timer) };
 }
@@ -88,7 +90,8 @@ export const COMMAND_SCHEMA = {
     kgDelta: { type: 'NUMBER', nullable: true },
     repsDelta: { type: 'INTEGER', nullable: true },
     sec: { type: 'INTEGER', nullable: true, description: 'seconds, for rest' },
-    what: { type: 'STRING', nullable: true, enum: QUERY }
+    what: { type: 'STRING', nullable: true, enum: QUERY },
+    sets: { type: 'ARRAY', nullable: true, description: 'for LogSets: each set in order', items: { type: 'OBJECT', properties: { kg: { type: 'NUMBER' }, reps: { type: 'INTEGER' } }, required: ['kg', 'reps'] } }
   },
   required: ['type']
 };
@@ -112,6 +115,7 @@ export function commandPrompt(text, ctx) {
 const SYSTEM_COMMAND = 'You map a gym voice command to one intent for a workout logger. ' +
   'Use only the given types and fields. Fill kg and reps from context only when the user clearly refers to it ("same weight", "10 reps"). ' +
   'Never invent numbers. If it is a question or conversation rather than a command, return type "question". ' +
+  'Use LogSets with a sets array when several sets with different reps or weights are described in one go. ' +
   'AdjustLast changes the last logged set by kgDelta or repsDelta. EditLast sets its kg or reps. Query.what is one of last, pr, setsLeft, restLeft.';
 
 const num = (v, lo, hi) => (typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi ? v : null);
@@ -131,7 +135,17 @@ export function validateAI(raw, ctx) {
     const m = matchExercise(raw.exercise, ctx);
     return m?.exerciseId || null;
   };
+  const setList = Array.isArray(raw.sets) && raw.sets.length ? raw.sets : null;
+  if ((t === 'LogSets' || t === 'LogSet') && setList) {
+    if (setList.length > 10) return null;
+    const sets = setList.map(x => ({ kg: num(x?.kg, 0, LIMITS.kgMax), reps: int(x?.reps, 1, LIMITS.repsMax) }));
+    if (sets.some(x => x.kg == null || x.reps == null)) return null;
+    const ex = exercise();
+    if (ex === null) return null;
+    return { type: 'LogSets', sets, exerciseId: ex ?? null };
+  }
   switch (t) {
+    case 'LogSets': return null; // needs a sets array
     case 'LogSet': {
       const kg = num(raw.kg, 0, LIMITS.kgMax), reps = int(raw.reps, 1, LIMITS.repsMax);
       if (kg == null || reps == null) return null;
@@ -223,5 +237,18 @@ export async function listModelsText(key) {
   const r = await listModels(key);
   if (r.status !== 'ok') return null;
   const p = pickTextModels(r.models);
-  return { cmdModel: p.command || '', coachModel: p.coach || '' };
+  return { cmdModel: p.command || '', coachModel: p.coach || '', cmdAlt: p.commandAlt || '', coachAlt: p.coachAlt || '' };
+}
+
+// Errors worth trying another model for: overloaded, rate limited, gone, server trouble.
+export const retryable = e => e instanceof AiError && (e.code === 'busy' || e.code === 'nomodel' || (e.code === 'failed' && e.status >= 500));
+
+// Run fn(model) with the chosen model, then the runner-up, then Google's rolling alias.
+export async function withFallback(models, fn) {
+  const list = [...new Set(models.filter(Boolean))];
+  let last;
+  for (const m of list) {
+    try { return await fn(m); } catch (e) { last = e; if (!retryable(e)) throw e; }
+  }
+  throw last;
 }

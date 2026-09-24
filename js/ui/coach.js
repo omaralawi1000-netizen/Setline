@@ -1,10 +1,10 @@
 // Coach tab: chat thread, composer, streamed answers, spoken when complete.
 import * as store from '../store.js';
 import { state } from '../store.js';
-import { streamChat, listModelsText, AiError } from '../ai.js';
+import { streamChat, listModelsText, AiError, withFallback } from '../ai.js';
 import { buildContext, chatContents, systemPrompt, formatAnswer, speakable } from '../coach.js';
 import { getKey } from '../keys.js';
-import { coachModelId, ttsModelId } from '../settings.js';
+import { coachModels, ttsModelId } from '../settings.js';
 import * as tts from '../tts.js';
 import { isRecording } from '../voice.js';
 import { haptic } from '../haptics.js';
@@ -60,9 +60,9 @@ function scrollDown(root, smooth = true) {
 }
 
 // Pick coach/command models once, from the key's model list.
-async function ensureModels() {
+export async function ensureModels() {
   const s = state.settings;
-  if (s.coachModel || s.coachOverride) return;
+  if (s.coachOverride || (s.coachModel && s.coachAlt)) return;
   try {
     const r = await listModelsText(getKey('google'));
     if (r) store.setSettings(r);
@@ -90,8 +90,8 @@ export async function ask(question, { root = $('#s-coach') } = {}) {
   });
   try {
     let last = 0;
-    const text = await streamChat({
-      key, model: coachModelId(state.settings), system: systemPrompt(lang), contents: chatContents(history, context, question), signal: ctl.signal,
+    const text = await withFallback(coachModels(state.settings), model => streamChat({
+      key, model, system: systemPrompt(lang), contents: chatContents(history, context, question), signal: ctl.signal,
       onText: full => {
         store.updateChat(reply.id, { text: full }, { quiet: true });
         const li = root.querySelector(`[data-id="${reply.id}"] .bub`);
@@ -99,7 +99,7 @@ export async function ask(question, { root = $('#s-coach') } = {}) {
         const now = performance.now();
         if (now - last > 120) { last = now; scrollDown(root); }
       }
-    });
+    }));
     store.updateChat(reply.id, { text, streaming: false }, { persist: true });
     haptic('tap');
     if (text && state.settings.spoken !== 'off') {

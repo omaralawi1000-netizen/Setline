@@ -16,10 +16,10 @@ import { haptic } from '../haptics.js';
 import { $, esc } from './dom.js';
 import { I } from './icons.js';
 import { hideToast } from './toast.js';
-import { aiCommand } from '../ai.js';
+import { aiCommand, withFallback } from '../ai.js';
 import { isQuestion } from '../coach.js';
-import { ask as askCoach } from './coach.js';
-import { cmdModelId } from '../settings.js';
+import { ask as askCoach, ensureModels } from './coach.js';
+import { cmdModels } from '../settings.js';
 
 const HOLD_MS = 280;          // shorter press = tap
 const BARS = 27;
@@ -370,8 +370,11 @@ async function aiFallback(text, parsed, { typed }) {
   showCard({ kind: 'wait', icon: 'info', title: t('voice.thinkingAi'), sub: t('voice.heard', { text }), lang, intent: parsed });
   let intent;
   try {
+    await ensureModels();
     const ctx = { ...parseCtx(), hasWorkout: !!state.active };
-    intent = await aiCommand(text, ctx, { key: getKey('google'), model: cmdModelId(state.settings) });
+    // 4 s in total across the chosen model and its runner-up
+    const until = performance.now() + 4000;
+    intent = await withFallback(cmdModels(state.settings), model => aiCommand(text, ctx, { key: getKey('google'), model, timeout: Math.max(800, until - performance.now()) }));
   } catch {
     intent = null;
   }

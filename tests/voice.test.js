@@ -17,8 +17,9 @@ test('TTS model: preferred name if listed, else newest stable flash-lite tts', (
     { name: 'models/gemini-3.9-flash-lite-tts', supportedGenerationMethods: ['generateContent'] },
     { name: 'models/gemini-3.9-pro-tts', supportedGenerationMethods: ['generateContent'] }
   ];
-  assert.equal(pickTtsModel(models, 'gemini-3.8-flash-lite-tts'), 'gemini-3.8-flash-lite-tts');
-  assert.equal(pickTtsModel(models, 'gone-model'), 'gemini-3.9-flash-lite-tts');
+  assert.equal(pickTtsModel(models, 'gemini-3.8-flash-lite-tts'), 'gemini-4.0-flash-lite-tts-preview', 'newer generation wins over the default');
+  assert.equal(pickTtsModel(models.filter(m => !/4\.0|3\.9/.test(m.name)), 'gemini-3.8-flash-lite-tts'), 'gemini-3.8-flash-lite-tts');
+  assert.equal(pickTtsModel(models.filter(m => !/4\.0/.test(m.name)), 'gone-model'), 'gemini-3.9-flash-lite-tts');
   assert.equal(pickTtsModel(models.slice(0, 2)), 'gemini-2.5-flash-preview-tts', 'falls back to flash tts');
   assert.equal(pickTtsModel([{ name: 'models/gemini-2.5-flash' }]), null);
 });

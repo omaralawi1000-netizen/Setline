@@ -1,5 +1,7 @@
 /* Design tokens, copied from design-target.html. */
 :root{
+  /* the app is dark by design: stop Chrome's "dark theme for websites" from re-darkening it */
+  color-scheme:dark only;
   --bg:#0D0F15; --card:#191C25; --ink:#F1F0F6; --muted:#9293A6; --dim:#626478;
   --accent:#C6BBFA; --accent-ink:#191433; --violet:#7A67F2; --blue:#5B86FF; --warm:#FFD9A8;
   --line:rgba(207,199,255,.09); --ease:cubic-bezier(.16,1,.3,1);
