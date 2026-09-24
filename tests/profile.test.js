@@ -32,3 +32,17 @@ test('a program without a key, a plan request with one', () => {
   assert.match(P.profileText(P.sanitizeProfile(me, now), now), /25 years old.*build muscle.*4 days/);
   assert.equal(P.profileText(null), 'PROFILE: not filled in.');
 });
+
+import { mergeHeard, PROFILE_SCHEMA } from '../js/profile.js';
+test('what you said fills the questions it answers, and only those', () => {
+  const a = { name: '', age: 25, sex: null, height: 178, weight: 80, level: null, goal: null, days: null, minutes: null, equipment: null, injuries: [], cardio: null };
+  const got = mergeHeard(a, { name: 'Omar', age: 27, heightCm: 183, weightKg: 84.3, goal: 'muscle', days: 5, minutes: 70, equipment: 'gym', injuries: ['knee', 'nope'], sex: null, level: 'bogus', notes: 'Loves deadlifts, plays football on Sundays.' });
+  assert.deepEqual([...got].sort(), ['age', 'days', 'equipment', 'goal', 'height', 'injuries', 'minutes', 'name', 'notes', 'weight']);
+  assert.equal(a.minutes, 75, 'rounded to an offered length');
+  assert.equal(a.weight, 84.5);
+  assert.deepEqual(a.injuries, ['knee']);
+  assert.equal(a.level, null, 'unknown values are ignored');
+  assert.match(a.notes, /football/);
+  assert.equal(mergeHeard(a, null).size, 0);
+  assert.ok(PROFILE_SCHEMA.properties.goal.enum.includes('fatloss'));
+});

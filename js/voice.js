@@ -14,7 +14,7 @@ function pickMime() {
 }
 
 // Start recording. Resolves once the mic is open. Throws {code:'denied'|'nomic'|'unsupported'|'busy'}.
-export async function start({ onMaxed } = {}) {
+export async function start({ onMaxed, maxMs = MAX_MS } = {}) {
   if (rec) return;
   if (!navigator.mediaDevices?.getUserMedia || !globalThis.MediaRecorder) throw Object.assign(new Error('unsupported'), { code: 'unsupported' });
   let stream;
@@ -43,7 +43,7 @@ export async function start({ onMaxed } = {}) {
     } catch { r.analyser = null; }
   }
   recorder.start(250);
-  r.timer = setTimeout(() => onMaxed?.(), MAX_MS);
+  r.timer = setTimeout(() => onMaxed?.(), maxMs);
   rec = r;
 }
 

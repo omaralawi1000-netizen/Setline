@@ -26,7 +26,7 @@ export function sanitizeProfile(p, now = Date.now()) {
     minutes: MINUTES.includes(p.minutes) ? p.minutes : null,
     equipment: pick(p.equipment, EQUIPMENT),
     injuries: Array.isArray(p.injuries) ? [...new Set(p.injuries.filter(x => INJURIES.includes(x)))] : [],
-    notes: typeof p.notes === 'string' ? p.notes.trim().slice(0, 200) : '',
+    notes: typeof p.notes === 'string' ? p.notes.trim().slice(0, 600) : '',
     cardio: pick(p.cardio, CARDIO),
     at: Number.isFinite(p.at) ? p.at : now
   };
@@ -81,4 +81,53 @@ export function planRequest(p, lang = 'en') {
     return `Lav en ${p.days || 3}-dages træningsplan til mig, ${p.minutes || 60} minutter pr. træning, mål: ${goalDa}, udstyr: ${eq}${p.injuries?.length ? `, pas på: ${p.injuries.join(', ')}` : ''}.`;
   }
   return `Make me a ${p.days || 3}-day training plan, ${p.minutes || 60} minutes per session, goal: ${goal}, equipment: ${eq}${p.injuries?.length ? `, avoid aggravating: ${p.injuries.join(', ')}` : ''}.`;
+}
+
+// ---------- "Tell me about yourself": free talk → profile fields ----------
+
+export const PROFILE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    name: { type: 'STRING', nullable: true },
+    age: { type: 'INTEGER', nullable: true },
+    sex: { type: 'STRING', enum: SEXES, nullable: true },
+    heightCm: { type: 'INTEGER', nullable: true },
+    weightKg: { type: 'NUMBER', nullable: true },
+    level: { type: 'STRING', enum: LEVELS, nullable: true, description: 'new: under a year of training; some: 1-3 years; experienced: 3+ years' },
+    goal: { type: 'STRING', enum: GOALS, nullable: true },
+    days: { type: 'INTEGER', nullable: true, description: 'strength training days per week' },
+    minutes: { type: 'INTEGER', nullable: true, description: 'minutes per session' },
+    equipment: { type: 'STRING', enum: EQUIPMENT, nullable: true, description: 'gym: full gym; dumbbells: dumbbells at home; homebar: barbell and rack at home; bodyweight: none' },
+    injuries: { type: 'ARRAY', items: { type: 'STRING', enum: INJURIES } },
+    cardio: { type: 'STRING', enum: CARDIO, nullable: true, description: 'none: rarely; some: 1-2 sessions a week; lots: 3+' },
+    notes: { type: 'STRING', description: 'everything else useful for a coach, in short phrases: preferences, favourite or disliked exercises, schedule, sports, targets, history. Empty if nothing.' }
+  },
+  required: ['injuries', 'notes']
+};
+
+export const profileSystem = lang => [
+  'Extract a training profile from what the user said about themselves (it may be transcribed speech, in English or Danish).',
+  'Fill a field only when the user said it or it clearly follows; otherwise null. Convert units (feet/inches to cm, lb to kg).',
+  `Write notes in ${lang === 'da' ? 'Danish' : 'English'}, max 500 characters, without repeating the other fields.`
+].join(' ');
+
+// Merge what the model heard into the onboarding answers. Returns the ids of the questions it answered.
+export function mergeHeard(a, raw) {
+  const got = new Set();
+  if (!raw || typeof raw !== 'object') return got;
+  const set = (k, v) => { a[k] = v; got.add(k); };
+  if (typeof raw.name === 'string' && raw.name.trim()) set('name', raw.name.trim().slice(0, 30));
+  if (Number.isFinite(raw.age) && raw.age >= 13 && raw.age <= 90) set('age', Math.round(raw.age));
+  if (SEXES.includes(raw.sex)) set('sex', raw.sex);
+  if (Number.isFinite(raw.heightCm) && raw.heightCm >= 140 && raw.heightCm <= 220) set('height', Math.round(raw.heightCm));
+  if (Number.isFinite(raw.weightKg) && raw.weightKg >= 35 && raw.weightKg <= 200) { set('weight', Math.round(raw.weightKg * 2) / 2); a.weightTouched = true; }
+  if (LEVELS.includes(raw.level)) set('level', raw.level);
+  if (GOALS.includes(raw.goal)) set('goal', raw.goal);
+  if (Number.isFinite(raw.days) && raw.days >= 1 && raw.days <= 7) set('days', Math.round(raw.days));
+  if (Number.isFinite(raw.minutes) && raw.minutes >= 15 && raw.minutes <= 180) set('minutes', MINUTES.reduce((b, m) => (Math.abs(m - raw.minutes) < Math.abs(b - raw.minutes) ? m : b)));
+  if (EQUIPMENT.includes(raw.equipment)) set('equipment', raw.equipment);
+  if (Array.isArray(raw.injuries) && raw.injuries.some(x => INJURIES.includes(x))) set('injuries', [...new Set(raw.injuries.filter(x => INJURIES.includes(x)))]);
+  if (CARDIO.includes(raw.cardio)) set('cardio', raw.cardio);
+  if (typeof raw.notes === 'string' && raw.notes.trim()) { a.notes = raw.notes.trim().slice(0, 600); got.add('notes'); }
+  return got;
 }
