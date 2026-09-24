@@ -167,7 +167,7 @@ function playPcm({ pcm, rate }, mine) {
       if (current?.source === source) { current = null; emit(false); }
       res();
     };
-    current = { source, gain };
+    current = { source, gain, until: performance.now() + audio.duration * 1000 + 1500 };
     emit(true);
     if (ac.state === 'suspended') ac.resume().catch(() => {});
     source.start();
@@ -187,7 +187,8 @@ function fallback(text, lang, mine) {
   u.lang = lang === 'da' ? 'da-DK' : 'en-GB';
   u.rate = 1;
   u.onend = u.onerror = () => { if (current?.utter === u) { current = null; emit(false); } };
-  current = { utter: u };
+  // Android sometimes never fires onend: don't let "speaking" stick past a generous estimate
+  current = { utter: u, until: performance.now() + 3000 + text.length * 110 };
   emit(true);
   ss.speak(u);
 }
@@ -226,4 +227,7 @@ export async function speak(text, opts) {
   fallback(text, opts.lang, mine);
 }
 
-export const isSpeaking = () => !!current;
+export const isSpeaking = () => {
+  if (current && current.until && performance.now() > current.until) { current = null; emit(false); }
+  return !!current;
+};

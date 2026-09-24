@@ -23,6 +23,7 @@ import { renderProgress, renderExercise, setRange } from './ui/progress.js';
 import { countAll, burst } from './ui/fx.js';
 import { initPress } from './ui/press.js';
 import { autoBackup } from './ui/drive.js';
+import { initHandsFree } from './ui/handsfree.js';
 import { cardioElapsed, cardioName } from './cardio.js';
 import { weekStart } from './stats.js';
 import { nextRoutine } from './routines.js';
@@ -205,6 +206,7 @@ Object.assign(actions, {
   }
 });
 initPress(document);
+initHandsFree();
 initWorkout($('#s-workout'), actions);
 initSettings(actions, $('#s-settings'));
 setWorkoutNav({ go, showDetail });

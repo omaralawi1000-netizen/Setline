@@ -19,6 +19,7 @@ import { startCardsHTML, workoutTitle } from './today.js';
 import { renderLiveCardio } from './cardio.js';
 import { suggest } from '../progression.js';
 import { usualMinutes, timeStatus } from '../insights.js';
+import { handsFreeOn, hfPillHTML, toggleHandsFree } from './handsfree.js';
 
 const C = 157.08; // ring circumference, r=25
 const REST_LINGER = 4000; // keep the card up after rest ends
@@ -54,8 +55,9 @@ export function renderWorkout(root) {
   const header = `<header class="top">
       <button class="iconbtn" data-act="go" data-to="today" aria-label="${t('common.back')}">${I.back}</button>
       <div class="ttl"><strong>${esc(workoutTitle(w))}</strong><span><span data-elapsed>${clock(W.elapsedSec(w))}</span><span class="tgoal${goalOver(w, Date.now()) ? ' over' : ''}" data-tgoal>${goalText(w, Date.now())}</span>${w.deload ? ` · <em class="easy">${t('deload.badge')}</em>` : w.easy ? ` · <em class="easy">${t('ready.easyBadge')}</em>` : ''}</span></div>
-      <button class="pillbtn" data-act="finish">${t('workout.finish')}</button>
-    </header>`;
+      <div class="topacts"><button class="iconbtn hfbtn${handsFreeOn() ? ' is-on' : ''}" data-act="handsfree" aria-pressed="${handsFreeOn()}" aria-label="${t('hf.title')}">${I.headphones}</button>
+      <button class="pillbtn" data-act="finish">${t('workout.finish')}</button></div>
+    </header>${hfPillHTML()}`;
 
   if (!w.exercises.length) {
     ui.restVisible = false;
@@ -603,6 +605,7 @@ function finishSheet() {
 
 export function initWorkout(root, actions) {
   Object.assign(actions, {
+    handsfree: () => toggleHandsFree(),
     'kg-': () => stepKg(-1),
     'kg+': () => stepKg(1),
     'reps-': () => stepReps(-1),

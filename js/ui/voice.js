@@ -458,6 +458,31 @@ export function handleText(text, { typed = false } = {}) {
   present(intent, { typed });
 }
 
+// Hands-free: speech the app overheard. It acts only on what reads as a workout command, or on
+// anything said after "Coach"/"Setline"; everything else (chat, music, the gym) is ignored.
+const HF_OK = new Set(['LogSet', 'LogSets', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
+  'StartRest', 'AdjustRest', 'SkipRest', 'Query', 'AddExercise', 'SwapExercise', 'LogProtein', 'LogBodyweight']);
+export const WAKE = /^\s*(?:hey |hej |ok |okay )?(?:coach|setline|set line|sætlajn)\b[\s,.:!-]*/i;
+export function handleAmbient(text) {
+  const raw = String(text || '').trim();
+  if (!raw || v.open) return false;
+  const m = WAKE.exec(raw);
+  if (m) {
+    const rest = raw.slice(m[0].length).trim();
+    if (!rest) return false;
+    handleText(rest);
+    return true;
+  }
+  const intent = parse(raw, parseCtx());
+  if (!HF_OK.has(intent.type)) return false;
+  if (card.cmd && !card.committed && card.cmd.kind === 'auto') commitNow();
+  present(intent);
+  return true;
+}
+
+// Spoken cue with the reply voice (hands-free rest cues).
+export const speakCue = (text, lang = state.lang) => speak(text, lang);
+
 // Questions land in the Coach thread; the answer is streamed there and spoken when complete.
 async function toCoach(text) {
   dismissCard();

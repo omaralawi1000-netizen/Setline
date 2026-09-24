@@ -19,7 +19,7 @@ export class SttError extends Error {
 
 async function once(blob, { key, model, language, prompt }) {
   const fd = new FormData();
-  const ext = /mp4/.test(blob.type) ? 'm4a' : /ogg/.test(blob.type) ? 'ogg' : 'webm';
+  const ext = /mp4/.test(blob.type) ? 'm4a' : /ogg/.test(blob.type) ? 'ogg' : /wav/.test(blob.type) ? 'wav' : 'webm';
   fd.append('file', blob, `speech.${ext}`);
   fd.append('model', model);
   fd.append('temperature', '0');

@@ -981,3 +981,22 @@ html[data-motion=off] .osay .w{opacity:1;transform:none}
 .dfiles .srow{width:100%;border-radius:18px}
 .dnudge.gone{opacity:0;transform:scale(.96);transition:opacity .3s,transform .3s var(--ease)}
 .srow > svg.i{flex:none}
+
+/* ---------- 1.7: hands-free ---------- */
+.topacts{display:flex;align-items:center;gap:8px}
+.hfbtn .i{width:20px;height:20px}
+.hfbtn.is-on{background:rgba(198,187,250,.18);border-color:rgba(198,187,250,.45);color:var(--accent);box-shadow:0 0 0 4px rgba(198,187,250,.08)}
+.hfpill{margin-top:10px;display:flex;align-items:center;gap:10px;height:44px;padding:0 6px 0 14px;border-radius:999px;background:rgba(198,187,250,.09);border:1px solid rgba(198,187,250,.22);animation:rise .45s var(--ease);transition:opacity .25s,transform .25s var(--ease)}
+.hfpill.bye{opacity:0;transform:translateY(-6px)}
+.hfdot{position:relative;width:12px;height:12px;flex:none}
+.hfdot i{position:absolute;inset:0;border-radius:50%;background:var(--accent);transform:scale(calc(.8 + var(--l, 0) * .9));transition:transform .08s linear,background .3s}
+.hfdot::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:2px solid var(--accent);opacity:0}
+.hfpill[data-s=listening] .hfdot::after{animation:gping 2.2s var(--ease) infinite}
+.hfpill[data-s=hearing] .hfdot i{background:#E4DEFF;box-shadow:0 0 14px rgba(198,187,250,.9)}
+.hfpill[data-s=thinking] .hfdot i{animation:blink .7s ease-in-out infinite alternate}
+.hfpill[data-s=heard]{background:rgba(111,227,165,.1);border-color:rgba(111,227,165,.3)}
+.hfpill[data-s=heard] .hfdot i{background:#6FE3A5}
+.hfpill[data-s=paused] .hfdot i{background:var(--dim)}
+.hft{flex:1;min-width:0;font-size:13.5px;font-weight:750;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hft.swap{animation:wordup .35s var(--ease)}
+.hfpill .chip{height:32px}
