@@ -42,8 +42,9 @@ const cardioOk = c => c && isId(c.id) && CARDIO_TYPES.some(t => t.id === c.type)
 const exerciseOk = e => e && isId(e.id) && isStr(e.en, 80) && isStr(e.da, 80) && Array.isArray(e.muscles) && isStr(e.equipment, 40);
 const prOk = p => p && isId(p.id) && isId(p.exerciseId) && ['weight', 'e1rm', 'reps'].includes(p.kind) && isNum(p.kg, 0, 1500);
 const bwOk = b => b && isDate(b.date) && isNum(b.kg, 20, 400);
-const mealOk = m => m && isId(m.id) && ts(m.t) && isStr(m.name, 80) && isNum(m.protein, 0, 300) && isNum(m.kcal, 0, 5000) && (m.thumb === undefined || validThumb(m.thumb));
-const nutOk = n => n && isDate(n.date) && isNum(n.protein, 0, 1000) && (n.kcal === undefined || isNum(n.kcal, 0, 20000)) &&
+const mealOk = m => m && isId(m.id) && ts(m.t) && isStr(m.name, 80) && isNum(m.protein, 0, 300) && isNum(m.kcal, 0, 5000) && (m.thumb === undefined || validThumb(m.thumb)) &&
+  (m.slot === undefined || ['breakfast', 'lunch', 'dinner', 'snack'].includes(m.slot));
+const nutOk = n => n && isDate(n.date) && isNum(n.protein, 0, 1000) && (n.kcal === undefined || isNum(n.kcal, 0, 20000)) && (n.water === undefined || isNum(n.water, 0, 8000)) &&
   (n.meals === undefined || (Array.isArray(n.meals) && n.meals.length <= 60 && n.meals.every(mealOk)));
 const dailyOk = d => d && isDate(d.date) && (d.sleepH == null || isNum(d.sleepH, 0, 14)) && (d.energy == null || [1, 2, 3, 4, 5].includes(d.energy)) &&
   Array.isArray(d.sore) && d.sore.length <= 6 && d.sore.every(g => isStr(g, 20));

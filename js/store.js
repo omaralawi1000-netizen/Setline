@@ -1,5 +1,6 @@
 // App state + persistence. The active workout is written to IndexedDB on every change.
 import * as db from './db.js';
+import { addWater, setSlot } from './nutrition.js';
 import { createCatalog } from './catalog.js';
 import { starterRoutines } from './routines.js';
 import { loadSettings, saveSettings, sanitize, SETTINGS_KEY } from './settings.js';
@@ -291,6 +292,26 @@ export async function logMeal(meal, date = dateKey()) {
   await db.put('nutrition', state.nutrition.find(x => x.date === date));
   emit('body');
   return r.meal;
+}
+export async function logWater(ml, date = dateKey()) {
+  state.nutrition = addWater(state.nutrition, date, ml);
+  await db.put('nutrition', state.nutrition.find(x => x.date === date));
+  emit('body');
+}
+export async function moveMeal(id, slot, date = dateKey()) {
+  state.nutrition = setSlot(state.nutrition, date, id, slot);
+  const e = state.nutrition.find(x => x.date === date);
+  if (e) await db.put('nutrition', e);
+  emit('body');
+}
+// put a deleted meal back exactly as it was (undo)
+export async function restoreMeal(meal, date = dateKey()) {
+  const cur = state.nutrition.find(x => x.date === date) || { date, protein: 0 };
+  if (cur.meals?.some(m => m.id === meal.id)) return;
+  const next = { ...cur, protein: Math.min(1000, (cur.protein || 0) + meal.protein), kcal: Math.min(20000, (cur.kcal || 0) + meal.kcal), meals: [...(cur.meals || []), meal] };
+  state.nutrition = [...state.nutrition.filter(x => x.date !== date), next];
+  await db.put('nutrition', next);
+  emit('body');
 }
 export async function deleteMeal(id, date = dateKey()) {
   state.nutrition = removeMeal(state.nutrition, date, id);

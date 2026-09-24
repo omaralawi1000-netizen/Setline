@@ -5,6 +5,7 @@ import { e1rm, bestsFrom } from './pr.js';
 import { weekStart, weekStreak } from './stats.js';
 import { cardioName, paceText, cardioMinutes } from './cardio.js';
 import { bodyTrend, proteinTarget, dateKey } from './body.js';
+import { autoTargets, targetsFor, dayTotals } from './nutrition.js';
 import { sleepTrend } from './checkin.js';
 import { profileText } from './profile.js';
 import { deloadStatus, muscleBalance, usualMinutes } from './insights.js';
@@ -37,7 +38,7 @@ export const APP_GUIDE = [
   'Other voice: "start push day", "30 minutes zone 2 on the bike", "slept 7 hours, legs sore", "I ate 3 eggs and toast", "30 g protein", "I weigh 82", "what should I lift?", or any question for you.',
   'Headphones button on the workout screen: hands-free mode listens for sets and speaks rest cues.',
   'Workout screen: steppers and Log set, rest timer (+15/-15 teaches that exercise its rest), warm-up ramp, plate calculator, swipe a set left to delete, tap a set to edit, auto-advance after the last planned set, Finish.',
-  'Today: one-tap morning check-in (how you feel, sleep, sore spots → readiness), Up next routine, cardio start and "again" chip, week ring and cardio minutes, muscles this week, deload suggestion after 6 steady weeks, bodyweight, protein ring, Snap a meal (photo or text → protein and calories), barcode scanner for packaged food, one-tap favourite meals.',
+  'Today: one-tap morning check-in (how you feel, sleep, sore spots → readiness), Up next routine, cardio start and "again" chip, week ring and cardio minutes, muscles this week, deload suggestion after 6 steady weeks, bodyweight, a Food card (calories left, protein) that opens the Food screen: calorie ring and protein/carbs/fat against daily targets (from the profile, editable by tapping the ring), Scan barcode / Photo / Say it / Type, favourite meals, water glasses, meals by breakfast/lunch/dinner/snacks (tap to move, log again, favourite, delete), a 7-day chart.',
   'Plans: asking for one in plain words here ("I need a 5-day plan", "make my plan 4 days") builds a plan card right away, with Replace my routines or Add.',
   'History: every workout and cardio session, "Do this again". Progress: volume, cardio, bodyweight, sleep, muscles, lifts with e1RM curves and records. Body & photos: measurements, progress photos (on the phone only), before/after compare.',
   'Settings: profile (edit answers), voice and replies, API keys, Google Drive backup, export/import, units, rest default, auto-advance.'
@@ -143,6 +144,9 @@ export function buildContext(snap) {
   const target = tr ? proteinTarget(tr.latest.kg, settings.proteinPerKg) : null;
   const protein = (snap.nutrition || []).find(n => n.date === dateKey(now))?.protein || 0;
   out.push(`PROTEIN today: ${protein} g${target ? ` of a ${target} g target` : ' (no target without bodyweight)'}.`);
+  const ft = targetsFor(autoTargets({ profile: settings.profile, bodyweightKg: tr?.latest.kg, proteinPerKg: settings.proteinPerKg, now }), settings.foodTargets);
+  const ftot = dayTotals((snap.nutrition || []).find(n => n.date === dateKey(now)));
+  out.push(`FOOD today: ${ftot.kcal} of ${ft.kcal} kcal, protein ${ftot.protein}/${ft.protein} g, carbs ${ftot.carbs}/${ft.carbs} g, fat ${ftot.fat}/${ft.fat} g, water ${ftot.water}/${ft.water} ml (targets ${settings.foodTargets ? 'set by the user' : 'worked out from the profile'}).`);
   const ci = (snap.daily || []).find(d => d.date === dateKey(now));
   if (ci) out.push(`CHECK-IN today: ${ci.sleepH != null ? `${ci.sleepH} h sleep` : 'sleep not given'}, ${ci.energy != null ? `energy ${ci.energy}/5` : 'energy not given'}, sore: ${ci.sore?.length ? ci.sore.join(', ') : 'nothing'}.`);
   const sl = sleepTrend(snap.daily || [], 7);

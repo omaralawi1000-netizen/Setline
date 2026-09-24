@@ -2,6 +2,7 @@
 import { LIMITS } from './workout.js';
 import { sanitizeProfile } from './profile.js';
 import { sanitizeGoals } from './goals.js';
+import { sanitizeTargets } from './nutrition.js';
 
 export const SETTINGS_KEY = 'setline.settings';
 
@@ -43,6 +44,7 @@ export const DEFAULTS = Object.freeze({
   goals: [],           // lift goals (goals.js)
   accent: 'violet',    // colour theme
   fullscreen: false,   // hide the phone's status bar (edge to edge)
+  foodTargets: null,   // {kcal, protein, carbs, fat, water} set by hand; null = worked out from the profile
   todayHide: ['balance', 'routines'] // Today sections tucked away (Customize)
 });
 
@@ -75,6 +77,7 @@ export function sanitize(input) {
   if (Number.isFinite(input.profileAsked)) s.profileAsked = input.profileAsked;
   if (ACCENTS.includes(input.accent)) s.accent = input.accent;
   if (typeof input.fullscreen === 'boolean') s.fullscreen = input.fullscreen;
+  s.foodTargets = sanitizeTargets(input.foodTargets);
   if (Array.isArray(input.todayHide)) s.todayHide = [...new Set(input.todayHide.filter(x => TODAY_PARTS.includes(x)))];
   if (Array.isArray(input.favMeals)) s.favMeals = input.favMeals.filter(x => typeof x === 'string' && x.length <= 60).slice(0, 30);
   for (const k of ['deloadUntil', 'deloadSnoozed']) if (Number.isFinite(input[k]) && input[k] >= 0) s[k] = input[k];

@@ -1,6 +1,6 @@
 // Service worker: precached app shell, runtime cache for Google Fonts.
 // Bump VERSION on every release (keep js/version.js in sync).
-const VERSION = '1.12.0';
+const VERSION = '1.13.0';
 const CACHE = 'setline-' + VERSION;
 const FONTS = 'setline-fonts';
 const SHELL = [
@@ -80,6 +80,8 @@ const SHELL = [
   'js/endpoint.js',
   'js/figures.js',
   'js/ui/figure.js',
+  'js/nutrition.js',
+  'js/ui/food.js',
   'js/ui/progress.js',
   'js/ui/routine.js',
   'js/ui/history.js',
@@ -101,9 +103,30 @@ self.addEventListener('activate', e => {
   })());
 });
 
+// Rest alarm. The page hands over when rest ends and the worker waits it out itself: a worker
+// stays alive while it handles a message (up to about 5 minutes), so the ping comes even when the
+// page is frozen in the background or you're in another app.
+let rest = null;
+const REST_MAX = 270_000;
 self.addEventListener('message', e => {
-  if (e.data === 'skipWaiting') self.skipWaiting();
+  const d = e.data;
+  if (d === 'skipWaiting') { self.skipWaiting(); return; }
+  if (d?.type === 'rest' && Number.isFinite(d.endsAt)) { const r = rest = { ...d }; e.waitUntil(waitRest(r)); }
+  else if (d?.type === 'rest-cancel') rest = null;
 });
+async function waitRest(r) {
+  const ms = r.endsAt - Date.now();
+  if (ms <= 0 || ms > REST_MAX) return;
+  await new Promise(res => setTimeout(res, ms));
+  if (rest !== r) return; // skipped, changed or the workout ended
+  rest = null;
+  const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  if (all.some(c => c.visibilityState === 'visible' && c.focused)) return; // the app is open: it rings itself
+  await self.registration.showNotification(r.title, {
+    body: r.body || '', tag: 'setline-rest', renotify: true, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png',
+    vibrate: [220, 90, 220, 90, 320], timestamp: r.endsAt, data: { url: './' }
+  });
+}
 
 // Tapping a rest alert brings the app back.
 self.addEventListener('notificationclick', e => {

@@ -31,5 +31,8 @@ export const I = {
   ruler: svg('<path d="M4 16.5 16.5 4 20 7.5 7.5 20z"/><path d="M8 12.5l1.6 1.6M10.5 10l2.2 2.2M13 7.5l1.6 1.6"/>'),
   moon: svg('<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/>'),
   cloud: svg('<path d="M7.5 18.5a4 4 0 0 1-.6-7.96A5.5 5.5 0 0 1 17.6 9.5a4.5 4.5 0 0 1-.1 9z"/>'),
+  mic: svg('<rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M6 11.5a6 6 0 0 0 12 0M12 17.5v3"/>'),
+  pen: svg('<path d="M4.5 19.5h4l10-10-4-4-10 10z"/><path d="M13 7l4 4"/>'),
+  drop: svg('<path d="M12 3.8s-6 6.6-6 10.7a6 6 0 0 0 12 0c0-4.1-6-10.7-6-10.7z"/>'),
   headphones: svg('<path d="M4.5 16v-3.5a7.5 7.5 0 0 1 15 0V16"/><rect x="4" y="14" width="4" height="6" rx="1.6"/><rect x="16" y="14" width="4" height="6" rx="1.6"/>')
 };

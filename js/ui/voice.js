@@ -232,6 +232,14 @@ function pushVoiceEntry() {
   if (v.closing) v.closing.then(push); else push();
 }
 
+// Food screen's "Say it": lift the orb and start listening straight away.
+export function talkNow() {
+  unlockAudio();
+  if (!v.open) openMini();
+  v.toggle = true;
+  startRec();
+}
+
 export function openMini() {
   hideToast();
   if (v.open) return;

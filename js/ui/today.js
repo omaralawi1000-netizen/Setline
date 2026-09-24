@@ -1,5 +1,7 @@
 // Today: the hub. Streak, what's next, cardio, the week, body, last week's review, routines.
 import { state } from '../store.js';
+import { foodTargets } from './food.js';
+import { dayTotals } from '../nutrition.js';
 import { esc } from './dom.js';
 import { I } from './icons.js';
 import { routineName, estimateMinutes, nextRoutine } from '../routines.js';
@@ -9,7 +11,7 @@ import { doneSetCount, elapsedSec } from '../workout.js';
 import { getKey } from '../keys.js';
 import { thisWeek, lastSessionSummary, latestPR, sparkline, weekStreak, weekReview, weekStart } from '../stats.js';
 import { cardioMinutes, cardioName, cardioElapsed, paceText } from '../cardio.js';
-import { bodyTrend, proteinTarget, dateKey } from '../body.js';
+import { bodyTrend, dateKey } from '../body.js';
 import { cardioIcon, favouriteTypes } from './cardio.js';
 import { muscleBalance, deloadStatus } from '../insights.js';
 import { driveNudgeHTML } from './drive.js';
@@ -178,8 +180,6 @@ function bodyHTML() {
   const { t, lang, settings } = state;
   const unit = settings.unit, u = t(`unit.${unit}`);
   const tr = bodyTrend(state.bodyweight);
-  const target = tr ? proteinTarget(tr.latest.kg, settings.proteinPerKg) : null;
-  const today = state.nutrition.find(n => n.date === dateKey())?.protein || 0;
   const sp = tr ? sparkline(tr.series, 96, 40, 6) : null;
   const weightCard = `<button class="mini solid body" data-body="weight"><span class="label">${t('body.weight')}</span>
       ${tr ? `<strong>${esc(weight(tr.latest.kg, unit, lang))} <small>${u}</small></strong>
@@ -187,11 +187,14 @@ function bodyHTML() {
         ${sp ? `<svg class="bspark" viewBox="0 0 96 40" aria-hidden="true"><polyline points="${sp.line}" fill="none" stroke="url(#sp)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${sp.last.x}" cy="${sp.last.y}" r="3" style="fill:var(--accent)"/></svg>` : ''}`
       : `<span class="bsub">${t('body.noWeight')}</span><span class="bplus">${I.plus}</span>`}
     </button>`;
-  const pct = target ? Math.min(1, today / target) : 0;
+  // the food card: calories left and protein, opens the Food screen; the chips still add protein
+  const ft = foodTargets(), tot = dayTotals(state.nutrition.find(n => n.date === dateKey()));
+  const kLeft = ft.kcal - tot.kcal;
+  const pct = Math.min(1, tot.kcal / ft.kcal);
   const R = 2 * Math.PI * 21;
-  const proteinCard = `<div class="mini solid protein"><span class="label">${t('body.protein')}</span>
-      <div class="prow2"><div class="pring"><svg viewBox="0 0 52 52" aria-hidden="true"><circle class="bg" cx="26" cy="26" r="21"/><circle class="fg" cx="26" cy="26" r="21" style="stroke-dasharray:${R};stroke-dashoffset:${R * (1 - pct)}"/></svg><b>${today}</b></div>
-      <span class="bsub">${target ? esc(t('body.proteinOf', { g: today, target })) : t('body.proteinNeedsBw')}</span></div>
+  const proteinCard = `<div class="mini solid protein foodcard" data-foodscreen role="button" tabindex="0" aria-label="${esc(t('food.title'))}"><span class="label">${t('food.title')} <span class="fgo">→</span></span>
+      <div class="prow2"><div class="pring"><svg viewBox="0 0 52 52" aria-hidden="true"><circle class="bg" cx="26" cy="26" r="21"/><circle class="fg" cx="26" cy="26" r="21" style="stroke-dasharray:${R};stroke-dashoffset:${R * (1 - pct)}"/></svg><b>${Math.round(pct * 100)}<small>%</small></b></div>
+      <span class="bsub"><strong>${esc(new Intl.NumberFormat(lang === 'da' ? 'da-DK' : 'en-GB').format(Math.abs(kLeft)))}</strong> ${t(kLeft < 0 ? 'food.kcalOver' : 'food.kcalLeft')}<br>${esc(t('food.proteinOf', { g: tot.protein, target: ft.protein }))}</span></div>
       <div class="padd">${[20, 30, 40].map(g => `<button class="chip" data-body="protein" data-g="${g}">+${g}</button>`).join('')}</div>
     </div>`;
   const day = state.nutrition.find(n => n.date === dateKey());

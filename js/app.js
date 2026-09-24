@@ -28,6 +28,7 @@ import { autoBackup } from './ui/drive.js';
 import { initHandsFree } from './ui/handsfree.js';
 import { onCheckinClick } from './ui/checkin.js';
 import { renderBody, initBodyScreen } from './ui/bodyscreen.js';
+import { renderFood, initFood, openFoodDay } from './ui/food.js';
 import { openScanner } from './ui/scan.js';
 import { openMealSheet } from './ui/meal.js';
 import { maybeOnboard, setOnboardNav } from './ui/onboard.js';
@@ -39,7 +40,7 @@ import { repeatTemplate } from './insights.js';
 import { animateFigures } from './ui/figure.js';
 
 const TABS = ['today', 'workout', 'coach', 'history'];
-const SUB = ['detail', 'settings', 'routine', 'progress', 'exercise', 'body'];
+const SUB = ['detail', 'settings', 'routine', 'progress', 'exercise', 'body', 'food'];
 const view = { screen: 'today', detailId: null, detailKind: 'workout', parent: 'history' };
 const actions = {};
 const app = $('#app');
@@ -60,6 +61,7 @@ function renderScreen(name = view.screen) {
   else if (name === 'exercise') renderExercise(root, view.exerciseId);
   else if (name === 'settings') renderSettings(root);
   else if (name === 'body') renderBody(root);
+  else if (name === 'food') renderFood(root);
 }
 
 // Built once; later renders only move the pill and relabel, so the indicator can glide.
@@ -120,7 +122,7 @@ function renderAll() {
 }
 
 // Direction for the transition: tabs by position, sub screens push in from the right.
-const ORDER = { today: 0, workout: 1, coach: 2, history: 3, detail: 4, settings: 4, routine: 4, progress: 4, body: 4, exercise: 5 };
+const ORDER = { today: 0, workout: 1, coach: 2, history: 3, detail: 4, settings: 4, routine: 4, progress: 4, body: 4, food: 4, exercise: 5 };
 function show(name, { back = false } = {}) {
   const prev = view.screen;
   view.screen = name;
@@ -229,6 +231,7 @@ initChrome();
 app.addEventListener('dockopen', () => renderDock());
 initHandsFree();
 initBodyScreen($('#s-body'));
+initFood($('#s-food'));
 initGoals();
 setOnboardNav({ go: name => go(name), ask: q => askCoach(q) });
 initWorkout($('#s-workout'), actions);
@@ -256,6 +259,7 @@ app.addEventListener('click', e => {
   if (ex) { haptic('tap'); pushSub('exercise', { exerciseId: ex.dataset.ex }); return; }
   if (e.target.closest('[data-progress]')) { haptic('tap'); pushSub('progress'); return; }
   if (e.target.closest('[data-bodyscreen]')) { haptic('tap'); pushSub('body'); return; }
+  if (e.target.closest('[data-foodscreen]') && !e.target.closest('[data-body]')) { haptic('tap'); openFoodDay(); pushSub('food'); return; }
   const pr = e.target.closest('[data-prange]');
   if (pr) { setRange(Number(pr.dataset.prange)); haptic('tap'); renderScreen('progress'); countAll($('#s-progress'), state.lang); return; }
   const f = e.target.closest('[data-hfilter]');
@@ -290,20 +294,39 @@ app.addEventListener('click', e => {
 let restTimer = 0, restFor = 0;
 function scheduleRestAlert() {
   const r = state.active?.rest;
-  if (!state.settings.restAlerts || !r || r.endsAt <= Date.now()) { clearTimeout(restTimer); restFor = 0; return; }
+  const sw = navigator.serviceWorker?.controller;
+  const allowed = state.settings.restAlerts && globalThis.Notification?.permission === 'granted';
+  if (!allowed || !r || r.endsAt <= Date.now()) {
+    if (restFor) sw?.postMessage({ type: 'rest-cancel' });
+    clearTimeout(restTimer); restFor = 0;
+    if (r && r.endsAt > Date.now()) maybeAskAlerts();
+    return;
+  }
   if (restFor === r.endsAt) return;
   clearTimeout(restTimer);
   restFor = r.endsAt;
+  const w = state.active, ex = w?.exercises[w.current];
+  const msg = { type: 'rest', endsAt: r.endsAt, title: state.t('workout.restDone'), body: ex ? `${state.catalog.name(ex.exerciseId, state.lang)} · ${state.t('workout.setNext', { n: nextSetNumber(ex) })}` : '' };
+  // the service worker keeps time even when this page is frozen in the background
+  if (sw && r.endsAt - Date.now() < 270_000) { sw.postMessage(msg); return; }
   restTimer = setTimeout(async () => {
     restFor = 0;
-    if (document.visibilityState === 'visible' || Notification.permission !== 'granted') return;
-    const w = state.active, ex = w?.exercises[w.current];
-    const reg = await navigator.serviceWorker?.ready;
-    reg?.showNotification(state.t('workout.restDone'), {
-      body: ex ? `${state.catalog.name(ex.exerciseId, state.lang)} · ${state.t('workout.setNext', { n: nextSetNumber(ex) })}` : '',
-      tag: 'setline-rest', renotify: true, icon: 'icons/icon-192.png', vibrate: [120, 80, 120]
-    });
+    if (document.visibilityState === 'visible') return;
+    (await navigator.serviceWorker?.ready)?.showNotification(msg.title, { body: msg.body, tag: 'setline-rest', renotify: true, icon: 'icons/icon-192.png', vibrate: [220, 90, 220, 90, 320] });
   }, r.endsAt - Date.now());
+}
+
+// The first rest asks once (after the set's own toast has gone) whether to ping you when it ends.
+function maybeAskAlerts() {
+  if (state.settings.restAlerts || !globalThis.Notification || Notification.permission === 'denied') return;
+  try { if (localStorage.getItem('setline.alertsAsked')) return; localStorage.setItem('setline.alertsAsked', '1'); } catch { return; }
+  setTimeout(() => {
+    if (!state.active?.rest || document.querySelector('#toast.show')) { try { localStorage.removeItem('setline.alertsAsked'); } catch {} return; }
+    toast({ title: esc(state.t('alerts.ask')), sub: state.t('alerts.askSub'), action: state.t('alerts.turnOn'), ms: 9000, onAction: async () => {
+      const p = await Notification.requestPermission();
+      if (p === 'granted') { store.setSettings({ restAlerts: true }); toast({ title: esc(state.t('alerts.on')) }); }
+    } });
+  }, 4500);
 }
 
 store.subscribe(reason => {

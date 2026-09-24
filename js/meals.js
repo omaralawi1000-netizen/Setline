@@ -77,7 +77,8 @@ export function addMeal(entries, date, meal, now = Date.now(), id = uid()) {
     id, t: now, name: String(meal.name || '').slice(0, MEAL_LIMITS.name),
     protein: Math.round(clamp(meal.protein, MEAL_LIMITS.protein)), kcal: Math.round(clamp(meal.kcal, MEAL_LIMITS.kcal)),
     carbs: Math.round(clamp(meal.carbs, MEAL_LIMITS.carbs)), fat: Math.round(clamp(meal.fat, MEAL_LIMITS.fat)),
-    source: ['photo', 'barcode'].includes(meal.source) ? meal.source : 'text', ...(validThumb(meal.thumb) ? { thumb: meal.thumb } : {})
+    source: ['photo', 'barcode'].includes(meal.source) ? meal.source : 'text', ...(validThumb(meal.thumb) ? { thumb: meal.thumb } : {}),
+    ...(['breakfast', 'lunch', 'dinner', 'snack'].includes(meal.slot) ? { slot: meal.slot } : {})
   };
   const cur = entries.find(e => e.date === date) || { date, protein: 0 };
   const next = { ...cur, protein: Math.min(1000, (cur.protein || 0) + m.protein), kcal: Math.min(20000, (cur.kcal || 0) + m.kcal), meals: [...(cur.meals || []), m] };
