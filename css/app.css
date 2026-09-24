@@ -1353,3 +1353,26 @@ p.ckwarn{margin:6px 0 0}
 .screen:not(.enter) :is(.gcard,.favchip,.msite,.pthumb,.ckq,.ckdone:not(.arrive),.hfpill,.mrow i b,.gbar .fill,.ckbars i,.mealrow,.dlcard,.dnudge){animation:none}
 .msg.seen{animation:none}
 .glass .label{color:#A99DE8}
+
+/* ---------- phone edges: status bar colour, Apple-style blurred edges, a dock that tucks in ---------- */
+.app{background:linear-gradient(#24233F,var(--bg) 220px)}
+.edge{position:absolute;left:0;right:0;z-index:6;pointer-events:none}
+.edge::before,.edge::after{content:"";position:absolute;inset:0;transition:opacity .45s var(--ease)}
+/* top: always a hair of the status-bar colour so the bar and the app meet without a seam */
+.edge.et{top:0;height:calc(var(--safe-top) + 58px)}
+.edge.et::before{background:linear-gradient(#24233F,rgba(36,35,63,.72) 22%,rgba(36,35,63,0));opacity:.55}
+.edge.et::after{-webkit-backdrop-filter:blur(14px) saturate(150%);backdrop-filter:blur(14px) saturate(150%);
+  -webkit-mask-image:linear-gradient(#000 35%,transparent);mask-image:linear-gradient(#000 35%,transparent);opacity:0}
+.app.under-top .edge.et::before{opacity:1}
+.app.under-top .edge.et::after{opacity:1}
+.edge.eb{bottom:0;height:calc(var(--dock-bottom) + var(--dock-h) + 40px)}
+.edge.eb::after{-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  -webkit-mask-image:linear-gradient(transparent,#000 70%);mask-image:linear-gradient(transparent,#000 70%);opacity:0}
+.app.under-bottom .edge.eb::after{opacity:1}
+.app.voice .edge,.app.is-sub .edge.eb{opacity:0}
+.app.is-sub .edge.et{opacity:1}
+/* the dock tucks in while you read and comes back when you scroll up */
+.dock{transition:opacity .35s var(--ease),transform .6s cubic-bezier(.3,1.35,.5,1)}
+.app.compact:not(.is-sub):not(.voice):not(.kb) .dock{transform:translateY(10px) scale(.9)}
+.dock .ind{transition:transform .6s cubic-bezier(.3,1.25,.5,1),width .6s cubic-bezier(.3,1.25,.5,1),opacity .3s}
+html[data-motion=off] .edge::before,html[data-motion=off] .edge::after{transition:none}

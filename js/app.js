@@ -22,6 +22,7 @@ import { setHistoryFilter } from './ui/history.js';
 import { renderProgress, renderExercise, setRange } from './ui/progress.js';
 import { countAll, burst } from './ui/fx.js';
 import { initPress } from './ui/press.js';
+import { initChrome } from './ui/chrome.js';
 import { autoBackup } from './ui/drive.js';
 import { initHandsFree } from './ui/handsfree.js';
 import { onCheckinClick } from './ui/checkin.js';
@@ -141,6 +142,7 @@ function show(name, { back = false } = {}) {
   }
   app.classList.toggle('is-sub', SUB.includes(name));
   app.classList.toggle('coaching', name === 'coach');
+  requestAnimationFrame(() => app.dispatchEvent(new Event('screenchange')));
   renderAll();
 }
 
@@ -217,6 +219,7 @@ Object.assign(actions, {
   }
 });
 initPress(document);
+initChrome();
 initHandsFree();
 initBodyScreen($('#s-body'));
 initGoals();

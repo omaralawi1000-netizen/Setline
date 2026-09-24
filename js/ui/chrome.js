@@ -1,0 +1,39 @@
+// The phone's own bars: the status bar takes the colour of the app's top edge (darker under a sheet
+// or the voice layer), and soft blurred edges fade in at the top and bottom once content scrolls under them.
+export const EDGE = '#24233F', DIM = '#121220';
+
+export function initChrome() {
+  const app = document.getElementById('app');
+  const meta = document.querySelector('meta[name=theme-color]');
+  let color = '';
+  const paint = () => {
+    const dim = app.classList.contains('voice') || !!app.querySelector(':scope > .scrim.show');
+    const next = dim ? DIM : EDGE;
+    if (next !== color && meta) { color = next; meta.setAttribute('content', next); }
+  };
+  new MutationObserver(paint).observe(app, { attributes: true, attributeFilter: ['class'], childList: true, subtree: false });
+  // a sheet's scrim gets .show a frame after it's added
+  app.addEventListener('transitionrun', e => { if (e.target.classList?.contains('scrim')) paint(); });
+  app.addEventListener('transitionend', e => { if (e.target.classList?.contains('scrim')) paint(); });
+  let raf = 0, lastY = 0;
+  const onScroll = e => {
+    const s = e.target;
+    if (!s.classList?.contains('screen') || raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      app.classList.toggle('under-top', s.scrollTop > 6);
+      app.classList.toggle('under-bottom', s.scrollHeight - s.clientHeight - s.scrollTop > 6);
+      const y = s.scrollTop, dy = y - lastY;
+      if (Math.abs(dy) > 12) { app.classList.toggle('compact', dy > 0 && y > 80); lastY = y; }
+    });
+  };
+  app.addEventListener('scroll', onScroll, { capture: true, passive: true });
+  // a new screen starts at its own scroll position
+  app.addEventListener('screenchange', () => {
+    const s = app.querySelector('.screen.on');
+    app.classList.remove('compact'); lastY = s?.scrollTop || 0;
+    app.classList.toggle('under-top', !!s && s.scrollTop > 6);
+    app.classList.toggle('under-bottom', !!s && s.scrollHeight - s.clientHeight - s.scrollTop > 6);
+  });
+  paint();
+}
