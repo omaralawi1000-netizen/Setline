@@ -26,6 +26,10 @@ import { planFor } from './routine.js';
 import { orbPulse } from './fx.js';
 import { ask as askCoach, ensureModels } from './coach.js';
 import { cmdModels } from '../settings.js';
+import { createEndpointer, looksUnfinished } from '../endpoint.js';
+
+const endpoint = createEndpointer();
+const WAIT_MS = 6000; // sounded unfinished: still send after this much quiet
 
 const HOLD_MS = 280;          // shorter press = tap
 const BARS = 27;
@@ -368,6 +372,15 @@ function startLoop() {
     const target = listening ? mic.level() : 0;
     v.lvl += (target - v.lvl) * (target > v.lvl ? 0.45 : 0.12);
     v.hist[v.histAt = (v.histAt + 1) % v.hist.length] = v.lvl;
+    // tapped to talk: a pause sends it, but only once what you said sounds finished
+    const dt = v.lastTick ? now - v.lastTick : 0;
+    v.lastTick = now;
+    if (listening && v.toggle) {
+      const ev = endpoint.push(target, dt);
+      if (ev === 'pause') speculate();
+      else if (ev === 'resume') { v.spec = null; v.waiting = false; setPausing(''); }
+      if (v.waiting && endpoint.quietMs >= WAIT_MS) { v.waiting = false; finishRec(); }
+    }
     if (reduced()) return;
     const l = v.lvl;
     // alive, not mechanical: a slow breath, and a soft squash and stretch that follows the voice
@@ -437,8 +450,46 @@ async function startRec() {
     showCard({ kind: 'info', icon: 'info', title: state.t('voice.micReady'), sub: state.t('voice.micReadySub'), lang: state.lang });
     return;
   }
+  endpoint.reset();
+  v.spec = null; v.waiting = false; setPausing('');
   setPhase('listening');
   if (v.pendingStop) { v.pendingStop = false; finishRec(); }
+}
+
+function sttOpts() {
+  const ex = state.active?.exercises[state.active.current];
+  const recent = [...new Set([...(state.active?.exercises || []).map(e => e.exerciseId), ...Object.keys(state.usage).sort((a, b) => state.usage[b] - state.usage[a])])];
+  return {
+    key: getKey('groq'), model: sttModelId(state.settings), language: state.settings.voiceLang,
+    prompt: buildPrompt({ current: ex?.exerciseId, recent, catalog: state.catalog })
+  };
+}
+// "Keep talking" after a sentence got cut off: the new words continue the old ones
+const withCarry = text => { const c = v.carry; v.carry = ''; return [c, text].filter(Boolean).join(' ').trim(); };
+
+// A pause: listen to what we have so far. Finished → send it now (no second upload).
+// Sounds unfinished ("…for", "and", "um") → keep listening, and say so.
+async function speculate() {
+  const blob = mic.snapshot();
+  if (!blob || blob.size < 800) return;
+  const spec = v.spec = { token: v.token };
+  setPausing('check');
+  let text;
+  try { text = await transcribe(blob, sttOpts()); }
+  catch { if (v.spec === spec) { v.spec = null; v.waiting = true; setPausing(''); } return; }
+  if (v.spec !== spec || spec.token !== v.token || !mic.isRecording() || v.phase !== 'listening') return;
+  v.spec = null;
+  if (looksUnfinished(text)) { v.waiting = true; setPausing('wait'); return; }
+  v.toggle = false;
+  mic.cancel();
+  setPausing('');
+  setPhase('thinking');
+  handleText(withCarry(text));
+}
+function setPausing(k) {
+  el.mini.dataset.pause = k;
+  el.layer.dataset.pause = k;
+  if (v.phase === 'listening') el.ostatus.textContent = state.t(k === 'wait' ? 'voice.takeTime' : v.toggle ? 'voice.tapSendMini' : 'voice.listening');
 }
 
 async function finishRec() {
@@ -446,18 +497,14 @@ async function finishRec() {
   if (!mic.isRecording()) return;
   const token = v.token;
   v.toggle = false;
+  v.spec = null; v.waiting = false; setPausing('');
   setPhase('thinking');
   const r = await mic.stop();
   if (!r || token !== v.token) return;
   if (r.ms < 400 || (r.measured && r.peak < 0.03) || r.blob.size < 800) return showError('voice.tooShort', 'voice.tooShortSub');
-  const ex = state.active?.exercises[state.active.current];
-  const recent = [...new Set([...(state.active?.exercises || []).map(e => e.exerciseId), ...Object.keys(state.usage).sort((a, b) => state.usage[b] - state.usage[a])])];
   let text;
   try {
-    text = await transcribe(r.blob, {
-      key: getKey('groq'), model: sttModelId(state.settings), language: state.settings.voiceLang,
-      prompt: buildPrompt({ current: ex?.exerciseId, recent, catalog: state.catalog })
-    });
+    text = await transcribe(r.blob, sttOpts());
   } catch (e) {
     if (token !== v.token) return;
     const map = { offline: ['voice.offline', 'voice.offlineSub'], badkey: ['voice.badKey', 'voice.badKeySub'], busy: ['voice.busy', 'voice.busySub'], nokey: ['voice.noKey', 'voice.noKeySub'] };
@@ -466,6 +513,7 @@ async function finishRec() {
     return showError(a, b, { retry: true, type: true, settings: e.code === 'badkey' || e.code === 'nokey', code: e.status || e.code });
   }
   if (token !== v.token) return;
+  text = withCarry(text);
   if (!text) return showError('voice.tooShort', 'voice.tooShortSub', { retry: true });
   handleText(text);
 }
@@ -625,7 +673,8 @@ function showCard(cmd) {
   else if (cmd.kind === 'confirm') actions = `<span class="pair">${btn('cancel', t('common.cancel'))}${btn('confirm', t('voice.confirm'), 'primary')}</span>`;
   else if (cmd.kind === 'error') {
     const list = [];
-    if (cmd.retry && getKey('groq')) list.push(btn('retry', t('voice.retry')));
+    if (cmd.intent?.heard && getKey('groq')) list.push(btn('more', t('voice.more')));
+    else if (cmd.retry && getKey('groq')) list.push(btn('retry', t('voice.retry')));
     if (cmd.settings) list.push(btn('settings', t('voice.openSettings')));
     if (cmd.type || (cmd.retry && !cmd.local)) list.push(btn('edit', cmd.local ? t('voice.type') : t('voice.edit')));
     actions = list.length ? `<span class="pair">${list.slice(0, 2).join('')}</span>` : btn('close', '×', 'x');
@@ -783,6 +832,15 @@ function onCardClick(e) {
     haptic('tap');
     dismissCard({ keepPending: false });
     return present({ ...ch.intent, heard: cmd.intent?.heard || '', lang: cmd.lang });
+  }
+  if (k === 'more') {
+    v.carry = cmd?.intent?.heard || '';
+    dismissCard({ keepPending: false });
+    if (!v.open) openMini();
+    el.osay.textContent = v.carry;
+    el.say.textContent = v.carry;
+    v.toggle = true;
+    return startRec();
   }
   if (k === 'retry') { dismissCard({ keepPending: false }); if (!v.open) openMini(); v.toggle = true; return startRec(); }
   if (k === 'edit') {

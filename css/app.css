@@ -1415,3 +1415,6 @@ html{transition:background-color .4s}
 .obtext::placeholder{color:var(--dim)}
 .obgot{display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--accent);font-weight:800;font-size:14px;animation:wordin .45s var(--ease) both}
 .obgot svg{width:16px;height:16px;flex:none}
+/* a pause: the orb holds its breath while it checks whether you're done */
+.ofloat[data-pause=check] .orb.lift{opacity:.82;transition:opacity .3s}
+.ofloat[data-pause=wait] .ostatus{color:var(--warm);background:rgba(255,217,168,.1)}

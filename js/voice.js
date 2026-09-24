@@ -86,6 +86,12 @@ export function stop() {
   });
 }
 
+// What's been recorded so far, without stopping (for a quick look at a pause).
+export function snapshot() {
+  if (!rec?.chunks.length) return null;
+  return new Blob(rec.chunks, { type: rec.recorder.mimeType || 'audio/webm' });
+}
+
 export function cancel() {
   const r = rec;
   rec = null;
