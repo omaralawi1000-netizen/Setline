@@ -71,6 +71,8 @@ export function renderSettings(root) {
     <div class="sgroup"><h2>${t('settings.workout')}</h2><div class="slist solid">
       <div class="srow"><span class="l"><strong>${t('settings.rest')}</strong></span>
         <div class="stepper"><button class="step" data-act="rest-default" data-d="-15" aria-label="−15 s" ${s.restSec <= LIMITS.restMin ? 'disabled' : ''}>−</button><b>${t('seconds', { n: s.restSec })}</b><button class="step" data-act="rest-default" data-d="15" aria-label="+15 s" ${s.restSec >= LIMITS.restMax ? 'disabled' : ''}>+</button></div></div>
+      <div class="srow"><span class="l"><strong>${t('settings.weeklyGoal')}</strong><small>${t('settings.weeklyGoalSub')}</small></span>
+        <div class="stepper"><button class="step" data-act="goal" data-d="-1" aria-label="−1" ${s.weeklyGoal <= 1 ? 'disabled' : ''}>−</button><b>${s.weeklyGoal}</b><button class="step" data-act="goal" data-d="1" aria-label="+1" ${s.weeklyGoal >= 7 ? 'disabled' : ''}>+</button></div></div>
     </div></div>
 
     <div class="sgroup"><h2>${t('settings.feel')}</h2><div class="slist solid">
@@ -127,6 +129,7 @@ export function initSettings(actions, root) {
       speak(state.t('settings.previewText'), { key: getKey('google'), model: ttsModelId(state.settings), voice: state.settings.voice, lang: state.lang, canSpeak: () => true });
     },
     set: el => { setSettings({ [el.dataset.key]: el.dataset.v }); haptic('tap'); },
+    goal: el => { setSettings({ weeklyGoal: state.settings.weeklyGoal + Number(el.dataset.d) }); haptic('tap'); },
     'rest-default': el => { setSettings({ restSec: state.settings.restSec + Number(el.dataset.d) }); haptic('tap'); },
     'toggle-haptics': () => { setSettings({ haptics: !state.settings.haptics }); haptic('tap'); },
     reset: () => resetFlow()

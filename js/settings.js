@@ -15,7 +15,8 @@ export const DEFAULTS = Object.freeze({
   voice: 'Kore',       // Gemini prebuilt voice
   stt: 'fast',         // fast | accurate
   ttsModel: '',        // picked from the model list on key test
-  ttsOverride: ''      // manual model id
+  ttsOverride: '',     // manual model id
+  weeklyGoal: 3        // workouts per week, Today ring
 });
 
 export const VOICES = ['Kore', 'Puck', 'Aoede', 'Charon', 'Leda', 'Orus', 'Zephyr', 'Fenrir'];
@@ -30,6 +31,7 @@ export function sanitize(input) {
   if (Number.isFinite(input.restSec)) s.restSec = Math.min(LIMITS.restMax, Math.max(LIMITS.restMin, Math.round(input.restSec / 15) * 15));
   if (typeof input.haptics === 'boolean') s.haptics = input.haptics;
   if (['auto', 'on', 'off'].includes(input.motion)) s.motion = input.motion;
+  if (Number.isInteger(input.weeklyGoal) && input.weeklyGoal >= 1 && input.weeklyGoal <= 7) s.weeklyGoal = input.weeklyGoal;
   if (['auto', 'da', 'en'].includes(input.voiceLang)) s.voiceLang = input.voiceLang;
   if (['hold', 'tap'].includes(input.micMode)) s.micMode = input.micMode;
   if (['off', 'minimal', 'full'].includes(input.spoken)) s.spoken = input.spoken;

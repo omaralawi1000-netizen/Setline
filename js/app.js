@@ -61,7 +61,7 @@ function renderDock() {
 function renderMini() {
   const w = state.active;
   const show = !!w && view.screen !== 'workout' && !SUB.includes(view.screen);
-  app.classList.toggle('mini', show);
+  app.classList.toggle('has-mini', show);
   const el = $('#minibar');
   el.tabIndex = show ? 0 : -1;
   if (!w) return;

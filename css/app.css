@@ -30,7 +30,7 @@ svg.i{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke
 .screen{position:absolute;inset:0;z-index:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:calc(var(--safe-top) + 4px) 20px calc(var(--dock-bottom) + var(--dock-h) + 28px);opacity:0;visibility:hidden;transform:scale(.985);transition:opacity .4s var(--ease),transform .6s var(--ease),visibility 0s .4s;scrollbar-width:none}
 .screen::-webkit-scrollbar{display:none}
 .screen.on{opacity:1;visibility:visible;transform:none;transition:opacity .4s var(--ease),transform .6s var(--ease)}
-.app.mini .screen{padding-bottom:calc(var(--dock-bottom) + var(--dock-h) + 88px)}
+.app.has-mini .screen{padding-bottom:calc(var(--dock-bottom) + var(--dock-h) + 88px)}
 
 .top{display:flex;align-items:center;justify-content:space-between;height:44px;gap:10px}
 .iconbtn{width:40px;height:40px;flex:none;border-radius:14px;display:grid;place-items:center;background:rgba(255,255,255,.05);border:1px solid var(--line);transition:transform .3s var(--ease),background .3s}
@@ -232,7 +232,7 @@ button.chip:active{transform:scale(.93);background:rgba(198,187,250,.16)}
 
 /* workout mini bar */
 .minibar{position:absolute;z-index:6;left:24px;right:24px;bottom:calc(var(--dock-bottom) + var(--dock-h) + 10px);height:52px;border-radius:20px;padding:0 8px 0 14px;display:flex;align-items:center;gap:10px;text-align:left;opacity:0;transform:translateY(12px);pointer-events:none;transition:opacity .35s var(--ease),transform .5s var(--ease)}
-.app.mini .minibar{opacity:1;transform:none;pointer-events:auto}
+.app.has-mini .minibar{opacity:1;transform:none;pointer-events:auto}
 .minibar .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none;animation:mic 1.4s infinite}
 .minibar .l{flex:1;min-width:0;line-height:1.2}
 .minibar strong{display:block;font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -243,7 +243,7 @@ button.chip:active{transform:scale(.93);background:rgba(198,187,250,.16)}
 /* toast: the intent-card surface */
 .toast{position:absolute;z-index:9;left:16px;right:16px;bottom:calc(var(--dock-bottom) + var(--dock-h) + 16px);padding:12px 14px 15px;border-radius:22px;display:grid;grid-template-columns:36px 1fr auto;gap:12px;align-items:center;overflow:hidden;opacity:0;transform:translateY(18px) scale(.96);pointer-events:none;transition:opacity .35s var(--ease),transform .5s var(--ease)}
 .toast.show{opacity:1;transform:none;pointer-events:auto}
-.app.mini .toast{bottom:calc(var(--dock-bottom) + var(--dock-h) + 72px)}
+.app.has-mini .toast{bottom:calc(var(--dock-bottom) + var(--dock-h) + 72px)}
 .app.sub .toast,.app.sub .intent{bottom:calc(var(--dock-bottom) + 8px)}
 .ic{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:rgba(198,187,250,.18);color:var(--accent)}
 .ic svg{width:18px;height:18px;stroke-width:2.6}
@@ -370,7 +370,7 @@ html[data-motion=off] *,html[data-motion=off] *::before,html[data-motion=off] *:
 .intent.show{opacity:1;transform:none;pointer-events:auto}
 .intent.swap > *{opacity:0;transform:translateY(4px);transition:opacity .14s,transform .14s}
 .intent > *{transition:opacity .2s,transform .3s var(--ease)}
-.app.mini .intent{bottom:calc(var(--dock-bottom) + var(--dock-h) + 72px)}
+.app.has-mini .intent{bottom:calc(var(--dock-bottom) + var(--dock-h) + 72px)}
 .app.voice .intent.show{transform:translateY(-22px)}
 .intent .ctext{min-width:0}
 .intent b{font-size:16px;font-weight:800;display:block;overflow-wrap:anywhere}
@@ -434,3 +434,39 @@ html[data-motion=off] .say .w{opacity:1;transform:none}
 .keyedit .chip{height:40px}
 .select{height:34px;padding:0 10px;border-radius:12px;background:rgba(0,0,0,.25);border:1px solid var(--line);font-weight:700;font-size:13px;color:var(--ink)}
 .snote{margin:10px 6px 0;font-size:12.5px;line-height:1.45;color:var(--dim);font-weight:600}
+
+/* today cards (design target) */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.grid2.one{grid-template-columns:1fr}
+.mini{padding:14px;border-radius:22px;height:128px;position:relative;display:flex;flex-direction:column;text-align:left;width:100%;transition:transform .3s var(--ease)}
+button.mini:active,button.pr:active{transform:scale(.98)}
+.mini .t{font-size:13px;color:var(--muted);font-weight:700}
+.mini strong{font-size:18px;font-weight:800;letter-spacing:-.01em;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.week{display:flex;align-items:center;gap:12px;margin-top:auto}
+.week .ring{width:64px;height:64px}
+.week .ring svg{width:64px;height:64px}
+.week .ring b{font-size:16px}
+.week .ring .fg{transition:stroke-dashoffset 1.1s var(--ease)}
+.grid2.one .mini{height:auto;flex-direction:row;align-items:center;gap:16px}
+.grid2.one .week{margin-top:0}
+.grid2.one .days{flex:1;margin-top:0}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;width:100%;margin-top:10px}
+.days i{display:block;height:6px;border-radius:3px;background:rgba(255,255,255,.1)}
+.days i.on{background:var(--accent)}
+.days i.now:not(.on){background:rgba(198,187,250,.28)}
+.vol{margin-top:auto;display:block}
+.vol b{display:block;font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.vol span{display:block;font-size:13px;color:var(--muted);font-weight:600;margin-top:2px}
+.pr{margin-top:12px;padding:14px 16px;border-radius:22px;display:flex;align-items:center;gap:12px;width:100%;text-align:left;transition:transform .3s var(--ease)}
+.pr .l{flex:1;min-width:0}
+.pr strong{display:block;font-size:22px;font-weight:800;letter-spacing:-.02em;margin-top:6px}
+.pr .p{display:block;font-size:13px;color:var(--muted);font-weight:600;margin-top:2px}
+.pr svg{width:112px;height:56px;flex:none;overflow:visible}
+.pr polyline{stroke-dasharray:400;stroke-dashoffset:0}
+.screen.enter .pr polyline{animation:draw 1.2s var(--ease) both .15s}
+.screen.enter .pr path{animation:fadein .9s ease both .35s}
+.pr .pulse{transform-box:fill-box;transform-origin:center;animation:prpulse 2.4s ease-in-out infinite}
+@keyframes draw{from{stroke-dashoffset:400}}
+@keyframes fadein{from{opacity:0}}
+@keyframes prpulse{50%{transform:scale(1.5);opacity:.05}}
+.screen:not(.on){pointer-events:none}

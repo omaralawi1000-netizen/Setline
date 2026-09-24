@@ -57,12 +57,15 @@ Decisions made in phase 1:
 - [x] Error states: no key, offline, mic denied, nothing heard, didn't catch that (Retry / Edit)
 - [x] Motion pass: sliding dock indicator, directional screen transitions with staggered entry, number ticks on the steppers, exercise slide on next/previous, log flash, sets landing (touch and voice), drag-to-close sheets
 
+- [x] Pulled forward from phase 5 (asked for): Today cards as in the mockup (This week ring and days, Last session, Latest PR with e1RM sparkline), plus a Weekly goal setting (default 3) for the ring
+
 Decisions made in phase 2:
 - "Add 2.5", "læg 2,5 til" and "one more rep" adjust the last logged set (the intent is AdjustLast); the card shows "Set 2, was 80 kg × 8".
 - Naming an exercise that's already in the workout jumps to it instead of adding a duplicate.
 - A bare number with no context ("8") is never guessed; weight without reps uses the planned reps if there are any, otherwise asks.
 - Cards show exercise names in the app language; replies are spoken in the language you spoke.
 - Anything the parser doesn't understand shows "Didn't catch that" until the AI fallback lands in phase 3.
+- The spec has no weekly target, so the week ring uses a new Weekly goal setting (1 to 7, default 3).
 - Groq could not be reached from the build sandbox (network policy), so the request was tested against a mock; the Settings Test button verifies it on the phone.
 
 ## Phase 3: AI brain and Coach
@@ -75,7 +78,7 @@ Routine editor, starter routines, voice plan builder.
 
 ## Phase 5: Progress and extras
 
-SVG progress charts, Today cards, bodyweight log, plate calculator, backup export/import, polish pass.
+SVG progress charts, bodyweight log, plate calculator, backup export/import, polish pass.
 
 ## Notes
 
