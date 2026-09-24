@@ -7,12 +7,12 @@ export const refreshChrome = () => repaint();
 
 export function initChrome() {
   const app = document.getElementById('app');
-  const meta = document.querySelector('meta[name=theme-color]');
+  const metas = () => document.querySelectorAll('meta[name=theme-color]');
   let color = '';
   const paint = () => {
     const dim = app.classList.contains('voice') || !!app.querySelector(':scope > .scrim.show');
     const next = dim ? DIM : edge();
-    if (next !== color && meta) { color = next; meta.setAttribute('content', next); }
+    if (next !== color) { color = next; for (const m of metas()) m.setAttribute('content', next); }
   };
   new MutationObserver(paint).observe(app, { attributes: true, attributeFilter: ['class'], childList: true, subtree: false });
   // a sheet's scrim gets .show a frame after it's added

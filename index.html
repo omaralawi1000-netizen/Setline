@@ -4,11 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#24233F">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#24233F">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#24233F">
 <meta name="color-scheme" content="dark only">
 <meta name="darkreader-lock">
 <meta name="description" content="Log your lifts fast.">
 <title>Setline</title>
-<script>try{var a=JSON.parse(localStorage.getItem("setline.settings")||"{}").accent;if(a)document.documentElement.dataset.accent=a}catch(e){}</script>
+<script>try{var a=JSON.parse(localStorage.getItem("setline.settings")||"{}").accent;if(a)document.documentElement.dataset.accent=a;var c={violet:"#24233F",ocean:"#1B2B40",jade:"#1B3029",ember:"#33241F",rose:"#34203A"}[a];if(c)document.querySelectorAll("meta[name=theme-color]").forEach(function(m){m.content=c})}catch(e){}</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
