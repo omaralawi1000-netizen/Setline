@@ -1402,18 +1402,6 @@ html{transition:background-color .4s}
 .minibar{view-transition-name:minibar}
 .uphead{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .uphead .textbtn{font-size:13px;margin:-6px -6px -6px 0}
-/* onboarding: tell me about yourself */
-.obtalk{display:flex;flex-direction:column;align-items:center;gap:14px;margin:18px auto 16px;padding:6px 20px;border-radius:28px}
-.obtalk .orb{--s:104px;transition:transform .12s linear}
-.obtalk .obtlabel{font-size:14px;font-weight:800;color:var(--muted);transition:color .3s}
-.obtalk[data-s=on] .obtlabel{color:var(--accent)}
-.obtalk[data-s=on] .orb .core{box-shadow:inset 0 0 0 1px rgba(var(--a-rgb),.6),0 0 40px rgba(var(--v-rgb),.7),0 0 90px rgba(var(--v-rgb),.35)}
-.obtalk[data-s=busy] .orb .spin{opacity:1;animation:spin 1.1s linear infinite}
-.obtext{width:100%;min-height:96px;padding:14px 16px;border-radius:18px;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--ink);font:600 15px/1.45 var(--font);resize:none;-webkit-user-select:text;user-select:text}
-.obtext:focus{outline:none;border-color:rgba(var(--a-rgb),.4);background:rgba(255,255,255,.07)}
-.obtext::placeholder{color:var(--dim)}
-.obgot{display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--accent);font-weight:800;font-size:14px;animation:wordin .45s var(--ease) both}
-.obgot svg{width:16px;height:16px;flex:none}
 /* a pause: the orb holds its breath while it checks whether you're done */
 .ofloat[data-pause=check] .orb.lift{opacity:.82;transition:opacity .3s}
 .ofloat[data-pause=wait] .ostatus{color:var(--warm);background:rgba(255,217,168,.1)}
@@ -1437,3 +1425,31 @@ html{transition:background-color .4s}
 .app.compact .dock .tab.on{background:rgba(var(--a-rgb),.14)}
 .app.compact .dock .orbbtn{transform:scale(.8);margin-top:-14px}
 .orbbtn{transition:transform .5s cubic-bezier(.3,1.35,.5,1),margin .5s cubic-bezier(.3,1.2,.4,1)}
+
+/* onboarding: the getting-to-know-you chat */
+.ivmount{display:block;margin-top:14px}
+.iv{display:flex;flex-direction:column;gap:14px}
+.ivthread{list-style:none;display:flex;flex-direction:column;gap:10px;max-height:min(46vh,380px);overflow-y:auto;padding:4px 2px;scrollbar-width:none;
+  -webkit-mask-image:linear-gradient(transparent,#000 18px);mask-image:linear-gradient(transparent,#000 18px)}
+.ivm{max-width:86%;padding:12px 15px;border-radius:20px;font-size:15.5px;line-height:1.4;font-weight:600;animation:ivin .45s var(--ease) both}
+.ivm.seen{animation:none}
+.ivm.ai{align-self:flex-start;background:rgba(255,255,255,.07);border:1px solid var(--line);border-bottom-left-radius:6px}
+.ivm.me{align-self:flex-end;background:linear-gradient(180deg,rgba(var(--a-rgb),.28),rgba(var(--v-rgb),.24));border-bottom-right-radius:6px;color:var(--ink)}
+.ivm.typing{padding:14px 16px}
+@keyframes ivin{from{opacity:0;transform:translateY(10px) scale(.97)}}
+.ivbar{display:flex;flex-direction:column;align-items:center;gap:10px}
+.ivorb{padding:6px;border-radius:50%}
+.ivorb .orb{--s:96px;transition:transform .12s linear}
+.iv[data-phase=listening] .ivorb .orb .core,.iv[data-phase=wait] .ivorb .orb .core{box-shadow:inset 0 0 0 1px rgba(var(--a-rgb),.6),0 0 40px rgba(var(--v-rgb),.7),0 0 90px rgba(var(--v-rgb),.35)}
+.iv[data-phase=thinking] .ivorb .spin,.iv[data-phase=hearing] .ivorb .spin{opacity:1;animation:spin 1.1s linear infinite}
+.iv[data-phase=speaking] .ivorb .orb{animation:talk .9s ease-in-out infinite alternate}
+.ivstatus{min-height:18px;font-size:13px;font-weight:800;color:var(--muted);text-align:center}
+.iv[data-phase=listening] .ivstatus{color:var(--accent)}
+.iv[data-phase=wait] .ivstatus{color:var(--warm)}
+.ivtype{display:flex;gap:8px;width:100%}
+.ivtype input{flex:1;height:46px;padding:0 16px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--ink);font:600 15px var(--font);-webkit-user-select:text;user-select:text}
+.ivtype input:focus{outline:none;border-color:rgba(var(--a-rgb),.4)}
+.ivtype button{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:rgba(var(--a-rgb),.16);color:var(--accent)}
+.ivtype button svg{width:18px;height:18px}
+.obnext.ready{animation:logflash .6s var(--ease)}
+.iv[data-phase=done] .ivtype{opacity:0;pointer-events:none}

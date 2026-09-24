@@ -197,3 +197,11 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 ## 1.10.1: no auto-stop
 
 - [x] On request: tapping the orb (and "Tell me about yourself") keeps listening through pauses until you tap again; recordings can run 60 s so there's time to think
+
+## 1.11.0: smart pause, mini dock, talk to get started
+
+- [x] Smart pause (on request, replaces 1.10.1): tap the orb and talk; at a pause it listens to what it has so far and sends only if it sounds finished. Trailing "and / for / with / um / med / øh…" or Whisper's "…" means you're still thinking: it says "Take your time… I'm listening" and waits (sends after 6 s of quiet, or tap to send). Talking again cancels a pending send. A finished sentence isn't uploaded twice
+- [x] "Keep talking" on a card that didn't understand you: what you say next continues the old sentence, no retyping
+- [x] Dock minimizes like iOS while you scroll down: a small pill with the current tab and the orb; scroll up or tap the pill to open it again
+- [x] Status bar: every theme-color tag (and the manifest) carries the app's top colour from the first paint, per theme. An installed app picks up a new manifest colour only after it's reinstalled or Chrome refreshes it. Android doesn't let web apps draw or blur under the status bar
+- [x] Onboarding is a conversation: "Let's get to know you". The Coach asks out loud, listens with the smart pause (or you type), reacts like a friend and asks only what it doesn't know yet; profile and notes fill in as you talk; the question screens that follow skip everything covered

@@ -46,3 +46,17 @@ test('what you said fills the questions it answers, and only those', () => {
   assert.equal(mergeHeard(a, null).size, 0);
   assert.ok(PROFILE_SCHEMA.properties.goal.enum.includes('fatloss'));
 });
+
+import { missingTopics, interviewPrompt, INTERVIEW_SCHEMA, firstQuestion } from '../js/profile.js';
+test('the interview asks only for what is still missing', () => {
+  const a = { name: '', age: 25, height: 178, weight: 80, level: null, goal: null, days: null, minutes: null, equipment: null, injuries: [], cardio: null, asked: {} };
+  assert.equal(missingTopics(a)[0], 'their name');
+  mergeHeard(a, { name: 'Omar', goal: 'muscle', days: 5, level: 'some', injuries: [] });
+  const m = missingTopics(a);
+  assert.ok(!m.includes('their name') && !m.includes('their main goal') && m.includes('how long a session can be'));
+  const p = interviewPrompt(a, [{ who: 'ai', text: firstQuestion('en') }, { who: 'me', text: 'Omar, muscle' }]);
+  assert.match(p, /KNOWN SO FAR: .*"name":"Omar"/);
+  assert.match(p, /"age":null/, 'the default age is not passed off as an answer');
+  assert.match(p, /USER: Omar, muscle/);
+  assert.ok(INTERVIEW_SCHEMA.required.includes('reply') && INTERVIEW_SCHEMA.properties.goal.enum);
+});

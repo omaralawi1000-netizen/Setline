@@ -105,11 +105,6 @@ export const PROFILE_SCHEMA = {
   required: ['injuries', 'notes']
 };
 
-export const profileSystem = lang => [
-  'Extract a training profile from what the user said about themselves (it may be transcribed speech, in English or Danish).',
-  'Fill a field only when the user said it or it clearly follows; otherwise null. Convert units (feet/inches to cm, lb to kg).',
-  `Write notes in ${lang === 'da' ? 'Danish' : 'English'}, max 500 characters, without repeating the other fields.`
-].join(' ');
 
 // Merge what the model heard into the onboarding answers. Returns the ids of the questions it answered.
 export function mergeHeard(a, raw) {
@@ -117,9 +112,9 @@ export function mergeHeard(a, raw) {
   if (!raw || typeof raw !== 'object') return got;
   const set = (k, v) => { a[k] = v; got.add(k); };
   if (typeof raw.name === 'string' && raw.name.trim()) set('name', raw.name.trim().slice(0, 30));
-  if (Number.isFinite(raw.age) && raw.age >= 13 && raw.age <= 90) set('age', Math.round(raw.age));
+  if (Number.isFinite(raw.age) && raw.age >= 13 && raw.age <= 90) { set('age', Math.round(raw.age)); a.ageSaid = true; }
   if (SEXES.includes(raw.sex)) set('sex', raw.sex);
-  if (Number.isFinite(raw.heightCm) && raw.heightCm >= 140 && raw.heightCm <= 220) set('height', Math.round(raw.heightCm));
+  if (Number.isFinite(raw.heightCm) && raw.heightCm >= 140 && raw.heightCm <= 220) { set('height', Math.round(raw.heightCm)); a.heightSaid = true; }
   if (Number.isFinite(raw.weightKg) && raw.weightKg >= 35 && raw.weightKg <= 200) { set('weight', Math.round(raw.weightKg * 2) / 2); a.weightTouched = true; }
   if (LEVELS.includes(raw.level)) set('level', raw.level);
   if (GOALS.includes(raw.goal)) set('goal', raw.goal);
@@ -131,3 +126,55 @@ export function mergeHeard(a, raw) {
   if (typeof raw.notes === 'string' && raw.notes.trim()) { a.notes = raw.notes.trim().slice(0, 600); got.add('notes'); }
   return got;
 }
+
+// ---------- the getting-to-know-you conversation ----------
+
+export const INTERVIEW_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    ...PROFILE_SCHEMA.properties,
+    notes: { type: 'STRING', description: 'everything else useful for a coach from the WHOLE conversation so far, in short phrases (preferences, favourite or disliked exercises, schedule, sports, targets, history). Empty if nothing.' },
+    answered: { type: 'ARRAY', items: { type: 'STRING', enum: ['injuries', 'age', 'body', 'cardio'] }, description: 'topics the user has answered so far, even when the answer was "none" or "rather not say"' },
+    reply: { type: 'STRING', description: 'what you say next, spoken aloud' },
+    done: { type: 'BOOLEAN' }
+  },
+  required: ['injuries', 'notes', 'answered', 'reply', 'done']
+};
+
+// What the Coach still wants to know, most important first.
+export function missingTopics(a) {
+  const out = [];
+  if (!a.name) out.push('their name');
+  if (!a.goal) out.push('their main goal');
+  if (!a.level) out.push('how long they have trained');
+  if (!a.days) out.push('how many days a week they can train');
+  if (!a.minutes) out.push('how long a session can be');
+  if (!a.equipment) out.push('where they train / what equipment');
+  if (!a.asked?.injuries && !a.injuries?.length) out.push('injuries or pain');
+  if (!a.asked?.age && !a.age) out.push('age');
+  if (!a.asked?.body) out.push('height and weight');
+  if (!a.cardio) out.push('cardio they do');
+  return out;
+}
+
+export const interviewSystem = lang => [
+  'You are the user\'s new strength coach getting to know them in a relaxed voice chat, like a friend: warm, casual, curious, never a form.',
+  `Speak ${lang === 'da' ? 'Danish' : 'English'}. Your reply is read aloud: plain words, no lists or emoji, at most two short sentences.`,
+  'React briefly and genuinely to what they just said (a few words), then ask ONE question, or two that belong together (height and weight).',
+  'Never ask again what you already know. If they give a vague answer, you may ask one natural follow-up.',
+  'Also fill the profile fields from everything said so far (null when unknown; convert units; "a couple of years" → some).',
+  'Set done=true when STILL TO LEARN is empty or they want to stop, and then reply with a short, warm wrap-up that says you\'ll use this for their plan (no question).'
+].join(' ');
+
+export function interviewPrompt(a, msgs) {
+  const known = {
+    name: a.name || null, age: a.ageSaid ? a.age : null, sex: a.sex, heightCm: a.heightSaid ? a.height : null, weightKg: a.weightTouched ? a.weight : null,
+    level: a.level, goal: a.goal, days: a.days, minutes: a.minutes, equipment: a.equipment, injuries: a.injuries, cardio: a.cardio, notes: a.notes || ''
+  };
+  const talk = msgs.map(m => `${m.who === 'ai' ? 'COACH' : 'USER'}: ${m.text}`).join('\n');
+  return `KNOWN SO FAR: ${JSON.stringify(known)}\nSTILL TO LEARN: ${missingTopics(a).join(', ') || 'nothing, wrap up'}\n\nCONVERSATION:\n${talk}`;
+}
+
+export const firstQuestion = lang => (lang === 'da'
+  ? 'Hej! Jeg er din nye coach. Hvad skal jeg kalde dig, og hvad træner du efter lige nu?'
+  : 'Hey! I\'m your new coach. What should I call you, and what are you training for right now?');

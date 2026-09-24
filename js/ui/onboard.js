@@ -2,16 +2,13 @@
 // Shown once on first open (skippable), editable from Settings.
 import * as store from '../store.js';
 import { state } from '../store.js';
-import { sanitizeProfile, derivedSettings, programFor, planRequest, PROFILE_SCHEMA, profileSystem, mergeHeard, LEVELS, GOALS, EQUIPMENT, INJURIES, MINUTES, CARDIO } from '../profile.js';
+import { sanitizeProfile, derivedSettings, programFor, planRequest, LEVELS, GOALS, EQUIPMENT, INJURIES, MINUTES, CARDIO } from '../profile.js';
 import { PROGRAMS, programRoutines } from '../routines.js';
 import { bodyTrend, validBodyweight } from '../body.js';
 import { toDisplay, fromDisplay } from '../units.js';
 import { weight as fmtW } from '../format.js';
 import { getKey } from '../keys.js';
-import * as mic from '../voice.js';
-import { transcribe } from '../stt.js';
-import { aiPlan, withFallback } from '../ai.js';
-import { coachModels, sttModelId } from '../settings.js';
+import { mountInterview } from './interview.js';
 import { haptic } from '../haptics.js';
 import { esc } from './dom.js';
 import { I } from './icons.js';
@@ -26,7 +23,7 @@ const year = () => new Date().getFullYear();
 function steps(edit) {
   const list = [
     !edit && { id: 'welcome', kind: 'welcome' },
-    getKey('google') && { id: 'tell', kind: 'tell' },
+    getKey('google') && { id: 'chat', kind: 'chat' },
     { id: 'name', kind: 'text' },
     { id: 'age', kind: 'number', min: 13, max: 90, step: 1 },
     { id: 'sex', kind: 'choice', options: ['male', 'female', 'other'] },
@@ -52,10 +49,12 @@ export function openOnboarding({ edit = false } = {}) {
   const a = {
     name: p.name || '', age: p.birthYear ? year() - p.birthYear : 25, sex: p.sex || null, height: p.heightCm || 178,
     weight: bw ?? 80, weightTouched: false, level: p.level || null, goal: p.goal || null, days: p.days || null, minutes: p.minutes || null,
-    equipment: p.equipment || null, injuries: [...(p.injuries || [])], cardio: p.cardio || null, plan: null, notes: p.notes || '', story: ''
+    equipment: p.equipment || null, injuries: [...(p.injuries || [])], cardio: p.cardio || null, plan: null, notes: p.notes || '', asked: {}
   };
   let list = steps(edit);
-  const talk = { on: false, busy: '', raf: 0, heard: null }; // the "tell me about yourself" recorder
+  let chat = null; // the getting-to-know-you conversation, kept across back/next
+  const chatEl = document.createElement('div');
+  chatEl.className = 'ivmount';
   let i = 0, saved = false;
 
   const profile = () => sanitizeProfile({ name: a.name, birthYear: year() - a.age, sex: a.sex, heightCm: a.height, level: a.level, goal: a.goal, days: a.days, minutes: a.minutes, equipment: a.equipment, injuries: a.injuries, cardio: a.cardio, notes: a.notes });
@@ -80,6 +79,7 @@ export function openOnboarding({ edit = false } = {}) {
         <div class="obstep ${dir > 0 ? 'in-r' : dir < 0 ? 'in-l' : ''}">${stepHTML(st)}</div>
       </div>`;
       box.querySelector('.obstep input[type=text]')?.focus({ preventScroll: true });
+      if (st.kind === 'chat') placeChat();
     };
 
     function stepHTML(st) {
@@ -90,15 +90,8 @@ export function openOnboarding({ edit = false } = {}) {
           <ul class="obwhy"><li>${I.check}<span>${t('ob.why1')}</span></li><li>${I.check}<span>${t('ob.why2')}</span></li><li>${I.check}<span>${t('ob.why3')}</span></li></ul>
           ${next(t('ob.start'))}`;
       }
-      if (st.kind === 'tell') {
-        const canTalk = !!getKey('groq');
-        const heard = talk.heard ? [...talk.heard].filter(k => k !== 'notes') : [];
-        return `${q}
-          ${canTalk ? `<button class="obtalk" data-ob="talk" data-s="${talk.on ? 'on' : talk.busy ? 'busy' : ''}" aria-label="${esc(t('ob.tell.talk'))}"><span class="orb big obglow" id="obtorb"><i class="core"><b></b><b></b><b></b></i><i class="spin"></i></span>
-            <span class="obtlabel">${esc(talk.busy ? t('ob.tell.' + talk.busy) : talk.on ? t('ob.tell.listening') : t('ob.tell.talk'))}</span></button>` : ''}
-          <textarea class="obtext" data-ob-input="story" rows="4" maxlength="1500" placeholder="${esc(t('ob.tell.ph'))}">${esc(a.story)}</textarea>
-          ${talk.heard ? `<p class="obgot">${I.check}<span>${esc(heard.length ? t('ob.tell.got', { n: heard.length }) : t('ob.tell.gotNotes'))}</span></p>` : ''}
-          ${next(talk.heard ? t('ob.next') : t('ob.tell.go'), !!talk.busy)}`;
+      if (st.kind === 'chat') {
+        return `<h1>${esc(t('iv.title'))}</h1><div class="ivslot"></div>${next(chat?.finished ? t('ob.next') : t('iv.enough'))}`;
       }
       if (st.kind === 'text') {
         return `${q}<input type="text" class="obinput" data-ob-input="name" value="${esc(a.name)}" maxlength="30" autocomplete="given-name" placeholder="${esc(t('ob.name.ph'))}" enterkeyhint="next">${next()}`;
@@ -134,49 +127,24 @@ export function openOnboarding({ edit = false } = {}) {
       render(d);
     };
 
-    // ---- tell me about yourself: record, transcribe, understand ----
-    const paintTell = () => { if (list[i]?.kind === 'tell') { const y = box.scrollTop; render(0); box.scrollTop = y; } };
-    async function startTalk() {
-      if (talk.on || talk.busy) return;
-      try { await mic.start({ onMaxed: () => stopTalk(), maxMs: 90_000 }); }
-      catch { toast({ title: esc(t('voice.micDenied')), error: true }); return; }
-      talk.on = true;
-      paintTell();
-      const tick = () => {
-        if (!talk.on) return;
-        const l = mic.level();
-        const orb = box.querySelector('#obtorb');
-        if (orb) orb.style.transform = `scale(${(1 + l * 0.18).toFixed(3)})`;
-        talk.raf = requestAnimationFrame(tick);
-      };
-      talk.raf = requestAnimationFrame(tick);
-    }
-    async function stopTalk(discard = false) {
-      if (!talk.on) return;
-      talk.on = false;
-      cancelAnimationFrame(talk.raf);
-      if (discard) { mic.cancel(); return; }
-      talk.busy = 'hearing'; paintTell();
-      const r = await mic.stop();
-      if (!r || r.ms < 600) { talk.busy = ''; return paintTell(); }
-      try {
-        const text = await transcribe(r.blob, { key: getKey('groq'), model: sttModelId(state.settings), language: state.settings.voiceLang });
-        a.story = [a.story.trim(), text].filter(Boolean).join(' ');
-      } catch { toast({ title: esc(t('voice.sttFailed')), error: true }); talk.busy = ''; return paintTell(); }
-      await understand();
-    }
-    async function understand() {
-      talk.busy = 'understanding'; paintTell();
-      try {
-        const raw = await withFallback(coachModels(state.settings), model => aiPlan({ key: getKey('google'), model, system: profileSystem(state.lang), prompt: a.story, schema: PROFILE_SCHEMA }));
-        const got = mergeHeard(a, raw);
-        talk.heard = got;
-        // only ask what's still missing
-        list = list.filter((x, k) => k <= i || !got.has(x.id));
-        haptic('success');
-      } catch { toast({ title: esc(t('ob.tell.failed')), error: true }); }
-      talk.busy = ''; paintTell();
-    }
+    // ---- the conversation: mounted once, moved into its step whenever that step shows ----
+    const skipHeard = heard => {
+      const done = new Set(heard);
+      if (a.asked.injuries) done.add('injuries');
+      if (a.asked.age) done.add('age');
+      if (a.asked.body) { done.add('height'); done.add('weight'); }
+      if (a.asked.cardio) done.add('cardio');
+      list = list.filter((x, k) => k <= i || !done.has(x.id)); // only ask what the chat didn't cover
+    };
+    const placeChat = () => {
+      const slot = box.querySelector('.ivslot');
+      if (!slot) return;
+      if (!chat) chat = mountInterview(chatEl, a, {
+        onChange: heard => skipHeard(heard),
+        onDone: () => { chat.finished = true; const b = box.querySelector('.obnext span'); if (b) b.textContent = t('ob.next'); box.querySelector('.obnext')?.classList.add('ready'); }
+      });
+      slot.replaceWith(chatEl);
+    };
 
     async function finish() {
       await save();
@@ -201,10 +169,8 @@ export function openOnboarding({ edit = false } = {}) {
         if (st.kind === 'welcome' || st.kind === 'plan') { if (st.kind === 'welcome') { store.setSettings({ profileAsked: Date.now() }); saved = true; return closeTop(); } return go(1); }
         return go(1);
       }
-      if (k === 'talk') { haptic('tap'); return talk.on ? stopTalk() : startTalk(); }
-      if (k === 'next' && st.kind === 'tell' && !talk.heard && a.story.trim()) { haptic('tap'); return understand(); }
       if (k === 'next') {
-        if (st.kind === 'tell') stopTalk(true);
+        if (st.kind === 'chat') chat?.pause();
         if (st.kind === 'done') return finish();
         haptic('tap');
         return go(1);
@@ -246,7 +212,7 @@ export function openOnboarding({ edit = false } = {}) {
     });
     box.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('.obinput')) { e.preventDefault(); go(1); } });
     render(1);
-  }, { label: t('ob.title'), onClose: () => { if (talk.on) { talk.on = false; cancelAnimationFrame(talk.raf); mic.cancel(); } if (!saved) { saved = true; const pr = profile(); store.setSettings({ profile: i > (edit ? 0 : 1) ? pr : state.settings.profile, profileAsked: Date.now(), ...(i > 1 ? derivedSettings(pr) : {}) }); } } });
+  }, { label: t('ob.title'), onClose: () => { chat?.destroy(); if (!saved) { saved = true; const pr = profile(); store.setSettings({ profile: i > (edit ? 0 : 1) ? pr : state.settings.profile, profileAsked: Date.now(), ...(i > 1 ? derivedSettings(pr) : {}) }); } } });
   api.sheet.classList.add('obsheet');
 }
 
