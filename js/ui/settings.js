@@ -2,6 +2,8 @@
 import { state, setSettings, resetAll } from '../store.js';
 import { makeBackup } from '../backup.js';
 import { driveGroupHTML, driveActions, setDriveRender, confirmImport } from './drive.js';
+import { openOnboarding } from './onboard.js';
+import { ageOf } from '../profile.js';
 import { dateKey } from '../body.js';
 import { VERSION } from '../version.js';
 import { LIMITS } from '../workout.js';
@@ -53,6 +55,15 @@ function speechStatus() {
   return t('speech.device', { why: lastSpeech.error === 'nokey' ? t('speech.why.nokey') : t('speech.why.error', { code: lastSpeech.error }) });
 }
 
+function profileRow() {
+  const { t } = state;
+  const p = state.settings.profile;
+  const age = ageOf(p);
+  const bits = p ? [age && `${age} ${t('ob.years')}`, p.goal && t(`ob.goal.${p.goal}`), p.days && t('ob.daysShort', { n: p.days })].filter(Boolean).join(' · ') : t('profile.empty');
+  return `<button class="profrow glass" data-act="edit-profile"><span class="pav">${esc((p?.name || '?').slice(0, 1).toUpperCase())}</span>
+    <span class="l"><strong>${esc(p?.name || t('profile.title'))}</strong><span>${esc(bits)}</span></span><span class="go">${I.fwd}</span></button>`;
+}
+
 export function renderSettings(root) {
   const { t, settings: s } = state;
   root.innerHTML = `<header class="top">
@@ -60,6 +71,7 @@ export function renderSettings(root) {
       <div class="ttl"><strong>${t('settings.title')}</strong></div><span class="spacer"></span>
     </header>
     <h1 class="h1">${t('settings.title')}</h1>
+    ${profileRow()}
 
     <div class="sgroup"><h2>${t('settings.general')}</h2><div class="slist solid">
       <div class="srow"><span class="l"><strong>${t('settings.language')}</strong></span>${seg('lang', ['auto', 'da', 'en'], [t('lang.auto'), t('lang.da'), t('lang.en')])}</div>
@@ -172,6 +184,7 @@ export function initSettings(actions, root) {
   });
   setDriveRender(() => { if (root.classList.contains('on')) renderSettings(root); });
   Object.assign(actions, driveActions, {
+    'edit-profile': () => openOnboarding({ edit: true }),
     'test-key': el => testKey(el.dataset.k, root),
     'clear-key': el => { setKey(el.dataset.k, ''); delete keyStatus[el.dataset.k]; haptic('tap'); renderSettings(root); },
     'preview-voice': () => {

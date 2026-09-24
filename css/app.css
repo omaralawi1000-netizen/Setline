@@ -1234,3 +1234,70 @@ p.ckwarn{margin:6px 0 0}
 .scrim{-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 .sheet .sin{animation:sheetin .5s var(--ease) both}
 @keyframes sheetin{from{opacity:0;transform:translateY(14px);filter:blur(6px)}}
+
+/* ---------- 1.9: onboarding ---------- */
+.sheet.obsheet{top:0;max-height:none;height:100%;border-radius:0;padding:calc(var(--safe-top) + 6px) 22px calc(var(--safe-bottom) + 20px);--gl-fill:rgba(12,14,20,.86)}
+.sheet.obsheet .grab{display:none}
+.sheet.obsheet .sin{height:100%;display:flex;flex-direction:column}
+.ob{flex:1;display:flex;flex-direction:column;min-height:0}
+.obtop{display:flex;align-items:center;gap:12px;height:44px}
+.obtop .iconbtn[hidden]{display:block!important;visibility:hidden}
+.obbar{flex:1;height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
+.obbar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#7A67F2,#C6BBFA);transform-origin:left;transition:transform .5s var(--ease)}
+.obsp{width:40px}
+.obstep{flex:1;display:flex;flex-direction:column;padding-top:8vh;min-height:0;overflow-y:auto;scrollbar-width:none}
+.obstep.in-r{animation:obinr .42s var(--ease) both}
+.obstep.in-l{animation:obinl .42s var(--ease) both}
+.obstep.out-l{animation:obout .16s ease-in forwards}
+.obstep.out-r{animation:oboutr .16s ease-in forwards}
+@keyframes obinr{from{opacity:0;transform:translateX(28px)}}
+@keyframes obinl{from{opacity:0;transform:translateX(-28px)}}
+@keyframes obout{to{opacity:0;transform:translateX(-22px)}}
+@keyframes oboutr{to{opacity:0;transform:translateX(22px)}}
+.obstep h1{font-size:30px;line-height:1.15;font-weight:800;letter-spacing:-.03em}
+.obsub{margin-top:10px;font-size:15px;color:var(--muted);font-weight:600;line-height:1.45}
+.obnext{margin-top:auto;justify-content:space-between;height:56px;border-radius:20px;font-size:17px}
+.obnext .i{width:20px;height:20px}
+.obhero{display:grid;place-items:center;height:180px;margin-bottom:10px}
+.obhero .orb.big{--s:120px;animation:breathe 3s ease-in-out infinite}
+.obwhy{list-style:none;margin:22px 0 24px;display:grid;gap:12px}
+.obwhy li{display:flex;align-items:center;gap:12px;font-size:15px;font-weight:650;color:var(--ink)}
+.obwhy .i{width:22px;height:22px;flex:none;padding:3px;border-radius:50%;background:rgba(198,187,250,.16);color:var(--accent)}
+.obinput{margin:26px 0 20px;height:62px;padding:0 20px;border-radius:20px;background:rgba(255,255,255,.06);border:1px solid var(--line);font-size:22px;font-weight:700;outline:none;color:var(--ink)}
+.obinput:focus{border-color:rgba(198,187,250,.5);background:rgba(198,187,250,.08)}
+.obnum{margin:34px 0 18px;display:flex;align-items:center;justify-content:center;gap:14px}
+.obnum b{font-size:72px;font-weight:800;letter-spacing:-.05em;font-variant-numeric:tabular-nums;min-width:2.2ch;text-align:center;display:inline-block}
+.obnum b.tick{animation:tickUp .22s var(--ease)}
+.obnum > span{font-size:17px;font-weight:800;color:var(--muted);margin-left:-8px;align-self:flex-end;padding-bottom:18px}
+.obnum .step{width:48px;height:48px;border-radius:16px;font-size:24px}
+.obrange{width:100%;margin-bottom:22px;-webkit-appearance:none;appearance:none;height:34px;background:none}
+.obrange::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(90deg,#7A67F2,#C6BBFA)}
+.obrange::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;margin-top:-11px;border-radius:50%;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.5),0 0 0 6px rgba(198,187,250,.18)}
+.obopts{margin-top:24px;display:grid;gap:10px}
+.obopts.row{grid-template-columns:repeat(auto-fit,minmax(56px,1fr))}
+.obopt{position:relative;display:grid;gap:3px;text-align:left;padding:16px 50px 16px 18px;border-radius:20px;background:rgba(255,255,255,.05);border:1px solid var(--line);animation:obopt .45s var(--ease) both;animation-delay:calc(var(--i) * 45ms + 60ms);transition:background .3s,border-color .3s,transform .3s var(--ease)}
+.obopts.row .obopt{padding:18px 0;text-align:center;justify-items:center}
+.obopt strong{font-size:17px;font-weight:800}
+.obopt small{font-size:13px;color:var(--muted);font-weight:600}
+.obck{position:absolute;right:16px;top:50%;margin-top:-12px;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);opacity:0;transform:scale(.4);transition:opacity .25s,transform .35s cubic-bezier(.34,1.6,.5,1)}
+.obck .i{width:15px;height:15px;stroke-width:2.6}
+.obopts.row .obck{top:6px;right:6px;margin:0;width:18px;height:18px}
+.obopts.row .obck .i{width:11px;height:11px}
+.obopt.on{background:rgba(198,187,250,.14);border-color:rgba(198,187,250,.55)}
+.obopt.on .obck{opacity:1;transform:none}
+@keyframes obopt{from{opacity:0;transform:translateY(10px)}}
+.obchips{margin:24px 0 20px;display:flex;flex-wrap:wrap;gap:8px}
+.obchips .chip{height:42px;padding:0 16px;font-size:15px}
+.obchips .chip[aria-pressed=true]{background:rgba(198,187,250,.2);border-color:rgba(198,187,250,.5);color:var(--ink)}
+.obhero.done{height:150px}
+.obdone{width:92px;height:92px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 30%,#E4DCFF,#9C8BF4);color:var(--accent-ink);box-shadow:0 0 0 12px rgba(198,187,250,.12),0 20px 50px -10px rgba(122,103,242,.8);animation:obdone .7s cubic-bezier(.34,1.6,.5,1) both}
+.obdone .i{width:44px;height:44px;stroke-width:2.6}
+@keyframes obdone{from{transform:scale(.3);opacity:0}}
+.obsum{margin:22px 0 20px;display:flex;flex-wrap:wrap;gap:8px}
+.obsum span{height:34px;line-height:34px;padding:0 14px;border-radius:999px;background:rgba(255,255,255,.07);font-size:14px;font-weight:750;animation:obopt .45s var(--ease) both;animation-delay:calc(var(--i) * 60ms + 200ms)}
+.profrow{margin-top:16px;width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:24px;text-align:left}
+.pav{width:46px;height:46px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:20px;font-weight:800;background:linear-gradient(145deg,#C6BBFA,#7A67F2);color:var(--accent-ink)}
+.profrow .l{flex:1;min-width:0;display:grid;gap:2px}
+.profrow .l strong{font-size:17px;font-weight:800}
+.profrow .l > span{font-size:13px;color:var(--muted);font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.profrow .go{color:var(--dim)}

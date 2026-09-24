@@ -1,5 +1,6 @@
 // Settings: defaults, sanitizing, localStorage. API keys are not stored here.
 import { LIMITS } from './workout.js';
+import { sanitizeProfile } from './profile.js';
 
 export const SETTINGS_KEY = 'setline.settings';
 
@@ -35,7 +36,9 @@ export const DEFAULTS = Object.freeze({
   autoAdvance: true,   // move to the next exercise when its planned sets are done
   deloadUntil: 0,      // timestamp: deload week running until then
   deloadSnoozed: 0,    // timestamp: don't suggest a deload before then
-  favMeals: []         // starred meal names
+  favMeals: [],        // starred meal names
+  profile: null,       // who you are and what you train for (profile.js)
+  profileAsked: 0      // when the onboarding was shown (so it's asked once)
 });
 
 // Gemini prebuilt voices and how they sound.
@@ -59,6 +62,8 @@ export function sanitize(input) {
   if (typeof input.suggestions === 'boolean') s.suggestions = input.suggestions;
   if (typeof input.restAlerts === 'boolean') s.restAlerts = input.restAlerts;
   if (typeof input.autoAdvance === 'boolean') s.autoAdvance = input.autoAdvance;
+  if (input.profile) s.profile = sanitizeProfile(input.profile);
+  if (Number.isFinite(input.profileAsked)) s.profileAsked = input.profileAsked;
   if (Array.isArray(input.favMeals)) s.favMeals = input.favMeals.filter(x => typeof x === 'string' && x.length <= 60).slice(0, 30);
   for (const k of ['deloadUntil', 'deloadSnoozed']) if (Number.isFinite(input[k]) && input[k] >= 0) s[k] = input[k];
   if (input.restByEx && typeof input.restByEx === 'object') {

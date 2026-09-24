@@ -28,6 +28,7 @@ import { onCheckinClick } from './ui/checkin.js';
 import { renderBody, initBodyScreen } from './ui/bodyscreen.js';
 import { openScanner } from './ui/scan.js';
 import { openMealSheet } from './ui/meal.js';
+import { maybeOnboard, setOnboardNav } from './ui/onboard.js';
 import { cardioElapsed, cardioName } from './cardio.js';
 import { weekStart } from './stats.js';
 import { nextRoutine } from './routines.js';
@@ -215,6 +216,7 @@ Object.assign(actions, {
 initPress(document);
 initHandsFree();
 initBodyScreen($('#s-body'));
+setOnboardNav({ go: name => go(name), ask: q => askCoach(q) });
 initWorkout($('#s-workout'), actions);
 initSettings(actions, $('#s-settings'));
 setWorkoutNav({ go, showDetail });
@@ -381,6 +383,7 @@ async function boot() {
   ensureModels();
   shortcut();
   autoBackup();
+  if (!new URLSearchParams(location.search).has('go')) maybeOnboard();
 }
 
 // Home-screen shortcuts (long-press the icon): ?go=next | cardio | talk
