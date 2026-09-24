@@ -2,7 +2,7 @@
 // The stream is released on stop, on cancel and whenever the page hides.
 import { audioContext } from './audio.js';
 
-export const MAX_MS = 30_000;
+export const MAX_MS = 60_000; // room to stop and think mid-sentence
 
 let rec = null; // {stream, recorder, chunks, analyser, source, startedAt, peak, timer, resolve}
 

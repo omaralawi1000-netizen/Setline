@@ -10,7 +10,6 @@ import { weight as fmtW } from '../format.js';
 import { getKey } from '../keys.js';
 import * as mic from '../voice.js';
 import { transcribe } from '../stt.js';
-import { createEndpointer } from '../vad.js';
 import { aiPlan, withFallback } from '../ai.js';
 import { coachModels, sttModelId } from '../settings.js';
 import { haptic } from '../haptics.js';
@@ -136,22 +135,18 @@ export function openOnboarding({ edit = false } = {}) {
     };
 
     // ---- tell me about yourself: record, transcribe, understand ----
-    const ep = createEndpointer({ endMs: 2600, startMs: 400 });
     const paintTell = () => { if (list[i]?.kind === 'tell') { const y = box.scrollTop; render(0); box.scrollTop = y; } };
     async function startTalk() {
       if (talk.on || talk.busy) return;
       try { await mic.start({ onMaxed: () => stopTalk(), maxMs: 90_000 }); }
       catch { toast({ title: esc(t('voice.micDenied')), error: true }); return; }
-      talk.on = true; ep.reset();
+      talk.on = true;
       paintTell();
-      let last = 0;
-      const tick = now => {
+      const tick = () => {
         if (!talk.on) return;
         const l = mic.level();
         const orb = box.querySelector('#obtorb');
         if (orb) orb.style.transform = `scale(${(1 + l * 0.18).toFixed(3)})`;
-        if (last && ep.push(l, now - last)) return stopTalk();
-        last = now;
         talk.raf = requestAnimationFrame(tick);
       };
       talk.raf = requestAnimationFrame(tick);

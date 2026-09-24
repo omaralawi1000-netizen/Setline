@@ -26,9 +26,6 @@ import { planFor } from './routine.js';
 import { orbPulse } from './fx.js';
 import { ask as askCoach, ensureModels } from './coach.js';
 import { cmdModels } from '../settings.js';
-import { createEndpointer } from '../vad.js';
-
-const endpoint = createEndpointer();
 
 const HOLD_MS = 280;          // shorter press = tap
 const BARS = 27;
@@ -371,10 +368,6 @@ function startLoop() {
     const target = listening ? mic.level() : 0;
     v.lvl += (target - v.lvl) * (target > v.lvl ? 0.45 : 0.12);
     v.hist[v.histAt = (v.histAt + 1) % v.hist.length] = v.lvl;
-    // tapped to talk: a pause after you've spoken sends it, no second tap needed
-    const dt = v.lastTick ? now - v.lastTick : 0;
-    v.lastTick = now;
-    if (listening && v.toggle && endpoint.push(target, dt)) { endpoint.reset(); finishRec(); }
     if (reduced()) return;
     const l = v.lvl;
     // alive, not mechanical: a slow breath, and a soft squash and stretch that follows the voice
@@ -444,7 +437,6 @@ async function startRec() {
     showCard({ kind: 'info', icon: 'info', title: state.t('voice.micReady'), sub: state.t('voice.micReadySub'), lang: state.lang });
     return;
   }
-  endpoint.reset();
   setPhase('listening');
   if (v.pendingStop) { v.pendingStop = false; finishRec(); }
 }
