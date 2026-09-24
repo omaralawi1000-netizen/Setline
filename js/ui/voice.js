@@ -19,6 +19,10 @@ import { I } from './icons.js';
 import { hideToast } from './toast.js';
 import { aiCommand, withFallback } from '../ai.js';
 import { openMealSheet } from './meal.js';
+import { foodTargets } from './food.js';
+import { aiMeal } from '../ai.js';
+import { MEAL_SCHEMA, mealPrompt, validateMeal } from '../meals.js';
+import { coachModels } from '../settings.js';
 import { addGoal } from './goals.js';
 import { isQuestion, isPlanRequest } from '../coach.js';
 import { startCardioSession, finishSheet as cardioFinishSheet } from './cardio.js';
@@ -65,14 +69,15 @@ function parseCtx() {
     lang: state.settings.voiceLang, unit: state.settings.unit, catalog: state.catalog, usage: state.usage, now: Date.now(),
     routines: state.routines, workoutExerciseIds: w ? w.exercises.map(e => e.exerciseId) : [],
     current: ex ? { exerciseId: ex.exerciseId, lastSet: li >= 0 ? ex.sets[li] : null, planned: pi >= 0 ? ex.sets[pi] : null, shown: shownValues(ex) } : null,
-    restRunning: !!(w && restRemaining(w.rest) > 0)
+    restRunning: !!(w && restRemaining(w.rest) > 0),
+    screen: document.querySelector('.screen.on')?.id?.replace(/^s-/, '') || ''
   };
 }
 
 const snapshot = () => ({
   nameLang: state.lang, planFor, active: state.active, cardio: state.cardio, activeCardio: state.activeCardio,
   bodyweight: state.bodyweight, nutrition: state.nutrition, daily: state.daily, history: state.history, prs: state.prs, routines: state.routines,
-  undoCount: state.undo.length, settings: state.settings, catalog: state.catalog, usage: state.usage, now: Date.now()
+  undoCount: state.undo.length, settings: state.settings, catalog: state.catalog, usage: state.usage, now: Date.now(), targets: foodTargets()
 });
 
 function speak(text, lang) {
@@ -555,6 +560,17 @@ export function handleText(text, { typed = false } = {}) {
   present(intent, { typed });
 }
 
+// The Coach box: a clear command (food, a set, water, targets…) is done, not discussed.
+const DO_TYPES = new Set(['LogSet', 'LogSets', 'LogBatch', 'LogRel', 'LogMeal', 'LogWater', 'SetTarget', 'LogBodyweight', 'LogProtein', 'LogCardio', 'StartCardio', 'StartRoutine', 'CheckIn', 'AddWarmup', 'WarmupDone', 'SetGoal']);
+export function actOnText(text) {
+  text = String(text || '').trim();
+  if (!text || /\?\s*$/.test(text) || isQuestion(text)) return null;
+  const intent = parse(text, { ...parseCtx(), screen: 'coach' });
+  if (!DO_TYPES.has(intent.type)) return null;
+  present(intent, { typed: true });
+  return intent.type;
+}
+
 // Hands-free: speech the app overheard. It acts only on what reads as a workout command, or on
 // anything said after "Coach"/"Setline"; everything else (chat, music, the gym) is ignored.
 const HF_OK = new Set(['LogSet', 'LogSets', 'AddWarmup', 'WarmupDone', 'LogRel', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
@@ -632,6 +648,7 @@ function present(intent, { typed = false } = {}) {
   const cmd = resolve(intent, snapshot(), tFor(lang), lang);
   cmd.lang = lang;
   cmd.typed = typed;
+  if (cmd.run?.op === 'meal-ai') return estimateMeal(cmd, intent, lang);
   if (cmd.kind === 'cancel') {
     dismissCard({ keepPending: false });
     speak(tFor(lang)('say.cancel'), lang);
@@ -661,6 +678,25 @@ function showError(titleKey, subKey, opts = {}) {
   const sub = (subKey ? t(subKey) : '') + (opts.code ? ` (${opts.code})` : '');
   if (v.open && v.mode === 'mini') setTimeout(() => { if (v.open && v.mode === 'mini') closeVoice(); }, 250);
   showCard({ kind: 'error', icon: 'alert', title: t(titleKey), sub, retry: !!opts.retry, settings: !!opts.settings, type: !!opts.type, local: true });
+}
+
+// A meal the food list doesn't know: the AI estimates it right in the card, then it logs like a set.
+let mealSeq = 0;
+async function estimateMeal(cmd, intent, lang) {
+  const t = tFor(lang), mine = ++mealSeq;
+  const key = getKey('google');
+  if (!key) { if (v.open) await closeVoice(); openMealSheet({ text: cmd.run.text }); return; }
+  if (v.open) { setPhase('result'); setTimeout(() => { if (v.open) closeVoice(); }, 300); }
+  showCard({ kind: 'wait', icon: 'info', title: t('meal.estimating'), value: cmd.run.text, sub: t('meal.estimatingSub'), lang, intent });
+  let meal = null;
+  try {
+    await ensureModels();
+    const raw = await withFallback(coachModels(state.settings), model => aiMeal({ key, model, prompt: mealPrompt(cmd.run.text, lang), schema: MEAL_SCHEMA, timeout: 20000 }), { rounds: 2 });
+    meal = validateMeal(raw);
+  } catch { meal = null; }
+  if (mine !== mealSeq) return;
+  if (!meal) { showCard({ kind: 'error', icon: 'alert', title: t('meal.notUnderstood'), sub: cmd.run.text, lang, intent, type: true }); return; }
+  present({ type: 'MealReady', meal, slot: cmd.run.slot, heard: intent.heard, lang });
 }
 
 // ---------- the intent card ----------
@@ -787,6 +823,9 @@ async function execute(run, cmd) {
   if (run.op === 'goal') { addGoal(run.goal); return true; }
   if (run.op === 'checkin') { const r = await store.saveCheckin(run.patch); card.undoOp = { op: 'checkin', prev: r.prev }; return true; }
   if (run.op === 'meal') { dismissCard(); if (v.open) await closeVoice(); openMealSheet({ text: run.text }); return false; }
+  if (run.op === 'meal-log') { const m = await store.logMeal(run.meal); card.undoOp = { op: 'meal-del', id: m.id }; return true; }
+  if (run.op === 'water') { await store.logWater(run.ml); card.undoOp = { op: 'water', ml: run.ml }; return true; }
+  if (run.op === 'targets') { store.setSettings({ foodTargets: run.targets }); card.undoOp = { op: 'targets', prev: state.settings.foodTargets ?? null, was: run.prev }; return true; }
   if (run.op === 'discard') {
     await store.discard();
     card.hideTimer = setTimeout(() => dismissCard(), 1500);
@@ -818,6 +857,9 @@ function undoCard() {
   else if (u?.op === 'cardio-discard') { store.discardCardio(); nav.go('today'); }
   else if (u?.op === 'bw') { if (u.prev == null) store.deleteBodyweight(u.date); else store.logBodyweight(u.prev, u.date); }
   else if (u?.op === 'protein') store.undoProtein(u.grams);
+  else if (u?.op === 'meal-del') store.deleteMeal(u.id);
+  else if (u?.op === 'water') store.logWater(-u.ml);
+  else if (u?.op === 'targets') store.setSettings({ foodTargets: u.prev });
   else if (u?.op === 'checkin') store.restoreCheckin(u.prev);
   else if (u?.op === 'undo') store.undo();
   else if (u?.op === 'discardStart' && state.active?.id === u.id) { store.discard(); nav.go('today'); }

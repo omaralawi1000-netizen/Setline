@@ -293,6 +293,20 @@ export async function logMeal(meal, date = dateKey()) {
   emit('body');
   return r.meal;
 }
+// several meals at once (a saved meal, yesterday's breakfast): one save, one re-render
+export async function logMeals(list, date = dateKey()) {
+  const out = [];
+  for (const meal of list) { const r = addMeal(state.nutrition, date, meal, Date.now() + out.length); state.nutrition = r.entries; out.push(r.meal); }
+  await db.put('nutrition', state.nutrition.find(x => x.date === date));
+  emit('body');
+  return out;
+}
+export async function deleteMeals(ids, date = dateKey()) {
+  for (const id of ids) state.nutrition = removeMeal(state.nutrition, date, id);
+  const e = state.nutrition.find(x => x.date === date);
+  if (e) await db.put('nutrition', e);
+  emit('body');
+}
 export async function updateMeal(id, patch, date = dateKey()) {
   state.nutrition = editMeal(state.nutrition, date, id, patch);
   const e = state.nutrition.find(x => x.date === date);

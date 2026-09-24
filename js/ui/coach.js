@@ -15,6 +15,8 @@ import { isRecording } from '../voice.js';
 import { haptic } from '../haptics.js';
 import { $, esc } from './dom.js';
 import { listenSmart } from './listen.js';
+import { unlockAudio } from '../audio.js';
+import { actOnText } from './voice.js';
 import { I } from './icons.js';
 import { openSheet, closeTop } from './sheet.js';
 import { toast } from './toast.js';
@@ -26,6 +28,13 @@ const shown = new Set(); // chat message ids already rendered
 const errorText = (code, t) => ({
   offline: t('coach.offline'), network: t('coach.offline'), badkey: t('coach.badKey'), busy: t('coach.busy'), quota: t('coach.quota', { time: new Date(nextQuotaReset()).toLocaleTimeString(state.lang === 'da' ? 'da-DK' : 'en-GB', { hour: '2-digit', minute: '2-digit' }) }), empty: t('coach.empty'), timeout: t('coach.timeout'), nomodel: t('coach.noModel'), nokey: t('coach.noKey')
 }[code] || t('coach.failed', { code }));
+
+// Thinking: the orb breathes, a glow runs round the bubble and the steps say what it's looking at.
+function thinkingHTML(m) {
+  const { t } = state;
+  const steps = [t('coach.step1'), t('coach.step2'), t('coach.step3'), t('coach.step4')];
+  return `<span class="think"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span><span class="tsteps">${steps.map((x, i) => `<span class="tl" style="--i:${i}">${esc(x)}</span>`).join('')}</span></span>`;
+}
 
 function bubble(m) {
   const { t } = state;
@@ -39,7 +48,7 @@ function bubble(m) {
   const dhead = m.debrief ? `<p class="wkhead">${I.workout}<span>${esc(t('debrief.head', { name: m.dname || t('debrief.session') }))}</span></p>` : '';
   const head = m.weekly ? `<p class="wkhead">${I.chart}<span>${esc(t('weekly.head', { date: new Intl.DateTimeFormat(state.lang === 'da' ? 'da-DK' : 'en-GB', { day: 'numeric', month: 'short' }).format(new Date(m.weekly + 'T12:00')) }))}</span></p>` : '';
   const kept = m.remembered?.length ? `<p class="memnote">${I.check}<span>${esc(t('memory.kept', { what: m.remembered.join(' · ') }))}</span></p>` : '';
-  return `<li class="msg ai${m.streaming ? ' is-streaming' : ''}${m.weekly || m.debrief ? ' weekly' : ''}" data-id="${m.id}"><div class="bub">${head}${dhead}${m.text ? formatAnswer(hideMemoryTail(m.text)) : `<span class="think"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span><span class="tl">${esc(t('coach.thinking'))}</span></span>`}${kept}</div></li>`;
+  return `<li class="msg ai${m.streaming ? ' is-streaming' : ''}${m.streaming && !m.text ? ' is-thinking' : ''}${m.weekly || m.debrief ? ' weekly' : ''}" data-id="${m.id}"><div class="bub">${head}${dhead}${m.text ? formatAnswer(hideMemoryTail(m.text)) : thinkingHTML(m)}${kept}</div></li>`;
 }
 
 function planCard(m) {
@@ -80,25 +89,57 @@ export function renderCoach(root) {
   requestAnimationFrame(() => scrollDown(root, false));
 }
 
-// Streamed words appear smoothly, not in lumps: the text on screen glides after what has arrived,
-// catching up faster the further behind it is.
+// Streamed words don't appear in lumps: each word blurs in, lit by the accent, and settles.
+// The text on screen glides after what has arrived, faster the further behind it is.
+const WORD_MS = 650;
+function wordsHTML(bub, text, births, now) {
+  bub.innerHTML = formatAnswer(hideMemoryTail(text));
+  const walker = document.createTreeWalker(bub, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  let i = 0;
+  for (const n of nodes) {
+    const frag = document.createDocumentFragment();
+    for (const part of n.nodeValue.split(/(\s+)/)) {
+      if (!part) continue;
+      if (/^\s+$/.test(part)) { frag.append(part); continue; }
+      births[i] ??= now;
+      const age = now - births[i];
+      const w = document.createElement('span');
+      w.textContent = part;
+      if (age < WORD_MS) { w.className = 'w'; w.style.animationDelay = `${-age}ms`; }
+      frag.append(w);
+      i++;
+    }
+    n.replaceWith(frag);
+  }
+}
 function typewriter(root, id) {
-  let target = '', shown = 0, raf = 0, lastScroll = 0, waiters = [];
+  let words = [], shown = 0, raf = 0, last = 0, lastScroll = 0, waiters = [];
+  const births = [];
+  const done = () => (shown >= words.length);
   const step = now => {
-    const behind = target.length - shown;
-    if (behind <= 0) { raf = 0; waiters.splice(0).forEach(r => r()); return; }
-    shown += Math.max(1, Math.ceil(behind / 14));
-    // don't stop inside a word
-    const sp = target.indexOf(' ', shown);
-    if (sp !== -1 && sp - shown < 8) shown = sp;
-    const bub = root.querySelector(`[data-id="${id}"] .bub`);
-    if (bub) bub.innerHTML = formatAnswer(hideMemoryTail(target.slice(0, Math.min(shown, target.length))));
-    if (now - lastScroll > 140) { lastScroll = now; scrollDown(root); }
+    if (!done() && now - last > 34) {
+      last = now;
+      shown = Math.min(words.length, shown + Math.max(1, Math.ceil((words.length - shown) / 10)));
+      const bub = root.querySelector(`[data-id="${id}"] .bub`);
+      if (bub) {
+        bub.closest('.msg')?.classList.remove('is-thinking');
+        wordsHTML(bub, words.slice(0, shown).join(''), births, now);
+      }
+      if (now - lastScroll > 140) { lastScroll = now; scrollDown(root); }
+    }
+    if (done()) {
+      // let the last words finish settling before anything re-renders the bubble
+      raf = 0;
+      setTimeout(() => { if (done()) waiters.splice(0).forEach(r => r()); }, WORD_MS);
+      return;
+    }
     raf = requestAnimationFrame(step);
   };
   return {
-    set(t) { target = t; if (!raf) raf = requestAnimationFrame(step); },
-    drain: () => (target.length - shown <= 0 ? Promise.resolve() : Promise.race([new Promise(r => waiters.push(r)), new Promise(r => setTimeout(r, 2500))]))
+    set(t) { words = t.match(/\S+\s*/g) || []; if (!raf) raf = requestAnimationFrame(step); },
+    drain: () => (done() && !raf ? new Promise(r => setTimeout(r, WORD_MS)) : Promise.race([new Promise(r => waiters.push(r)), new Promise(r => setTimeout(r, 4000))]))
   };
 }
 
@@ -136,9 +177,16 @@ let goalLines = () => [];
 export const setGoalLines = fn => { goalLines = fn; };
 
 // Ask the coach. Used by the composer, the example chips, and voice questions.
-export async function ask(question, { root = $('#s-coach') } = {}) {
+export async function ask(question, { root = $('#s-coach'), voice = false } = {}) {
   question = String(question || '').trim();
   if (!question) return;
+  // "I had 2 eggs", "bench 80 for 8", "set my calories to 2400": done straight away (with Undo), not discussed
+  const did = actOnText(question);
+  if (did) {
+    store.addChat('user', question);
+    store.addChat('model', state.t(did === 'LogMeal' ? 'coach.didFood' : 'coach.did'), { persist: true });
+    return;
+  }
   inflight?.ctl.abort();
   const lang = /[æøå]|\b(hvad|hvordan|jeg|min|mit|skal|træning)\b/i.test(question) ? 'da' : state.lang;
   const history = state.chat.filter(m => !m.error);
@@ -159,7 +207,7 @@ export async function ask(question, { root = $('#s-coach') } = {}) {
   const context = buildContext(coachSnap());
   try {
     const typer = typewriter(root, reply.id);
-    const slow = setTimeout(() => { const tl = root.querySelector(`[data-id="${reply.id}"] .tl`); if (tl) { tl.textContent = state.t('coach.thinkingLong'); } }, 7000);
+    const slow = 0;
     const text = await withFallback(coachModels(state.settings), model => streamChat({
       key, model, system: systemPrompt(lang), contents: chatContents(history, context, question), signal: ctl.signal,
       onText: full => { clearTimeout(slow); store.updateChat(reply.id, { text: full }, { quiet: true }); typer.set(full); }
@@ -172,8 +220,9 @@ export async function ask(question, { root = $('#s-coach') } = {}) {
     if (facts.length) store.setSettings({ memories: mem });
     store.updateChat(reply.id, { text: said, streaming: false, ...(facts.length ? { remembered: facts } : {}) }, { persist: true });
     haptic('tap');
-    if (said && state.settings.spoken !== 'off') {
-      tts.speak(speakable(said), { key, model: ttsModelId(state.settings), alt: ttsAlt(state.settings), voice: state.settings.voice, lang, canSpeak: () => !isRecording() });
+    if (said && (voice || state.settings.spoken !== 'off')) {
+      const talk = tts.speak(speakable(said), { key, model: ttsModelId(state.settings), alt: ttsAlt(state.settings), voice: state.settings.voice, lang, canSpeak: () => !isRecording() });
+      if (voice) await talk;
     }
   } catch (e) {
     const code = e instanceof AiError ? e.code : 'failed';
@@ -255,36 +304,53 @@ export function initCoach(n) {
   nav = n;
   const root = $('#s-coach');
   const composer = $('#composer');
-  composer.innerHTML = `<button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span></button><input enterkeyhint="send" autocomplete="off" maxlength="600"><button type="submit" class="csend">${I.fwd}</button>`;
-  // the small orb: tap, talk, and what you said lands in the box (tap again to finish)
-  let dict = null;
-  composer.querySelector('[data-dictate]').addEventListener('click', async () => {
-    const input = composer.querySelector('input');
-    const orb = composer.querySelector('.corb');
-    if (dict) { dict.stop(); return; }
-    if (!getKey('groq')) { toast({ title: esc(state.t('voice.noKey')), error: true }); return; }
-    haptic('tap');
-    composer.classList.add('dictating');
-    const before = input.value, ph = input.placeholder;
-    input.placeholder = state.t('coach.listening');
-    const l = dict = listenSmart({
+  composer.innerHTML = `<button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span></button><input enterkeyhint="send" autocomplete="off" maxlength="5000"><button type="submit" class="csend">${I.fwd}</button>`;
+  // The composer's orb: talk to your coach. What you say is sent when you pause, the answer is
+  // spoken, then it listens again, so it's a conversation. Tap while it listens to send at once;
+  // tap while it thinks or speaks (or say nothing) to end it.
+  const input = composer.querySelector('input'), orbBtn = composer.querySelector('.corb');
+  const talk = { on: false, l: null };
+  const setTalk = phase => {
+    composer.dataset.talk = phase || '';
+    composer.classList.toggle('talking', !!phase);
+    input.placeholder = phase ? state.t('coach.talk.' + phase) : state.t('coach.ph');
+    input.disabled = !!phase;
+  };
+  const stopTalk = () => { talk.on = false; talk.l?.cancel(); talk.l = null; tts.stop(); setTalk(null); orbBtn.style.removeProperty('--lv'); };
+  const listenTurn = async () => {
+    if (!talk.on) return;
+    setTalk('listening');
+    const l = talk.l = listenSmart({
       stt: { key: getKey('groq'), model: sttModelId(state.settings), language: state.settings.voiceLang },
-      onLevel: v => orb.style.setProperty('--lv', v.toFixed(3)),
-      onState: k => composer.classList.toggle('hearing', k === 'hearing' || k === 'check')
+      onLevel: v => orbBtn.style.setProperty('--lv', v.toFixed(3)),
+      onState: k => { if (talk.l === l && (k === 'hearing' || k === 'check')) setTalk('hearing'); }
     });
     let text = '';
-    try { text = await l.done; } catch { toast({ title: esc(state.t('voice.micDenied')), error: true }); }
-    dict = null;
-    composer.classList.remove('dictating', 'hearing');
-    orb.style.removeProperty('--lv');
-    input.placeholder = ph;
-    if (text.trim()) {
-      input.value = (before ? before.trim() + ' ' : '') + text.trim();
-      haptic('success');
-      input.focus();
-      input.setSelectionRange(input.value.length, input.value.length);
-    }
+    try { text = (await l.done).trim(); } catch { toast({ title: esc(state.t('voice.micDenied')), error: true }); return stopTalk(); }
+    if (talk.l !== l) return;
+    talk.l = null;
+    orbBtn.style.removeProperty('--lv');
+    if (!talk.on) return;
+    if (!text) return stopTalk(); // nothing said: the conversation rests
+    setTalk('thinking');
+    await ask(text, { root, voice: true });
+    if (!talk.on) return;
+    setTalk('speaking');
+    for (let t0 = Date.now(); talk.on && tts.isSpeaking() && Date.now() - t0 < 90_000;) await new Promise(r => setTimeout(r, 150));
+    if (talk.on) setTimeout(listenTurn, 300);
+  };
+  orbBtn.addEventListener('click', () => {
+    if (talk.on) { haptic('tap'); if (talk.l && composer.dataset.talk !== 'thinking') talk.l.stop(); else stopTalk(); return; }
+    if (!getKey('groq')) { toast({ title: esc(state.t('voice.noKey')), error: true }); return; }
+    haptic('tap');
+    unlockAudio();
+    input.blur();
+    talk.on = true;
+    const typed = input.value.trim();
+    if (typed) { input.value = ''; talk.on = true; setTalk('thinking'); ask(typed, { root, voice: true }).then(() => talk.on && setTimeout(listenTurn, 300)); return; }
+    listenTurn();
   });
+  document.getElementById('app').addEventListener('screenchange', () => { if (talk.on && !document.getElementById('app').classList.contains('coaching')) stopTalk(); });
   composer.addEventListener('submit', e => {
     e.preventDefault();
     if (inflight) { inflight.ctl.abort(); return; }
@@ -336,7 +402,7 @@ export async function weeklyCheckin({ force = false } = {}) {
       'Then the plan for this week: which days and routines, two or three concrete targets (e.g. "bench 82.5 × 8"), and the one thing to fix. Use their MEMORIES and PROFILE.',
       'Warm and direct, like their coach. At most 140 words, short lines, no tables, no headings except "Last week" and "This week".'
     ].join(' ');
-    const text = await withFallback(coachModels(state.settings), model => streamChat({ key, model, system: systemPrompt(lang), contents: chatContents([], context, ask) }), { rounds: 2, alsoRetry: ['timeout'] });
+    const text = await withFallback(coachModels(state.settings, { background: true }), model => streamChat({ key, model, system: systemPrompt(lang), contents: chatContents([], context, ask) }), { rounds: 2, alsoRetry: ['timeout'] });
     const { text: said } = splitMemories(text);
     if (said) {
       store.addChat('model', said, { weekly: monday });
@@ -361,7 +427,7 @@ export async function sessionDebrief(w, { onReady = () => {} } = {}) {
       lines.join('\n'),
       'Compare every lift with the last time they did it (in the training data). In at most 90 words: what moved (with numbers), anything that dropped and the likely reason (sleep, food, other sport or fatigue from the brief), then a line starting "Next time:" with two or three exact targets for this routine\'s next session (kg × reps). Warm, direct, no headings, no tables.'
     ].join('\n');
-    const text = await withFallback(coachModels(state.settings), model => streamChat({ key, model, system: systemPrompt(lang), contents: chatContents([], buildContext(coachSnap()), ask) }), { rounds: 2, alsoRetry: ['timeout'] });
+    const text = await withFallback(coachModels(state.settings, { background: true }), model => streamChat({ key, model, system: systemPrompt(lang), contents: chatContents([], buildContext(coachSnap()), ask) }), { rounds: 2, alsoRetry: ['timeout'] });
     const { text: said } = splitMemories(text);
     if (said) { store.addChat('model', said, { debrief: w.id, dname: w.name || '' }); store.setSettings({ debriefUnseen: w.id }); onReady(); }
   } catch { /* the session is saved either way */ } finally { debriefBusy = false; }

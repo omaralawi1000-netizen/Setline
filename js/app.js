@@ -113,7 +113,9 @@ function renderMini() {
 function renderAll() {
   document.documentElement.lang = state.lang;
   document.documentElement.dataset.motion = state.settings.motion;
+  const glowWas = document.documentElement.dataset.glow;
   Object.assign(document.documentElement.dataset, { text: state.settings.textSize, glow: state.settings.glow, dock: state.settings.dockLabels ? 'labels' : 'icons' });
+  if (glowWas !== state.settings.glow) refreshChrome();
   configureSteps(state.settings.kgSteps);
   if (document.documentElement.dataset.accent !== state.settings.accent) { document.documentElement.dataset.accent = state.settings.accent; refreshChrome(); }
   renderScreen();
@@ -124,6 +126,31 @@ function renderAll() {
   const root = $('#s-' + view.screen);
   if (root && root._counted === false) { root._counted = true; countAll(root, state.lang); }
   else root?.querySelectorAll('[data-count]').forEach(el => { el.textContent = new Intl.NumberFormat(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: Number(el.dataset.dp || 0), minimumFractionDigits: Number(el.dataset.dp || 0) }).format(Number(el.dataset.count)); });
+}
+
+// On the Coach tab the orb leaves the dock and settles into the message box (and goes back when you
+// leave): a copy flies between the two places while the real ones wait out of sight.
+function flyOrb(toCoach) {
+  if (document.documentElement.dataset.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const dockOrb = $('#dock .orbbtn .orb'), boxOrb = $('#composer .corb .orb');
+  if (!dockOrb || !boxOrb) return;
+  const d = $('#dock').getBoundingClientRect(), dr = dockOrb.getBoundingClientRect();
+  const home = { x: d.left + d.width / 2, y: dr.top + dr.height / 2, s: dr.width || 76 }; // the dock's centre, where the orb lives
+  const c = $('#composer').getBoundingClientRect();
+  const box = { x: c.left + 7 + 21, y: c.top + c.height / 2 - (toCoach ? 0 : 0), s: 34 };
+  const [from, to] = toCoach ? [home, box] : [box, home];
+  const fly = dockOrb.cloneNode(true);
+  fly.className = 'orb orbfly'; // a component of its own, not a state
+  fly.style.cssText = `--s:${to.s}px;left:${to.x - to.s / 2}px;top:${to.y - to.s / 2}px`;
+  app.appendChild(fly);
+  app.classList.add('orbflying');
+  const k = from.s / to.s;
+  const a = fly.animate([
+    { transform: `translate(${from.x - to.x}px, ${from.y - to.y}px) scale(${k})` },
+    { transform: `translate(${(from.x - to.x) * 0.35}px, ${(from.y - to.y) * 0.55 - 26}px) scale(${(k + 1) / 2 * 1.06})`, offset: 0.55 },
+    { transform: 'none' }
+  ], { duration: 560, easing: 'cubic-bezier(.3,.7,.2,1)' });
+  a.onfinish = a.oncancel = () => { fly.remove(); app.classList.remove('orbflying'); };
 }
 
 // Direction for the transition: tabs by position, sub screens push in from the right.
@@ -153,6 +180,8 @@ function show(name, { back = false } = {}) {
     s.inert = !on;
   }
   app.classList.toggle('is-sub', SUB.includes(name));
+  const wasCoach = app.classList.contains('coaching');
+  if (wasCoach !== (name === 'coach') && !SUB.includes(name) && !SUB.includes(prev)) flyOrb(name === 'coach');
   app.classList.toggle('coaching', name === 'coach');
   if (name === 'coach') { markWeeklySeen(); markDebriefSeen(); }
   requestAnimationFrame(() => app.dispatchEvent(new Event('screenchange')));
@@ -285,6 +314,14 @@ app.addEventListener('click', e => {
     pushSub('body');
     return;
   }
+  const su = e.target.closest('[data-setup]');
+  if (su) {
+    haptic('tap');
+    go('coach');
+    if (su.dataset.setup === 'brief') setTimeout(() => askCoach(state.t('brief.routinesAsk')), 350);
+    else setTimeout(() => { const i = $('#composer input'); if (i) { i.value = state.t('setup.prefill'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 450);
+    return;
+  }
   const pl = e.target.closest('[data-plateau]');
   if (pl) { onPlateau(pl.dataset.plateau, pl.dataset.pex); return; }
   const dl = e.target.closest('[data-deload]');
@@ -356,7 +393,7 @@ function scheduleRestAlert() {
   clearTimeout(restTimer);
   restFor = r.endsAt;
   const w = state.active, ex = w?.exercises[w.current];
-  const msg = { type: 'rest', endsAt: r.endsAt, title: state.t('workout.restDone'), body: ex ? `${state.catalog.name(ex.exerciseId, state.lang)} · ${state.t('workout.setNext', { n: nextSetNumber(ex) })}` : '' };
+  const msg = { type: 'rest', endsAt: r.endsAt, live: state.settings.restLive !== false, liveTitle: state.t('workout.restLive'), title: state.t('workout.restDone'), body: ex ? `${state.catalog.name(ex.exerciseId, state.lang)} · ${state.t('workout.setNext', { n: nextSetNumber(ex) })}` : '' };
   // the service worker keeps time even when this page is frozen in the background
   if (sw && r.endsAt - Date.now() < 270_000) { sw.postMessage(msg); return; }
   restTimer = setTimeout(async () => {

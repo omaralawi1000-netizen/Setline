@@ -10,7 +10,7 @@ import { sleepTrend } from './checkin.js';
 import { profileText } from './profile.js';
 import { deloadStatus, muscleBalance, usualMinutes } from './insights.js';
 import { measureSummary } from './measures.js';
-import { nextRoutine } from './routines.js';
+import { nextRoutine, routineDay } from './routines.js';
 import { stalledLifts } from './plateau.js';
 import { EQUIPMENT, MUSCLES, makeCustom, normalize } from './catalog.js';
 
@@ -50,6 +50,7 @@ export const APP_GUIDE = [
   'Headphones button on the workout screen: hands-free mode listens for sets and speaks rest cues.',
   'Workout screen: steppers and Log set, rest timer (+15/-15 teaches that exercise its rest), warm-up ramp, plate calculator, swipe a set left to delete, tap a set to edit, auto-advance after the last planned set, Finish.',
   'Routines can belong to a weekday (a weekday in the name, or the day chips in the routine editor): Up next picks today\'s routine, and "Your week" (Workout tab and Today) shows the week. After each workout the Coach writes a short debrief with targets for next time. The Coach composer has its own small orb: tap it to dictate. A rest bell with 3-2-1 ticks rings when rest ends (Settings → Workout). Food targets: calories and macros move together.',
+  'The orb understands food too: "2 eggs and toast", "for lunch chicken and rice", "two glasses of water", "set my calories to 2400" are logged or set at once with Undo (foods on the built-in Danish list are counted exactly, others estimated). Typing a clear command in this chat does it too. On the Coach tab the orb sits in the message box: tap it to talk, it sends when you pause, the answer is spoken and it listens again. Food: "Same breakfast as yesterday" rows, and a bookmark on a meal group saves it as a one-tap Saved meal. With Rest alerts on, the rest timer counts down on the lock screen.',
   'Tabs: Today, Workout, the orb in the middle, Food, Coach. History is the clock button on the Workout tab (and Last session on Today).',
   'Workout: smart warm-ups are added before the first lift for each muscle (Settings → Workout → Smart warm-ups), spoken in hands-free; say "warm up" to add them, "warm-up done" to tick one off. Today: one-tap morning check-in (how you feel, sleep, sore spots → readiness), Up next routine, cardio start and "again" chip, week ring and cardio minutes, muscles this week, deload suggestion after 6 steady weeks, a Plateau card when a planned lift stalls (one tap switches its rep range or swaps it for a close variation in every routine, with undo), bodyweight, a Food card (calories left, protein) that opens the Food tab. Food tab: calorie ring and protein/carbs/fat against daily targets (from the profile, editable by tapping the ring), Scan barcode / Photo / Say it / Search (a built-in list of ~250 common Danish foods with typical values, plus Danish products from Open Food Facts while online; tap one to pick the amount; anything not found can be estimated by AI), favourite meals, quick add buttons (calories or protein, your own amounts), water glasses, meals by breakfast/lunch/dinner/snacks (tap to move, log again, favourite, delete), a 7-day chart.',
   'Plans: asking for one in plain words here ("I need a 5-day plan", "make my plan 4 days") builds a plan card right away, with Replace my routines or Add.',
@@ -134,7 +135,7 @@ export function buildContext(snap) {
 
   if (snap.routines?.length) {
     out.push('', 'ROUTINES:');
-    for (const r of snap.routines) out.push(`- ${r.name}: ${r.exercises.map(e => `${name(e.exerciseId)} ${e.sets.length}x${e.sets[0]?.reps ?? '?'}${e.sets[0]?.kg ? ` @ ${r1(e.sets[0].kg)} kg` : ''}`).join(', ')}`);
+    for (const r of snap.routines) out.push(`- ${r.name}${routineDay(r) != null && !/day|dag/i.test(r.name) ? ` (${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][routineDay(r)]})` : ''}: ${r.exercises.map(e => `${name(e.exerciseId)} ${e.sets.length}x${e.sets[0]?.reps ?? '?'}${e.sets[0]?.kg ? ` @ ${r1(e.sets[0].kg)} kg` : ''}`).join(', ')}`);
   }
   const stalls = snap.routines?.length && snap.catalog ? stalledLifts(hist, snap.routines, { catalog: snap.catalog, now }) : [];
   if (stalls.length) out.push('', 'STALLED LIFTS (no new e1RM in the last 3 sessions over 2+ weeks):', ...stalls.map(x => `- ${name(x.exerciseId)}: best e1RM ${x.best} kg, planned ${x.sets}x${x.reps}${x.swapTo ? `, variation: ${name(x.swapTo)}` : ''}`));

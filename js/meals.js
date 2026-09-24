@@ -136,3 +136,20 @@ export function favouriteMeals(entries, starred = [], now = Date.now(), n = 6) {
     .slice(0, n)
     .map(f => ({ key: f.key, starred: star.has(f.key), count: f.count, meal: f.last }));
 }
+
+// ---------- repeating meals ----------
+
+const SLOT_IDS = ['breakfast', 'lunch', 'dinner', 'snack'];
+const item = m => ({ name: String(m.name || '').slice(0, MEAL_LIMITS.name), kcal: Math.round(clamp(m.kcal, MEAL_LIMITS.kcal)), protein: Math.round(clamp(m.protein, MEAL_LIMITS.protein)), carbs: Math.round(clamp(m.carbs, MEAL_LIMITS.carbs)), fat: Math.round(clamp(m.fat, MEAL_LIMITS.fat)) });
+
+// Saved meals: a few foods logged together in one tap ("My breakfast: skyr, oats, banana").
+export function sanitizeTemplates(list) {
+  if (!Array.isArray(list)) return [];
+  return list.filter(x => x && typeof x.id === 'string' && typeof x.name === 'string' && Array.isArray(x.items) && x.items.length)
+    .slice(0, 24).map(x => ({ id: x.id.slice(0, 60), name: x.name.trim().slice(0, 40) || 'Meal', ...(SLOT_IDS.includes(x.slot) ? { slot: x.slot } : {}), items: x.items.slice(0, MEAL_LIMITS.items).map(item).filter(i => i.name) }))
+    .filter(x => x.items.length);
+}
+export function makeTemplate(name, meals, slot = null, id = 't-' + globalThis.crypto.randomUUID()) {
+  return sanitizeTemplates([{ id, name, slot, items: meals }])[0] || null;
+}
+export const templateTotals = tpl => tpl.items.reduce((a, i) => ({ kcal: a.kcal + i.kcal, protein: a.protein + i.protein }), { kcal: 0, protein: 0 });

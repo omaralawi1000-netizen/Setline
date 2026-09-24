@@ -312,3 +312,16 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] Workout tab is now "Train": your week (routines by weekday, done/today/missed), Up next, Progress / History / Body tiles, cardio, routines; routine editor has day chips; "Your week" can also go on Today
 - [x] Up next picks today's routine by weekday
 - [x] Coach debrief after every workout: what moved, what dropped, exact targets for next time (toast + Today card; Customize toggle)
+
+## 1.23.0: one orb for everything, a Coach you can talk to, calmer screens
+
+- [x] Chat always uses Flash (fast); Pro only does background work (weekly check-in, after-workout debrief)
+- [x] The orb understands food: "2 eggs and toast", "for lunch chicken and rice", "200 g skyr", "to æg og en skive rugbrød" → counted from the Danish list instantly (offline); anything else is estimated in the voice card; logged with Undo. On the Food screen, anything that isn't a command is food. "Two glasses of water", "set my calories to 2400" (macros follow). The AI fallback knows food, water and which screen you're on
+- [x] Typing a clear command in the Coach box does it (with the card and Undo) instead of discussing it
+- [x] Coach: the orb flies out of the dock into the message box (dock closes the gap); tap it to talk: sends when you pause, answers aloud, listens again (a real conversation); tap to send early or to stop
+- [x] Replies: no box, words blur in lit by the accent and settle; thinking = a glow running round the bubble, breathing orb, steps ("Reading your log…"); the box lifts with the keyboard (transform only), send button appears only when there's text; the Undo card sits above the box
+- [x] No routines yet → "Tell Setline how you train" card: set up from the brief in one tap, or tell the coach, or pick a program
+- [x] Lock screen: with Rest alerts on, the rest timer counts down in a silent notification every second, then rings (Settings → Workout → Lock-screen countdown)
+- [x] Food: "Same breakfast as yesterday" rows; a bookmark on a meal group saves it as a one-tap Saved meal (long-press to remove); water is one calm row with − / +
+- [x] Status bar: the top edge is the background with a touch of the theme glow, and the status bar gets exactly that colour, so the glow runs under it; the top overlay only appears when content scrolls under it
+- [x] Calmer: Today without the brand line, cardio lives on Train by default, the week strip only when routines have days, less space above titles

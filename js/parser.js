@@ -11,8 +11,9 @@ import { parseCheckin } from './checkin.js';
 import { normalize } from './catalog.js';
 import { lbToKg, round } from './units.js';
 import { CARDIO_TYPES } from './cardio.js';
+import { parseMealLocal } from './fooddb.js';
 
-export const INTENTS = ['LogSet', 'LogSets', 'LogBatch', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'CheckIn', 'LogRel', 'SetGoal', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
+export const INTENTS = ['LogSet', 'LogSets', 'LogBatch', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'LogWater', 'SetTarget', 'CheckIn', 'LogRel', 'SetGoal', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
   'AddWarmup', 'WarmupDone', 'AddExercise', 'SwapExercise', 'StartRoutine', 'StartEmpty', 'Finish', 'Discard', 'StartRest', 'AdjustRest', 'SkipRest',
   'Query', 'Cancel', 'Help', 'Ask', 'Unknown'];
 
@@ -366,12 +367,16 @@ export function parse(text, ctx = {}) {
   const batch = parseBatch(text, ctx);
   if (batch) return batch;
   const said = String(text || '').trim();
+  const pre = foodAndWater(said, ctx); // water, calorie targets
+  if (pre) return pre;
   text = shortBy(text);
   const r = parseOne(text, ctx);
   r.heard = said;
   if (r.type === 'Unknown') {
     const named = relOnExercise(text, ctx, r); // "I did one more rep on tricep pushdowns today"
     if (named) return named;
+    const meal = mealPhrase(said, ctx, r); // "log 2 eggs and toast", "for lunch chicken and rice", "200 g skyr"
+    if (meal) return meal;
     const g = gist(text, ctx, r); // "I'm on C bar row" names the exercise better than word matching
     if (g?.exerciseId) return g;
     return slots(text, ctx, r) || g || r;
@@ -385,6 +390,53 @@ export function parse(text, ctx = {}) {
     }
   }
   return r;
+}
+
+// ---------- food, water and targets ----------
+
+const WATER_WORDS = /\b(water|vand|danskvand)\b/;
+const numWord = w => ({ a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, et: 1, en: 1, to: 2, tre: 3, fire: 4, fem: 5 })[w] ?? Number(w);
+function foodAndWater(text, ctx) {
+  const s = clean(text);
+  const lang = detectLang(s, ctx.lang);
+  const out = (type, f) => ({ type, ...f, lang, heard: String(text).trim() });
+  let m;
+  // "drank 500 ml water", "2 glasses of water", "a bottle of water", "et glas vand", "water 750"
+  if (WATER_WORDS.test(s) && !/\b(ate|had|spiste)\b.*\b(and|og)\b/.test(s)) {
+    if ((m = /(\d+(?:\.\d+)?) ?(ml|l|liter|litre|dl|cl)\b/.exec(s))) return out('LogWater', { ml: Math.round(Number(m[1]) * { ml: 1, l: 1000, liter: 1000, litre: 1000, dl: 100, cl: 10 }[m[2]]) });
+    if ((m = /\b(a|an|one|two|three|four|five|\d+|et|en|to|tre|fire|fem) (glass|glasses|glas|cups?|kopper|kop|bottles?|flasker?|flaske)\b/.exec(s))) {
+      const per = /bottle|flask/.test(m[2]) ? 500 : 250;
+      return out('LogWater', { ml: numWord(m[1]) * per });
+    }
+    if ((m = /^(?:water|vand) (\d{2,4})$/.exec(s))) return out('LogWater', { ml: Number(m[1]) });
+  }
+  // "set my calories to 2400", "protein 180 grams", "sæt kalorier til 2400"
+  if ((m = /^(set|change|make|put|sæt|ændr|skift)?\s*(?:my |mine |min )?(calories|calorie|kcal|kalorier|protein|carbs|kulhydrater|fat|fedt)( target| goal| mål| målet)?(?: to| til| at| på)? (\d{2,4})(?: ?(?:kcal|calories|kalorier|g|gram|grams))?$/.exec(s)) && (m[1] || m[3])) {
+    m = [m[0], m[2], m[4]]; // a target needs "set …" or "… target": "protein 30 g" alone is food
+    const key = { calories: 'kcal', calorie: 'kcal', kcal: 'kcal', kalorier: 'kcal', protein: 'protein', carbs: 'carbs', kulhydrater: 'carbs', fat: 'fat', fedt: 'fat' }[m[1]];
+    return out('SetTarget', { key, value: Number(m[2]) });
+  }
+  return null;
+}
+
+const SLOT_WORDS = { breakfast: 'breakfast', morgenmad: 'breakfast', lunch: 'lunch', frokost: 'lunch', dinner: 'dinner', aftensmad: 'dinner', supper: 'dinner', snack: 'snack', mellemmåltid: 'snack' };
+function mealPhrase(text, ctx, unknown) {
+  const s = String(text || '').toLowerCase().trim().replace(/[.!?]+$/, '');
+  const lang = unknown.lang;
+  const out = (food, slot) => ({ type: 'LogMeal', text: food, ...(slot ? { slot } : {}), lang, heard: String(text).trim() });
+  let m;
+  // "for lunch I had chicken and rice", "til frokost fik jeg …", "breakfast: skyr and oats"
+  if ((m = /^(?:for |to |til )?(breakfast|lunch|dinner|supper|snack|morgenmad|frokost|aftensmad|mellemmåltid)\b[:,]?\s*(?:i had|i ate|was|i got|fik jeg|spiste jeg|var|havde jeg|jeg fik|jeg spiste)?\s*(.{3,})$/.exec(s))) return out(m[2].trim(), SLOT_WORDS[m[1]]);
+  // "log 2 eggs and toast", "add a banana", "track 200 g skyr"
+  if ((m = /^(?:log|add|track|record|note|put in|notér|noter|tilføj|registrer|skriv)(?: me)?(?: down)? (.{3,})$/.exec(s))) {
+    const rest = m[1].replace(/\s+(?:to|til) (?:my )?(?:food|meals|mad)$/, '');
+    if (parseMealLocal(rest, lang) || ctx.screen === 'food' || /\b(for (?:breakfast|lunch|dinner)|meal|food|måltid|mad)\b/.test(s)) return out(rest);
+  }
+  // said on its own: "2 eggs and toast", "200 g skyr og en banan"
+  if (parseMealLocal(s, lang)) return out(s);
+  // on the Food screen, anything that isn't a command is food
+  if (ctx.screen === 'food' && /[a-zæøå]{3}/.test(s) && !/\b(reps?|sets?|sæt|gentagelser|km|minutes?|minutter)\b/.test(s)) return out(s);
+  return null;
 }
 
 // "I needed one more rep" / "missed one rep" / "manglede en gentagelse": one short of the plan.

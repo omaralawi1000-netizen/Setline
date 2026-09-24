@@ -505,11 +505,9 @@ button.mini:active,button.pr:active{transform:scale(.98)}
 .composer .csend svg{width:20px;height:20px;stroke-width:2.4}
 .composer .csend.stop{background:rgba(255,255,255,.1);color:var(--ink)}
 .app.coaching .screen#s-coach{padding-bottom:calc(var(--dock-bottom) + var(--dock-h) + 84px)}
-.app.coaching.has-mini .composer{bottom:calc(var(--dock-bottom) + var(--dock-h) + 70px)}
+.app.coaching.has-mini:not(.inputting):not(.kb) .composer{bottom:calc(var(--dock-bottom) + var(--dock-h) + 70px)}
 .app.coaching.has-mini #s-coach{padding-bottom:calc(var(--dock-bottom) + var(--dock-h) + 144px)}
 .app.kb .dock,.app.kb .minibar,.app.inputting .dock,.app.inputting .minibar{opacity:0;pointer-events:none;transform:translateY(24px) scale(.96)}
-.app.inputting:not(.kb) .composer{bottom:calc(var(--dock-bottom) + 6px)}
-.app.kb .composer{bottom:calc(var(--kb, 0px) + 10px)}
 .app.kb #s-coach{padding-bottom:calc(var(--kb, 0px) + 80px)}
 .intent .spin2{width:22px;height:22px;border-radius:50%;border:2.5px solid rgba(var(--a-rgb),.25);border-top-color:var(--accent);animation:spin .8s linear infinite}
 
@@ -1907,3 +1905,96 @@ html[data-dock=icons] .dock .tab span{display:none}
 .msg.is-streaming .bub > .think::after{display:none}
 .wplan.open .wr{display:none}
 .wphint{margin-top:8px}
+
+/* repeat yesterday, saved meals */
+.frepeat{display:grid;gap:8px;margin-top:14px}
+.frep{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:20px;text-align:left;border:1px dashed rgba(var(--a-rgb),.3);animation:rise .5s var(--ease) both;animation-delay:calc(var(--i) * .06s);transition:transform .3s cubic-bezier(.3,1.5,.5,1)}
+.frep:active{transform:scale(.97)}
+.frep .fri{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:rgba(var(--a-rgb),.12);color:var(--accent);flex:none}
+.frep .fri svg{width:19px;height:19px}
+.frep .l{flex:1;min-width:0;display:grid;gap:2px}
+.frep strong{font-size:14.5px;font-weight:800}
+.frep small{font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.frep b{font-size:15px;font-weight:800;text-align:right}.frep b small{display:block;font-size:10.5px;color:var(--dim)}
+.fsave{margin-left:8px;width:28px;height:28px;border-radius:9px;display:inline-grid;place-items:center;color:var(--muted);vertical-align:middle;background:rgba(255,255,255,.05)}
+.fsave svg{width:15px;height:15px}
+.fsave:active{transform:scale(.9)}
+.favchip.tpl .fi{color:var(--accent)}
+.favchip.tpl .fi svg{width:18px;height:18px}
+.favchip.logged{animation:pop .5s var(--ease)}
+
+/* ---------- 1.23: the Coach ---------- */
+/* on Coach the orb leaves the dock (its column closes) and lives in the message box */
+.app.coaching:not(.voice) .dock{grid-template-columns:var(--c-today) var(--c-workout) 0px var(--c-food) var(--c-coach)}
+.app.coaching .dock .orbbtn{transform:scale(.3);opacity:0;pointer-events:none}
+.orbbtn{transition:transform .5s var(--dk),margin .5s var(--dk),opacity .3s}
+.app.orbflying .dock .orbbtn .orb,.app.orbflying .corb .orb{opacity:0}
+.orbfly{position:absolute;z-index:20;pointer-events:none;will-change:transform;margin:0}
+/* the box: lifts with the keyboard (transform only, so it never jumps), the dock steps aside */
+.composer{transition:opacity .35s var(--ease),transform .42s cubic-bezier(.2,.9,.25,1),box-shadow .4s}
+.app.coaching.inputting:not(.is-sub):not(.voice) .composer{transform:translateY(calc(var(--dock-h) + 4px))}
+.app.coaching.kb:not(.is-sub):not(.voice) .composer{transform:translateY(calc(var(--dock-bottom) + var(--dock-h) - var(--kb, 0px)))}
+.app.coaching.inputting .screen#s-coach,.app.coaching.kb .screen#s-coach{padding-bottom:calc(var(--kb, 0px) + 90px)}
+.composer .csend{flex:none;transition:transform .4s cubic-bezier(.3,1.5,.5,1),opacity .2s,width .35s var(--ease),margin .35s var(--ease)}
+.composer:has(input:placeholder-shown) .csend:not(.stop){transform:scale(.3);opacity:0;width:0;margin-left:-8px;pointer-events:none}
+.composer.talking{box-shadow:0 0 0 1.5px rgba(var(--a-rgb),.55),0 18px 44px -14px rgba(var(--v-rgb),.85)}
+.composer.talking input::placeholder{color:var(--ink);opacity:.85}
+.composer[data-talk=listening] .corb .orb,.composer[data-talk=hearing] .corb .orb{transform:scale(calc(1.06 + var(--lv, 0) * .5))}
+.composer[data-talk=thinking] .corb .orb .core,.composer[data-talk=hearing] .corb .orb .core{animation:breathe .9s ease-in-out infinite}
+.composer[data-talk=speaking] .corb .orb{animation:talk .8s ease-in-out infinite alternate}
+.corb .orb{--s:34px}
+
+/* replies: no box, just the words, which blur in lit by the accent and settle */
+.msg.ai .bub{background:none;border:0;padding:4px 2px;max-width:100%;-webkit-backdrop-filter:none;backdrop-filter:none;font-size:16px;line-height:1.55;font-weight:560;color:rgba(241,240,246,.94)}
+.msg.ai.weekly .bub,.msg.ai.plan .bub,.msg.ai.is-err .bub,.msg.ai.stopped .bub{background:rgba(25,28,37,.72);border:1px solid var(--line);padding:12px 15px;border-radius:22px}
+.msg.me .bub{border-radius:22px;border-bottom-right-radius:8px;padding:11px 15px}
+.msg.is-streaming .bub > :last-child::after{display:none}
+.bub .w{display:inline-block;animation:wordin .65s cubic-bezier(.2,.8,.2,1) both}
+@keyframes wordin{0%{opacity:0;filter:blur(9px);transform:translateY(.3em) scale(.96);color:var(--accent-hi);text-shadow:0 0 16px rgba(var(--a-rgb),.9)}55%{opacity:1;filter:blur(0);color:var(--accent-hi);text-shadow:0 0 10px rgba(var(--a-rgb),.35)}100%{opacity:1;filter:none;transform:none}}
+.msg.ai:not(.is-streaming):not(.seen) .bub{animation:none}
+
+/* thinking: the bubble gets a glow that runs round its edge, the orb breathes, the steps change */
+@property --ang{syntax:'<angle>';initial-value:0deg;inherits:false}
+.msg.ai.is-thinking .bub{position:relative;isolation:isolate;padding:12px 16px;border-radius:24px;background:rgba(22,24,33,.7);max-width:max-content}
+.msg.ai.is-thinking .bub::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;background:conic-gradient(from var(--ang),rgba(var(--a-rgb),0) 0 15%,var(--accent) 30%,var(--blue) 45%,rgba(var(--a-rgb),0) 62% 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);animation:angspin 2.2s linear infinite;pointer-events:none}
+.msg.ai.is-thinking .bub::after{content:"";position:absolute;inset:-14px;border-radius:34px;background:radial-gradient(closest-side,rgba(var(--v-rgb),.4),transparent);filter:blur(16px);z-index:-1;animation:breathe 2.4s ease-in-out infinite;pointer-events:none}
+@keyframes angspin{to{--ang:360deg}}
+.think{display:inline-flex;align-items:center;gap:11px}
+.think .orb{--s:24px}
+.think .tsteps{display:grid;min-width:170px}
+.think .tl{grid-area:1/1;opacity:0;font-weight:700;background:linear-gradient(90deg,var(--muted) 0%,var(--ink) 45%,var(--muted) 90%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:shimmer 1.8s linear infinite,stepcycle 8s ease infinite;animation-delay:0s,calc(var(--i) * 2s)}
+@keyframes stepcycle{0%{opacity:0;transform:translateY(7px);filter:blur(4px)}5%,21%{opacity:1;transform:none;filter:none}26%,100%{opacity:0;transform:translateY(-7px);filter:blur(4px)}}
+
+/* ---------- 1.23: the top edge ---------- */
+/* the status bar's colour at the very top, melting into the glow within a finger's width */
+.app{background:linear-gradient(var(--edge) 0,var(--edge) var(--safe-top),var(--bg) calc(var(--safe-top) + 260px))}
+.ambient::before{background:linear-gradient(var(--edge) 0,var(--edge) var(--safe-top),color-mix(in srgb,var(--edge) 55%,transparent) calc(var(--safe-top) + 26px),transparent calc(var(--safe-top) + 90px));height:calc(var(--safe-top) + 90px)}
+.edge.et::before{background:linear-gradient(var(--edge) 0,var(--edge) var(--safe-top),color-mix(in srgb,var(--edge) 60%,transparent) calc(var(--safe-top) + 18px),transparent)}
+.ambient i:nth-child(1){top:-200px;opacity:.36}
+.tabtop{height:10px}
+.app.coaching .intent,.app.coaching .toast{bottom:calc(var(--dock-bottom) + var(--dock-h) + 76px)}
+.app.coaching.inputting .intent,.app.coaching.kb .intent{bottom:calc(var(--kb, 0px) + 76px)}
+.upcoming.setup p{margin-top:6px}
+.upcoming.setup .log{margin-top:16px}
+.setupalt{display:flex;justify-content:center;gap:22px;margin-top:12px}
+
+/* the top overlay only shows once content slides under it (so titles at rest stay crisp) */
+.edge.et::before{opacity:0;transition:opacity .35s var(--ease)}
+.app.under-top .edge.et::before,.app.is-sub.under-top .edge.et::before{opacity:1}
+/* Today: no brand line, just the greeting with Settings beside it */
+#s-today > .brand{position:absolute;right:20px;top:calc(var(--safe-top) + 18px);z-index:2}
+#s-today > .brand > div{display:none}
+#s-today > .greet{margin-top:24px;padding-right:56px}
+/* water: one calm row */
+.fwrow{display:flex;align-items:center;gap:12px;margin-top:14px;padding:12px 12px 12px 14px;border-radius:22px}
+.fwrow .fwi{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:rgba(120,190,255,.12);color:#8CCBFF;flex:none}
+.fwrow .fwi svg{width:20px;height:20px}
+.fwrow .l{flex:1;min-width:0;display:grid;gap:5px}
+.fwrow strong{font-size:14.5px;font-weight:800}
+.fwrow strong small{font-weight:700;color:var(--muted);margin-left:6px;font-size:12.5px}
+.fwbar{display:block;height:6px;border-radius:9px;background:rgba(255,255,255,.07);overflow:hidden}
+.fwbar i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#6FB7FF,#8CE0FF);transform-origin:0 50%;transition:transform .6s var(--ease)}
+.fwrow .step{width:40px;height:40px;flex:none}
+.fwrow .step.plus{background:rgba(120,190,255,.16);color:#BFE3FF}

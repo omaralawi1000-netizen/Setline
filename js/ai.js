@@ -108,7 +108,7 @@ async function post(path, key, body, { timeout = 0, signal } = {}) {
 // ---------- command fallback ----------
 
 const QUERY = ['last', 'pr', 'setsLeft', 'restLeft', 'suggest'];
-const AI_TYPES = INTENTS.filter(t => !['Ask', 'Unknown', 'LogMeal', 'CheckIn', 'LogRel', 'SetGoal', 'LogBatch'].includes(t)).concat('question');
+const AI_TYPES = INTENTS.filter(t => !['Ask', 'Unknown', 'CheckIn', 'LogRel', 'SetGoal', 'LogBatch', 'SetTarget'].includes(t)).concat('question');
 
 export const COMMAND_SCHEMA = {
   type: 'OBJECT',
@@ -128,6 +128,8 @@ export const COMMAND_SCHEMA = {
     distanceKm: { type: 'NUMBER', nullable: true },
     zone: { type: 'INTEGER', nullable: true, description: 'effort zone 1-5' },
     grams: { type: 'INTEGER', nullable: true, description: 'protein grams' },
+    food: { type: 'STRING', nullable: true, description: 'LogMeal: what was eaten or drunk, with the amounts as said' },
+    ml: { type: 'INTEGER', nullable: true, description: 'LogWater: millilitres of water' },
     sets: { type: 'ARRAY', nullable: true, description: 'for LogSets: each set in order', items: { type: 'OBJECT', properties: { kg: { type: 'NUMBER' }, reps: { type: 'INTEGER' } }, required: ['kg', 'reps'] } }
   },
   required: ['type']
@@ -141,6 +143,7 @@ export function commandPrompt(text, ctx) {
     cur?.lastSet ? `Last logged set: ${cur.lastSet.kg} kg x ${cur.lastSet.reps}.` : 'No set logged on this exercise yet.',
     cur?.planned ? `Next planned set: ${cur.planned.kg ?? '?'} kg x ${cur.planned.reps}.` : '',
     ctx.restRunning ? 'A rest timer is running.' : '',
+    ctx.screen ? `The user is looking at the ${ctx.screen} screen${ctx.screen === 'food' ? ' (so food words are most likely something they ate)' : ''}.` : '',
     `Routines: ${(ctx.routines || []).map(r => r.name).join(', ') || 'none'}.`,
     `Exercise catalog: ${ctx.catalog.all.map(e => e.en).join(', ')}.`,
     '',
@@ -154,6 +157,7 @@ const SYSTEM_COMMAND = 'You map a gym voice command to one intent for a workout 
   'Never invent numbers. If it is a question or conversation rather than a command, return type "question". ' +
   'Use LogSets with a sets array when several sets with different reps or weights are described in one go. ' +
   'LogCardio logs finished cardio (cardioType, durationSec, optional distanceKm and zone); StartCardio starts a live cardio timer. ' +
+  'LogMeal logs food or drinks the user ate or drank (food = what, with amounts); LogWater logs plain water in ml (a glass = 250). ' +
   'LogBodyweight uses kg; LogProtein uses grams. Query.what "suggest" asks what weight to use next. ' +
   'AdjustLast changes the last logged set by kgDelta or repsDelta. EditLast sets its kg or reps. Query.what is one of last, pr, setsLeft, restLeft.';
 
@@ -225,6 +229,8 @@ export function validateAI(raw, ctx) {
     case 'StartCardio': return COMMAND_SCHEMA.properties.cardioType.enum.includes(raw.cardioType) ? { type: t, cardioType: raw.cardioType } : null;
     case 'LogBodyweight': { const kg = num(raw.kg, 20, 400); return kg ? { type: t, kg } : null; }
     case 'LogProtein': { const grams = int(raw.grams, 1, 300); return grams ? { type: t, grams } : null; }
+    case 'LogMeal': { const food = typeof raw.food === 'string' ? raw.food.trim().slice(0, 200) : ''; return food.length >= 2 ? { type: t, text: food } : null; }
+    case 'LogWater': { const ml = int(raw.ml, 50, 5000); return ml ? { type: t, ml } : null; }
     case 'AdjustRest': { const sec = int(raw.sec, -600, 600); return sec ? { type: t, sec } : null; }
     case 'Query': {
       if (!QUERY.includes(raw.what)) return null;
@@ -272,7 +278,7 @@ export async function streamChat({ key, model, system, contents, onText, signal,
     posted = await post(`models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, key, {
       systemInstruction: { parts: [{ text: system }] },
       contents,
-      generationConfig: { temperature: 0.6, maxOutputTokens: 8192, ...(think ? { thinkingConfig: { thinkingBudget: pro ? -1 : 3072 } } : {}) }
+      generationConfig: { temperature: 0.6, maxOutputTokens: 8192, ...(think ? { thinkingConfig: { thinkingBudget: pro ? -1 : 1536 } } : {}) }
     }, { timeout: firstByteTimeout, signal });
   } catch (e) {
     if (think && e instanceof AiError && e.code === 'badrequest') { noThinking.add(model); return streamChat({ key, model, system, contents, onText, signal, firstByteTimeout, firstChunkTimeout, idleTimeout }); }

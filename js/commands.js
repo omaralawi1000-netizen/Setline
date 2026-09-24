@@ -20,12 +20,15 @@ import { weight as fmtW } from './format.js';
 import { cardioName, validateCardio, makeCardioSession, paceText } from './cardio.js';
 import { suggest } from './progression.js';
 import { warmupsFor, pendingWarmup } from './warmup.js';
+import { parseMealLocal } from './fooddb.js';
+import { syncTargets, TARGET_LIMITS } from './nutrition.js';
 import { validBodyweight, proteinTarget, dateKey, bodyTrend } from './body.js';
 
 export const AUTO_MS = 1500;
 export const FRESH_MS = 90_000; // a relative phrase this soon after logging corrects that set
 
 export function resolve(intent, snap, t, lang) {
+  if (intent.type === 'MealReady') return resolveMeal(intent, t, snap, lang);
   const { active: w, settings } = snap;
   const unit = settings.unit;
   const u = t(`unit.${unit}`);
@@ -173,6 +176,12 @@ export function resolve(intent, snap, t, lang) {
   };
 
   const exerciseCtx = id => id || cur()?.exerciseId || null;
+
+  // a meal worked out (from the food list, or by the AI): logged with Undo like a set
+  const mealCommand = (m, slot, heardText) => cmd('auto', {
+    title: m.name, value: `${m.kcal} kcal · ${m.protein} g ${t('food.protein').toLowerCase()}`, sub: t('voice.heard', { text: heardText }),
+    say: say(t('say.meal', { k: m.kcal, p: m.protein })), run: { op: 'meal-log', meal: { name: m.name, kcal: m.kcal, protein: m.protein, carbs: m.carbs || 0, fat: m.fat || 0, source: 'voice', ...(slot ? { slot } : {}) } }
+  });
 
   // tick off a warm-up set, and say what comes next (the next warm-up or the first real set)
   const warmupDoneCommand = (ex, pend) => {
@@ -415,8 +424,26 @@ export function resolve(intent, snap, t, lang) {
         say: say(r ? t('say.checkin', { score: r.score, advice: t('say.checkin.' + r.advice) }) : t('checkin.saved')), run: { op: 'checkin', patch: intent }
       });
     }
-    case 'LogMeal':
-      return cmd('auto', { title: t('meal.title'), value: intent.text, sub: t('meal.reading'), say: '', run: { op: 'meal', text: intent.text } });
+    case 'LogMeal': {
+      // foods on the Danish list are counted right here; anything else the AI estimates in the card
+      const local = parseMealLocal(intent.text, lang);
+      if (local) return mealCommand(local, intent.slot, heard);
+      return cmd('auto', { title: t('meal.estimating'), value: intent.text, sub: t('voice.heard', { text: heard }), say: '', run: { op: 'meal-ai', text: intent.text, slot: intent.slot || null } });
+    }
+    case 'LogWater': {
+      if (!(intent.ml > 0 && intent.ml <= 5000)) return err('voice.didntCatch');
+      const had = ((snap.nutrition || []).find(n => n.date === dateKey(snap.now))?.water || 0) + intent.ml;
+      return cmd('auto', { title: t('food.water'), value: `+${intent.ml} ml`, sub: t('voice.waterToday', { l: (had / 1000).toLocaleString(lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: 2 }) }), say: say(t('say.water', { ml: intent.ml })), run: { op: 'water', ml: intent.ml } });
+    }
+    case 'SetTarget': {
+      const cur = snap.targets;
+      if (!cur) return err('voice.didntCatch');
+      const [lo, hi] = TARGET_LIMITS[intent.key];
+      if (!(intent.value >= lo && intent.value <= hi)) return err('voice.didntCatch');
+      const next = syncTargets(cur, intent.key, intent.value);
+      const g = k => `${next[k]} g`;
+      return cmd('auto', { title: t('food.targets'), value: `${next.kcal} kcal`, sub: `${t('food.protein')} ${g('protein')} · ${t('food.carbs')} ${g('carbs')} · ${t('food.fat')} ${g('fat')}`, say: say(t('say.targets', { k: next.kcal })), run: { op: 'targets', targets: next, prev: cur } });
+    }
     case 'LogProtein': {
       if (!(intent.grams > 0 && intent.grams <= 300)) return err('voice.didntCatch');
       const today = (snap.nutrition || []).find(n => n.date === dateKey(snap.now))?.protein || 0;
@@ -519,4 +546,12 @@ export function checkinText(c, t, lang = 'en') {
   if (c.energy != null) parts.push(t('checkin.energyShort', { n: c.energy }));
   if (c.sore?.length) parts.push(t('checkin.soreShort', { what: c.sore.map(g => t('group.' + g).toLowerCase()).join(', ') }));
   return parts.join(' · ');
+}
+
+// An AI estimate that came back: the card to log it with.
+function resolveMeal(intent, t, snap, lang) {
+  const m = { ...intent.meal, protein: Math.round(intent.meal.protein), kcal: Math.round(intent.meal.kcal), carbs: Math.round(intent.meal.carbs || 0), fat: Math.round(intent.meal.fat || 0) };
+  const say = x => (snap.settings.spoken === 'off' ? '' : x);
+  return { kind: 'auto', icon: 'check', title: m.name, value: `${m.kcal} kcal · ${m.protein} g ${t('food.protein').toLowerCase()}`, sub: t('voice.heard', { text: intent.heard || '' }), say: say(t('say.meal', { k: m.kcal, p: m.protein })), choices: null, intent,
+    run: { op: 'meal-log', meal: { name: m.name, kcal: m.kcal, protein: m.protein, carbs: m.carbs || 0, fat: m.fat || 0, source: 'voice', ...(intent.slot ? { slot: intent.slot } : {}) } } };
 }

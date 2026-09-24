@@ -1,6 +1,6 @@
 // Service worker: precached app shell, runtime cache for Google Fonts.
 // Bump VERSION on every release (keep js/version.js in sync).
-const VERSION = '1.22.0';
+const VERSION = '1.23.0';
 const CACHE = 'setline-' + VERSION;
 const FONTS = 'setline-fonts';
 const SHELL = [
@@ -117,20 +117,38 @@ self.addEventListener('message', e => {
   const d = e.data;
   if (d === 'skipWaiting') { self.skipWaiting(); return; }
   if (d?.type === 'rest' && Number.isFinite(d.endsAt)) { const r = rest = { ...d }; e.waitUntil(waitRest(r)); }
-  else if (d?.type === 'rest-cancel') rest = null;
+  else if (d?.type === 'rest-cancel') { rest = null; e.waitUntil(closeRest()); }
 });
+const sleep = ms => new Promise(res => setTimeout(res, ms));
+const clock = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const appInFront = async () => (await self.clients.matchAll({ type: 'window', includeUncontrolled: true })).some(c => c.visibilityState === 'visible' && c.focused);
+// While rest runs and the app isn't in front: a quiet notification that counts down on the lock
+// screen, updated every second. When it ends: the real alert, with sound and buzz.
 async function waitRest(r) {
-  const ms = r.endsAt - Date.now();
-  if (ms <= 0 || ms > REST_MAX) return;
-  await new Promise(res => setTimeout(res, ms));
+  if (r.endsAt - Date.now() <= 0 || r.endsAt - Date.now() > REST_MAX) return;
+  let shown = false;
+  while (Date.now() < r.endsAt - 250) {
+    if (rest !== r) { if (shown && rest === null) closeRest(); return; }
+    if (r.live && !(await appInFront())) {
+      await self.registration.showNotification(`${r.liveTitle || 'Rest'} · ${clock(r.endsAt - Date.now())}`, {
+        body: r.body || '', tag: 'setline-rest', renotify: false, silent: true, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', timestamp: r.endsAt, data: { url: './' }
+      });
+      shown = true;
+    } else if (shown) { closeRest(); shown = false; }
+    const left = r.endsAt - Date.now();
+    await sleep(Math.max(100, Math.min(1000, left % 1000 || 1000)));
+  }
+  await sleep(Math.max(0, r.endsAt - Date.now()));
   if (rest !== r) return; // skipped, changed or the workout ended
   rest = null;
-  const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  if (all.some(c => c.visibilityState === 'visible' && c.focused)) return; // the app is open: it rings itself
+  if (await appInFront()) { if (shown) closeRest(); return; } // the app is open: it rings itself
   await self.registration.showNotification(r.title, {
-    body: r.body || '', tag: 'setline-rest', renotify: true, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png',
-    vibrate: [220, 90, 220, 90, 320], timestamp: r.endsAt, data: { url: './' }
+    body: r.body || '', tag: 'setline-rest', renotify: true, silent: false, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png',
+    vibrate: [260, 110, 260, 110, 420], timestamp: r.endsAt, data: { url: './' }
   });
+}
+async function closeRest() {
+  for (const n of await self.registration.getNotifications({ tag: 'setline-rest' })) n.close();
 }
 
 // Tapping a rest alert brings the app back.

@@ -16,7 +16,7 @@ import { openMealSheet, favRowHTML, toggleStar } from './meal.js';
 import { openScanner, scanIcon } from './scan.js';
 import { openFoodSearch } from './foodsearch.js';
 import { talkNow } from './voice.js';
-import { mealKey } from '../meals.js';
+import { mealKey, makeTemplate, templateTotals } from '../meals.js';
 import { openFoodCustomize } from './customize.js';
 
 const view = { date: null };
@@ -54,6 +54,44 @@ function mealRowHTML(m, fresh, i) {
     </button></li>`;
 }
 
+const BOOKMARK = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5h10a1 1 0 0 1 1 1V20l-6-3.8L6 20V5.5a1 1 0 0 1 1-1z"/></svg>';
+const STACK = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 3.5 8.5 12 13l8.5-4.5z"/><path d="M3.5 12.5 12 17l8.5-4.5M3.5 16 12 20.5 20.5 16"/></svg>';
+
+// Yesterday's meals for the slots you haven't eaten yet today: one tap and they're in.
+function repeatHTML(slots) {
+  const { t } = state;
+  const y = state.nutrition.find(e => e.date === shiftDate(dateKey(), -1));
+  if (!y?.meals?.length) return '';
+  const ys = bySlot(y);
+  const hour = new Date().getHours();
+  const due = SLOTS.filter(s => ys[s].length && !slots[s].length && (s === 'snack' || SLOTS.indexOf(s) <= (hour < 11 ? 0 : hour < 16 ? 1 : 2) + 1));
+  if (!due.length) return '';
+  return `<div class="frepeat">${due.slice(0, 2).map((s, i) => {
+    const k = ys[s].reduce((a, m) => a + m.kcal, 0);
+    return `<button class="frep solid" data-f="repeat" data-slot="${s}" style="--i:${i}"><span class="fri">${I.undo}</span>
+      <span class="l"><strong>${esc(t('tpl.repeat', { slot: t('food.slot.' + s).toLowerCase() }))}</strong><small>${esc(ys[s].map(m => m.name).join(', '))}</small></span><b>${nf().format(k)}<small>kcal</small></b></button>`;
+  }).join('')}</div>`;
+}
+
+// Saved meals first in the favourites row.
+function templatesHTML() {
+  const { t } = state;
+  const list = state.settings.mealTemplates || [];
+  if (!list.length) return '';
+  return `<div class="section"><span class="label">${t('tpl.title')}</span></div><div class="favrow tplrow">${list.map((x, i) => {
+    const tt = templateTotals(x);
+    return `<button class="favchip tpl solid" data-f="tpl" data-id="${esc(x.id)}" style="--i:${i}"><span class="fi">${STACK}</span><span class="fn">${esc(x.name)}</span><b>${nf().format(tt.kcal)} kcal</b></button>`;
+  }).join('')}</div>`;
+}
+
+async function logMany(meals, title, slot) {
+  const { t } = state;
+  const logged = await store.logMeals(meals.map(m => ({ name: m.name, kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat, source: m.source, ...(slot ? { slot } : {}) })));
+  const k = logged.reduce((a, m) => a + m.kcal, 0), p = logged.reduce((a, m) => a + m.protein, 0);
+  haptic('success');
+  toast({ title: `${esc(title)} <span class="v">${nf().format(k)} kcal</span>`, sub: `${p} g ${t('food.protein').toLowerCase()}`, action: t('common.undo'), ms: 5000, onAction: () => store.deleteMeals(logged.map(m => m.id)) });
+}
+
 export function renderFood(root) {
   const { t } = state;
   const today = dateKey();
@@ -84,15 +122,18 @@ export function renderFood(root) {
   // the sections under the ring, in your order (Food → Customize)
   const qa = sanitizeQuick(state.settings.quickAdd);
   const part = {
-    favourites: () => (on('favourites') && isToday ? favRowHTML(10) : ''),
+    favourites: () => (on('favourites') && isToday ? templatesHTML() + favRowHTML(10) : ''),
     quickProtein: () => (on('quickProtein') && isToday ? `<div class="fqp"><span>${t(qa.kind === 'kcal' ? 'food.quickKcal' : 'food.quickProtein')}</span>${qa.values.map(v => `<button class="chip" data-f="quick" data-kind="${qa.kind}" data-v="${v}">+${v}${qa.kind === 'kcal' ? '' : ' g'}</button>`).join('')}</div>` : ''),
-    water: () => (on('water') ? `    <div class="section"><span class="label">${t('food.water')}</span><span class="fwl">${(tot.water / 1000).toLocaleString(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: 2 })} / ${(tg.water / 1000).toLocaleString(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: 1 })} L</span></div>
-    <div class="fwater" style="--n:${Math.min(12, glasses)}">${Array.from({ length: glasses }, (_, i) => `<button class="glass-w${i < full ? ' on' : ''}" data-f="water" data-n="${i + 1}" aria-label="${esc(t('food.glasses', { n: i + 1 }))}" style="--i:${i}"><i></i></button>`).join('')}</div>` : ''),
-    meals: () => (anyMeals ? SLOTS.filter(s => slots[s].length).map(s => {
+    water: () => (on('water') ? `<div class="fwrow solid"><span class="fwi">${I.drop}</span>
+      <span class="l"><strong>${t('food.water')}<small>${(tot.water / 1000).toLocaleString(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: 2 })} / ${(tg.water / 1000).toLocaleString(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: 1 })} L</small></strong>
+      <i class="fwbar"><i style="transform:scaleX(${Math.min(1, tot.water / tg.water).toFixed(3)})"></i></i></span>
+      <button class="step" data-f="water" data-n="${Math.max(0, full - 1)}" aria-label="−${GLASS_ML} ml" ${full ? '' : 'disabled'}>−</button><button class="step plus" data-f="water" data-n="${full + 1}" aria-label="+${GLASS_ML} ml">+</button></div>` : ''),
+    meals: () => (isToday ? repeatHTML(slots) : '') + (anyMeals ? SLOTS.filter(s => slots[s].length).map(s => {
       const k = slots[s].reduce((a, m) => a + m.kcal, 0);
-      return `<div class="section fslot"><span class="label">${t('food.slot.' + s)}</span><span class="fsk">${nf().format(k)} kcal</span></div>
+      const saved = (state.settings.mealTemplates || []).some(x => x.slot === s && x.items.length === slots[s].length && x.items.every((it, j) => it.name === slots[s][j].name));
+      return `<div class="section fslot"><span class="label">${t('food.slot.' + s)}</span><span class="fsk">${nf().format(k)} kcal${slots[s].length > 1 && !saved ? `<button class="fsave" data-f="savetpl" data-slot="${s}" aria-label="${esc(t('tpl.save'))}">${BOOKMARK}</button>` : ''}</span></div>
         <ul class="flist solid">${slots[s].map(m => mealRowHTML(m, seen && !seen.has(m.id), idx++)).join('')}</ul>`;
-    }).join('') : `<div class="fempty"><span class="fei">${I.meal}</span><strong>${t(isToday ? 'food.emptyToday' : 'food.emptyDay')}</strong><small>${t('food.emptySub')}</small></div>`) + (tot.quickProtein > 0 ? `<p class="fquick">${esc(t('food.quick', { g: tot.quickProtein }))}</p>` : ''),
+    }).join('') : isToday && repeatHTML(slots) ? '' : `<div class="fempty"><span class="fei">${I.meal}</span><strong>${t(isToday ? 'food.emptyToday' : 'food.emptyDay')}</strong><small>${t('food.emptySub')}</small></div>`) + (tot.quickProtein > 0 ? `<p class="fquick">${esc(t('food.quick', { g: tot.quickProtein }))}</p>` : ''),
     week: () => (on('week') ? `    <div class="section"><span class="label">${t('food.week')}</span><span class="fwl">${esc(t('food.avg', { k: nf().format(Math.round(week.filter(d => d.kcal).reduce((a, d) => a + d.kcal, 0) / Math.max(1, week.filter(d => d.kcal).length))) }))}</span></div>
     <div class="fweek solid">
       <i class="ftarget" style="bottom:${(tg.kcal / maxK * 100).toFixed(1)}%"></i>
@@ -294,10 +335,26 @@ function targetsSheet() {
 export function openFoodDay(date = dateKey()) { view.date = date; }
 
 export function initFood(root) {
+  // long-press a saved meal to remove it
+  root.addEventListener('contextmenu', e => {
+    const b = e.target.closest('[data-f=tpl]');
+    if (!b) return;
+    e.preventDefault();
+    const x = (state.settings.mealTemplates || []).find(m => m.id === b.dataset.id);
+    if (!x) return;
+    haptic('tap');
+    openSheet(el => {
+      el.insertAdjacentHTML('beforeend', `<h2>${esc(x.name)}</h2><p class="lead">${esc(x.items.map(i => i.name).join(', '))}</p>
+        <div class="acts"><button class="btn2 solid danger" data-k="del">${I.trash}<span>${state.t('tpl.remove')}</span></button><button class="btn2 solid" data-k="no">${state.t('common.cancel')}</button></div>`);
+      el.querySelector('[data-k=no]').onclick = () => closeTop();
+      el.querySelector('[data-k=del]').onclick = async () => { await closeTop(); store.setSettings({ mealTemplates: (state.settings.mealTemplates || []).filter(m => m.id !== x.id) }); };
+    }, { label: x.name });
+  });
   root.addEventListener('click', async e => {
     const b = e.target.closest('[data-f]');
     if (!b || b.disabled) return;
     const k = b.dataset.f;
+    const t = state.t;
     haptic('tap');
     if (k === 'day') { view.date = shiftDate(view.date, Number(b.dataset.d)); slide(root, Number(b.dataset.d)); return renderFood(root); }
     if (k === 'goto') { const d = Number(new Date(b.dataset.date) > new Date(view.date)) || -1; view.date = b.dataset.date; slide(root, d); return renderFood(root); }
@@ -308,6 +365,26 @@ export function initFood(root) {
       const meal = await store.logMeal({ name: state.t('food.quickName'), kcal: v, protein: 0, carbs: 0, fat: 0, source: 'text' });
       haptic('success');
       return toast({ title: `${esc(state.t('food.quickName'))} <span class="v">+${v} kcal</span>`, action: state.t('common.undo'), onAction: () => store.deleteMeal(meal.id), ms: 3000 });
+    }
+    if (k === 'repeat') {
+      const y = state.nutrition.find(e => e.date === shiftDate(dateKey(), -1));
+      const list = bySlot(y)[b.dataset.slot] || [];
+      if (list.length) await logMany(list, t('food.slot.' + b.dataset.slot), b.dataset.slot);
+      return;
+    }
+    if (k === 'tpl') {
+      const x = (state.settings.mealTemplates || []).find(m => m.id === b.dataset.id);
+      if (x) { b.classList.add('logged'); await logMany(x.items, x.name, x.slot || slotOf({ t: Date.now() })); }
+      return;
+    }
+    if (k === 'savetpl') {
+      const s = b.dataset.slot, list = bySlot(state.nutrition.find(e => e.date === view.date))[s] || [];
+      const tpl = makeTemplate(`${t('food.slot.' + s)}: ${list.map(m => m.name.split(/[,(]/)[0].trim()).join(', ')}`.slice(0, 40), list, s);
+      if (!tpl) return;
+      store.setSettings({ mealTemplates: [tpl, ...(state.settings.mealTemplates || [])].slice(0, 24) });
+      haptic('success');
+      toast({ title: esc(t('tpl.saved')), sub: esc(tpl.name), action: t('common.undo'), onAction: () => store.setSettings({ mealTemplates: (state.settings.mealTemplates || []).filter(m => m.id !== tpl.id) }) });
+      return;
     }
     if (k === 'targets') return targetsSheet();
     if (k === 'custom') return openFoodCustomize({ targets: targetsSheet });

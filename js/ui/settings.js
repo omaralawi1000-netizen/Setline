@@ -178,6 +178,8 @@ export function renderSettings(root) {
         <button class="toggle" role="switch" aria-checked="${s.restSound}" aria-label="${t('settings.restSound')}" data-act="toggle" data-key="restSound"></button></div>
       <div class="srow"><span class="l"><strong>${t('alerts.title')}</strong><small>${t('alerts.sub')}</small></span>
         <button class="toggle" role="switch" aria-checked="${s.restAlerts}" aria-label="${t('alerts.title')}" data-act="rest-alerts"></button></div>
+      ${s.restAlerts ? `<div class="srow"><span class="l"><strong>${t('alerts.live')}</strong><small>${t('alerts.liveSub')}</small></span>
+        <button class="toggle" role="switch" aria-checked="${s.restLive}" aria-label="${t('alerts.live')}" data-act="toggle" data-key="restLive"></button></div>` : ''}
       <div class="srow"><span class="l"><strong>${t('settings.readiness')}</strong><small>${t('settings.readinessSub')}</small></span>
         <button class="toggle" role="switch" aria-checked="${s.readiness}" aria-label="${t('settings.readiness')}" data-act="toggle" data-key="readiness"></button></div>
       <div class="srow"><span class="l"><strong>${t('settings.suggestions')}</strong><small>${t('settings.suggestionsSub')}</small></span>

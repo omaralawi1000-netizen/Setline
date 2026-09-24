@@ -3,7 +3,19 @@
 import * as store from '../store.js';
 
 export const DIM = '#07080B';
-const edge = () => getComputedStyle(document.documentElement).getPropertyValue('--edge').trim() || '#000000';
+// The top edge (and so the status bar) is the background with a touch of the theme's glow, so the
+// glow seems to run on under the status bar instead of stopping in a dark band.
+const hex = c => { const m = /^#?([\da-f]{6})$/i.exec(String(c).trim()); return m ? [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16)) : null; };
+export function edgeColor() {
+  const root = document.documentElement, cs = getComputedStyle(root);
+  const bg = hex(cs.getPropertyValue('--bg')) || [13, 15, 21], glow = hex(cs.getPropertyValue('--amb1'));
+  const k = root.dataset.glow === 'off' || !glow ? 0 : root.dataset.glow === 'soft' ? 0.07 : 0.14;
+  const c = bg.map((v, i) => Math.round(v + ((glow?.[i] ?? v) - v) * k));
+  const out = '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
+  root.style.setProperty('--edge', out);
+  return out;
+}
+const edge = () => edgeColor();
 let repaint = () => {};
 export const refreshChrome = () => repaint();
 
@@ -31,7 +43,7 @@ export function initChrome() {
       const y = s.scrollTop, dy = y - lastY;
       const atEnd = s.scrollHeight - s.clientHeight - y < 24; // the end of the page: the bar opens again
       if (atEnd && app.classList.contains('compact')) { app.classList.remove('compact'); lastY = y; }
-      else if (Math.abs(dy) > 14) { app.classList.toggle('compact', dy > 0 && y > 90 && !atEnd); lastY = y; }
+      else if (Math.abs(dy) > 14) { app.classList.toggle('compact', dy > 0 && y > 90 && !atEnd && !app.classList.contains('coaching')); lastY = y; }
     });
   };
   app.addEventListener('scroll', onScroll, { capture: true, passive: true });

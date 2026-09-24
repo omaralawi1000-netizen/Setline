@@ -19,6 +19,7 @@ import { driveNudgeHTML } from './drive.js';
 import { checkinHTML } from './checkin.js';
 import { goalCardsHTML } from './goals.js';
 import { stalledLifts } from '../plateau.js';
+import { isRoutineImport } from '../coach.js';
 import { monthly } from './bodyscreen.js';
 
 const MIC = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.6 11.5a6.4 6.4 0 0 0 12.8 0M12 18v3"/></svg>';
@@ -36,8 +37,12 @@ const sortedRoutines = () => [...state.routines].sort((a, b) => (a.createdAt || 
 function upNextHTML({ more = false } = {}) {
   const { t, lang, catalog } = state;
   const r = nextRoutine(sortedRoutines(), state.history);
-  if (!r) return `<div class="upcoming glass"><span class="label">${t('label.routines')}</span><h2>${t('routine.none')}</h2>
-      <div class="row2"><button class="log" data-routine="new">${I.plus}<span>${t('routine.new')}</span></button><button class="btn2 solid" data-routine="programs">${t('routine.program')}</button></div></div>`;
+  if (!r) { // no routines yet: the quickest way in is telling the Coach (or it reads your brief)
+    const fromBrief = isRoutineImport(state.settings.coachBrief || '');
+    return `<div class="upcoming glass setup" data-part="setup"><span class="label">${t('setup.label')}</span><h2>${t('setup.title')}</h2><p>${t('setup.sub')}</p>
+      <button class="log" data-setup="${fromBrief ? 'brief' : 'say'}">${I.chat}<span>${t(fromBrief ? 'setup.brief' : 'setup.say')}</span></button>
+      <div class="setupalt"><button class="textbtn" data-routine="programs">${t('routine.program')}</button><button class="textbtn" data-routine="new">${t('setup.own')}</button></div></div>`;
+  }
   const names = r.exercises.map(e => catalog.name(e.exerciseId, lang));
   return `<div class="upcoming glass">
       ${more ? `<div class="uphead"><span class="label">${t('label.upNext')}</span><button class="textbtn" data-act="go" data-to="workout">${t('today.otherRoutines')} →</button></div>` : `<span class="label">${t('label.upNext')}</span>`}
@@ -90,7 +95,8 @@ function weekPlanHTML() {
     return `<button class="wpday ${cls}" ${r && !state.active ? `data-act="start-routine" data-id="${esc(r.id)}"` : 'disabled'} style="--i:${i}">
       <span class="wd">${esc(fmt.format(at).replace('.', ''))}</span><span class="wdot">${done ? I.check : ''}</span><span class="wr">${esc(r ? withoutDay(routineName(r, lang)) : byDay.size ? t('plan.rest') : '')}</span></button>`;
   });
-  return `<div class="section"><span class="label">${t('plan.week')}</span></div><div class="wplan${byDay.size ? '' : ' open'}">${days.join('')}</div>${byDay.size ? '' : `<p class="snote wphint">${t('plan.weekHint')}</p>`}`;
+  if (!byDay.size) return ''; // no routine has a day yet: nothing to show
+  return `<div class="section"><span class="label">${t('plan.week')}</span></div><div class="wplan">${days.join('')}</div>`;
 }
 
 // Everything else about your training, one tap away.
