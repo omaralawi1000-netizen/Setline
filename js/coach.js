@@ -109,6 +109,8 @@ export function buildContext(snap) {
   const target = tr ? proteinTarget(tr.latest.kg, settings.proteinPerKg) : null;
   const protein = (snap.nutrition || []).find(n => n.date === dateKey(now))?.protein || 0;
   out.push(`PROTEIN today: ${protein} g${target ? ` of a ${target} g target` : ' (no target without bodyweight)'}.`);
+  const day = (snap.nutrition || []).find(n => n.date === dateKey(now));
+  if (day?.meals?.length) out.push(`MEALS today (estimates): ${day.meals.map(m => `${m.name} ${m.protein} g protein ${m.kcal} kcal`).join('; ')}. Total ${day.kcal || 0} kcal.`);
   if (w?.readiness) out.push(`Readiness today: ${w.readiness}/5${w.easy ? ', easy day chosen' : ''}.`);
 
   let text = out.join('\n');

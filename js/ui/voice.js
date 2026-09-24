@@ -17,6 +17,7 @@ import { $, esc } from './dom.js';
 import { I } from './icons.js';
 import { hideToast } from './toast.js';
 import { aiCommand, withFallback } from '../ai.js';
+import { openMealSheet } from './meal.js';
 import { isQuestion, isPlanRequest } from '../coach.js';
 import { startCardioSession, finishSheet as cardioFinishSheet } from './cardio.js';
 import { dateKey } from '../body.js';
@@ -660,6 +661,7 @@ async function execute(run, cmd) {
     return true;
   }
   if (run.op === 'protein') { await store.logProtein(run.grams); card.undoOp = { op: 'protein', grams: run.grams }; return true; }
+  if (run.op === 'meal') { dismissCard(); if (v.open) await closeVoice(); openMealSheet({ text: run.text }); return false; }
   if (run.op === 'discard') {
     await store.discard();
     card.hideTimer = setTimeout(() => dismissCard(), 1500);

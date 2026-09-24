@@ -45,6 +45,6 @@ export function addProtein(entries, date, grams) {
   const g = Math.round(grams);
   if (!Number.isFinite(g) || g <= 0 || g > 300) return entries;
   const cur = entries.find(e => e.date === date);
-  const next = { date, protein: Math.min(600, (cur?.protein || 0) + g) };
+  const next = { ...(cur || {}), date, protein: Math.min(600, (cur?.protein || 0) + g) }; // meals and kcal stay
   return [...entries.filter(e => e.date !== date), next];
 }

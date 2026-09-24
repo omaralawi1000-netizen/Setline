@@ -189,7 +189,12 @@ function bodyHTML() {
       <span class="bsub">${target ? esc(t('body.proteinOf', { g: today, target })) : t('body.proteinNeedsBw')}</span></div>
       <div class="padd">${[20, 30, 40].map(g => `<button class="chip" data-body="protein" data-g="${g}">+${g}</button>`).join('')}</div>
     </div>`;
-  return `<div class="section"><span class="label">${t('label.body')}</span></div><div class="grid2">${weightCard}${proteinCard}</div>`;
+  const day = state.nutrition.find(n => n.date === dateKey());
+  const meals = day?.meals?.length || 0;
+  const mealRow = `<button class="mealrow solid" data-body="meal"><span class="mcam">${I.camera}</span>
+      <span class="l"><strong>${t('meal.snap')}</strong><span>${meals ? esc(t('meal.todaySub', { n: meals, kcal: day.kcal || 0 })) : t('meal.snapSub')}</span></span>
+      <span class="go">${I.fwd}</span></button>`;
+  return `<div class="section"><span class="label">${t('label.body')}</span></div><div class="grid2">${weightCard}${proteinCard}</div>${mealRow}`;
 }
 
 function reviewHTML() {

@@ -289,6 +289,8 @@ export function resolve(intent, snap, t, lang) {
       if (!validBodyweight(intent.kg)) return err('voice.bwInvalid');
       return cmd('auto', { title: t('body.weight'), value: `${kgTxt(intent.kg)} ${u}`, sub: t('voice.heard', { text: heard }), say: say(t('say.bw', { kg: kgTxt(intent.kg), unit: sayUnit })), run: { op: 'bodyweight', kg: intent.kg } });
     }
+    case 'LogMeal':
+      return cmd('auto', { title: t('meal.title'), value: intent.text, sub: t('meal.reading'), say: '', run: { op: 'meal', text: intent.text } });
     case 'LogProtein': {
       if (!(intent.grams > 0 && intent.grams <= 300)) return err('voice.didntCatch');
       const today = (snap.nutrition || []).find(n => n.date === dateKey(snap.now))?.protein || 0;

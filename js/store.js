@@ -9,6 +9,7 @@ import { applyWorkout } from './pr.js';
 import { clearKeys } from './keys.js';
 import { startCardio, pauseCardio, resumeCardio, finishCardio, cardioRecords } from './cardio.js';
 import { upsertBodyweight, addProtein, dateKey } from './body.js';
+import { addMeal, removeMeal } from './meals.js';
 import { easyDay } from './progression.js';
 import { deloadDay } from './insights.js';
 
@@ -237,9 +238,23 @@ export async function logProtein(grams, date = dateKey()) {
 export async function undoProtein(grams, date = dateKey()) {
   const e = state.nutrition.find(x => x.date === date);
   if (!e) return;
-  const next = { date, protein: Math.max(0, e.protein - grams) };
+  const next = { ...e, protein: Math.max(0, e.protein - grams) };
   state.nutrition = [...state.nutrition.filter(x => x.date !== date), next];
   await db.put('nutrition', next);
+  emit('body');
+}
+
+export async function logMeal(meal, date = dateKey()) {
+  const r = addMeal(state.nutrition, date, meal);
+  state.nutrition = r.entries;
+  await db.put('nutrition', state.nutrition.find(x => x.date === date));
+  emit('body');
+  return r.meal;
+}
+export async function deleteMeal(id, date = dateKey()) {
+  state.nutrition = removeMeal(state.nutrition, date, id);
+  const e = state.nutrition.find(x => x.date === date);
+  if (e) await db.put('nutrition', e);
   emit('body');
 }
 

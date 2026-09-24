@@ -10,7 +10,7 @@ import { normalize } from './catalog.js';
 import { lbToKg, round } from './units.js';
 import { CARDIO_TYPES } from './cardio.js';
 
-export const INTENTS = ['LogSet', 'LogSets', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
+export const INTENTS = ['LogSet', 'LogSets', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
   'AddExercise', 'SwapExercise', 'StartRoutine', 'StartEmpty', 'Finish', 'Discard', 'StartRest', 'AdjustRest', 'SkipRest',
   'Query', 'Cancel', 'Help', 'Ask', 'Unknown'];
 
@@ -410,8 +410,15 @@ export function parse(text, ctx = {}) {
     const v = Number(m[1]);
     return out('LogBodyweight', { kg: m[2] && /^(lb|lbs|pounds|pund)$/.test(m[2]) || (!m[2] && ctx.unit === 'lb') ? round(lbToKg(v), 2) : v });
   }
-  if ((m = R(/^(?:log |add |ate |had |spiste |fik )?(\d+) ?(?:g|gram|grams|gr) (?:of )?protein$|^protein (\d+) ?(?:g|gram|grams)?$/, s))) {
+  if ((m = R(/^(?:i |jeg )?(?:log |add |ate |had |spiste |fik )?(\d+) ?(?:g|gram|grams|gr) (?:of )?protein$|^protein (\d+) ?(?:g|gram|grams)?$/, s))) {
     return out('LogProtein', { grams: Number(m[1] ?? m[2]) });
+  }
+
+  // --- a meal to estimate: "i ate 3 eggs and toast", "jeg spiste kylling og ris" ---
+  if ((m = R(/^(?:i |jeg )?(?:just |lige )?(?:ate|had|have eaten|spiste|har spist|fik)(?: an?| some| en| et| lidt)? (.{3,})$/, s)) &&
+      !/^\d+ ?(?:g|gram|grams|gr) (?:of )?protein$/.test(m[1]) &&
+      !/\b(reps?|kilo|kilos|kg|lb|lbs|sets?|sæt|gentagelser|minutes?|minutter|km)\b/.test(m[1])) {
+    return out('LogMeal', { text: m[1] });
   }
 
   // --- what to lift next ---

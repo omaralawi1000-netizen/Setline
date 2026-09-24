@@ -2,6 +2,7 @@
 import { SCHEMA_VERSION } from './db.js';
 import { sanitize } from './settings.js';
 import { CARDIO_TYPES } from './cardio.js';
+import { validThumb } from './meals.js';
 
 export const BACKUP_KIND = 'setline-backup';
 const MAX = { workouts: 20000, cardio: 20000, routines: 500, exercises: 1000, prs: 50000, bodyweight: 20000, nutrition: 20000, chat: 5000 };
@@ -40,7 +41,9 @@ const cardioOk = c => c && isId(c.id) && CARDIO_TYPES.some(t => t.id === c.type)
 const exerciseOk = e => e && isId(e.id) && isStr(e.en, 80) && isStr(e.da, 80) && Array.isArray(e.muscles) && isStr(e.equipment, 40);
 const prOk = p => p && isId(p.id) && isId(p.exerciseId) && ['weight', 'e1rm', 'reps'].includes(p.kind) && isNum(p.kg, 0, 1500);
 const bwOk = b => b && isDate(b.date) && isNum(b.kg, 20, 400);
-const nutOk = n => n && isDate(n.date) && isNum(n.protein, 0, 1000);
+const mealOk = m => m && isId(m.id) && ts(m.t) && isStr(m.name, 80) && isNum(m.protein, 0, 300) && isNum(m.kcal, 0, 5000) && (m.thumb === undefined || validThumb(m.thumb));
+const nutOk = n => n && isDate(n.date) && isNum(n.protein, 0, 1000) && (n.kcal === undefined || isNum(n.kcal, 0, 20000)) &&
+  (n.meals === undefined || (Array.isArray(n.meals) && n.meals.length <= 60 && n.meals.every(mealOk)));
 const chatOk = m => m && isId(m.id) && ['user', 'model'].includes(m.role) && typeof m.text === 'string' && m.text.length <= 20000;
 
 // Validate everything before anything is written. Returns {ok, data?, error?}.

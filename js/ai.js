@@ -76,7 +76,7 @@ async function post(path, key, body, { timeout = 0, signal } = {}) {
 // ---------- command fallback ----------
 
 const QUERY = ['last', 'pr', 'setsLeft', 'restLeft', 'suggest'];
-const AI_TYPES = INTENTS.filter(t => !['Ask', 'Unknown'].includes(t)).concat('question');
+const AI_TYPES = INTENTS.filter(t => !['Ask', 'Unknown', 'LogMeal'].includes(t)).concat('question');
 
 export const COMMAND_SCHEMA = {
   type: 'OBJECT',
@@ -288,6 +288,19 @@ export async function withFallback(models, fn, { rounds = 1, wait = 1500, sleep 
     if (last?.code !== 'busy' && last?.code !== 'empty') break;
   }
   throw last;
+}
+
+// Meal estimate from a photo (base64 JPEG) and/or a description. Resolves to the raw JSON answer.
+export async function aiMeal({ key, model, image = null, prompt, schema, signal, timeout = 25000 }) {
+  const parts = [...(image ? [{ inlineData: { mimeType: image.mime, data: image.data } }] : []), { text: prompt }];
+  const { res, done } = await post(`models/${encodeURIComponent(model)}:generateContent`, key, {
+    contents: [{ role: 'user', parts }],
+    generationConfig: { temperature: 0.2, responseMimeType: 'application/json', responseSchema: schema, maxOutputTokens: 2048 }
+  }, { timeout, signal });
+  try {
+    const data = await res.json();
+    try { return JSON.parse(textOf(data)); } catch { throw new AiError('invalid'); }
+  } finally { done(); }
 }
 
 // Structured plan from the Coach model (JSON schema output).
