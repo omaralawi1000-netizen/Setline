@@ -7,7 +7,9 @@ const waiting = [];   // resolvers for history.back() calls we triggered
 export const sheetOpen = () => stack.length > 0;
 
 // render(body, api) fills the sheet. api = {close, replace}.
+import { haptic } from '../haptics.js';
 export function openSheet(render, { onClose = null, label = '' } = {}) {
+  haptic('tick');
   const app = $('#app');
   const scrim = document.createElement('div');
   scrim.className = 'scrim';

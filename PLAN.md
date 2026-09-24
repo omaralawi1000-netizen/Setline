@@ -339,3 +339,10 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] Spoken replies (phone voice): waits for voices to load, a beat after cancelling, sentence by sentence with a watchdog and one retry, primed on the first tap (Android only speaks after a touch); conversation mode waits for the real end of speech
 - [x] Motion setting: Calm / Lively / Wow (default). Wow: screens arrive out of a soft blur with a spring, tab icons bounce, cards and toasts pop in, a light ripples from your finger on big buttons and tiles; presses spring everywhere
 - [x] Orb style: Aurora / Glass / Ring / Dot; Bottom bar: Glass / Solid / Minimal; Cards: Soft / Glass / Outline (Customize → Look and feel)
+
+## 1.25.0: the orb is the Coach, a new bar, cards that open into their page, haptics
+
+- [x] Bar: a glass pill with Today / Train / Food and the orb as its own round button beside it (the Coach tab is gone). Scrolling down, it shrinks as one piece (one spring): shorter, narrower pill, labels slip away, icons get small, the orb shrinks too; it grows back when you scroll up or reach the end. The tab lens tracks its tab every frame
+- [x] Orb: tap = the Coach, which grows out of the orb (a circle opening over the tab you're on) and closes back into it (✓ button or Back); everything it said is there to read. Hold = a quick voice command from anywhere (as before). The "Orb: hold/tap" setting is gone
+- [x] Cards open into their page: Food card, Progress / History / Body tiles and past workouts grow into the new screen (shared-element transition; off with Motion: Calm)
+- [x] Haptics matched to motion: a tick for tabs and sheets, a soft double for opening a card or the Coach, a firm press for logging, a drum roll for records

@@ -1,5 +1,6 @@
 // navigator.vibrate behind the haptics setting.
-const PATTERNS = { tap: 10, success: [20, 30, 20], error: 40 };
+// every animation has its feel: a tick for moving around, a firm press for logging, a double for records
+const PATTERNS = { tick: 6, tap: 10, open: [8, 24, 14], success: [20, 30, 20], log: [28], pr: [30, 60, 30, 60, 60], error: 40 };
 let enabled = () => true;
 export const setHapticsGate = fn => { enabled = fn; };
 export function haptic(kind = 'tap') {

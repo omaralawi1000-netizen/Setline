@@ -33,7 +33,7 @@ const en = {
   'settings.weeklyGoalSub': 'Workouts per week for the Today ring',
 
   'tab.today': 'Today',
-  'tab.workout': 'Workout',
+  'tab.workout': 'Train',
   'tab.history': 'History',
   'tab.food': 'Food',
   'plates.title': 'Plates',

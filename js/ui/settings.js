@@ -152,7 +152,6 @@ export function renderSettings(root) {
 
     <div class="sgroup"><h2>${t('settings.voice')}</h2><div class="slist solid">
       <div class="srow"><span class="l"><strong>${t('settings.voiceLang')}</strong></span>${seg('voiceLang', ['auto', 'da', 'en'], [t('lang.auto'), t('lang.da'), t('lang.en')])}</div>
-      <div class="srow"><span class="l"><strong>${t('settings.micMode')}</strong><small>${t('settings.micModeSub')}</small></span>${seg('micMode', ['hold', 'tap'], [t('mic.hold'), t('mic.tap')])}</div>
       <div class="srow"><span class="l"><strong>${t('settings.spoken')}</strong></span>${seg('spoken', ['off', 'minimal', 'full'], [t('spoken.off'), t('spoken.minimal'), t('spoken.full')])}</div>
       <div class="srow"><span class="l"><strong>${t('settings.ttsQuality')}</strong><small>${t('settings.ttsQualitySub')}</small></span>${seg('ttsQuality', ['instant', 'natural', 'fast'], [t('tts.instant'), t('tts.natural'), t('tts.fast')])}</div>
       <div class="srow"><span class="l"><strong>${t('settings.voiceName')}</strong><small id="speechstat">${esc(speechStatus())}</small></span>

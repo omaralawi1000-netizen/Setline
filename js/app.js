@@ -73,9 +73,11 @@ function renderDock() {
   const { t } = state;
   const dock = $('#dock');
   const tab = (name, icon, cls = '') => `<button class="tab${cls}" data-act="go" data-to="${name}">${icon}<span>${t('tab.' + name)}</span></button>`;
-  if (dock.dataset.built !== '2' || dock.dataset.lang !== state.lang) {
-    dock.innerHTML = '<span class="ind" aria-hidden="true"></span>' + tab('today', TAB_ICONS.today) + tab('workout', TAB_ICONS.workout) + orbHTML() + tab('food', TAB_ICONS.food) + tab('coach', TAB_ICONS.coach);
-    dock.dataset.built = '2';
+  if (dock.dataset.built !== '3' || dock.dataset.lang !== state.lang) {
+    // a glass pill with the three places, and the orb (the Coach) on its own beside it
+    dock.innerHTML = '<div class="dpill"><span class="ind" aria-hidden="true"></span>' + tab('today', TAB_ICONS.today) + tab('workout', TAB_ICONS.workout) + tab('food', TAB_ICONS.food) + '</div>' + orbHTML();
+    dock.classList.add('v2');
+    dock.dataset.built = '3';
     dock.dataset.lang = state.lang;
   }
   let on = null;
@@ -153,6 +155,52 @@ function renderAll() {
   else root?.querySelectorAll('[data-count]').forEach(el => { el.textContent = new Intl.NumberFormat(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: Number(el.dataset.dp || 0), minimumFractionDigits: Number(el.dataset.dp || 0) }).format(Number(el.dataset.count)); });
 }
 
+// The Coach grows out of the orb (a circle opening from it) and shrinks back into it when you close it.
+// A card opens into its page: the card itself grows into the new screen (a shared-element
+// transition), instead of one screen swapping for another.
+function heroNav(el, fn) {
+  const card = el.closest('.solid, .glass, .ttile, .grid2 > *, .upcoming, .pr, .hitem') || el;
+  const vt = document.startViewTransition && document.documentElement.dataset.motion !== 'off' && !matchMedia('(prefers-reduced-motion: reduce)').matches
+    && state.settings.fx !== 'calm' && card.getBoundingClientRect().height < innerHeight * 0.8;
+  if (!vt) return fn();
+  const was = card.style.viewTransitionName;
+  card.style.viewTransitionName = 'hero';
+  app.classList.add('vt');
+  let target = null;
+  const t = document.startViewTransition(() => {
+    card.style.viewTransitionName = was;
+    fn();
+    target = $('.screen.on');
+    if (target) target.style.viewTransitionName = 'hero';
+  });
+  t.finished.finally(() => { if (target) target.style.viewTransitionName = ''; app.classList.remove('vt'); });
+  haptic('open');
+}
+
+function revealCoach(open, prevEl = null) {
+  const s = $('#s-coach'), orb = $('#dock .orbbtn');
+  if (!s || !orb || document.documentElement.dataset.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const r = orb.getBoundingClientRect(), a = app.getBoundingClientRect();
+  const x = r.left + r.width / 2 - a.left, y = r.top + r.height / 2 - a.top;
+  const small = `circle(${r.width / 2}px at ${x}px ${y}px)`, big = `circle(${Math.hypot(Math.max(x, a.width - x), y) + 40}px at ${x}px ${y}px)`;
+  s.getAnimations().forEach(x => x.cancel());
+  if (open) {
+    // the tab you were on stays put under the circle until it has covered the screen
+    if (prevEl && prevEl !== s) {
+      prevEl.style.transition = 'opacity .15s ease .45s, transform .3s ease .45s, visibility 0s .6s';
+      setTimeout(() => { prevEl.style.transition = ''; }, 700);
+    }
+    s.animate([{ clipPath: small, filter: 'blur(6px)' }, { clipPath: big, filter: 'blur(0)' }], { duration: 560, easing: 'cubic-bezier(.3,.9,.2,1)' });
+  } else {
+    // keep it on top and visible while it closes into the orb
+    Object.assign(s.style, { opacity: '1', visibility: 'visible', transition: 'none', zIndex: '4' });
+    const anim = s.animate([{ clipPath: big }, { clipPath: small, opacity: 0.6 }], { duration: 420, easing: 'cubic-bezier(.5,0,.2,1)' });
+    anim.onfinish = anim.oncancel = () => Object.assign(s.style, { opacity: '', visibility: '', transition: '', zIndex: '' });
+    orb.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.18)', offset: 0.85 }, { transform: 'scale(1)' }], { duration: 520, easing: 'ease-out' });
+  }
+  haptic(open ? 'open' : 'tick');
+}
+
 // On the Coach tab the orb leaves the dock and settles into the message box (and goes back when you
 // leave): a copy flies between the two places while the real ones wait out of sight.
 function flyOrb(toCoach) {
@@ -214,9 +262,8 @@ function show(name, { back = false } = {}) {
   }
   app.classList.toggle('is-sub', SUB.includes(name));
   const wasCoach = app.classList.contains('coaching');
-  if (wasCoach !== (name === 'coach') && !SUB.includes(name) && !SUB.includes(prev)) flyOrb(name === 'coach');
+  if (wasCoach !== (name === 'coach')) revealCoach(name === 'coach', $('#s-' + prev));
   app.classList.toggle('coaching', name === 'coach');
-  if (wasCoach !== (name === 'coach')) followLens(); // the bar changes shape: the lens rides along
   if (name === 'coach') { markWeeklySeen(); markDebriefSeen(); }
   requestAnimationFrame(() => app.dispatchEvent(new Event('screenchange')));
   renderAll();
@@ -226,9 +273,21 @@ function show(name, { back = false } = {}) {
 function go(name, { quiet = false } = {}) {
   if (!TABS.includes(name)) return;
   if (name === view.screen) { if (!quiet) $('#s-' + name).scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  if (name === 'coach' && !SUB.includes(view.screen)) { // the Coach opens over the tab you're on; Back closes it
+    coachFrom = view.screen;
+    history.pushState({ screen: 'coach', from: coachFrom }, '');
+    show('coach');
+    return;
+  }
   history.replaceState({ screen: name }, '');
   $('#s-' + name).scrollTop = 0;
   show(name);
+}
+
+let coachFrom = 'today';
+function closeCoach() {
+  if (view.screen !== 'coach') return;
+  if (history.state?.screen === 'coach') history.back(); else go(coachFrom || 'today');
 }
 
 function pushSub(name, extra = {}) {
@@ -256,6 +315,7 @@ function celebrate() {
   const hero = root.querySelector('.summary');
   if (!hero) return;
   hero.classList.add('celebrate');
+  if (root.querySelector('.prs li, .prs .tag')) setTimeout(() => haptic('pr'), 300);
   burst(hero, { count: 22, spread: 120 });
   const prs = [...root.querySelectorAll('.prs li, .prs .tag')];
   prs.slice(0, 4).forEach((el, i) => setTimeout(() => burst(el, { warm: true, count: 12, spread: 60 }), 350 + i * 160));
@@ -274,11 +334,11 @@ addEventListener('popstate', e => {
 // ---------- actions ----------
 
 Object.assign(actions, {
-  go: el => { if (el.closest('#dock')) haptic('tap'); go(el.dataset.to); },
+  go: el => { if (el.closest('#dock')) haptic('tick'); go(el.dataset.to); },
   back: () => history.back(),
   'open-settings': () => pushSub('settings'),
   customize: () => openCustomize(),
-  detail: el => pushSub('detail', { detailId: el.dataset.id, detailKind: el.dataset.kind || 'workout' }),
+  detail: el => heroNav(el, () => pushSub('detail', { detailId: el.dataset.id, detailKind: el.dataset.kind || 'workout' })),
   'start-routine': el => startRoutine(el.dataset.id),
   'repeat-workout': el => {
     const w = state.history.find(x => x.id === el.dataset.id);
@@ -306,8 +366,8 @@ setOnboardNav({ go: name => go(name), ask: q => askCoach(q) });
 initWorkout($('#s-workout'), actions);
 initSettings(actions, $('#s-settings'));
 setWorkoutNav({ go, showDetail });
-initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings') });
-initCoach({ openSettings: () => pushSub('settings') });
+initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings'), openCoach: () => go('coach') });
+initCoach({ openSettings: () => pushSub('settings'), closeCoach: () => closeCoach() });
 setCardioNav({ go, showDetail });
 initCardio();
 initBody();
@@ -326,10 +386,11 @@ app.addEventListener('click', e => {
   }
   const ex = e.target.closest('[data-ex]');
   if (ex) { haptic('tap'); pushSub('exercise', { exerciseId: ex.dataset.ex }); return; }
-  if (e.target.closest('[data-progress]')) { haptic('tap'); pushSub('progress'); return; }
-  if (e.target.closest('[data-bodyscreen]')) { haptic('tap'); pushSub('body'); return; }
-  if (e.target.closest('[data-foodscreen]') && !e.target.closest('[data-body]')) { haptic('tap'); openFoodDay(); go('food'); return; }
-  if (e.target.closest('[data-historyscreen]')) { haptic('tap'); pushSub('history'); return; }
+  let h;
+  if ((h = e.target.closest('[data-progress]'))) { haptic('tap'); heroNav(h, () => pushSub('progress')); return; }
+  if ((h = e.target.closest('[data-bodyscreen]'))) { haptic('tap'); heroNav(h, () => pushSub('body')); return; }
+  if ((h = e.target.closest('[data-foodscreen]')) && !e.target.closest('[data-body]')) { haptic('tap'); heroNav(h, () => { openFoodDay(); go('food'); }); return; }
+  if ((h = e.target.closest('[data-historyscreen]'))) { haptic('tap'); heroNav(h, () => pushSub('history')); return; }
   const pr = e.target.closest('[data-prange]');
   if (pr) { setRange(Number(pr.dataset.prange)); haptic('tap'); renderScreen('progress'); countAll($('#s-progress'), state.lang); return; }
   const f = e.target.closest('[data-hfilter]');
@@ -608,6 +669,8 @@ function ripple(e) {
   host.appendChild(s);
   setTimeout(() => s.remove(), 650);
 }
+
+app.addEventListener('dockshape', () => followLens(620));
 
 boot();
 

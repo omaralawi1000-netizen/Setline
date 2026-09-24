@@ -1004,13 +1004,19 @@ export function initVoice(n) {
     e.preventDefault();
     unlockAudio();
     try { orb.setPointerCapture(e.pointerId); } catch {}
-    haptic('tap');
     // hands-free and the orb is up: touching the dock orb again sends, like tapping the floating one
-    if (v.open && v.mode === 'mini' && v.toggle && (mic.isRecording() || v.phase === 'opening')) { v.press = null; finishRec(); return; }
-    openMini();
-    if (state.settings.micMode === 'tap') { v.toggle = true; v.press = { t: performance.now(), orb: true, y: e.clientY, tapMode: true }; startRec(); return; }
-    v.press = { t: performance.now(), orb: true, y: e.clientY };
-    startRec();
+    if (v.open && v.mode === 'mini' && v.toggle && (mic.isRecording() || v.phase === 'opening')) { haptic('tap'); v.press = null; finishRec(); return; }
+    // a tap opens the Coach; holding talks (the mic starts once it's clearly a hold)
+    const press = v.press = { t: performance.now(), orb: true, y: e.clientY, waiting: true };
+    orb.classList.add('pressing');
+    press.timer = setTimeout(() => {
+      if (v.press !== press || !press.waiting) return;
+      press.waiting = false;
+      press.t = performance.now() - HOLD_MS; // counts as a hold from here
+      haptic('success');
+      openMini();
+      startRec();
+    }, 240);
   });
   // while holding: drag the orb up to open the full voice screen
   document.getElementById('dock').addEventListener('pointermove', e => {
@@ -1019,8 +1025,10 @@ export function initVoice(n) {
     pullTo(p, e);
   });
   const orbUp = e => {
+    document.querySelector('#dock .orbbtn')?.classList.remove('pressing');
     if (!e.target.closest?.('.orbbtn') || !v.press?.orb) return;
     const p = v.press;
+    if (p.waiting) { clearTimeout(p.timer); v.press = null; haptic('tap'); nav.openCoach?.(); return; } // a tap: the Coach
     const dt = performance.now() - p.t;
     v.press = null;
     if (v.mode === 'mini') releasePull();
@@ -1031,7 +1039,7 @@ export function initVoice(n) {
     if (v.phase === 'listening' || v.phase === 'opening') setPhase(v.phase);
   };
   document.getElementById('dock').addEventListener('pointerup', orbUp);
-  document.getElementById('dock').addEventListener('pointercancel', () => { if (v.press?.orb) { v.press = null; cancelRec(); } });
+  document.getElementById('dock').addEventListener('pointercancel', () => { document.querySelector('#dock .orbbtn')?.classList.remove('pressing'); if (v.press?.orb) { const p = v.press; v.press = null; if (p.waiting) clearTimeout(p.timer); else cancelRec(); } });
   document.getElementById('dock').addEventListener('contextmenu', e => { if (e.target.closest('.orbbtn')) e.preventDefault(); });
 
   // floating orb: tap to send (or to listen again), tap outside to cancel

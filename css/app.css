@@ -2058,3 +2058,63 @@ html[data-bar=minimal] .edge.eb::after{opacity:1}
 /* ---------- card styles (Customize → Cards) ---------- */
 html[data-cards=glass] .screen :is(.solid,.glass){background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(255,255,255,.02) 50%),rgba(24,26,36,.42);-webkit-backdrop-filter:blur(18px) saturate(150%);backdrop-filter:blur(18px) saturate(150%);border:1px solid rgba(255,255,255,.09)}
 html[data-cards=outline] .screen :is(.solid,.glass){background:transparent;border:1px solid rgba(255,255,255,.12);box-shadow:none}
+
+/* ======================= 1.25: the bar, rebuilt =======================
+   A glass pill with Today / Train / Food and the orb (the Coach) as its own round button beside it.
+   Scrolling down it shrinks: the pill gets shorter and narrower, labels slip away, icons get small,
+   the orb shrinks with it. One spring for every part, so it moves as one piece. */
+@property --orb-d{syntax:'<length>';inherits:true;initial-value:68px}
+@property --pill-w{syntax:'<length-percentage>';inherits:true;initial-value:100%}
+.dock.v2{--sp:cubic-bezier(.34,1.26,.5,1);--orb-d:68px;display:flex;align-items:center;justify-content:center;gap:10px;
+  left:16px;right:16px;height:var(--dock-h);padding:0;grid-template-columns:none;
+  background:none!important;border:0!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+  transition:opacity .35s var(--ease),transform .55s var(--sp),--orb-d .6s var(--sp)}
+.dock.v2 .dpill{position:relative;flex:none;width:calc(100% - var(--orb-d) - 10px);height:var(--dock-h);border-radius:36px;display:flex;align-items:center;padding:0 7px;isolation:isolate;
+  background:radial-gradient(90% 120% at 50% -30%,rgba(255,255,255,.16),rgba(255,255,255,0) 60%) padding-box,linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,0) 50%,rgba(0,0,0,.08)) padding-box,linear-gradient(rgba(18,20,28,.66),rgba(18,20,28,.66)) padding-box,linear-gradient(170deg,rgba(255,255,255,.5),rgba(255,255,255,.08) 28%,rgba(255,255,255,.03) 60%,rgba(var(--a-rgb),.35)) border-box;
+  border:1px solid transparent;-webkit-backdrop-filter:blur(26px) saturate(210%) brightness(1.08);backdrop-filter:blur(26px) saturate(210%) brightness(1.08);
+  box-shadow:0 22px 44px -14px rgba(0,0,0,.8),0 6px 14px -6px rgba(0,0,0,.5),inset 0 1px 1px rgba(255,255,255,.28),inset 0 -16px 26px -20px rgba(var(--v-rgb),.45);
+  transition:width .6s var(--sp),height .6s var(--sp),border-radius .6s var(--sp),padding .6s var(--sp)}
+.dock.v2 .tab{flex:1;min-width:0;height:58px;margin:0;border-radius:26px;background:none;opacity:1;pointer-events:auto;transition:height .6s var(--sp),color .3s}
+.dock.v2 .tab span{max-height:14px;overflow:hidden;transition:opacity .25s,transform .5s var(--sp),max-height .5s var(--sp)}
+.dock.v2 .tab svg.ti{transition:transform .6s var(--sp),color .3s}
+.dock.v2 .ind{top:7px;bottom:7px;height:auto;border-radius:26px;opacity:1}
+.dock.v2 .orbbtn{position:relative;flex:none;width:var(--orb-d);height:var(--orb-d);margin:0;border-radius:50%;transform:none;opacity:1;pointer-events:auto;transition:transform .35s var(--sp)}
+.dock.v2 .orbbtn::before{inset:0;opacity:1;background:radial-gradient(90% 90% at 50% 0%,rgba(255,255,255,.18),rgba(255,255,255,0) 60%),rgba(18,20,28,.6);border:1px solid rgba(255,255,255,.14);box-shadow:0 18px 36px -12px rgba(0,0,0,.8),inset 0 1px 1px rgba(255,255,255,.25)}
+.dock.v2 .orbbtn .orb{--s:calc(var(--orb-d) - 16px)}
+.dock.v2 .orbbtn.pressing{transform:scale(.9)}
+.dock.v2 .orbbtn:active{transform:scale(.9)}
+/* shrunk */
+.app.compact:not(.is-sub):not(.voice):not(.kb) .dock.v2{left:16px;right:16px;height:var(--dock-h);padding:0;--orb-d:50px;grid-template-columns:none}
+.app.compact .dock.v2 .dpill{width:156px;height:50px;padding:0 4px;border-radius:26px}
+.app.compact .dock.v2 .tab{height:42px;border-radius:21px;opacity:1;pointer-events:auto;background:none;box-shadow:none}
+.app.compact .dock.v2 .tab span{opacity:0;max-height:0;transform:translateY(5px) scale(.8)}
+.app.compact .dock.v2 .tab svg.ti,.app.compact .dock.v2 .tab.on svg.ti{transform:scale(.8)}
+.app.compact .dock.v2 .ind{opacity:1!important;top:4px;bottom:4px;border-radius:21px}
+.app.compact .dock.v2 .orbbtn{transform:none;margin:0}
+.app.compact .dock.v2 .orbbtn::before{opacity:1}
+/* bar styles on the pill and the orb button */
+html[data-bar=solid] .dock.v2 .dpill{background:#171A22;-webkit-backdrop-filter:none;backdrop-filter:none;border:1px solid rgba(255,255,255,.07)}
+html[data-bar=minimal] .dock.v2 .dpill{background:rgba(13,15,21,.35);border-color:transparent;box-shadow:none}
+html[data-bar=minimal] .dock.v2 .orbbtn::before{background:transparent;border-color:transparent;box-shadow:none}
+
+/* ======================= 1.25: the Coach is the orb =======================
+   It opens as a layer over the tab you were on (the bar steps aside) and closes back into the orb. */
+.app.coaching .dock.v2{opacity:0;transform:translateY(34px) scale(.92);pointer-events:none}
+.app.coaching:not(.is-sub):not(.voice) .composer{bottom:calc(var(--dock-bottom) + 6px)}
+.app.coaching.inputting:not(.is-sub):not(.voice) .composer{transform:none}
+.app.coaching.kb:not(.is-sub):not(.voice) .composer{transform:translateY(calc(var(--dock-bottom) - 4px - var(--kb, 0px)))}
+.app.coaching .screen#s-coach{padding-bottom:calc(var(--dock-bottom) + 90px)}
+.app.coaching .intent,.app.coaching .toast{bottom:calc(var(--dock-bottom) + 74px)}
+#s-coach > .cclose{margin-top:10px}
+#s-coach{z-index:3}
+
+/* ======================= 1.25: cards open into their page ======================= */
+.app.vt .screen{transition:none!important}
+.app.vt .screen.enter > *{animation:none!important}
+::view-transition-group(hero){animation-duration:.52s;animation-timing-function:cubic-bezier(.25,.9,.25,1);border-radius:26px;overflow:hidden}
+::view-transition-old(hero){animation:vtout .22s ease-out both}
+::view-transition-new(hero){animation:vtin .38s cubic-bezier(.2,.8,.2,1) .08s both}
+::view-transition-old(root){animation:vtout .2s ease-out both}
+::view-transition-new(root){animation:vtin .3s ease .12s both}
+@keyframes vtout{to{opacity:0;filter:blur(4px)}}
+@keyframes vtin{from{opacity:0;filter:blur(6px)}}
