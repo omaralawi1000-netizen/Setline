@@ -1178,3 +1178,59 @@ p.ckwarn{margin:6px 0 0}
 .mscan > .i:last-child{width:20px;height:20px;flex:none}
 .mthumb.icon .i{width:24px;height:24px}
 .mthumb.icon.sm .i{width:20px;height:20px}
+
+/* =====================================================================
+   1.8: liquid glass. Layered fill + specular highlight + a light-catching
+   gradient rim, over a strong saturated blur. Transform/opacity animations only.
+   ===================================================================== */
+.glass{
+  --gl-fill:rgba(22,25,35,.5);
+  background:
+    radial-gradient(120% 70% at 0% 0%,rgba(255,255,255,.12),rgba(255,255,255,0) 55%) padding-box,
+    linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.012) 46%,rgba(255,255,255,0)) padding-box,
+    linear-gradient(var(--gl-fill),var(--gl-fill)) padding-box,
+    linear-gradient(155deg,rgba(255,255,255,.44),rgba(255,255,255,.07) 30%,rgba(198,187,250,.05) 62%,rgba(198,187,250,.34)) border-box;
+  border:1px solid transparent;
+  -webkit-backdrop-filter:blur(30px) saturate(185%) brightness(1.06);
+  backdrop-filter:blur(30px) saturate(185%) brightness(1.06);
+  box-shadow:0 24px 50px -18px rgba(0,0,0,.72),inset 0 1px 1px rgba(255,255,255,.2),inset 0 -14px 28px -18px rgba(122,103,242,.3);
+}
+.solid{background-image:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,0) 42%)}
+.dock.glass{--gl-fill:rgba(16,18,26,.46);box-shadow:0 18px 40px -12px rgba(0,0,0,.75),inset 0 1px 1px rgba(255,255,255,.24),inset 0 -12px 22px -16px rgba(122,103,242,.35)}
+.sheet.glass{--gl-fill:rgba(20,23,32,.72)}
+.toast.glass,.intent.glass{--gl-fill:rgba(20,23,32,.62)}
+
+/* the tab indicator is a lens that stretches as it slides */
+.dock .ind{background:radial-gradient(100% 90% at 50% 0%,rgba(255,255,255,.24),rgba(255,255,255,0) 62%),rgba(198,187,250,.15);box-shadow:inset 0 1px 0 rgba(255,255,255,.28),inset 0 0 0 1px rgba(255,255,255,.07),0 8px 20px -8px rgba(122,103,242,.6)}
+.dock .ind.moving{animation:liquid .6s var(--ease)}
+@keyframes liquid{28%{scale:1.26 .84}62%{scale:.96 1.05}100%{scale:1 1}}
+
+/* primary buttons: glossy, with a sheen that sweeps on press */
+.log{position:relative;overflow:hidden;isolation:isolate;
+  background:radial-gradient(120% 100% at 28% -10%,rgba(255,255,255,.78),rgba(255,255,255,0) 55%),linear-gradient(180deg,#E4DCFF,#C3B7F8 58%,#B1A2F2);
+  box-shadow:0 14px 34px -10px rgba(170,150,250,.62),inset 0 1px 0 rgba(255,255,255,.85),inset 0 -3px 8px rgba(90,70,200,.22)}
+.log::after{content:"";position:absolute;inset:-2px;z-index:-1;background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.6) 48%,transparent 66%);transform:translateX(-120%);pointer-events:none}
+.log:active::after{animation:sheen .75s var(--ease)}
+@keyframes sheen{to{transform:translateX(120%)}}
+
+/* an aurora that turns slowly behind everything */
+.ambient i:nth-child(4){width:560px;height:560px;left:50%;top:-300px;margin-left:-280px;background:conic-gradient(from 20deg,rgba(122,103,242,0),rgba(122,103,242,.42),rgba(91,134,255,.3),rgba(255,217,168,.14),rgba(198,187,250,.3),rgba(122,103,242,0));filter:blur(90px);opacity:.5;animation:aurora 70s linear infinite}
+@keyframes aurora{to{transform:rotate(360deg)}}
+
+/* content softly blurs as it slides under the dock */
+.app::before{content:"";position:absolute;z-index:6;left:0;right:0;bottom:0;height:calc(var(--dock-bottom) + var(--dock-h) + 34px);pointer-events:none;
+  background:linear-gradient(to top,rgba(13,15,21,.55),rgba(13,15,21,0));
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  -webkit-mask-image:linear-gradient(to top,#000 45%,transparent);mask-image:linear-gradient(to top,#000 45%,transparent)}
+.app.voice::before,.app.is-sub::before{opacity:0}
+
+/* big titles melt away as you scroll */
+@supports (animation-timeline:scroll()){
+  .greet,.h1{animation:headmelt linear both;animation-timeline:scroll(nearest block);animation-range:0 140px}
+  @keyframes headmelt{to{opacity:0;transform:translateY(-14px) scale(.97);filter:blur(6px)}}
+}
+
+/* sheets: the page behind dims and blurs a little */
+.scrim{-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.sheet .sin{animation:sheetin .5s var(--ease) both}
+@keyframes sheetin{from{opacity:0;transform:translateY(14px);filter:blur(6px)}}

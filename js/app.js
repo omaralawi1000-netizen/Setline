@@ -75,8 +75,10 @@ function renderDock() {
   }
   const ind = dock.querySelector('.ind');
   if (on && on.offsetWidth) {
+    const to = `translateX(${on.offsetLeft}px)`;
+    if (ind.style.transform && ind.style.transform !== to) { ind.classList.remove('moving'); void ind.offsetWidth; ind.classList.add('moving'); }
     ind.style.width = on.offsetWidth + 'px';
-    ind.style.transform = `translateX(${on.offsetLeft}px)`;
+    ind.style.transform = to;
     requestAnimationFrame(() => ind.classList.add('ready'));
   }
 }
