@@ -18,7 +18,8 @@ export const DEFAULTS = Object.freeze({
   spoken: 'minimal',   // off | minimal | full
   voice: 'Achird',     // Gemini prebuilt voice
   voiceV: 2,           // bumped when the default voice changes
-  ttsQuality: 'natural', // natural (Flash TTS) | fast (Flash-Lite TTS)
+  ttsQuality: 'instant', // instant (the phone's own voice, no wait) | natural (Flash TTS) | fast (Flash-Lite TTS)
+  ttsV: 1,             // bumped when the default voice engine changes
   stt: 'fast',         // fast | accurate
   ttsModel: '',        // Flash TTS, picked from the model list on key test
   ttsLite: '',         // Flash-Lite TTS
@@ -30,11 +31,15 @@ export const DEFAULTS = Object.freeze({
   coachOverride: '',
   cmdAlt: '',          // runner-up models, tried on 503/429/404
   coachAlt: '',
+  coachPro: '',        // newest Pro text model on the key (picked on key test)
+  proChecked: false,   // the model list was checked for Pro
+  coachBrain: 'best',  // best (Pro, slower, smarter) | fast (Flash)
   cardioGoal: 150,     // minutes per week
   proteinPerKg: 1.8,
   readiness: true,
   suggestions: true,
   restAlerts: false,
+  restSound: true,     // a bell (and 3-2-1 ticks) when rest ends with the app open
   restByEx: {},        // exerciseId → seconds, learned when rest is adjusted
   monthSeen: '',       // the latest monthly photo pair you've opened (its after-photo id)
   photoNudge: '',      // the month (YYYY-MM) the photo-day reminder was shown
@@ -54,7 +59,8 @@ export const DEFAULTS = Object.freeze({
   dockLabels: true,    // words under the tab icons
   greeting: true,      // Today's big greeting and week line
   exFigure: true,      // the moving figure on the workout screen
-  exGhost: true,       // "Last time / Best" under the steppers
+  exGhost: true,
+  hfButton: false,     // the headphones (hands-free) button on the workout screen       // "Last time / Best" under the steppers
   fullscreen: false,   // hide the phone's status bar (edge to edge)
   foodHide: [],        // Food tab parts turned off (Customize)
   foodOrder: [],       // Food tab sections, in your order
@@ -63,17 +69,19 @@ export const DEFAULTS = Object.freeze({
   kgSteps: null,       // {barbell, dumbbell, machine}: the − / + step in kg
   coachBrief: '',      // who you are and how to coach you, in your own words (the Coach follows it)
   memories: [],        // what you told the Coach that it keeps in mind [{id, text, at}]
-  weeklyCheckin: true, // the Coach's Monday look back and plan
+  weeklyCheckin: true,
+  debrief: true,       // the Coach reviews each workout right after it ends
+  debriefUnseen: '',   // the workout whose debrief hasn't been read yet // the Coach's Monday look back and plan
   weeklyFor: '',       // the week (its Monday) the last check-in was written for
   weeklySeen: '',      // …and the one you've opened
   foodTargets: null,   // {kcal, protein, carbs, fat, water} set by hand; null = worked out from the profile
   todayHide: ['balance', 'routines'] // Today sections tucked away (Customize)
 });
 
-export const ACCENTS = ['violet', 'ocean', 'jade', 'ember', 'rose'];
+export const ACCENTS = ['violet', 'ocean', 'jade', 'lime', 'gold', 'ember', 'crimson', 'rose', 'mono'];
 export const FOOD_PARTS = ['calories', 'carbs', 'fat', 'water', 'favourites', 'quickProtein', 'week'];
 export const FOOD_ORDER = ['favourites', 'quickProtein', 'water', 'meals', 'week'];
-export const TODAY_ORDER = ['checkin', 'upnext', 'plateau', 'goals', 'cardio', 'week', 'balance', 'body', 'review', 'routines'];
+export const TODAY_ORDER = ['checkin', 'upnext', 'weekplan', 'plateau', 'goals', 'cardio', 'week', 'balance', 'body', 'review', 'routines'];
 const order = (list, all) => {
   const out = [...new Set((Array.isArray(list) ? list : []).filter(x => all.includes(x)))];
   if (!out.length) return [...all];
@@ -82,7 +90,7 @@ const order = (list, all) => {
 };
 export const foodOrderOf = s => order(s.foodOrder, FOOD_ORDER);
 export const todayOrderOf = s => order(s.todayOrder, TODAY_ORDER);
-export const TODAY_PARTS = ['checkin', 'plateau', 'goals', 'cardio', 'week', 'balance', 'body', 'review', 'routines'];
+export const TODAY_PARTS = ['checkin', 'weekplan', 'plateau', 'goals', 'cardio', 'week', 'balance', 'body', 'review', 'routines'];
 
 // Gemini prebuilt voices and how they sound.
 export const VOICES = ['Achird', 'Sulafat', 'Callirrhoe', 'Puck', 'Aoede', 'Despina', 'Zubenelgenubi', 'Leda', 'Kore', 'Charon'];
@@ -104,16 +112,19 @@ export function sanitize(input) {
   if (typeof input.readiness === 'boolean') s.readiness = input.readiness;
   if (typeof input.suggestions === 'boolean') s.suggestions = input.suggestions;
   if (typeof input.restAlerts === 'boolean') s.restAlerts = input.restAlerts;
+  if (typeof input.restSound === 'boolean') s.restSound = input.restSound;
   if (typeof input.autoAdvance === 'boolean') s.autoAdvance = input.autoAdvance;
   if (typeof input.autoWarmup === 'boolean') s.autoWarmup = input.autoWarmup;
   if (input.profile) s.profile = sanitizeProfile(input.profile);
   if (Array.isArray(input.goals)) s.goals = sanitizeGoals(input.goals);
   if (Number.isFinite(input.profileAsked)) s.profileAsked = input.profileAsked;
   if (ACCENTS.includes(input.accent)) s.accent = input.accent;
+  if (typeof input.proChecked === 'boolean') s.proChecked = input.proChecked;
+  if (['best', 'fast'].includes(input.coachBrain)) s.coachBrain = input.coachBrain;
   if (['today', 'workout', 'food', 'coach'].includes(input.startTab)) s.startTab = input.startTab;
   if (['small', 'normal', 'large'].includes(input.textSize)) s.textSize = input.textSize;
   if (['on', 'soft', 'off'].includes(input.glow)) s.glow = input.glow;
-  for (const k of ['dockLabels', 'greeting', 'exFigure', 'exGhost']) if (typeof input[k] === 'boolean') s[k] = input[k];
+  for (const k of ['dockLabels', 'greeting', 'exFigure', 'exGhost', 'hfButton']) if (typeof input[k] === 'boolean') s[k] = input[k];
   if (typeof input.fullscreen === 'boolean') s.fullscreen = input.fullscreen;
   s.foodTargets = sanitizeTargets(input.foodTargets);
   if (Array.isArray(input.foodOrder)) s.foodOrder = order(input.foodOrder, FOOD_ORDER);
@@ -127,6 +138,8 @@ export function sanitize(input) {
   if (Array.isArray(input.todayHide)) s.todayHide = [...new Set(input.todayHide.filter(x => TODAY_PARTS.includes(x)))];
   if (Array.isArray(input.favMeals)) s.favMeals = input.favMeals.filter(x => typeof x === 'string' && x.length <= 60).slice(0, 30);
   for (const k of ['deloadUntil', 'deloadSnoozed']) if (Number.isFinite(input[k]) && input[k] >= 0) s[k] = input[k];
+  if (typeof input.debrief === 'boolean') s.debrief = input.debrief;
+  if (typeof input.debriefUnseen === 'string' && input.debriefUnseen.length <= 80) s.debriefUnseen = input.debriefUnseen;
   if (typeof input.coachBrief === 'string') s.coachBrief = input.coachBrief.slice(0, 5000);
   if (typeof input.monthSeen === 'string' && input.monthSeen.length <= 80) s.monthSeen = input.monthSeen;
   if (typeof input.photoNudge === 'string' && /^(\d{4}-\d{2})?$/.test(input.photoNudge)) s.photoNudge = input.photoNudge;
@@ -145,9 +158,10 @@ export function sanitize(input) {
   if (['off', 'minimal', 'full'].includes(input.spoken)) s.spoken = input.spoken;
   // the old default (Kore, firm) moves to the new friendlier default once
   if (VOICES.includes(input.voice) && (input.voiceV === 2 || input.voice !== 'Kore')) s.voice = input.voice;
-  if (['natural', 'fast'].includes(input.ttsQuality)) s.ttsQuality = input.ttsQuality;
+  // 1.22: replies speak at once with the phone's voice unless you pick Natural again after that
+  if (['instant', 'natural', 'fast'].includes(input.ttsQuality) && input.ttsV === 1) s.ttsQuality = input.ttsQuality;
   if (['fast', 'accurate'].includes(input.stt)) s.stt = input.stt;
-  for (const k of ['ttsModel', 'ttsLite', 'ttsOverride', 'cmdModel', 'coachModel', 'cmdOverride', 'coachOverride', 'cmdAlt', 'coachAlt']) if (typeof input[k] === 'string' && (input[k] === '' || MODEL_ID.test(input[k].trim()))) s[k] = input[k].trim();
+  for (const k of ['ttsModel', 'ttsLite', 'ttsOverride', 'cmdModel', 'coachModel', 'cmdOverride', 'coachOverride', 'cmdAlt', 'coachAlt', 'coachPro']) if (typeof input[k] === 'string' && (input[k] === '' || MODEL_ID.test(input[k].trim()))) s[k] = input[k].trim();
   return s;
 }
 
@@ -162,10 +176,11 @@ export const coachModelId = s => s.coachOverride || s.coachModel || 'gemini-flas
 // the order to try: chosen, runner-up, rolling alias
 export const cmdModels = s => [cmdModelId(s), s.cmdOverride ? '' : s.cmdAlt, 'gemini-flash-lite-latest'];
 // Flash first; the Flash-Lite models have their own (bigger) free quotas, so they're the last resort
-export const coachModels = s => [coachModelId(s), s.coachOverride ? '' : s.coachAlt, 'gemini-flash-latest', s.cmdModel, 'gemini-flash-lite-latest'];
-export const ttsModelId = s => s.ttsOverride || (s.ttsQuality === 'fast' ? s.ttsLite || s.ttsModel : s.ttsModel || s.ttsLite) || DEFAULT_TTS_MODEL;
+// the Coach's brain: Pro first when you want the best answers (slower), then Flash
+export const coachModels = s => [s.coachOverride || (s.coachBrain !== 'fast' ? s.coachPro : ''), coachModelId(s), s.coachOverride ? '' : s.coachAlt, 'gemini-flash-latest', s.cmdModel, 'gemini-flash-lite-latest'];
+export const ttsModelId = s => (s.ttsQuality === 'instant' && !s.ttsOverride ? 'device' : null) || s.ttsOverride || (s.ttsQuality === 'fast' ? s.ttsLite || s.ttsModel : s.ttsModel || s.ttsLite) || DEFAULT_TTS_MODEL;
 // runner-up voice model: the other family
-export const ttsAlt = s => (s.ttsOverride ? [] : [s.ttsQuality === 'fast' ? s.ttsModel : s.ttsLite, DEFAULT_TTS_MODEL].filter(Boolean));
+export const ttsAlt = s => (s.ttsOverride || s.ttsQuality === 'instant' ? [] : [s.ttsQuality === 'fast' ? s.ttsModel : s.ttsLite, DEFAULT_TTS_MODEL].filter(Boolean));
 export const sttModelId = s => (s.stt === 'accurate' ? 'whisper-large-v3' : 'whisper-large-v3-turbo');
 
 export function loadSettings(storage = globalThis.localStorage) {

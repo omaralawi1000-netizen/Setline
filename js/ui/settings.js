@@ -8,7 +8,7 @@ import { dateKey } from '../body.js';
 import { VERSION } from '../version.js';
 import { LIMITS } from '../workout.js';
 import { STEP_GROUPS, STEP_CHOICES } from '../progression.js';
-import { addMemories } from '../coach.js';
+import { addMemories, isRoutineImport } from '../coach.js';
 import { haptic } from '../haptics.js';
 import { I } from './icons.js';
 import { toast } from './toast.js';
@@ -102,6 +102,7 @@ function memorySheet() {
       el.innerHTML = `<div class="sbody"><h2>${t('memory.title')}</h2>
         <div class="field"><label>${t('brief.title')}</label><p class="snote">${t('brief.lead')}</p>
           <textarea class="brief solid" data-brief rows="7" maxlength="5000" placeholder="${esc(t('brief.ph'))}">${esc(state.settings.coachBrief || '')}</textarea>
+          ${isRoutineImport(state.settings.coachBrief || '') ? `<button class="btn2 solid wide" data-brief-routines>${I.workout}<span>${t('brief.routines')}</span></button>` : ''}
           <div class="briefbar"><small data-brief-n>${(state.settings.coachBrief || '').length} / 5000</small><button class="btn2 solid" data-brief-save>${I.check}<span>${t('common.save')}</span></button></div></div>
         <div class="field"><label>${t('memory.facts')}</label><p class="snote">${t('memory.lead')}</p></div>
         ${list.length ? `<ul class="memlist">${[...list].reverse().map(m => `<li><span>${esc(m.text)}</span><button class="iconbtn sm" data-mem-del="${esc(m.id)}" aria-label="${esc(t('common.delete'))}">${I.close}</button></li>`).join('')}</ul>` : `<p class="snote">${t('memory.none')}</p>`}
@@ -113,6 +114,7 @@ function memorySheet() {
     el.addEventListener('click', e => {
       const d = e.target.closest('[data-mem-del]');
       if (d) { haptic('tap'); setSettings({ memories: (state.settings.memories || []).filter(m => m.id !== d.dataset.memDel) }); return paint(); }
+      if (e.target.closest('[data-brief-routines]')) { haptic('tap'); closeTop().then(() => window.dispatchEvent(new CustomEvent('setline:brief-routines'))); return; }
       if (e.target.closest('[data-brief-save]')) {
         setSettings({ coachBrief: el.querySelector('[data-brief]').value.trim() });
         haptic('success'); toast({ title: esc(t('brief.saved')) }); return paint();
@@ -152,7 +154,7 @@ export function renderSettings(root) {
       <div class="srow"><span class="l"><strong>${t('settings.voiceLang')}</strong></span>${seg('voiceLang', ['auto', 'da', 'en'], [t('lang.auto'), t('lang.da'), t('lang.en')])}</div>
       <div class="srow"><span class="l"><strong>${t('settings.micMode')}</strong><small>${t('settings.micModeSub')}</small></span>${seg('micMode', ['hold', 'tap'], [t('mic.hold'), t('mic.tap')])}</div>
       <div class="srow"><span class="l"><strong>${t('settings.spoken')}</strong></span>${seg('spoken', ['off', 'minimal', 'full'], [t('spoken.off'), t('spoken.minimal'), t('spoken.full')])}</div>
-      <div class="srow"><span class="l"><strong>${t('settings.ttsQuality')}</strong><small>${t('settings.ttsQualitySub')}</small></span>${seg('ttsQuality', ['natural', 'fast'], [t('tts.natural'), t('tts.fast')])}</div>
+      <div class="srow"><span class="l"><strong>${t('settings.ttsQuality')}</strong><small>${t('settings.ttsQualitySub')}</small></span>${seg('ttsQuality', ['instant', 'natural', 'fast'], [t('tts.instant'), t('tts.natural'), t('tts.fast')])}</div>
       <div class="srow"><span class="l"><strong>${t('settings.voiceName')}</strong><small id="speechstat">${esc(speechStatus())}</small></span>
         <span class="stepper"><select class="select" data-set="voice" aria-label="${t('settings.voiceName')}">${VOICES.map(n => `<option value="${n}" ${n === s.voice ? 'selected' : ''}>${n} · ${t('feel.' + VOICE_FEEL[n])}</option>`).join('')}</select>
         <button class="chip" data-act="preview-voice">${t('settings.preview')}</button></span></div>
@@ -172,6 +174,8 @@ export function renderSettings(root) {
         <button class="toggle" role="switch" aria-checked="${s.autoAdvance}" aria-label="${t('settings.autoAdvance')}" data-act="toggle" data-key="autoAdvance"></button></div>
       <div class="srow"><span class="l"><strong>${t('settings.autoWarmup')}</strong><small>${t('settings.autoWarmupSub')}</small></span>
         <button class="toggle" role="switch" aria-checked="${s.autoWarmup}" aria-label="${t('settings.autoWarmup')}" data-act="toggle" data-key="autoWarmup"></button></div>
+      <div class="srow"><span class="l"><strong>${t('settings.restSound')}</strong><small>${t('settings.restSoundSub')}</small></span>
+        <button class="toggle" role="switch" aria-checked="${s.restSound}" aria-label="${t('settings.restSound')}" data-act="toggle" data-key="restSound"></button></div>
       <div class="srow"><span class="l"><strong>${t('alerts.title')}</strong><small>${t('alerts.sub')}</small></span>
         <button class="toggle" role="switch" aria-checked="${s.restAlerts}" aria-label="${t('alerts.title')}" data-act="rest-alerts"></button></div>
       <div class="srow"><span class="l"><strong>${t('settings.readiness')}</strong><small>${t('settings.readinessSub')}</small></span>
@@ -233,7 +237,7 @@ async function testKey(name, root) {
       st = r.status;
       if (st === 'ok') {
         const text = pickTextModels(r.models);
-        setSettings({ ttsModel: pickTtsModel(r.models, null, 'natural') || '', ttsLite: pickTtsModel(r.models, null, 'fast') || '', cmdModel: text.command || '', coachModel: text.coach || '', cmdAlt: text.commandAlt || '', coachAlt: text.coachAlt || '' });
+        setSettings({ ttsModel: pickTtsModel(r.models, null, 'natural') || '', ttsLite: pickTtsModel(r.models, null, 'fast') || '', cmdModel: text.command || '', coachModel: text.coach || '', cmdAlt: text.commandAlt || '', coachAlt: text.coachAlt || '', coachPro: text.pro || '', proChecked: true });
       }
     } catch { st = 'offline'; }
   }

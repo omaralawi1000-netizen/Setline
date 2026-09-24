@@ -7,16 +7,16 @@ import { clock } from './format.js';
 import { setHapticsGate, haptic } from './haptics.js';
 import { keepAwake } from './wakelock.js';
 import { $, esc } from './ui/dom.js';
-import { I } from './ui/icons.js';
+import { I, TAB_ICONS } from './ui/icons.js';
 import { toast } from './ui/toast.js';
 import { handlePop } from './ui/sheet.js';
 import { renderToday, currentStall } from './ui/today.js';
 import { applyPlateauFix } from './plateau.js';
-import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav, autoWarmup } from './ui/workout.js';
+import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav, autoWarmup, restBell } from './ui/workout.js';
 import { renderHistory, renderDetail } from './ui/history.js';
 import { renderSettings, initSettings } from './ui/settings.js';
 import { initVoice, orbHTML, voiceHandlePop, closeVoice, isVoiceOpen, openVoice } from './ui/voice.js';
-import { renderCoach, initCoach, ask as askCoach, ensureModels, weeklyCheckin, markWeeklySeen } from './ui/coach.js';
+import { renderCoach, initCoach, ask as askCoach, ensureModels, weeklyCheckin, markWeeklySeen, sessionDebrief, markDebriefSeen } from './ui/coach.js';
 import { initCardio, setCardioNav, tickCardio, renderCardioDetail, syncGps, startCardioSession, pickTypeSheet } from './ui/cardio.js';
 import { initBody } from './ui/body.js';
 import { initRoutine, setRoutineNav, renderRoutine, editRoutine, programsSheet, startRoutine } from './ui/routine.js';
@@ -72,9 +72,9 @@ function renderDock() {
   const { t } = state;
   const dock = $('#dock');
   const tab = (name, icon, cls = '') => `<button class="tab${cls}" data-act="go" data-to="${name}">${icon}<span>${t('tab.' + name)}</span></button>`;
-  if (!dock.dataset.built || dock.dataset.lang !== state.lang) {
-    dock.innerHTML = '<span class="ind" aria-hidden="true"></span>' + tab('today', I.home) + tab('workout', I.workout) + orbHTML() + tab('food', I.meal) + tab('coach', I.chat);
-    dock.dataset.built = '1';
+  if (dock.dataset.built !== '2' || dock.dataset.lang !== state.lang) {
+    dock.innerHTML = '<span class="ind" aria-hidden="true"></span>' + tab('today', TAB_ICONS.today) + tab('workout', TAB_ICONS.workout) + orbHTML() + tab('food', TAB_ICONS.food) + tab('coach', TAB_ICONS.coach);
+    dock.dataset.built = '2';
     dock.dataset.lang = state.lang;
   }
   let on = null;
@@ -154,7 +154,7 @@ function show(name, { back = false } = {}) {
   }
   app.classList.toggle('is-sub', SUB.includes(name));
   app.classList.toggle('coaching', name === 'coach');
-  if (name === 'coach') markWeeklySeen();
+  if (name === 'coach') { markWeeklySeen(); markDebriefSeen(); }
   requestAnimationFrame(() => app.dispatchEvent(new Event('screenchange')));
   renderAll();
 }
@@ -382,6 +382,10 @@ function maybeAskAlerts() {
 store.subscribe(reason => {
   keepAwake(!!state.active || !!state.activeCardio);
   if (reason === 'finish' || (reason === 'cardio' && !state.activeCardio)) setTimeout(autoBackup, 1500);
+  if (reason === 'finish') { // the Coach looks at the session straight away
+    const w = [...state.history].sort((a, b) => b.startedAt - a.startedAt)[0];
+    setTimeout(() => sessionDebrief(w, { onReady: () => { if (view.screen !== 'coach') toast({ title: esc(state.t('debrief.ready')), sub: esc(state.t('debrief.readySub')), action: state.t('debrief.read'), ms: 8000, onAction: () => go('coach') }); } }), 2500);
+  }
   syncGps();
   scheduleRestAlert();
   if (reason === 'draft') return syncNums($('#s-workout'));
@@ -429,6 +433,7 @@ function tick() {
   const now = Date.now();
   const txt = clock(elapsedSec(w, now));
   for (const el of document.querySelectorAll('[data-elapsed]')) if (el.textContent !== txt) el.textContent = txt;
+  restBell(w, now);
   if (view.screen === 'workout') tickWorkout($('#s-workout'), now);
 }
 function startClock() { if (!ticker) ticker = setInterval(tick, 250); tick(); }
@@ -513,6 +518,9 @@ function shortcut() {
   else if (to === 'meal') setTimeout(() => openMealSheet(), 250);
 }
 
+// "Set up these routines" in the brief: the Coach copies the routine written there
+window.addEventListener('setline:brief-routines', () => { if (SUB.includes(view.screen)) history.back(); setTimeout(() => { go('coach'); askCoach(state.t('brief.routinesAsk')); }, 350); });
+
 boot();
 
 addEventListener('pageshow', e => { if (e.persisted) renderAll(); });
@@ -522,11 +530,18 @@ addEventListener('resize', () => renderDock());
 // Android keeps the layout size when the keyboard opens; lift the composer above it and hide the dock.
 if (globalThis.visualViewport) {
   const vv = visualViewport;
+  let full = vv.height;
+  addEventListener('orientationchange', () => { setTimeout(() => { full = vv.height; }, 400); });
   const onVV = () => {
-    const kb = Math.max(0, innerHeight - vv.height - vv.offsetTop);
-    app.style.setProperty('--kb', kb + 'px');
-    app.classList.toggle('kb', kb > 120);
+    full = Math.max(full, vv.height); // the tallest the view has been: the height without a keyboard
+    // either the layout keeps its size (keyboard = the part of it hidden) or it shrinks with the keyboard
+    const over = Math.max(0, innerHeight - vv.height - vv.offsetTop); // keyboard covering the layout (lift things by this)
+    app.style.setProperty('--kb', over + 'px');
+    app.classList.toggle('kb', Math.max(over, full - vv.height) > 120); // …or the layout itself shrank
   };
   vv.addEventListener('resize', onVV);
   vv.addEventListener('scroll', onVV);
 }
+// typing anywhere: the dock steps aside at once (before the keyboard has finished sliding up)
+app.addEventListener('focusin', e => { if (e.target.matches('input:not([type=range]):not([type=checkbox]),textarea')) app.classList.add('inputting'); });
+app.addEventListener('focusout', () => setTimeout(() => { if (!document.activeElement?.matches?.('input,textarea')) app.classList.remove('inputting'); }, 60));

@@ -179,7 +179,7 @@ export function openScanner({ product = null } = {}) {
         </div>
         <div class="amounts">${choices.map(c => `<button class="chip" data-g="${c.g}" aria-pressed="${c.g === s.grams}">${esc(label(c))}</button>`).join('')}
           <label class="gram"><input inputmode="numeric" data-s="grams" value="${choices.some(c => c.g === s.grams) ? '' : s.grams}" placeholder="${esc(t('scan.grams'))}" aria-label="${esc(t('scan.grams'))}"><span>g</span></label></div>
-        <button class="log" data-s="add">${I.check}<span>${t('meal.save', { g: n.protein })}</span></button>
+        <button class="log" data-s="add">${I.check}<span>${t('scan.add', { k: n.kcal, g: n.protein })}</span></button>
         ${product ? '' : `<button class="linkbtn muted" data-s="again">${t('scan.again')}</button>`}
       </div></div>`;
       if (first) return render(html);
@@ -188,7 +188,7 @@ export function openScanner({ product = null } = {}) {
       const nums = card.querySelectorAll('.mnum b');
       [n.protein, n.kcal, n.carbs, n.fat].forEach((v, i) => { if (nums[i].textContent !== String(v)) { nums[i].textContent = v; nums[i].classList.remove('tick'); void nums[i].offsetWidth; nums[i].classList.add('tick'); } });
       for (const c of card.querySelectorAll('[data-g]')) c.setAttribute('aria-pressed', String(Number(c.dataset.g) === s.grams));
-      card.querySelector('[data-s=add] span').textContent = t('meal.save', { g: n.protein });
+      card.querySelector('[data-s=add] span').textContent = t('scan.add', { k: n.kcal, g: n.protein });
     }
 
     function missing(status) {

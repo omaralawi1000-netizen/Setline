@@ -9,11 +9,12 @@ import { dateKey } from '../body.js';
 import { weight } from '../format.js';
 import { buildContext, chatContents, systemPrompt, formatAnswer, speakable, isPlanRequest, PLAN_SCHEMA, planSchema, planSystem, validatePlan, planToRoutines, isRoutineImport, IMPORT_SCHEMA, importSystem, validateImport } from '../coach.js';
 import { getKey } from '../keys.js';
-import { coachModels, ttsModelId, ttsAlt } from '../settings.js';
+import { coachModels, ttsModelId, ttsAlt, sttModelId } from '../settings.js';
 import * as tts from '../tts.js';
 import { isRecording } from '../voice.js';
 import { haptic } from '../haptics.js';
 import { $, esc } from './dom.js';
+import { listenSmart } from './listen.js';
 import { I } from './icons.js';
 import { openSheet, closeTop } from './sheet.js';
 import { toast } from './toast.js';
@@ -35,9 +36,10 @@ function bubble(m) {
   }
   if (m.plan) return `<li class="msg ai plan" data-id="${m.id}"><div class="bub">${planCard(m)}</div></li>`;
   if (!m.text && !m.streaming) return `<li class="msg ai stopped" data-id="${m.id}"><div class="bub"><p>${esc(t('coach.stopped'))}</p>${m.q ? `<button class="chip" data-coach="retry" data-q="${esc(m.q)}">${t('coach.retry')}</button>` : ''}</div></li>`;
+  const dhead = m.debrief ? `<p class="wkhead">${I.workout}<span>${esc(t('debrief.head', { name: m.dname || t('debrief.session') }))}</span></p>` : '';
   const head = m.weekly ? `<p class="wkhead">${I.chart}<span>${esc(t('weekly.head', { date: new Intl.DateTimeFormat(state.lang === 'da' ? 'da-DK' : 'en-GB', { day: 'numeric', month: 'short' }).format(new Date(m.weekly + 'T12:00')) }))}</span></p>` : '';
   const kept = m.remembered?.length ? `<p class="memnote">${I.check}<span>${esc(t('memory.kept', { what: m.remembered.join(' · ') }))}</span></p>` : '';
-  return `<li class="msg ai${m.streaming ? ' is-streaming' : ''}${m.weekly ? ' weekly' : ''}" data-id="${m.id}"><div class="bub">${head}${m.text ? formatAnswer(hideMemoryTail(m.text)) : '<span class="dots"><i></i><i></i><i></i></span>'}${kept}</div></li>`;
+  return `<li class="msg ai${m.streaming ? ' is-streaming' : ''}${m.weekly || m.debrief ? ' weekly' : ''}" data-id="${m.id}"><div class="bub">${head}${dhead}${m.text ? formatAnswer(hideMemoryTail(m.text)) : `<span class="think"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span><span class="tl">${esc(t('coach.thinking'))}</span></span>`}${kept}</div></li>`;
 }
 
 function planCard(m) {
@@ -73,9 +75,31 @@ export function renderCoach(root) {
     ${body}`;
   const composer = $('#composer');
   composer.querySelector('input').placeholder = t('coach.ph');
-  composer.querySelector('button').setAttribute('aria-label', t('coach.send'));
-  composer.querySelector('button').innerHTML = inflight ? I.stop : I.fwd;
+  composer.querySelector('.csend').setAttribute('aria-label', t('coach.send'));
+  composer.querySelector('.csend').innerHTML = inflight ? I.stop : I.fwd;
   requestAnimationFrame(() => scrollDown(root, false));
+}
+
+// Streamed words appear smoothly, not in lumps: the text on screen glides after what has arrived,
+// catching up faster the further behind it is.
+function typewriter(root, id) {
+  let target = '', shown = 0, raf = 0, lastScroll = 0, waiters = [];
+  const step = now => {
+    const behind = target.length - shown;
+    if (behind <= 0) { raf = 0; waiters.splice(0).forEach(r => r()); return; }
+    shown += Math.max(1, Math.ceil(behind / 14));
+    // don't stop inside a word
+    const sp = target.indexOf(' ', shown);
+    if (sp !== -1 && sp - shown < 8) shown = sp;
+    const bub = root.querySelector(`[data-id="${id}"] .bub`);
+    if (bub) bub.innerHTML = formatAnswer(hideMemoryTail(target.slice(0, Math.min(shown, target.length))));
+    if (now - lastScroll > 140) { lastScroll = now; scrollDown(root); }
+    raf = requestAnimationFrame(step);
+  };
+  return {
+    set(t) { target = t; if (!raf) raf = requestAnimationFrame(step); },
+    drain: () => (target.length - shown <= 0 ? Promise.resolve() : Promise.race([new Promise(r => waiters.push(r)), new Promise(r => setTimeout(r, 2500))]))
+  };
 }
 
 function scrollDown(root, smooth = true) {
@@ -87,14 +111,14 @@ function scrollDown(root, smooth = true) {
 let picking = null;
 export function ensureModels() {
   const s = state.settings;
-  if (!getKey('google') || ((s.coachOverride || (s.coachModel && s.coachAlt)) && (s.ttsOverride || s.ttsLite))) return Promise.resolve();
+  if (!getKey('google') || ((s.coachOverride || (s.coachModel && s.coachAlt && s.proChecked)) && (s.ttsOverride || s.ttsLite))) return Promise.resolve();
   picking ||= (async () => {
     try {
       const r = await listModels(getKey('google'));
       if (r.status !== 'ok') return;
       const text = pickTextModels(r.models);
       store.setSettings({
-        cmdModel: text.command || '', coachModel: text.coach || '', cmdAlt: text.commandAlt || '', coachAlt: text.coachAlt || '',
+        cmdModel: text.command || '', coachModel: text.coach || '', cmdAlt: text.commandAlt || '', coachAlt: text.coachAlt || '', coachPro: text.pro || '', proChecked: true,
         ttsModel: pickTtsModel(r.models, null, 'natural') || '', ttsLite: pickTtsModel(r.models, null, 'fast') || ''
       });
     } catch { /* fall back to defaults */ } finally { picking = null; }
@@ -126,21 +150,21 @@ export async function ask(question, { root = $('#s-coach') } = {}) {
   inflight = { ctl, id: reply.id };
   syncButton();
   await ensureModels();
+  // "the plan from my brief", "set up my split": copy the routine you already wrote, don't design a new one
+  const brief = state.settings.coachBrief || '';
+  const fromBrief = brief && isRoutineImport(brief) && /\b(brief|beskrivelse|my (?:routine|split|program|plan|days)|mine rutiner|mit program|min plan)\b/i.test(question) && !/\b(new|ny|nyt|different|anden|andet)\b/i.test(question);
+  if (fromBrief) return buildPlan(`${brief}\n\n(The user asks: ${question})`, reply, { key, lang, ctl, root, copy: true });
   if (isRoutineImport(question)) return buildPlan(question, reply, { key, lang, ctl, root, copy: true });
   if (isPlanRequest(question)) return buildPlan(question, reply, { key, lang, ctl, root });
   const context = buildContext(coachSnap());
   try {
-    let last = 0;
+    const typer = typewriter(root, reply.id);
+    const slow = setTimeout(() => { const tl = root.querySelector(`[data-id="${reply.id}"] .tl`); if (tl) { tl.textContent = state.t('coach.thinkingLong'); } }, 7000);
     const text = await withFallback(coachModels(state.settings), model => streamChat({
       key, model, system: systemPrompt(lang), contents: chatContents(history, context, question), signal: ctl.signal,
-      onText: full => {
-        store.updateChat(reply.id, { text: full }, { quiet: true });
-        const li = root.querySelector(`[data-id="${reply.id}"] .bub`);
-        if (li) li.innerHTML = formatAnswer(hideMemoryTail(full));
-        const now = performance.now();
-        if (now - last > 120) { last = now; scrollDown(root); }
-      }
-    }), { rounds: 3, wait: 2500, alsoRetry: ['timeout'] }); // busy servers get a patient second and third go
+      onText: full => { clearTimeout(slow); store.updateChat(reply.id, { text: full }, { quiet: true }); typer.set(full); }
+    }), { rounds: 3, wait: 2500, alsoRetry: ['timeout'] }).finally(() => clearTimeout(slow)); // busy servers get a patient second and third go
+    await typer.drain();
     // "REMEMBER: …" lines become memories and leave the reply
     const { text: said, facts: all } = splitMemories(text);
     const before = state.settings.memories || [], mem = addMemories(before, all);
@@ -223,7 +247,7 @@ async function savePlan(id, mode = 'replace') {
 }
 
 function syncButton() {
-  const b = $('#composer button');
+  const b = $('#composer .csend');
   if (b) { b.innerHTML = inflight ? I.stop : I.fwd; b.classList.toggle('stop', !!inflight); }
 }
 
@@ -231,13 +255,44 @@ export function initCoach(n) {
   nav = n;
   const root = $('#s-coach');
   const composer = $('#composer');
-  composer.innerHTML = `<input enterkeyhint="send" autocomplete="off" maxlength="600"><button type="submit">${I.fwd}</button>`;
+  composer.innerHTML = `<button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span></button><input enterkeyhint="send" autocomplete="off" maxlength="600"><button type="submit" class="csend">${I.fwd}</button>`;
+  // the small orb: tap, talk, and what you said lands in the box (tap again to finish)
+  let dict = null;
+  composer.querySelector('[data-dictate]').addEventListener('click', async () => {
+    const input = composer.querySelector('input');
+    const orb = composer.querySelector('.corb');
+    if (dict) { dict.stop(); return; }
+    if (!getKey('groq')) { toast({ title: esc(state.t('voice.noKey')), error: true }); return; }
+    haptic('tap');
+    composer.classList.add('dictating');
+    const before = input.value, ph = input.placeholder;
+    input.placeholder = state.t('coach.listening');
+    const l = dict = listenSmart({
+      stt: { key: getKey('groq'), model: sttModelId(state.settings), language: state.settings.voiceLang },
+      onLevel: v => orb.style.setProperty('--lv', v.toFixed(3)),
+      onState: k => composer.classList.toggle('hearing', k === 'hearing' || k === 'check')
+    });
+    let text = '';
+    try { text = await l.done; } catch { toast({ title: esc(state.t('voice.micDenied')), error: true }); }
+    dict = null;
+    composer.classList.remove('dictating', 'hearing');
+    orb.style.removeProperty('--lv');
+    input.placeholder = ph;
+    if (text.trim()) {
+      input.value = (before ? before.trim() + ' ' : '') + text.trim();
+      haptic('success');
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+  });
   composer.addEventListener('submit', e => {
     e.preventDefault();
     if (inflight) { inflight.ctl.abort(); return; }
     const input = composer.querySelector('input');
     const q = input.value;
+    if (!q.trim()) return;
     input.value = '';
+    input.blur(); // the keyboard goes down so the answer has the screen
     haptic('tap');
     ask(q, { root });
   });
@@ -289,4 +344,28 @@ export async function weeklyCheckin({ force = false } = {}) {
     }
   } catch { /* try again on the next open */ } finally { weeklyBusy = false; }
 }
+// After every workout the Coach looks at it straight away: what moved, what dropped, and exact
+// targets for next time this routine comes round. Quietly, in the background; a card and a toast say when it's there.
+let debriefBusy = false;
+export async function sessionDebrief(w, { onReady = () => {} } = {}) {
+  const key = getKey('google');
+  if (!w || debriefBusy || !key || !state.settings.debrief || !(w.exercises || []).some(e => e.sets.some(x => x.done && x.type !== 'warmup'))) return;
+  if (state.chat.some(m => m.debrief === w.id)) return;
+  debriefBusy = true;
+  try {
+    await ensureModels();
+    const lang = state.lang, name = id => state.catalog.name(id, 'en');
+    const lines = w.exercises.map(e => `- ${name(e.exerciseId)}: ${e.sets.filter(x => x.done && x.type !== 'warmup').map(x => `${x.kg}x${x.reps}`).join(', ') || 'skipped'}`);
+    const ask = [
+      'SESSION DEBRIEF (the app asked for this, not the user). They just finished this workout' + (w.name ? ` ("${w.name}")` : '') + ':',
+      lines.join('\n'),
+      'Compare every lift with the last time they did it (in the training data). In at most 90 words: what moved (with numbers), anything that dropped and the likely reason (sleep, food, other sport or fatigue from the brief), then a line starting "Next time:" with two or three exact targets for this routine\'s next session (kg × reps). Warm, direct, no headings, no tables.'
+    ].join('\n');
+    const text = await withFallback(coachModels(state.settings), model => streamChat({ key, model, system: systemPrompt(lang), contents: chatContents([], buildContext(coachSnap()), ask) }), { rounds: 2, alsoRetry: ['timeout'] });
+    const { text: said } = splitMemories(text);
+    if (said) { store.addChat('model', said, { debrief: w.id, dname: w.name || '' }); store.setSettings({ debriefUnseen: w.id }); onReady(); }
+  } catch { /* the session is saved either way */ } finally { debriefBusy = false; }
+}
+export const markDebriefSeen = () => { if (state.settings.debriefUnseen) store.setSettings({ debriefUnseen: '' }); };
+
 export const markWeeklySeen = () => { const m = thisMonday(); if (state.settings.weeklyFor === m && state.settings.weeklySeen !== m) store.setSettings({ weeklySeen: m }); };

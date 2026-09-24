@@ -4,7 +4,7 @@
 import * as store from '../store.js';
 import { state } from '../store.js';
 import { dateKey, bodyTrend } from '../body.js';
-import { autoTargets, targetsFor, dayTotals, bySlot, weekOf, SLOTS, GLASS_ML, slotOf, TARGET_LIMITS, sanitizeQuick, adaptiveMaintenance, goalCalories } from '../nutrition.js';
+import { autoTargets, targetsFor, dayTotals, bySlot, weekOf, SLOTS, GLASS_ML, slotOf, TARGET_LIMITS, sanitizeQuick, adaptiveMaintenance, goalCalories, syncTargets } from '../nutrition.js';
 import { foodOrderOf } from '../settings.js';
 import { addProteinQuick } from './body.js';
 import { haptic } from '../haptics.js';
@@ -257,14 +257,17 @@ function targetsSheet() {
   const real = adaptiveMaintenance(state.nutrition, state.bodyweight, dateKey());
   const realGoal = real ? goalCalories(real.maintenance, state.settings.profile?.goal) : null;
   openSheet(el => {
-    const paint = () => {
+    const paint = changed => {
+      const split = ['protein', 'carbs', 'fat'].map(m => Math.round((f[m] * (m === 'fat' ? 9 : 4)) / Math.max(1, f.kcal) * 100));
       el.innerHTML = `<div class="sbody"><h2>${t('food.targets')}</h2><p class="lead">${t('food.targetsLead')}</p>
         ${real ? `<div class="freal solid"><strong>${esc(t('food.realTitle', { k: nf().format(real.maintenance) }))}</strong>
           <span>${esc(t('food.realSub', { days: real.days, intake: nf().format(real.intake), sign: real.kgPerWeek > 0 ? '+' : real.kgPerWeek < 0 ? '−' : '±', kg: Math.abs(real.kgPerWeek).toLocaleString(state.lang === 'da' ? 'da-DK' : 'en-GB') }))}</span>
           <button class="btn2 solid" data-ft="real">${esc(t('food.useReal', { k: nf().format(realGoal) }))}</button></div>`
         : `<p class="snote">${t('food.realLater')}</p>`}
         <div class="slist solid">${Object.keys(STEP).map(k => `<div class="srow"><span class="l"><strong>${t('food.t.' + k)}</strong><small>${esc(t('food.autoIs', { v: `${nf().format(auto[k])} ${k === 'kcal' ? 'kcal' : k === 'water' ? 'ml' : 'g'}` }))}</small></span>
-          <div class="stepper"><button class="step" data-ft="-" data-k="${k}">−</button><b>${nf().format(f[k])}</b><button class="step" data-ft="+" data-k="${k}">+</button></div></div>`).join('')}</div>
+          <div class="stepper"><button class="step" data-ft="-" data-k="${k}">−</button><b class="${changed && k !== changed && k !== 'water' ? 'synced' : ''}">${nf().format(f[k])}</b><button class="step" data-ft="+" data-k="${k}">+</button></div></div>`).join('')}</div>
+        <div class="fsplit"><i class="p" style="flex:${split[0]}"></i><i class="c" style="flex:${split[1]}"></i><i class="f" style="flex:${split[2]}"></i></div>
+        <p class="snote center">${esc(t('food.split', { p: split[0], c: split[1], f: split[2] }))}</p>
         <div class="acts"><button class="log" data-ft="save">${I.check}<span>${t('food.saveTargets')}</span></button>
           <button class="btn2 solid" data-ft="auto">${t('food.useAuto')}</button></div></div>`;
     };
@@ -275,11 +278,10 @@ function targetsSheet() {
       haptic('tap');
       const k = b.dataset.k, v = b.dataset.ft;
       if (v === '+' || v === '-') {
-        const [lo, hi] = TARGET_LIMITS[k];
-        f[k] = Math.min(hi, Math.max(lo, f[k] + (v === '+' ? 1 : -1) * STEP[k]));
-        return paint();
+        Object.assign(f, syncTargets(f, k, f[k] + (v === '+' ? 1 : -1) * STEP[k])); // calories and macros move together
+        return paint(k);
       }
-      if (v === 'real') { f.kcal = realGoal; f.carbs = Math.max(0, Math.round((realGoal - f.protein * 4 - f.fat * 9) / 4 / 5) * 5); return paint(); }
+      if (v === 'real') { Object.assign(f, syncTargets(f, 'kcal', realGoal)); return paint('kcal'); }
       if (v === 'auto') store.setSettings({ foodTargets: null });
       else store.setSettings({ foodTargets: f });
       await closeTop();

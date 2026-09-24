@@ -113,9 +113,27 @@ export function validRoutine(r) {
     r.exercises.every(e => e.sets.length >= 1 && e.sets.every(s => Number.isInteger(s.reps) && s.reps >= 1));
 }
 
-// The routine to do next: the one done least recently (never done first, in list order).
-export function nextRoutine(routines, history) {
+// Which weekday a routine belongs to (0 = Sunday … 6 = Saturday): set in the editor, or read from
+// its name ("Monday: Legs + Shoulders", "Mandag – ben"). null when it floats.
+const DAY_WORDS = [['sunday', 'søndag', 'sun', 'søn'], ['monday', 'mandag', 'mon', 'man'], ['tuesday', 'tirsdag', 'tue', 'tues', 'tir'], ['wednesday', 'onsdag', 'wed', 'ons'],
+  ['thursday', 'torsdag', 'thu', 'thur', 'thurs', 'tor'], ['friday', 'fredag', 'fri', 'fre'], ['saturday', 'lørdag', 'sat', 'lør']];
+export function routineDay(r) {
+  if (r?.weekday === -1) return null; // "any day", even if the name says a day
+  if (Number.isInteger(r?.weekday) && r.weekday >= 0 && r.weekday <= 6) return r.weekday;
+  const n = String(r?.name || '').toLowerCase();
+  for (let i = 0; i < 7; i++) if (DAY_WORDS[i].some(w => new RegExp(`(^|[^a-zæøå])${w}([^a-zæøå]|$)`).test(n) && (w.length > 3 || /^\s*\S{3,4}\b[\s:.,–-]/.test(n)))) return i;
+  return null;
+}
+// "Monday: Legs + Shoulders" → "Legs + Shoulders" (the day is shown on its own)
+export const withoutDay = name => String(name || '').replace(/^\s*(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mandag|tirsdag|onsdag|torsdag|fredag|lørdag|søndag)\s*[:.,–—-]?\s*/i, '') || name;
+const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
+
+// The routine to do next: today's (by weekday) if it isn't done yet, else the one done least
+// recently (never done first, in list order).
+export function nextRoutine(routines, history, now = Date.now()) {
   if (!routines.length) return null;
+  const today = routines.find(r => routineDay(r) === new Date(now).getDay());
+  if (today && !history.some(w => sameDay(w.startedAt, now))) return today;
   const last = id => Math.max(0, ...history.filter(w => w.routineId === id).map(w => w.startedAt));
   return [...routines].sort((a, b) => last(a.id) - last(b.id) || (a.createdAt || 0) - (b.createdAt || 0))[0];
 }

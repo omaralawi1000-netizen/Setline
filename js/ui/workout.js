@@ -12,6 +12,7 @@ import { toast } from './toast.js';
 import { burst } from './fx.js';
 import { openPlates } from './plates.js';
 import { warmupsFor } from '../warmup.js';
+import { chime } from '../audio.js';
 import { getKey } from '../keys.js';
 import { openSheet, closeTop } from './sheet.js';
 import { openPicker } from './picker.js';
@@ -60,7 +61,7 @@ export function renderWorkout(root) {
   const header = `<header class="top">
       <button class="iconbtn" data-act="go" data-to="today" aria-label="${t('common.back')}">${I.back}</button>
       <div class="ttl"><strong>${esc(workoutTitle(w))}</strong><span><span data-elapsed>${clock(W.elapsedSec(w))}</span><span class="tgoal${goalOver(w, Date.now()) ? ' over' : ''}" data-tgoal>${goalText(w, Date.now())}</span>${w.deload ? ` · <em class="easy">${t('deload.badge')}</em>` : w.easy ? ` · <em class="easy">${t('ready.easyBadge')}</em>` : ''}</span></div>
-      <div class="topacts"><button class="iconbtn hfbtn${handsFreeOn() ? ' is-on' : ''}" data-act="handsfree" aria-pressed="${handsFreeOn()}" aria-label="${t('hf.title')}">${I.headphones}</button>
+      <div class="topacts">${state.settings.hfButton || handsFreeOn() ? `<button class="iconbtn hfbtn${handsFreeOn() ? ' is-on' : ''}" data-act="handsfree" aria-pressed="${handsFreeOn()}" aria-label="${t('hf.title')}">${I.headphones}</button>` : ''}
       <button class="pillbtn" data-act="finish">${t('workout.finish')}</button></div>
     </header>${hfPillHTML()}`;
 
@@ -285,10 +286,6 @@ export function tickWorkout(root, now) {
   const st = restState(w, now);
   const slot = root.querySelector('#restslot');
   if (!slot) return;
-  if (w.rest && st !== 'running' && ui.buzzed !== w.rest.endsAt && now - w.rest.endsAt < 2000) {
-    ui.buzzed = w.rest.endsAt;
-    haptic('success');
-  }
   const card = slot.querySelector('#rest');
   const want = st === 'none' ? null : st;
   const have = card ? (card.querySelector('#rchips').hidden ? 'done' : 'running') : null;
@@ -623,6 +620,20 @@ function finishSheet() {
 // ---------- wiring ----------
 
 // Smart warm-ups: when you land on the first lift for a muscle, its warm-up sets are already there.
+// Rest over: a bell (3-2-1 ticks first) and a real buzz, whichever tab you're on. Called by the app clock.
+const bell = { ticked: '', rang: 0 };
+export function restBell(w, now = Date.now()) {
+  const r = w?.rest;
+  if (!r) return;
+  const left = Math.ceil((r.endsAt - now) / 1000);
+  if (state.settings.restSound && left <= 3 && left >= 1 && bell.ticked !== `${r.endsAt}:${left}`) { bell.ticked = `${r.endsAt}:${left}`; chime('tick'); }
+  if (now >= r.endsAt && bell.rang !== r.endsAt && now - r.endsAt < 2000) {
+    bell.rang = r.endsAt;
+    if (state.settings.restSound) chime('end');
+    try { navigator.vibrate?.([260, 110, 260, 110, 420]); } catch {} // a real buzz, even with light haptics off
+  }
+}
+
 export function autoWarmup() {
   const w = state.active;
   if (!w?.exercises.length || !state.settings.autoWarmup) return;

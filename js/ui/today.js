@@ -5,7 +5,7 @@ import { foodTargets } from './food.js';
 import { dayTotals } from '../nutrition.js';
 import { esc } from './dom.js';
 import { I } from './icons.js';
-import { routineName, estimateMinutes, nextRoutine } from '../routines.js';
+import { routineName, estimateMinutes, nextRoutine, routineDay, withoutDay } from '../routines.js';
 import { greetingKey, clock, total, weight, num } from '../format.js';
 import { toDisplay } from '../units.js';
 import { doneSetCount, elapsedSec } from '../workout.js';
@@ -72,7 +72,37 @@ function resumeHTML() {
 
 // Start cards, shared with the Workout tab's empty state.
 export function startCardsHTML() {
-  return upNextHTML() + cardioRowHTML() + routinesHTML();
+  return weekPlanHTML() + upNextHTML() + toolsHTML() + cardioRowHTML() + routinesHTML();
+}
+
+// Your week at a glance: each day's routine (from its weekday), what's done, and today.
+function weekPlanHTML() {
+  const { t, lang } = state;
+  const byDay = new Map();
+  for (const r of sortedRoutines()) { const d = routineDay(r); if (d != null && !byDay.has(d)) byDay.set(d, r); }
+  const start = weekStart(Date.now()), today = dateKey();
+  const trained = new Set([...state.history, ...state.cardio].map(w => dateKey(w.startedAt)));
+  const fmt = new Intl.DateTimeFormat(lang === 'da' ? 'da-DK' : 'en-GB', { weekday: 'short' });
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const at = start + i * 86_400_000, key = dateKey(at), r = byDay.get(new Date(at).getDay());
+    const done = trained.has(key), isToday = key === today, past = key < today;
+    const cls = [done ? 'done' : '', isToday ? 'today' : '', !r ? 'rest' : '', past && !done && r ? 'missed' : ''].filter(Boolean).join(' ');
+    return `<button class="wpday ${cls}" ${r && !state.active ? `data-act="start-routine" data-id="${esc(r.id)}"` : 'disabled'} style="--i:${i}">
+      <span class="wd">${esc(fmt.format(at).replace('.', ''))}</span><span class="wdot">${done ? I.check : ''}</span><span class="wr">${esc(r ? withoutDay(routineName(r, lang)) : byDay.size ? t('plan.rest') : '')}</span></button>`;
+  });
+  return `<div class="section"><span class="label">${t('plan.week')}</span></div><div class="wplan${byDay.size ? '' : ' open'}">${days.join('')}</div>${byDay.size ? '' : `<p class="snote wphint">${t('plan.weekHint')}</p>`}`;
+}
+
+// Everything else about your training, one tap away.
+function toolsHTML() {
+  const { t } = state;
+  const tile = (attr, icon, title, sub) => `<button class="ttile solid" ${attr}><span class="tic">${icon}</span><strong>${title}</strong><small>${sub}</small></button>`;
+  const prs = state.history.filter(w => w.startedAt >= Date.now() - 30 * 86_400_000).reduce((a, w) => a + (w.prs?.length || 0), 0);
+  return `<div class="tgrid">
+    ${tile('data-progress', I.chart, t('hub.progress'), esc(t('hub.progressSub', { n: prs })))}
+    ${tile('data-historyscreen', I.history, t('history.title'), esc(t('hub.historySub', { n: state.history.length })))}
+    ${tile('data-bodyscreen', I.ruler, t('bodyx.title'), esc(t('hub.bodySub')))}
+  </div>`;
 }
 
 function cardioRowHTML() {
@@ -239,6 +269,16 @@ function bodyHTML() {
 }
 
 // The Coach's Monday check-in, until you've read it.
+// The Coach's look at your last workout, until you've read it.
+function debriefCardHTML() {
+  const { t } = state;
+  const id = state.settings.debriefUnseen;
+  const msg = id && state.chat.find(m => m.debrief === id);
+  if (!msg) return '';
+  const preview = msg.text.replace(/\*\*?|#+\s/g, '').split('\n').map(x => x.trim()).filter(Boolean)[0] || '';
+  return `<button class="wkcard solid" data-weekly><span class="wki">${I.workout}</span><span class="l"><strong>${t('debrief.ready')}</strong><small>${esc(preview.slice(0, 110))}</small></span>${I.fwd}</button>`;
+}
+
 function weeklyCardHTML() {
   const { t } = state;
   const s = state.settings;
@@ -287,6 +327,7 @@ export function renderToday(root) {
   const part = {
     checkin: () => (busy || !on('checkin') ? '' : checkinHTML()),
     upnext: () => (busy ? '' : upNextHTML({ more: !on('routines') })),
+    weekplan: () => (busy || !on('weekplan') || !state.routines.some(r => routineDay(r) != null) ? '' : weekPlanHTML()),
     plateau: () => (busy || !on('plateau') ? '' : plateauHTML()),
     goals: () => (on('goals') ? goalCardsHTML() : ''),
     cardio: () => (busy || !on('cardio') ? '' : cardioRowHTML()),
@@ -303,7 +344,7 @@ export function renderToday(root) {
 ${state.settings.greeting ? `<h1 class="greet">${greeting(t(greetingKey(hour))).split(' ').map((w, i) => `<span class="gw" style="--i:${i}">${esc(w)}</span>`).join(' ')}</h1>
     <p class="sub${!busy && weekStreak(state.history, state.cardio, state.settings.weeklyGoal).streak ? ' streak' : ''}">${esc(subline())}</p>` : ''}
     ${busy ? '' : driveNudgeHTML({ stale: true })}
-    ${busy ? resumeHTML() : weeklyCardHTML()}
+    ${busy ? resumeHTML() : weeklyCardHTML() || debriefCardHTML()}
     ${busy ? '' : deloadHTML()}
     ${busy ? '' : monthCardHTML()}
     ${todayOrderOf(state.settings).map(k => part[k]()).join('')}

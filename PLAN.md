@@ -295,3 +295,20 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] Status bar: the app's own background colour (no black band); the black top fade is gone
 - [x] Fixed: huge arrows on Settings rows
 - [x] Make it yours (Today → Customize, or Settings → Make it yours): opens on Today/Workout/Food/Coach, text size, background glow on/soft/off, Today greeting on/off, tab names on/off, workout screen figure and last/best line on/off, smart warm-ups and coach tips; plus colours and Today cards as before
+
+## 1.22.0: a smarter, smoother Coach; liquid-glass bar; weekly plan; rest bell; synced targets
+
+- [x] Coach uses Gemini Pro first when the key has it (deeper thinking, slower), Flash as fallback; Settings keeps Flash-only as an option (coachBrain)
+- [x] "The plan from my brief" / "set up my routines" copies the routine written in the brief (no new design); Brief sheet has "Set up the routine in my brief"
+- [x] Coach replies: thinking state (orb + shimmer, "thinking it through" after 7 s), words glide in smoothly (typewriter that catches up), bubbles spring in, a soft glow when done; keyboard goes down after sending
+- [x] Composer: a small orb beside the text box: tap, talk, the words land in the box; the bottom bar steps aside while typing
+- [x] Replies speak instantly with the phone's voice by default (Instant); Natural/Fast Gemini voices still in Settings
+- [x] Rest bell: 3-2-1 ticks and a bell + strong buzz when rest ends, on any tab (Settings → Workout → Rest bell)
+- [x] Food targets: calories and macros move together (calories move carbs, then fat; macros move calories); split bar
+- [x] Hands-free (headphones) button hidden by default; Customize → Hands-free button brings it back
+- [x] New tab icons (duotone when active), liquid-glass bottom bar with a stretching lens, springier shrink to a pill and back (opens again at the end of a page)
+- [x] Top edge: a soft progressive blur into the status bar
+- [x] Four more colours: Lime, Gold, Crimson, Graphite
+- [x] Workout tab is now "Train": your week (routines by weekday, done/today/missed), Up next, Progress / History / Body tiles, cardio, routines; routine editor has day chips; "Your week" can also go on Today
+- [x] Up next picks today's routine by weekday
+- [x] Coach debrief after every workout: what moved, what dropped, exact targets for next time (toast + Today card; Customize toggle)

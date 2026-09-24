@@ -292,7 +292,7 @@ export async function speak(text, opts) {
   if (!text) return;
   stop();
   const mine = ++seq;
-  if (opts.key) {
+  if (opts.key && opts.model !== 'device') { // 'device': the phone's own voice, no network wait
     const parts = splitSpeech(text);
     const jobs = parts.map(p => clip(p, opts));
     jobs.forEach(j => j.catch(() => {})); // a later piece failing is handled when we get to it
@@ -312,7 +312,7 @@ export async function speak(text, opts) {
       console.warn('tts fallback', lastSpeech.error);
     }
     text = parts.slice(played).join(' ');
-  } else lastSpeech.error = 'nokey';
+  } else lastSpeech.error = opts.model === 'device' ? null : 'nokey';
   lastSpeech.engine = 'device';
   if (mine !== seq || !opts.canSpeak()) return;
   fallback(text, opts.lang, mine);

@@ -479,7 +479,9 @@ button.mini:active,button.pr:active{transform:scale(.98)}
 .exq{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:16px}
 .exq .chip{height:auto;min-height:38px;padding:8px 14px;white-space:normal;text-align:center;color:var(--ink)}
 .thread{list-style:none;margin-top:16px;display:flex;flex-direction:column;gap:10px}
-.msg{display:flex;animation:rise .4s var(--ease)}
+.msg{display:flex;animation:msgin .55s cubic-bezier(.2,1.25,.4,1) both}
+.msg.me{transform-origin:100% 100%}.msg.ai{transform-origin:0 100%}
+@keyframes msgin{from{opacity:0;transform:translateY(14px) scale(.94)}}
 .msg.me{justify-content:flex-end}
 .msg .bub{max-width:86%;padding:11px 14px;border-radius:20px;font-size:15.5px;line-height:1.45;font-weight:600;overflow-wrap:anywhere;-webkit-user-select:text;user-select:text}
 .msg.me .bub{background:rgba(var(--a-rgb),.16);border:1px solid rgba(var(--a-rgb),.22);border-bottom-right-radius:8px}
@@ -494,18 +496,19 @@ button.mini:active,button.pr:active{transform:scale(.98)}
 .dots i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:dot 1.1s ease-in-out infinite}
 .dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
 @keyframes dot{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
-.composer{position:absolute;z-index:6;left:16px;right:16px;bottom:calc(var(--dock-bottom) + var(--dock-h) + 10px);height:54px;border-radius:22px;padding:0 6px 0 16px;display:flex;align-items:center;gap:8px;opacity:0;transform:translateY(12px);pointer-events:none;transition:opacity .35s var(--ease),transform .5s var(--ease),bottom .25s var(--ease)}
+.composer{position:absolute;z-index:6;left:16px;right:16px;bottom:calc(var(--dock-bottom) + var(--dock-h) + 10px);height:56px;border-radius:24px;padding:0 6px 0 7px;display:flex;align-items:center;gap:8px;opacity:0;transform:translateY(12px);pointer-events:none;transition:opacity .35s var(--ease),transform .5s var(--ease),bottom .25s var(--ease)}
 .app.coaching:not(.is-sub):not(.voice) .composer{opacity:1;transform:none;pointer-events:auto}
 .composer input{flex:1;min-width:0;height:100%;outline:none;font-size:16px;font-weight:600}
 .composer input::placeholder{color:var(--dim)}
-.composer button{width:42px;height:42px;border-radius:15px;display:grid;place-items:center;background:linear-gradient(180deg,var(--accent),var(--accent));color:var(--accent-ink);transition:transform .25s var(--ease)}
-.composer button:active{transform:scale(.92)}
-.composer button svg{width:20px;height:20px;stroke-width:2.4}
-.composer button.stop{background:rgba(255,255,255,.1);color:var(--ink)}
+.composer .csend{width:42px;height:42px;border-radius:15px;display:grid;place-items:center;background:linear-gradient(180deg,var(--accent),var(--accent));color:var(--accent-ink);transition:transform .25s var(--ease)}
+.composer .csend:active{transform:scale(.92)}
+.composer .csend svg{width:20px;height:20px;stroke-width:2.4}
+.composer .csend.stop{background:rgba(255,255,255,.1);color:var(--ink)}
 .app.coaching .screen#s-coach{padding-bottom:calc(var(--dock-bottom) + var(--dock-h) + 84px)}
 .app.coaching.has-mini .composer{bottom:calc(var(--dock-bottom) + var(--dock-h) + 70px)}
 .app.coaching.has-mini #s-coach{padding-bottom:calc(var(--dock-bottom) + var(--dock-h) + 144px)}
-.app.kb .dock,.app.kb .minibar{opacity:0;pointer-events:none;transform:translateY(20px)}
+.app.kb .dock,.app.kb .minibar,.app.inputting .dock,.app.inputting .minibar{opacity:0;pointer-events:none;transform:translateY(24px) scale(.96)}
+.app.inputting:not(.kb) .composer{bottom:calc(var(--dock-bottom) + 6px)}
 .app.kb .composer{bottom:calc(var(--kb, 0px) + 10px)}
 .app.kb #s-coach{padding-bottom:calc(var(--kb, 0px) + 80px)}
 .intent .spin2{width:22px;height:22px;border-radius:50%;border:2.5px solid rgba(var(--a-rgb),.25);border-top-color:var(--accent);animation:spin .8s linear infinite}
@@ -1389,6 +1392,10 @@ html[data-motion=off] .edge::before,html[data-motion=off] .edge::after{transitio
 .swatch[data-accent=jade] i{background:radial-gradient(circle at 35% 30%,#E0FFEE,#3FCB8A 55%,#1F8A5C)}
 .swatch[data-accent=ember] i{background:radial-gradient(circle at 35% 30%,#FFEBDA,#F2804A 55%,#B9462C)}
 .swatch[data-accent=rose] i{background:radial-gradient(circle at 35% 30%,#FFE3F0,#E567B0 55%,#A83A86)}
+.swatch[data-accent=gold] i{background:radial-gradient(circle at 35% 30%,#FFF3D6,#F0B545 55%,#B97A1F)}
+.swatch[data-accent=crimson] i{background:radial-gradient(circle at 35% 30%,#FFE0E0,#E5484D 55%,#A3232A)}
+.swatch[data-accent=lime] i{background:radial-gradient(circle at 35% 30%,#F0FFD6,#9BD93A 55%,#5E9A1F)}
+.swatch[data-accent=mono] i{background:radial-gradient(circle at 35% 30%,#FFFFFF,#B8BACB 55%,#4A4D5E)}
 .swatch[aria-pressed=true]{color:var(--ink);background:rgba(255,255,255,.06)}
 .swatch[aria-pressed=true] i{transform:scale(1.1);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35),0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
 /* colour changes glide rather than snap */
@@ -1805,3 +1812,98 @@ html[data-dock=icons] .dock .tab span{display:none}
 .pcard .pacts > button{width:auto;min-width:0;margin-top:14px}
 .pcard .pacts .log span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pcard .pacts .btn2{padding:0 18px}
+
+/* 1.22: the composer's own orb: tap and talk, the words land in the box */
+.corb{width:42px;height:42px;flex:none;display:grid;place-items:center;border-radius:50%;transition:transform .35s cubic-bezier(.3,1.5,.5,1)}
+.corb .orb{--s:34px;transform:scale(calc(1 + var(--lv, 0) * .35));transition:transform .08s linear}
+.corb:active{transform:scale(.9)}
+.composer.dictating .corb .orb .core{animation:breathe 1.2s ease-in-out infinite}
+.composer.dictating{box-shadow:0 0 0 1.5px rgba(var(--a-rgb),.55),0 18px 40px -16px rgba(var(--v-rgb),.7)}
+.composer.hearing .corb .orb{animation:spinlite 1s linear infinite}
+@keyframes spinlite{to{filter:hue-rotate(40deg)}}
+.composer input{padding-left:2px}
+
+/* 1.22: the Coach thinking, and a soft finish */
+.think{display:inline-flex;align-items:center;gap:10px;padding:2px 0}
+.think .orb{--s:22px}
+.think .orb .core{animation:breathe 1.6s ease-in-out infinite}
+.think .tl{font-weight:700;background:linear-gradient(90deg,var(--muted) 0%,var(--ink) 45%,var(--muted) 90%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shimmer 1.8s linear infinite}
+@keyframes shimmer{from{background-position:120% 0}to{background-position:-100% 0}}
+.msg.ai:not(.is-streaming):not(.seen) .bub{animation:settle .9s ease-out}
+@keyframes settle{0%{box-shadow:0 0 0 1px rgba(var(--a-rgb),.45),0 0 24px -6px rgba(var(--a-rgb),.55)}100%{box-shadow:0 0 0 1px transparent,0 0 0 0 transparent}}
+.msg.ai .bub{backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%)}
+.msg.is-streaming .bub{transition:height .2s}
+
+/* targets that add up: the numbers that followed your change glow for a moment */
+.stepper b.synced{animation:synced .8s ease-out}
+@keyframes synced{0%{color:var(--accent);transform:scale(1.12)}100%{color:inherit;transform:none}}
+.fsplit{display:flex;gap:3px;height:8px;margin-top:14px;border-radius:99px;overflow:hidden}
+.fsplit i{transition:flex .5s var(--ease)}
+.fsplit .p{background:var(--accent)}.fsplit .c{background:#7EC8F2}.fsplit .f{background:#F2C27E}
+
+/* ---------- 1.22: liquid glass bottom bar ---------- */
+.dock.glass{--gl-fill:rgba(18,20,28,.64);
+  background:
+    radial-gradient(90% 120% at 50% -30%,rgba(255,255,255,.16),rgba(255,255,255,0) 60%) padding-box,
+    linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,0) 50%,rgba(0,0,0,.08)) padding-box,
+    linear-gradient(var(--gl-fill),var(--gl-fill)) padding-box,
+    linear-gradient(170deg,rgba(255,255,255,.5),rgba(255,255,255,.08) 28%,rgba(255,255,255,.03) 60%,rgba(var(--a-rgb),.35)) border-box;
+  border:1px solid transparent;
+  -webkit-backdrop-filter:blur(26px) saturate(210%) brightness(1.08);backdrop-filter:blur(26px) saturate(210%) brightness(1.08);
+  box-shadow:0 22px 44px -14px rgba(0,0,0,.8),0 6px 14px -6px rgba(0,0,0,.5),inset 0 1px 1px rgba(255,255,255,.28),inset 0 -1px 1px rgba(255,255,255,.05),inset 0 -16px 26px -20px rgba(var(--v-rgb),.45)}
+/* the lens under the active tab: glassy, with a highlight, and it stretches as it moves */
+.dock .ind{top:7px;height:58px;border-radius:26px;
+  background:radial-gradient(120% 90% at 50% 0%,rgba(255,255,255,.3),rgba(255,255,255,.04) 58%,rgba(255,255,255,0)),rgba(var(--a-rgb),.13);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4),inset 0 -1px 0 rgba(255,255,255,.06),inset 0 0 0 1px rgba(255,255,255,.08),0 10px 24px -10px rgba(var(--v-rgb),.7);
+  transition:transform .62s cubic-bezier(.3,1.3,.45,1),width .62s cubic-bezier(.3,1.3,.45,1),opacity .3s}
+.dock .ind.moving{animation:liquid2 .62s cubic-bezier(.3,1.1,.45,1)}
+@keyframes liquid2{0%{scale:1 1}25%{scale:1.22 .86}55%{scale:.95 1.06}80%{scale:1.02 .99}100%{scale:1 1}}
+.tab{color:rgba(236,236,245,.62)}
+.tab svg.ti{width:25px;height:25px;stroke-width:1.75;transition:transform .5s cubic-bezier(.3,1.5,.45,1),color .3s}
+.tab svg.ti .fl{fill:currentColor;fill-opacity:0;transition:fill-opacity .35s}
+.tab svg.ti .sp{fill:currentColor;stroke:none}
+.tab.on svg.ti{color:var(--accent);animation:none;transform:translateY(-1px) scale(1.06)}
+.tab.on svg.ti .fl{fill-opacity:.22}
+.tab.on{color:var(--ink)}
+.tab:active svg.ti{transform:scale(.86)}
+.tab span{font-size:10.5px;letter-spacing:.01em}
+/* shrinking into the pill and back: one spring for every part */
+.dock{--dk:cubic-bezier(.34,1.15,.4,1);will-change:left,right}
+.app.compact:not(.is-sub):not(.voice):not(.kb) .dock{border-radius:34px;box-shadow:0 16px 34px -12px rgba(0,0,0,.85),inset 0 1px 1px rgba(255,255,255,.3)}
+.app.compact .dock .tab.on{background:radial-gradient(120% 90% at 50% 0%,rgba(255,255,255,.24),rgba(255,255,255,0) 60%),rgba(var(--a-rgb),.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
+.app.compact .dock .tab.on svg.ti{transform:translateY(7px) scale(1.02)}
+
+/* ---------- 1.22: the top edge: a soft progressive blur into the status bar ---------- */
+.edge.et{height:calc(var(--safe-top) + 72px)}
+.edge.et::before{opacity:1;background:linear-gradient(180deg,var(--bg) 0,color-mix(in srgb,var(--bg) 88%,transparent) calc(var(--safe-top) * .9),color-mix(in srgb,var(--bg) 55%,transparent) calc(var(--safe-top) + 22px),color-mix(in srgb,var(--bg) 0%,transparent) 100%)}
+.edge.et::after{-webkit-backdrop-filter:blur(16px) saturate(170%);backdrop-filter:blur(16px) saturate(170%);
+  -webkit-mask-image:linear-gradient(#000 0,#000 calc(var(--safe-top) + 6px),rgba(0,0,0,.5) calc(var(--safe-top) + 34px),transparent);
+  mask-image:linear-gradient(#000 0,#000 calc(var(--safe-top) + 6px),rgba(0,0,0,.5) calc(var(--safe-top) + 34px),transparent);opacity:0}
+.app.under-top .edge.et::after{opacity:1}
+
+/* ---------- 1.22: the Workout tab as a hub ---------- */
+.wplan{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.wpday{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 2px 10px;border-radius:16px;background:var(--card);border:1px solid var(--card-line);min-width:0;animation:rise .5s var(--ease) both;animation-delay:calc(var(--i) * .035s);transition:transform .3s cubic-bezier(.3,1.5,.5,1)}
+.wpday:not(:disabled):active{transform:scale(.93)}
+.wpday .wd{font-size:11px;font-weight:800;color:var(--muted);text-transform:capitalize}
+.wpday .wdot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;border:1.5px solid rgba(255,255,255,.14)}
+.wpday .wdot svg{width:13px;height:13px;stroke-width:3}
+.wpday .wr{font-size:10px;font-weight:700;line-height:1.2;color:var(--ink);text-align:center;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;padding:0 2px}
+.wpday.rest .wr{color:var(--dim)}
+.wpday.done .wdot{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.wpday.today{border-color:rgba(var(--a-rgb),.55);background:radial-gradient(120% 90% at 50% 0%,rgba(var(--a-rgb),.16),rgba(var(--a-rgb),0) 70%),var(--card)}
+.wpday.today .wd{color:var(--accent)}
+.wpday.missed .wdot{border-style:dashed;opacity:.6}
+.tgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.ttile{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:14px 12px;border-radius:20px;text-align:left;min-width:0;transition:transform .3s cubic-bezier(.3,1.5,.5,1)}
+.ttile:active{transform:scale(.95)}
+.ttile .tic{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:rgba(var(--a-rgb),.12);color:var(--accent);margin-bottom:4px}
+.ttile .tic svg{width:19px;height:19px}
+.ttile strong{font-size:14px;font-weight:800}
+.ttile small{font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.3}
+#s-workout > .upcoming{margin-top:12px}
+.dayopts{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:10px -20px 4px;padding:0 20px}
+.dayopts .chip{flex:none;text-transform:capitalize}
+.msg.is-streaming .bub > .think::after{display:none}
+.wplan.open .wr{display:none}
+.wphint{margin-top:8px}

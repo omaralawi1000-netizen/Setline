@@ -28,7 +28,8 @@ const second = list => rankModels(list)[1] || null;
 export function pickTextModels(models) {
   const ids = models.filter(canGenerate).map(id).filter(s => /^gemini/.test(s) && !SPECIAL.test(s));
   const lite = ids.filter(s => /flash-lite/.test(s)), flash = ids.filter(s => /flash/.test(s) && !/lite/.test(s));
-  return { command: newest(lite), coach: newest(flash), commandAlt: second(lite), coachAlt: second(flash) };
+  const pro = ids.filter(s => /-pro\b/.test(s) && !/flash|lite/.test(s));
+  return { command: newest(lite), coach: newest(flash), commandAlt: second(lite), coachAlt: second(flash), pro: newest(pro) };
 }
 
 // ---------- SSE (pure) ----------
@@ -262,14 +263,16 @@ const noThinking = new Set();
 
 // firstChunkTimeout: thinking models say nothing until they've thought, so the first words get longer
 // than the gaps between later ones. The thinking itself is capped so answers start sooner.
-export async function streamChat({ key, model, system, contents, onText, signal, firstByteTimeout = 15000, firstChunkTimeout = 45000, idleTimeout = 20000 }) {
+export async function streamChat({ key, model, system, contents, onText, signal, firstByteTimeout = 20000, firstChunkTimeout = 0, idleTimeout = 25000 }) {
   const think = !noThinking.has(model);
+  const pro = /-pro\b/.test(model);
+  firstChunkTimeout ||= pro ? 90000 : 60000; // Pro thinks longer before its first word
   let posted;
   try {
     posted = await post(`models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, key, {
       systemInstruction: { parts: [{ text: system }] },
       contents,
-      generationConfig: { temperature: 0.6, maxOutputTokens: 2048, ...(think ? { thinkingConfig: { thinkingBudget: 1024 } } : {}) }
+      generationConfig: { temperature: 0.6, maxOutputTokens: 8192, ...(think ? { thinkingConfig: { thinkingBudget: pro ? -1 : 3072 } } : {}) }
     }, { timeout: firstByteTimeout, signal });
   } catch (e) {
     if (think && e instanceof AiError && e.code === 'badrequest') { noThinking.add(model); return streamChat({ key, model, system, contents, onText, signal, firstByteTimeout, firstChunkTimeout, idleTimeout }); }

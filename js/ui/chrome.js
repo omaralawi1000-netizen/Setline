@@ -29,7 +29,9 @@ export function initChrome() {
       app.classList.toggle('under-top', s.scrollTop > 6);
       app.classList.toggle('under-bottom', s.scrollHeight - s.clientHeight - s.scrollTop > 6);
       const y = s.scrollTop, dy = y - lastY;
-      if (Math.abs(dy) > 12) { app.classList.toggle('compact', dy > 0 && y > 80); lastY = y; }
+      const atEnd = s.scrollHeight - s.clientHeight - y < 24; // the end of the page: the bar opens again
+      if (atEnd && app.classList.contains('compact')) { app.classList.remove('compact'); lastY = y; }
+      else if (Math.abs(dy) > 14) { app.classList.toggle('compact', dy > 0 && y > 90 && !atEnd); lastY = y; }
     });
   };
   app.addEventListener('scroll', onScroll, { capture: true, passive: true });

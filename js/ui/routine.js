@@ -126,6 +126,7 @@ export function renderRoutine(root) {
     </header>
     <input class="rname" id="rname" value="${esc(R.routineName(d, lang))}" placeholder="${esc(t('routine.namePh'))}" maxlength="${R.LIMITS.name}" autocomplete="off" aria-label="${t('routine.name')}">
     <p class="sub">${t('routine.exercises', { n: d.exercises.length })} · ${t('min', { n: R.estimateMinutes(d) })}</p>
+    <div class="dayopts">${[-1, 1, 2, 3, 4, 5, 6, 0].map(v => `<button class="chip" data-r="day" data-v="${v}" aria-pressed="${(R.routineDay(d) ?? -1) === v}">${v === -1 ? t('plan.anyDay') : esc(new Intl.DateTimeFormat(lang === 'da' ? 'da-DK' : 'en-GB', { weekday: 'short' }).format(new Date(2026, 8, 27 + v)).replace('.', ''))}</button>`).join('')}</div>
     <ol class="redit" id="redit">${d.exercises.map((e, i) => `<li class="reitem solid" data-i="${i}">
         <span class="grip" data-grip aria-label="${t('routine.drag')}"><svg class="i" viewBox="0 0 24 24"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg></span>
         <div class="rei"><strong>${esc(state.catalog.name(e.exerciseId, lang))}</strong>
@@ -166,6 +167,12 @@ export function initRoutine(root) {
     const k = b.dataset.r, i = Number(b.dataset.i);
     const { t, lang } = state;
     readName(root);
+    if (k === 'day') {
+      ui.draft = { ...ui.draft, weekday: Number(b.dataset.v) };
+      haptic('tap');
+      for (const c of root.querySelectorAll('[data-r=day]')) c.setAttribute('aria-pressed', String(c === b));
+      return;
+    }
     if (k === 'sets' || k === 'reps') {
       const ex = ui.draft.exercises[i];
       const n = ex.sets.length + (k === 'sets' ? Number(b.dataset.d) : 0);

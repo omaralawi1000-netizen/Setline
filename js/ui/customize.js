@@ -30,6 +30,8 @@ export function openCustomize() {
           ${tog('exGhost', 'look.ghost', 'look.ghostSub')}
           ${tog('autoWarmup', 'settings.autoWarmup', 'settings.autoWarmupSub')}
           ${tog('suggestions', 'settings.suggestions', 'settings.suggestionsSub')}
+          ${tog('debrief', 'debrief.setting', 'debrief.settingSub')}
+          ${tog('hfButton', 'look.hf', 'look.hfSub')}
         </div></div>
         <div class="field"><label>${t('cust.cards')}</label><div class="slist solid">${todayOrderOf(s).map((k, i, ord) => `<div class="srow ord"><span class="l"><strong>${t('cust.part.' + k)}</strong></span>
           <span class="ordbtns"><button class="iconbtn sm" data-cu="move" data-k="${k}" data-d="-1" aria-label="${t('cust.up')}" ${i === 0 ? 'disabled' : ''}>${I.up}</button><button class="iconbtn sm dn" data-cu="move" data-k="${k}" data-d="1" aria-label="${t('cust.down')}" ${i === ord.length - 1 ? 'disabled' : ''}>${I.up}</button></span>

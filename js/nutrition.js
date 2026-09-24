@@ -125,3 +125,26 @@ export function adaptiveMaintenance(nutrition, bodyweight, today, days = 21) {
 
 // The goal's calories from a known maintenance (same adjustment as the formula).
 export const goalCalories = (maintenance, goal) => Math.round(maintenance * ({ fatloss: 0.8, muscle: 1.1, strength: 1.05 }[goal] ?? 1) / 10) * 10;
+
+// Targets that always add up: calories = 4·protein + 4·carbs + 9·fat.
+// Moving calories keeps protein (it protects muscle) and moves carbs; once carbs reach their floor,
+// fat moves. Moving a macro moves the calories with it.
+export function syncTargets(t, key, value) {
+  const [lo, hi] = TARGET_LIMITS[key];
+  const out = { ...t, [key]: Math.round(Math.min(hi, Math.max(lo, value))) };
+  const kcalOf = x => Math.round(x.protein * 4 + x.carbs * 4 + x.fat * 9);
+  if (key === 'water') return out;
+  if (key !== 'kcal') return { ...out, kcal: Math.min(TARGET_LIMITS.kcal[1], Math.max(TARGET_LIMITS.kcal[0], kcalOf(out))) };
+  let rest = out.kcal - out.protein * 4 - out.fat * 9;
+  const CARB_FLOOR = 50, FAT_FLOOR = TARGET_LIMITS.fat[0];
+  if (rest / 4 >= CARB_FLOOR) out.carbs = Math.round(rest / 4);
+  else {
+    out.carbs = CARB_FLOOR;
+    out.fat = Math.max(FAT_FLOOR, Math.round((out.kcal - out.protein * 4 - CARB_FLOOR * 4) / 9));
+    rest = out.kcal - out.protein * 4 - out.fat * 9;
+    out.carbs = Math.max(0, Math.round(rest / 4));
+  }
+  out.carbs = Math.min(TARGET_LIMITS.carbs[1], out.carbs);
+  out.kcal = kcalOf(out); // exact after rounding
+  return out;
+}
