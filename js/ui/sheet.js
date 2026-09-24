@@ -40,8 +40,39 @@ export function openSheet(render, { onClose = null, label = '' } = {}) {
   }
   fill(render);
   scrim.addEventListener('click', () => closeTop());
+  dragToClose(el, scrim, entry);
   requestAnimationFrame(() => requestAnimationFrame(() => { scrim.classList.add('show'); el.classList.add('show'); }));
   return api;
+}
+
+// Pull the sheet down by its top edge to close it.
+function dragToClose(el, scrim, entry) {
+  let d = null;
+  el.addEventListener('pointerdown', e => {
+    if (e.button > 0 || e.target.closest('input,button,select,a,.sbody')) return;
+    if (e.clientY - el.getBoundingClientRect().top > 72) return;
+    d = { y: e.clientY, t: performance.now(), dy: 0, id: e.pointerId };
+    el.setPointerCapture(e.pointerId);
+    el.classList.add('dragging');
+  });
+  el.addEventListener('pointermove', e => {
+    if (!d || e.pointerId !== d.id) return;
+    d.dy = Math.max(0, e.clientY - d.y);
+    el.style.transform = `translateY(${d.dy}px)`;
+    scrim.style.opacity = String(Math.max(0, 1 - d.dy / 400));
+  });
+  const end = () => {
+    if (!d) return;
+    const v = d.dy / Math.max(1, performance.now() - d.t);
+    const close = d.dy > 110 || (v > 0.6 && d.dy > 30);
+    d = null;
+    el.classList.remove('dragging');
+    el.style.transform = '';
+    scrim.style.opacity = '';
+    if (close && stack[stack.length - 1] === entry) closeTop();
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
 }
 
 function dismiss(entry) {

@@ -13,6 +13,7 @@ import { renderToday } from './ui/today.js';
 import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav } from './ui/workout.js';
 import { renderHistory, renderDetail } from './ui/history.js';
 import { renderSettings, initSettings } from './ui/settings.js';
+import { initVoice, orbHTML, voiceHandlePop, closeVoice, isVoiceOpen } from './ui/voice.js';
 
 const TABS = ['today', 'workout', 'history'];
 const SUB = ['detail', 'settings'];
@@ -33,11 +34,28 @@ function renderScreen(name = view.screen) {
   else if (name === 'settings') renderSettings(root);
 }
 
+// Built once; later renders only move the pill and relabel, so the indicator can glide.
 function renderDock() {
   const { t } = state;
-  const tab = (name, icon) => `<button class="tab${view.screen === name ? ' on' : ''}" data-act="go" data-to="${name}" ${view.screen === name ? 'aria-current="page"' : ''}>${icon}${t('tab.' + name)}</button>`;
-  $('#dock').innerHTML = tab('today', I.home) + tab('workout', I.workout) + tab('history', I.history);
-  $('#dock').style.setProperty('--tabs', 3);
+  const dock = $('#dock');
+  const tab = (name, icon, cls = '') => `<button class="tab${cls}" data-act="go" data-to="${name}">${icon}<span>${t('tab.' + name)}</span></button>`;
+  if (!dock.dataset.built || dock.dataset.lang !== state.lang) {
+    dock.innerHTML = '<span class="ind" aria-hidden="true"></span>' + tab('today', I.home) + tab('workout', I.workout) + orbHTML() + tab('history', I.history, ' wide');
+    dock.dataset.built = '1';
+    dock.dataset.lang = state.lang;
+  }
+  let on = null;
+  for (const b of dock.querySelectorAll('.tab')) {
+    const is = b.dataset.to === view.screen;
+    b.classList.toggle('on', is);
+    if (is) { b.setAttribute('aria-current', 'page'); on = b; } else b.removeAttribute('aria-current');
+  }
+  const ind = dock.querySelector('.ind');
+  if (on && on.offsetWidth) {
+    ind.style.width = on.offsetWidth + 'px';
+    ind.style.transform = `translateX(${on.offsetLeft}px)`;
+    requestAnimationFrame(() => ind.classList.add('ready'));
+  }
 }
 
 function renderMini() {
@@ -59,11 +77,27 @@ function renderAll() {
   renderMini();
 }
 
-function show(name) {
+// Direction for the transition: tabs by position, sub screens push in from the right.
+const ORDER = { today: 0, workout: 1, history: 2, detail: 3, settings: 3 };
+function show(name, { back = false } = {}) {
+  const prev = view.screen;
   view.screen = name;
+  const dir = prev === name ? 0 : (back ? -1 : Math.sign((ORDER[name] ?? 0) - (ORDER[prev] ?? 0)) || 1);
   for (const s of document.querySelectorAll('.screen')) {
     const on = s.dataset.screen === name;
-    s.classList.toggle('on', on);
+    const was = s.classList.contains('on');
+    if (on && !was) {
+      s.classList.add('instant');
+      s.style.setProperty('--off-x', `${dir * 28}px`);
+      void s.offsetWidth;
+      s.classList.remove('instant');
+      s.classList.add('on', 'enter');
+      clearTimeout(s._enter);
+      s._enter = setTimeout(() => s.classList.remove('enter'), 800);
+    } else if (!on && was) {
+      s.style.setProperty('--off-x', `${-dir * 28}px`);
+      s.classList.remove('on', 'enter');
+    }
     s.inert = !on;
   }
   app.classList.toggle('sub', SUB.includes(name));
@@ -71,9 +105,9 @@ function show(name) {
 }
 
 // Tabs replace the current history entry; sub screens push one so Android back works.
-function go(name) {
+function go(name, { quiet = false } = {}) {
   if (!TABS.includes(name)) return;
-  if (name === view.screen) { $('#s-' + name).scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  if (name === view.screen) { if (!quiet) $('#s-' + name).scrollTo({ top: 0, behavior: 'smooth' }); return; }
   history.replaceState({ screen: name }, '');
   $('#s-' + name).scrollTop = 0;
   show(name);
@@ -98,15 +132,17 @@ function showDetail(id, { fromFinish = false } = {}) {
 
 addEventListener('popstate', e => {
   if (handlePop()) return;
+  if (voiceHandlePop()) return;
   const s = e.state || { screen: 'today' };
   if (s.detailId) view.detailId = s.detailId;
-  show(TABS.includes(s.screen) || SUB.includes(s.screen) ? s.screen : 'today');
+  const next = TABS.includes(s.screen) || SUB.includes(s.screen) ? s.screen : 'today';
+  show(next, { back: SUB.includes(view.screen) && !SUB.includes(next) });
 });
 
 // ---------- actions ----------
 
 Object.assign(actions, {
-  go: el => { haptic('tap'); go(el.dataset.to); },
+  go: el => { if (el.closest('#dock')) haptic('tap'); go(el.dataset.to); },
   back: () => history.back(),
   'open-settings': () => pushSub('settings'),
   detail: el => pushSub('detail', { detailId: el.dataset.id }),
@@ -124,8 +160,9 @@ Object.assign(actions, {
   }
 });
 initWorkout($('#s-workout'), actions);
-initSettings(actions);
+initSettings(actions, $('#s-settings'));
 setWorkoutNav({ go, showDetail });
+initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings') });
 
 app.addEventListener('click', e => {
   const el = e.target.closest('[data-act]');
@@ -137,6 +174,7 @@ app.addEventListener('click', e => {
 store.subscribe(reason => {
   keepAwake(!!state.active);
   if (reason === 'draft') return syncNums($('#s-workout'));
+  if (reason === 'reset' && isVoiceOpen()) closeVoice();
   if (reason === 'error') {
     if (state.error) toast({ title: esc(state.t('toast.storageError')), error: true, ms: 6000 });
     return;
@@ -214,3 +252,4 @@ async function boot() {
 boot();
 
 addEventListener('pageshow', e => { if (e.persisted) renderAll(); });
+addEventListener('resize', () => renderDock());

@@ -58,14 +58,10 @@ export function createCatalog(custom = []) {
     return 0;
   }
 
-  // Search by name/alias. usage: {exerciseId: count} nudges frequent picks up.
-  function search(query, { usage = {}, limit = 40, lang = 'en' } = {}) {
+  // Scored matches, best first: [{e, s}]. usage: {exerciseId: count} nudges frequent picks up.
+  function rank(query, { usage = {}, lang = 'en', boost = null } = {}) {
     const q = normalize(query);
-    if (!q) {
-      return [...all]
-        .sort((a, b) => (usage[b.id] || 0) - (usage[a.id] || 0) || name(a.id, lang).localeCompare(name(b.id, lang)))
-        .slice(0, limit);
-    }
+    if (!q) return [];
     const words = String(query).trim().split(/\s+/).map(normalize).filter(Boolean);
     const out = [];
     for (const { e, terms } of keys) {
@@ -76,10 +72,19 @@ export function createCatalog(custom = []) {
         const hay = terms.join(' ');
         if (words.every(w => hay.includes(w))) s = 30;
       }
-      if (s) out.push({ e, s: s + Math.min(10, (usage[e.id] || 0)) });
+      if (s) out.push({ e, s: s + Math.min(10, (usage[e.id] || 0)) + (boost?.has(e.id) ? 8 : 0) });
     }
     out.sort((a, b) => b.s - a.s || name(a.e.id, lang).localeCompare(name(b.e.id, lang)));
-    return out.slice(0, limit).map(o => o.e);
+    return out;
+  }
+
+  function search(query, { usage = {}, limit = 40, lang = 'en' } = {}) {
+    if (!normalize(query)) {
+      return [...all]
+        .sort((a, b) => (usage[b.id] || 0) - (usage[a.id] || 0) || name(a.id, lang).localeCompare(name(b.id, lang)))
+        .slice(0, limit);
+    }
+    return rank(query, { usage, lang }).slice(0, limit).map(o => o.e);
   }
 
   // Exact name match (any language or alias), for duplicate checks.
@@ -89,7 +94,7 @@ export function createCatalog(custom = []) {
     return keys.find(k => k.terms.includes(q))?.e || null;
   }
 
-  return { all, get, name, search, findExact };
+  return { all, get, name, search, rank, findExact };
 }
 
 // Build a custom exercise record from user input. Returns {ok, exercise?, error?}.

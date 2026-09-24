@@ -5,6 +5,9 @@ import { I } from './icons.js';
 import { routineName, estimateMinutes } from '../routines.js';
 import { greetingKey, clock } from '../format.js';
 import { doneSetCount, elapsedSec } from '../workout.js';
+import { getKey } from '../keys.js';
+
+const MIC = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.6 11.5a6.4 6.4 0 0 0 12.8 0M12 18v3"/></svg>';
 
 export function workoutTitle(w) {
   const r = w.routineId && state.routines.find(r => r.id === w.routineId);
@@ -23,6 +26,7 @@ export function startCardsHTML() {
       <p>${t('today.exercisesAbout', { n: first.exercises.length, min: estimateMinutes(first) })}</p>
       <div class="exlist">${names.slice(0, 2).map(n => `<span class="chip">${esc(n)}</span>`).join('')}${names.length > 2 ? `<span class="chip">${t('today.more', { n: names.length - 2 })}</span>` : ''}</div>
       <button class="log" data-act="start-routine" data-id="${esc(first.id)}">${I.play}<span>${t('today.start')}</span></button>
+      ${getKey('groq') ? `<p class="sayhint">${MIC}${esc(t('today.orSay', { text: `${t('voice.hint.start').split(' ')[0].toLowerCase()} ${routineName(first, lang).toLowerCase()}` }))}</p>` : ''}
     </div>`;
   }
   for (const r of rest) {

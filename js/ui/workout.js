@@ -9,6 +9,7 @@ import { haptic } from '../haptics.js';
 import { esc, $ } from './dom.js';
 import { I } from './icons.js';
 import { toast } from './toast.js';
+import { getKey } from '../keys.js';
 import { openSheet, closeTop } from './sheet.js';
 import { openPicker } from './picker.js';
 import { startCardsHTML, workoutTitle } from './today.js';
@@ -16,7 +17,7 @@ import { startCardsHTML, workoutTitle } from './today.js';
 const C = 157.08; // ring circumference, r=25
 const REST_LINGER = 4000; // keep the card up after rest ends
 
-const ui = { fresh: null, restVisible: false, buzzed: 0, suppressClick: false };
+const ui = { restVisible: false, buzzed: 0, suppressClick: false, seenWorkout: null, seenDone: new Set(), lastCurrent: -1, tick: null, flash: false };
 let nav = { go: () => {}, showDetail: () => {} };
 export const setWorkoutNav = n => { nav = n; };
 
@@ -95,7 +96,7 @@ export function renderWorkout(root) {
           <div class="row3"><button class="step" data-act="reps-" aria-label="${t('workout.fewer')}">−</button><input class="num" id="in-reps" inputmode="numeric" enterkeyhint="done" autocomplete="off" aria-label="${t('workout.reps')}" value="${v.reps}"><button class="step" data-act="reps+" aria-label="${t('workout.more')}">+</button></div></div>
       </div>
       <div class="ghost">${ghost}</div>
-      <button class="log" data-act="log"><span>${t('workout.logSet', { n: W.nextSetNumber(ex) })}</span></button>
+      ${logButton(ex)}
     </div>
 
     <div id="restslot">${restHTML(w, Date.now())}</div>
@@ -108,8 +109,25 @@ export function renderWorkout(root) {
       <button class="btn2 solid" data-act="add-exercise">${I.plus}<span>${t('workout.addExercise')}</span></button>
     </div>`;
   fitNums(root);
-  ui.fresh = null;
+  // slide the exercise in when it changed (touch or voice)
+  const moved = ui.seenWorkout === w.id && ui.lastCurrent !== -1 && ui.lastCurrent !== i;
+  root.classList.remove('slide-l', 'slide-r');
+  if (moved) { void root.offsetWidth; root.classList.add(i > ui.lastCurrent ? 'slide-r' : 'slide-l'); }
+  if (ui.flash) { ui.flash = false; root.querySelector('.log')?.classList.add('flash'); }
+  ui.lastCurrent = i;
+  ui.seenWorkout = w.id;
+  ui.seenDone = new Set(w.exercises.flatMap(e => e.sets.filter(x => x.done).map(x => x.id)));
 }
+
+function logButton(ex) {
+  const { t } = state;
+  const label = `<span>${t('workout.logSet', { n: W.nextSetNumber(ex) })}</span>`;
+  if (!getKey('groq')) return `<button class="log" data-act="log">${label}</button>`;
+  const hint = t(ex.sets.some(s => s.done) ? 'voice.hint.same' : 'voice.hint.log');
+  return `<button class="log split" data-act="log">${label}<small>${micSvg}${esc(t('workout.orSay', { text: hint.toLowerCase() }))}</small></button>`;
+}
+
+const micSvg = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.6 11.5a6.4 6.4 0 0 0 12.8 0M12 18v3"/></svg>';
 
 // Shrink big numbers so "102.5" fits between the steppers.
 let measure = null;
@@ -139,7 +157,7 @@ function setsHTML(w, ex) {
       : `<span class="later">${t('workout.planned')}</span>`;
     const cls = s.done ? 'done' : 'planned';
     return `<li class="sw" data-set="${s.id}"><span class="del" aria-hidden="true">${I.trash}${t('common.delete')}</span>
-      <button class="set ${cls}${s.id === ui.fresh ? ' fresh' : ''}" data-act="${s.done ? 'edit-set' : 'noop'}" data-id="${s.id}" aria-label="${t('workout.editSet', { n })}"><span class="idx">${n}</span><span class="val">${val}</span>${end}</button></li>`;
+      <button class="set ${cls}${s.done && ui.seenWorkout === w.id && !ui.seenDone.has(s.id) ? ' fresh' : ''}" data-act="${s.done ? 'edit-set' : 'noop'}" data-id="${s.id}" aria-label="${t('workout.editSet', { n })}"><span class="idx">${n}</span><span class="val">${val}</span>${end}</button></li>`;
   }).join('');
 }
 
@@ -214,6 +232,14 @@ export function syncNums(root) {
   if (kg && document.activeElement !== kg) kg.value = weight(v.kg, unit(), state.lang);
   if (reps && document.activeElement !== reps) reps.value = v.reps;
   fitNums(root);
+  const tk = ui.tick;
+  ui.tick = null;
+  const target = tk && (tk.field === 'kg' ? kg : reps);
+  if (target) {
+    target.classList.remove('tick-up', 'tick-down');
+    void target.offsetWidth;
+    target.classList.add(tk.dir > 0 ? 'tick-up' : 'tick-down');
+  }
 }
 
 // ---------- actions ----------
@@ -226,6 +252,7 @@ function stepKg(dir) {
   const v = values();
   const kg = Math.min(W.LIMITS.kgMax, stepWeight(v.kg, dir, unit()));
   haptic('tap');
+  if (kg !== v.kg) ui.tick = { field: 'kg', dir };
   setDraft(kg, v.reps);
 }
 
@@ -233,6 +260,7 @@ function stepReps(dir) {
   const v = values();
   const reps = Math.max(W.LIMITS.repsMin, Math.min(W.LIMITS.repsMax, v.reps + dir));
   haptic('tap');
+  if (reps !== v.reps) ui.tick = { field: 'reps', dir };
   setDraft(v.kg, reps);
 }
 
@@ -308,8 +336,8 @@ function doLog(kg, reps) {
     haptic('error');
     return toast({ title: esc(t('toast.limit')), error: true });
   }
-  ui.fresh = set.id;
   ui.buzzed = 0;
+  ui.flash = true;
   haptic('success');
   const pr = livePRSets(state.prs, state.active).has(set.id);
   toast({

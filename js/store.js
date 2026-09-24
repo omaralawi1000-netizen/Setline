@@ -6,6 +6,7 @@ import { loadSettings, saveSettings, sanitize, SETTINGS_KEY } from './settings.j
 import { resolveLang, translator } from './i18n.js';
 import { createWorkout, finishWorkout, doneSetCount } from './workout.js';
 import { applyWorkout } from './pr.js';
+import { clearKeys } from './keys.js';
 
 const listeners = new Set();
 const UNDO_MAX = 20;
@@ -153,6 +154,7 @@ export async function resetAll() {
   await writing;
   await db.wipe();
   try { localStorage.removeItem(SETTINGS_KEY); } catch {}
+  clearKeys();
   state.settings = loadSettings();
   state.active = null;
   state.undo = [];

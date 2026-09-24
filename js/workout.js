@@ -240,3 +240,23 @@ export function planFromHistory(routine, history) {
     })
   };
 }
+
+// Swap the exercise at exIndex. With nothing done it's replaced in place (planned reps kept, kg cleared);
+// with sets done, the new exercise goes right after it and takes over the remaining planned sets.
+export function swapExercise(w, exIndex, exerciseId) {
+  const ex = w.exercises[exIndex];
+  if (!ex || ex.exerciseId === exerciseId) return w;
+  const next = clone(w);
+  const cur = next.exercises[exIndex];
+  const planned = cur.sets.filter(s => !s.done).map(s => makeSet({ reps: s.reps }));
+  if (!cur.sets.some(s => s.done)) {
+    next.exercises[exIndex] = { id: uid(), exerciseId, sets: planned, draft: null };
+    next.current = exIndex;
+    return next;
+  }
+  if (next.exercises.length >= LIMITS.exercisesPerWorkout) throw new RangeError('too many exercises');
+  cur.sets = cur.sets.filter(s => s.done);
+  next.exercises.splice(exIndex + 1, 0, { id: uid(), exerciseId, sets: planned, draft: null });
+  next.current = exIndex + 1;
+  return next;
+}
