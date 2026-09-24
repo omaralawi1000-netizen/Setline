@@ -89,6 +89,7 @@ export function closeTop() {
   const entry = stack.pop();
   if (!entry) return Promise.resolve();
   dismiss(entry);
+  if (!history.state?.sheet) return Promise.resolve(); // never step back past our own entry
   return new Promise(res => { waiting.push(res); history.back(); });
 }
 

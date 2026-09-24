@@ -165,7 +165,9 @@ export function openVoice() {
   void el.layer.offsetWidth;
   el.layer.classList.add('on');
   flyOrb(true);
-  history.pushState({ ...(history.state || {}), voice: 1 }, '');
+  // own history entry so Android back closes the layer; wait for a previous close to settle first
+  const push = () => { if (v.open && !history.state?.voice) history.pushState({ ...(history.state || {}), voice: 1 }, ''); };
+  if (v.closing) v.closing.then(push); else push();
   startLoop();
 }
 
@@ -185,14 +187,18 @@ export function closeVoice({ fromPop = false } = {}) {
   el.layer.classList.remove('carded');
   setTimeout(() => { if (!v.open) document.getElementById('app').classList.remove('orbaway'); }, reduced() ? 0 : 520);
   setTimeout(() => { if (!v.open) { el.layer.hidden = true; stopLoop(); el.orbwrap.style.transform = ''; } }, 600);
-  if (fromPop) return Promise.resolve();
+  // only step back over our own entry, never past it (that would leave the app)
+  if (fromPop || !history.state?.voice) return v.closing || Promise.resolve();
   v.closing = new Promise(res => { v.popWaiting++; v.popResolve = res; history.back(); }).then(() => { v.closing = null; });
   return v.closing;
 }
 
+// reopened while the old entry was being popped: give the open layer its entry back
+function push2() { if (!history.state?.voice) history.pushState({ ...(history.state || {}), voice: 1 }, ''); }
+
 // popstate hook: returns true if the voice layer consumed it.
 export function voiceHandlePop() {
-  if (v.popWaiting) { v.popWaiting--; v.popResolve?.(); return true; }
+  if (v.popWaiting) { v.popWaiting--; v.popResolve?.(); if (v.open) push2(); return true; }
   if (v.open) { closeVoice({ fromPop: true }); return true; }
   return false;
 }
