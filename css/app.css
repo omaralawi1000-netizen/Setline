@@ -1855,7 +1855,7 @@ html[data-dock=icons] .dock .tab span{display:none}
   box-shadow:inset 0 1px 0 rgba(255,255,255,.4),inset 0 -1px 0 rgba(255,255,255,.06),inset 0 0 0 1px rgba(255,255,255,.08),0 10px 24px -10px rgba(var(--v-rgb),.7);
   transition:transform .62s cubic-bezier(.3,1.3,.45,1),width .62s cubic-bezier(.3,1.3,.45,1),opacity .3s}
 .dock .ind.moving{animation:liquid2 .62s cubic-bezier(.3,1.1,.45,1)}
-@keyframes liquid2{0%{scale:1 1}25%{scale:1.22 .86}55%{scale:.95 1.06}80%{scale:1.02 .99}100%{scale:1 1}}
+@keyframes liquid2{0%{scale:1 1}30%{scale:1.1 .92}65%{scale:.98 1.03}100%{scale:1 1}}
 .tab{color:rgba(236,236,245,.62)}
 .tab svg.ti{width:25px;height:25px;stroke-width:1.75;transition:transform .5s cubic-bezier(.3,1.5,.45,1),color .3s}
 .tab svg.ti .fl{fill:currentColor;fill-opacity:0;transition:fill-opacity .35s}
@@ -1925,10 +1925,10 @@ html[data-dock=icons] .dock .tab span{display:none}
 
 /* ---------- 1.23: the Coach ---------- */
 /* on Coach the orb leaves the dock (its column closes) and lives in the message box */
-.app.coaching:not(.voice) .dock{grid-template-columns:var(--c-today) var(--c-workout) 0px var(--c-food) var(--c-coach)}
-.app.coaching .dock .orbbtn{transform:scale(.3);opacity:0;pointer-events:none}
-.orbbtn{transition:transform .5s var(--dk),margin .5s var(--dk),opacity .3s}
-.app.orbflying .dock .orbbtn .orb,.app.orbflying .corb .orb{opacity:0}
+.app.coaching .dock .orbbtn{transform:scale(.6);opacity:0;pointer-events:none}
+.orbbtn{transition:transform .45s var(--dk),margin .5s var(--dk),opacity .2s ease}
+.app.orbflying .dock .orbbtn{opacity:0!important;transition:none}
+.app.orbflying .corb .orb{opacity:0;transition:none}
 .orbfly{position:absolute;z-index:20;pointer-events:none;will-change:transform;margin:0}
 /* the box: lifts with the keyboard (transform only, so it never jumps), the dock steps aside */
 .composer{transition:opacity .35s var(--ease),transform .42s cubic-bezier(.2,.9,.25,1),box-shadow .4s}
@@ -1998,3 +1998,15 @@ html[data-dock=icons] .dock .tab span{display:none}
 .fwbar i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#6FB7FF,#8CE0FF);transform-origin:0 50%;transition:transform .6s var(--ease)}
 .fwrow .step{width:40px;height:40px;flex:none}
 .fwrow .step.plus{background:rgba(120,190,255,.16);color:#BFE3FF}
+
+/* ---------- 1.23.1: motion polish ---------- */
+/* tab switches: the old screen steps away fast and the new one arrives just after, so the two never
+   show at once; a small slide in the direction you went */
+.screen{transform:translateX(calc(var(--off-x, 0px) * .5)) scale(.992);transition:opacity .13s ease-out,transform .3s var(--ease),visibility 0s .13s}
+.screen.on{transform:none;transition:opacity .3s cubic-bezier(.2,.8,.2,1) .08s,transform .48s cubic-bezier(.2,.9,.25,1) .05s,visibility 0s 0s}
+.screen.enter > *{animation-duration:.42s}
+/* the message box only fades in (no slide), so the orb lands exactly where it will sit */
+.composer{transform:none}
+/* the tab lens: quicker, still springy */
+.dock .ind{transition:transform .44s cubic-bezier(.3,1.2,.45,1),width .44s cubic-bezier(.3,1.2,.45,1),opacity .3s}
+.dock .ind.moving{animation:liquid2 .44s cubic-bezier(.3,1.1,.45,1)}

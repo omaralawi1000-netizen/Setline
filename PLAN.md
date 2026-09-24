@@ -325,3 +325,10 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] Food: "Same breakfast as yesterday" rows; a bookmark on a meal group saves it as a one-tap Saved meal (long-press to remove); water is one calm row with − / +
 - [x] Status bar: the top edge is the background with a touch of the theme glow, and the status bar gets exactly that colour, so the glow runs under it; the top overlay only appears when content scrolls under it
 - [x] Calmer: Today without the brand line, cardio lives on Train by default, the week strip only when routines have days, less space above titles
+
+## 1.23.1: animation fixes from the screen recording
+
+- [x] Tab switches: the old screen fades out in 0.13 s and the new one arrives just after, with a small directional slide: the two never show at once (they overlapped for ~0.3 s)
+- [x] The dock keeps its shape on the Coach tab (the orb leaves its slot instead of the slot closing), so the tab lens never lands in the wrong place or lags
+- [x] Orb flight: sizes come from the layout (it no longer flies back tiny and pops), the copy starts where it takes off on the very first frame, both real orbs hide instantly while it flies, and it hands over with a short cross-fade
+- [x] Tab lens: quicker spring (0.44 s) and a smaller stretch

@@ -134,23 +134,31 @@ function flyOrb(toCoach) {
   if (document.documentElement.dataset.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const dockOrb = $('#dock .orbbtn .orb'), boxOrb = $('#composer .corb .orb');
   if (!dockOrb || !boxOrb) return;
-  const d = $('#dock').getBoundingClientRect(), dr = dockOrb.getBoundingClientRect();
-  const home = { x: d.left + d.width / 2, y: dr.top + dr.height / 2, s: dr.width || 76 }; // the dock's centre, where the orb lives
-  const c = $('#composer').getBoundingClientRect();
-  const box = { x: c.left + 7 + 21, y: c.top + c.height / 2 - (toCoach ? 0 : 0), s: 34 };
+  // sizes from the layout (not the screen), so a half-shrunk orb never sets the size
+  const at = el => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, s: el.offsetWidth }; };
+  const home = at(dockOrb), box = at(boxOrb);
   const [from, to] = toCoach ? [home, box] : [box, home];
+  $('.orbfly')?.remove();
   const fly = dockOrb.cloneNode(true);
   fly.className = 'orb orbfly'; // a component of its own, not a state
-  fly.style.cssText = `--s:${to.s}px;left:${to.x - to.s / 2}px;top:${to.y - to.s / 2}px`;
+  const k = from.s / to.s, dx = from.x - to.x, dy = from.y - to.y;
+  // starts where it takes off, even on the frame before the animation runs
+  fly.style.cssText = `--s:${to.s}px;left:${to.x - to.s / 2}px;top:${to.y - to.s / 2}px;transform:translate(${dx}px, ${dy}px) scale(${k})`;
   app.appendChild(fly);
   app.classList.add('orbflying');
-  const k = from.s / to.s;
   const a = fly.animate([
-    { transform: `translate(${from.x - to.x}px, ${from.y - to.y}px) scale(${k})` },
-    { transform: `translate(${(from.x - to.x) * 0.35}px, ${(from.y - to.y) * 0.55 - 26}px) scale(${(k + 1) / 2 * 1.06})`, offset: 0.55 },
+    { transform: `translate(${dx}px, ${dy}px) scale(${k})` },
+    { transform: `translate(${dx * 0.4}px, ${dy * 0.5 - 18}px) scale(${(k + 1) / 2})`, offset: 0.5 },
     { transform: 'none' }
-  ], { duration: 560, easing: 'cubic-bezier(.3,.7,.2,1)' });
-  a.onfinish = a.oncancel = () => { fly.remove(); app.classList.remove('orbflying'); };
+  ], { duration: 480, easing: 'cubic-bezier(.32,.72,0,1)', fill: 'forwards' });
+  let done = false;
+  const land = () => {
+    if (done) return; done = true;
+    app.classList.remove('orbflying'); // the real orb fades in where the copy landed…
+    fly.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180, easing: 'ease-out' }).onfinish = () => fly.remove(); // …as the copy fades out
+  };
+  a.onfinish = land;
+  a.oncancel = () => { done = true; fly.remove(); app.classList.remove('orbflying'); };
 }
 
 // Direction for the transition: tabs by position, sub screens push in from the right.
