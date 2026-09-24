@@ -1000,3 +1000,32 @@ html[data-motion=off] .osay .w{opacity:1;transform:none}
 .hft{flex:1;min-width:0;font-size:13.5px;font-weight:750;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hft.swap{animation:wordup .35s var(--ease)}
 .hfpill .chip{height:32px}
+
+/* ---------- 1.7: morning check-in ---------- */
+.ckcard{margin-top:16px;padding:16px;border-radius:26px;display:grid;gap:12px;animation:rise .5s var(--ease)}
+.ckcard .rhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.cksay{font-size:12px;font-weight:700;color:var(--dim);text-align:right}
+.ckrow{display:grid;gap:7px}
+.ckl{font-size:12.5px;font-weight:800;color:var(--muted)}
+.ckopts{display:flex;flex-wrap:wrap;gap:6px}
+.ckopts .chip{height:36px;padding:0 13px;font-size:13.5px}
+.ckopts .chip[aria-pressed=true]{background:rgba(198,187,250,.2);border-color:rgba(198,187,250,.5);color:var(--ink);box-shadow:0 0 0 3px rgba(198,187,250,.08)}
+.ckopts.energy .chip.e1[aria-pressed=true],.ckopts.energy .chip.e2[aria-pressed=true]{background:rgba(255,217,168,.16);border-color:rgba(255,217,168,.45)}
+.ckopts.energy .chip.e5[aria-pressed=true]{background:rgba(111,227,165,.14);border-color:rgba(111,227,165,.45)}
+.ckcard .log{margin-top:2px}
+.ckcard .log:disabled{opacity:.45;box-shadow:none}
+.ckdone{margin-top:16px;width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:24px;text-align:left;animation:rise .5s var(--ease)}
+.ckring{position:relative;width:52px;height:52px;flex:none;display:grid;place-items:center}
+.ckring svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.ckring .bg{fill:none;stroke:rgba(255,255,255,.08);stroke-width:5}
+.ckring .fg{fill:none;stroke:var(--accent);stroke-width:5;stroke-linecap:round;transition:stroke-dashoffset 1s var(--ease)}
+.ckdone.push .ckring .fg{stroke:#6FE3A5}
+.ckdone.easy .ckring .fg{stroke:var(--warm)}
+.ckring b{font-size:19px;font-weight:800}
+.ckdone .l{flex:1;min-width:0;display:grid;gap:2px}
+.ckdone .l strong{font-size:15.5px;font-weight:800}
+.ckdone .l > span{font-size:13px;color:var(--muted);font-weight:600}
+.ckwarn{font-size:12.5px!important;color:var(--warm)!important;font-weight:700}
+p.ckwarn{margin:6px 0 0}
+.ckbars{display:flex;align-items:flex-end;gap:3px;height:34px;flex:none}
+.ckbars i{display:block;width:5px;height:100%;border-radius:3px;background:linear-gradient(to top,#5B86FF,#C6BBFA);transform-origin:bottom;animation:grow .7s var(--ease) both;animation-delay:calc(var(--i) * 50ms + .1s)}

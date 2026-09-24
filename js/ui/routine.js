@@ -4,6 +4,8 @@ import { state } from '../store.js';
 import * as R from '../routines.js';
 import { planFromHistory } from '../workout.js';
 import { suggest } from '../progression.js';
+import { readiness, routineGroups } from '../checkin.js';
+import { dateKey } from '../body.js';
 import { haptic } from '../haptics.js';
 import { esc } from './dom.js';
 import { I } from './icons.js';
@@ -28,18 +30,35 @@ export function startRoutine(id) {
   if (!r) return;
   if (state.active || state.activeCardio) return nav.go('workout');
   if (!state.settings.readiness) { store.startWorkout(planFor(r)); haptic('success'); return nav.go('workout'); }
-  readinessSheet(r);
+  // answered this morning: no need to ask again unless it says take it easy
+  const c = state.daily.find(d => d.date === dateKey());
+  const rd = c ? readiness(c, routineGroups(r, state.catalog)) : null;
+  const note = rd?.soreHit.length ? state.t('checkin.soreHit', { what: rd.soreHit.map(g => state.t('group.' + g)).join(', ') }) : '';
+  if (rd && rd.score >= 3) {
+    store.startWorkout(planFor(r), { readiness: rd.score });
+    haptic('success');
+    nav.go('workout');
+    if (note) toast({ title: esc(note) });
+    return;
+  }
+  readinessSheet(r, rd ? { level: rd.score, easy: true, note } : {});
 }
 
-function readinessSheet(r) {
+function readinessSheet(r, preset = {}) {
   const { t, lang } = state;
-  let level = null, easy = false;
+  let level = preset.level ?? null, easy = !!preset.easy;
   openSheet(el => {
     el.insertAdjacentHTML('beforeend', `<h2>${t('ready.title')}</h2><p class="lead">${esc(R.routineName(r, lang))} · ${t('ready.sub')}</p>
       <div class="rgrid" role="group">${[1, 2, 3, 4, 5].map(n => `<button class="rdy r${n}" data-l="${n}" aria-pressed="false"><b>${n}</b><span>${t('ready.' + n)}</span></button>`).join('')}</div>
       <div class="srow easyrow" hidden><span class="l"><strong>${t('ready.easy')}</strong><small>${t('ready.easySub')}</small></span><button class="toggle" role="switch" aria-checked="false" data-k="easy" aria-label="${t('ready.easy')}"></button></div>
       <div class="acts"><button class="log" data-k="go">${I.play}<span>${t('ready.start')}</span></button><button class="linkbtn muted" data-k="skip">${t('ready.skip')}</button></div>`);
     const row = el.querySelector('.easyrow'), tog = el.querySelector('[data-k=easy]');
+    if (level != null) {
+      for (const b of el.querySelectorAll('[data-l]')) b.setAttribute('aria-pressed', String(Number(b.dataset.l) === level));
+      row.hidden = false;
+      tog.setAttribute('aria-checked', String(easy));
+      if (preset.note) el.querySelector('.lead').insertAdjacentHTML('afterend', `<p class="ckwarn">${esc(preset.note)}</p>`);
+    }
     const go = async () => {
       await closeTop();
       store.startWorkout(planFor(r), { readiness: level, easy });

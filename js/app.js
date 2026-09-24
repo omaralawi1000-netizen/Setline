@@ -24,6 +24,7 @@ import { countAll, burst } from './ui/fx.js';
 import { initPress } from './ui/press.js';
 import { autoBackup } from './ui/drive.js';
 import { initHandsFree } from './ui/handsfree.js';
+import { onCheckinClick } from './ui/checkin.js';
 import { cardioElapsed, cardioName } from './cardio.js';
 import { weekStart } from './stats.js';
 import { nextRoutine } from './routines.js';
@@ -236,6 +237,8 @@ app.addEventListener('click', e => {
   const f = e.target.closest('[data-hfilter]');
   if (f) { setHistoryFilter(f.dataset.hfilter); haptic('tap'); renderScreen('history'); return; }
   if (e.target.closest('[data-review=ask]')) { go('coach'); askCoach(state.t('review.prompt')); }
+  const ck = e.target.closest('[data-ck]');
+  if (ck && !ck.disabled) { onCheckinClick(ck, () => { renderScreen('today'); }); return; }
   const dl = e.target.closest('[data-deload]');
   if (dl) {
     haptic('tap');

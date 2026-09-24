@@ -76,7 +76,7 @@ async function post(path, key, body, { timeout = 0, signal } = {}) {
 // ---------- command fallback ----------
 
 const QUERY = ['last', 'pr', 'setsLeft', 'restLeft', 'suggest'];
-const AI_TYPES = INTENTS.filter(t => !['Ask', 'Unknown', 'LogMeal'].includes(t)).concat('question');
+const AI_TYPES = INTENTS.filter(t => !['Ask', 'Unknown', 'LogMeal', 'CheckIn'].includes(t)).concat('question');
 
 export const COMMAND_SCHEMA = {
   type: 'OBJECT',

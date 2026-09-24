@@ -10,6 +10,7 @@ import { clearKeys } from './keys.js';
 import { startCardio, pauseCardio, resumeCardio, finishCardio, cardioRecords } from './cardio.js';
 import { upsertBodyweight, addProtein, dateKey } from './body.js';
 import { addMeal, removeMeal } from './meals.js';
+import { mergeCheckin } from './checkin.js';
 import { easyDay } from './progression.js';
 import { deloadDay } from './insights.js';
 
@@ -32,6 +33,8 @@ export const state = {
   cardio: [],      // finished cardio sessions, newest first
   activeCardio: null,
   nutrition: [],
+  daily: [],       // morning check-ins, by date
+  measures: [],    // body measurements, by date
   undo: [],
   error: null
 };
@@ -56,7 +59,9 @@ export async function init() {
     db.getAll('exercises'), db.getAll('routines'), db.getAll('workouts'), db.getAll('prs'), db.get('meta', 'activeWorkout'),
     db.getAll('chat'), db.getAll('bodyweight')
   ]);
-  const [cardio, activeCardio, nutrition] = await Promise.all([db.getAll('cardio'), db.get('meta', 'activeCardio'), db.getAll('nutrition')]);
+  const [cardio, activeCardio, nutrition, daily, measures] = await Promise.all([db.getAll('cardio'), db.get('meta', 'activeCardio'), db.getAll('nutrition'), db.getAll('daily'), db.getAll('measures')]);
+  state.daily = daily;
+  state.measures = measures;
   state.cardio = cardio.sort((a, b) => b.startedAt - a.startedAt);
   state.activeCardio = activeCardio || null;
   state.nutrition = nutrition;
@@ -244,6 +249,21 @@ export async function undoProtein(grams, date = dateKey()) {
   emit('body');
 }
 
+// ---- morning check-in ----
+export async function saveCheckin(patch, date = dateKey()) {
+  const prev = state.daily.find(d => d.date === date) || null;
+  const next = mergeCheckin(prev, patch, date);
+  state.daily = [...state.daily.filter(d => d.date !== date), next];
+  await db.put('daily', next);
+  emit('checkin');
+  return { prev, next };
+}
+export async function restoreCheckin(prev, date = dateKey()) {
+  state.daily = state.daily.filter(d => d.date !== date);
+  if (prev) { state.daily.push(prev); await db.put('daily', prev); } else await db.del('daily', date);
+  emit('checkin');
+}
+
 export async function logMeal(meal, date = dateKey()) {
   const r = addMeal(state.nutrition, date, meal);
   state.nutrition = r.entries;
@@ -261,8 +281,8 @@ export async function deleteMeal(id, date = dateKey()) {
 // ---- backup ----
 // Replace everything with a validated backup in one transaction (keys and the active workout stay).
 export async function importBackup(d) {
-  await db.tx(['workouts', 'cardio', 'routines', 'exercises', 'prs', 'bodyweight', 'nutrition', 'chat'], 'readwrite', s => {
-    for (const k of ['workouts', 'cardio', 'routines', 'exercises', 'prs', 'bodyweight', 'nutrition', 'chat']) {
+  await db.tx(['workouts', 'cardio', 'routines', 'exercises', 'prs', 'bodyweight', 'nutrition', 'chat', 'daily', 'measures'], 'readwrite', s => {
+    for (const k of ['workouts', 'cardio', 'routines', 'exercises', 'prs', 'bodyweight', 'nutrition', 'chat', 'daily', 'measures']) {
       s[k].clear();
       for (const x of d[k]) s[k].put(x);
     }
@@ -348,6 +368,8 @@ export async function resetAll() {
   state.activeCardio = null;
   state.nutrition = [];
   state.bodyweight = [];
+  state.daily = [];
+  state.measures = [];
   await init();
   emit('reset');
 }

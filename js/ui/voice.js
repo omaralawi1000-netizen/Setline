@@ -62,7 +62,7 @@ function parseCtx() {
 
 const snapshot = () => ({
   nameLang: state.lang, planFor, active: state.active, cardio: state.cardio, activeCardio: state.activeCardio,
-  bodyweight: state.bodyweight, nutrition: state.nutrition, history: state.history, prs: state.prs, routines: state.routines,
+  bodyweight: state.bodyweight, nutrition: state.nutrition, daily: state.daily, history: state.history, prs: state.prs, routines: state.routines,
   undoCount: state.undo.length, settings: state.settings, catalog: state.catalog, now: Date.now()
 });
 
@@ -686,6 +686,7 @@ async function execute(run, cmd) {
     return true;
   }
   if (run.op === 'protein') { await store.logProtein(run.grams); card.undoOp = { op: 'protein', grams: run.grams }; return true; }
+  if (run.op === 'checkin') { const r = await store.saveCheckin(run.patch); card.undoOp = { op: 'checkin', prev: r.prev }; return true; }
   if (run.op === 'meal') { dismissCard(); if (v.open) await closeVoice(); openMealSheet({ text: run.text }); return false; }
   if (run.op === 'discard') {
     await store.discard();
@@ -718,6 +719,7 @@ function undoCard() {
   else if (u?.op === 'cardio-discard') { store.discardCardio(); nav.go('today'); }
   else if (u?.op === 'bw') { if (u.prev == null) store.deleteBodyweight(u.date); else store.logBodyweight(u.prev, u.date); }
   else if (u?.op === 'protein') store.undoProtein(u.grams);
+  else if (u?.op === 'checkin') store.restoreCheckin(u.prev);
   else if (u?.op === 'undo') store.undo();
   else if (u?.op === 'discardStart' && state.active?.id === u.id) { store.discard(); nav.go('today'); }
   dismissCard({ keepPending: false });

@@ -11,6 +11,7 @@ import { I } from './icons.js';
 import { barChart, lineChart } from './charts.js';
 import { sparkline } from '../stats.js';
 import { balanceHTML } from './today.js';
+import { sleepTrend } from '../checkin.js';
 
 let range = 12;
 export const setRange = r => { range = r; };
@@ -49,6 +50,7 @@ export function renderProgress(root) {
       ${lineChart(bw.series, { h: 110, fmt: v => kg(v) })}</div>` : ''}
 
     ${state.history.length ? balanceHTML({ always: true }) : ''}
+    ${sleepHTML()}
 
     ${lifts.length ? `<div class="section"><span class="label">${t('progress.lifts')}</span></div>
     <ul class="lifts">${lifts.map(l => {
@@ -118,3 +120,14 @@ function groupSets(sets) {
   return out.map(g => `${g.n > 1 ? `${g.n}×` : ''}${kg(g.kg)}×${g.reps}`).join('  ');
 }
 
+
+function sleepHTML() {
+  const { t, lang } = state;
+  const tr = sleepTrend(state.daily, 14);
+  if (!tr || tr.series.length < 2) return '';
+  const fmt = h => `${String(h).replace('.', lang === 'da' ? ',' : '.')} ${lang === 'da' ? 't' : 'h'}`;
+  return `<div class="chartcard solid">
+    <div class="chead"><span class="label">${t('checkin.sleepTitle')}</span><span class="cval"><b>${esc(fmt(tr.avg))}</b> ${esc(t('checkin.sleepAvg', { h: '' }).trim())}</span></div>
+    ${barChart(tr.series.map((p, i) => ({ v: p.v, label: p.date, hot: i === tr.series.length - 1 })), { color: 'blue', fmt })}
+  </div>`;
+}

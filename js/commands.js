@@ -14,7 +14,8 @@
 // }
 import * as W from './workout.js';
 import { bestsFrom, e1rm } from './pr.js';
-import { routineName, estimateMinutes } from './routines.js';
+import { routineName, estimateMinutes, nextRoutine } from './routines.js';
+import { mergeCheckin, readiness, routineGroups } from './checkin.js';
 import { weight as fmtW } from './format.js';
 import { cardioName, validateCardio, makeCardioSession, paceText } from './cardio.js';
 import { suggest } from './progression.js';
@@ -289,6 +290,16 @@ export function resolve(intent, snap, t, lang) {
       if (!validBodyweight(intent.kg)) return err('voice.bwInvalid');
       return cmd('auto', { title: t('body.weight'), value: `${kgTxt(intent.kg)} ${u}`, sub: t('voice.heard', { text: heard }), say: say(t('say.bw', { kg: kgTxt(intent.kg), unit: sayUnit })), run: { op: 'bodyweight', kg: intent.kg } });
     }
+    case 'CheckIn': {
+      const date = dateKey(snap.now);
+      const prev = (snap.daily || []).find(d => d.date === date) || null;
+      const next = mergeCheckin(prev, intent, date, snap.now);
+      const r = readiness(next, routineGroups(nextRoutine(snap.routines || [], snap.history || []), snap.catalog));
+      return cmd('auto', {
+        title: t('checkin.title'), value: checkinText(next, t, lang), sub: r ? t('checkin.advice.' + r.advice, { score: r.score }) : t('voice.heard', { text: heard }),
+        say: say(r ? t('say.checkin', { score: r.score, advice: t('say.checkin.' + r.advice) }) : t('checkin.saved')), run: { op: 'checkin', patch: intent }
+      });
+    }
     case 'LogMeal':
       return cmd('auto', { title: t('meal.title'), value: intent.text, sub: t('meal.reading'), say: '', run: { op: 'meal', text: intent.text } });
     case 'LogProtein': {
@@ -384,4 +395,13 @@ export function resolve(intent, snap, t, lang) {
     const spoken = groups.map(g => `${g.n > 1 ? `${t('say.setsWord', { n: g.n })}, ` : ''}${kgTxt(g.kg)} ${sayUnit} ${t('say.for')} ${g.reps}`).join('; ');
     return cmd('info', { title: `${t('q.last')}: ${name(exId)}`, value: null, sub: shown, say: say(t('say.last', { sets: spoken })) });
   }
+}
+
+// "7 h sleep · energy 4 · legs sore"
+export function checkinText(c, t, lang = 'en') {
+  const parts = [];
+  if (c.sleepH != null) parts.push(t('checkin.sleepShort', { h: String(c.sleepH).replace('.', lang === 'da' ? ',' : '.') }));
+  if (c.energy != null) parts.push(t('checkin.energyShort', { n: c.energy }));
+  if (c.sore?.length) parts.push(t('checkin.soreShort', { what: c.sore.map(g => t('group.' + g).toLowerCase()).join(', ') }));
+  return parts.join(' · ');
 }

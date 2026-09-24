@@ -109,7 +109,7 @@ export async function ask(question, { root = $('#s-coach') } = {}) {
   if (isPlanRequest(question)) return buildPlan(question, reply, { key, lang, ctl, root });
   const context = buildContext({
     active: state.active, history: state.history, routines: state.routines, prs: state.prs, bodyweight: state.bodyweight,
-    cardio: state.cardio, activeCardio: state.activeCardio, nutrition: state.nutrition, catalog: state.catalog, settings: state.settings
+    cardio: state.cardio, activeCardio: state.activeCardio, nutrition: state.nutrition, daily: state.daily, measures: state.measures, catalog: state.catalog, settings: state.settings
   });
   try {
     let last = 0;

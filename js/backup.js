@@ -5,7 +5,7 @@ import { CARDIO_TYPES } from './cardio.js';
 import { validThumb } from './meals.js';
 
 export const BACKUP_KIND = 'setline-backup';
-const MAX = { workouts: 20000, cardio: 20000, routines: 500, exercises: 1000, prs: 50000, bodyweight: 20000, nutrition: 20000, chat: 5000 };
+const MAX = { workouts: 20000, cardio: 20000, routines: 500, exercises: 1000, prs: 50000, bodyweight: 20000, nutrition: 20000, chat: 5000, daily: 20000, measures: 20000 };
 
 export function makeBackup(state, now = Date.now()) {
   const { ttsModel, ttsLite, cmdModel, coachModel, cmdAlt, coachAlt, ...settings } = state.settings;
@@ -14,7 +14,8 @@ export function makeBackup(state, now = Date.now()) {
     kind: BACKUP_KIND, version: 1, schema: SCHEMA_VERSION, exportedAt: new Date(now).toISOString(),
     data: {
       workouts: state.history, cardio: state.cardio, routines: state.routines, exercises: state.custom, prs: state.prs,
-      bodyweight: state.bodyweight, nutrition: state.nutrition, chat: state.chat.filter(m => !m.streaming), settings
+      bodyweight: state.bodyweight, nutrition: state.nutrition, chat: state.chat.filter(m => !m.streaming),
+      daily: state.daily || [], measures: state.measures || [], settings
     }
   };
 }
@@ -44,6 +45,9 @@ const bwOk = b => b && isDate(b.date) && isNum(b.kg, 20, 400);
 const mealOk = m => m && isId(m.id) && ts(m.t) && isStr(m.name, 80) && isNum(m.protein, 0, 300) && isNum(m.kcal, 0, 5000) && (m.thumb === undefined || validThumb(m.thumb));
 const nutOk = n => n && isDate(n.date) && isNum(n.protein, 0, 1000) && (n.kcal === undefined || isNum(n.kcal, 0, 20000)) &&
   (n.meals === undefined || (Array.isArray(n.meals) && n.meals.length <= 60 && n.meals.every(mealOk)));
+const dailyOk = d => d && isDate(d.date) && (d.sleepH == null || isNum(d.sleepH, 0, 14)) && (d.energy == null || [1, 2, 3, 4, 5].includes(d.energy)) &&
+  Array.isArray(d.sore) && d.sore.length <= 6 && d.sore.every(g => isStr(g, 20));
+const measuresOk = m => m && isDate(m.date) && Object.entries(m).every(([k, v]) => k === 'date' || (isStr(k, 20) && isNum(v, 0, 400)));
 const chatOk = m => m && isId(m.id) && ['user', 'model'].includes(m.role) && typeof m.text === 'string' && m.text.length <= 20000;
 
 // Validate everything before anything is written. Returns {ok, data?, error?}.
@@ -52,7 +56,7 @@ export function validateBackup(obj) {
   if (!Number.isInteger(obj.version) || obj.version > 1) return { ok: false, error: 'version' };
   const d = obj.data;
   if (!d || typeof d !== 'object') return { ok: false, error: 'data' };
-  const checks = { workouts: workout, cardio: cardioOk, routines: routine, exercises: exerciseOk, prs: prOk, bodyweight: bwOk, nutrition: nutOk, chat: chatOk };
+  const checks = { workouts: workout, cardio: cardioOk, routines: routine, exercises: exerciseOk, prs: prOk, bodyweight: bwOk, nutrition: nutOk, chat: chatOk, daily: dailyOk, measures: measuresOk };
   const out = {};
   for (const [k, ok] of Object.entries(checks)) {
     const list = d[k] ?? [];

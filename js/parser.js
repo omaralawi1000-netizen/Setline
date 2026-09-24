@@ -6,11 +6,12 @@
 //   workoutExerciseIds: [...], routines: [{id, name, names}], restRunning: bool
 // }
 // Intent shapes are shared with the AI fallback (phase 3).
+import { parseCheckin } from './checkin.js';
 import { normalize } from './catalog.js';
 import { lbToKg, round } from './units.js';
 import { CARDIO_TYPES } from './cardio.js';
 
-export const INTENTS = ['LogSet', 'LogSets', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
+export const INTENTS = ['LogSet', 'LogSets', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'CheckIn', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
   'AddExercise', 'SwapExercise', 'StartRoutine', 'StartEmpty', 'Finish', 'Discard', 'StartRest', 'AdjustRest', 'SkipRest',
   'Query', 'Cancel', 'Help', 'Ask', 'Unknown'];
 
@@ -404,6 +405,9 @@ export function parse(text, ctx = {}) {
     if (!phrase || hit?.exerciseId) return out('Query', { what: 'last', exerciseId: hit?.exerciseId ?? null });
     if (hit?.choices) return out('Ask', { reason: 'exercise', choices: hit.choices, then: { type: 'Query', what: 'last' } });
   }
+
+  // --- morning check-in: "slept 6 hours, legs are sore", "sov 7 timer", "energy 3" ---
+  { const ci = parseCheckin(s); if (ci) return out('CheckIn', ci); }
 
   // --- bodyweight and protein ---
   if ((m = R(/^(?:i )?(?:weigh|weighed|weight|my weight is|my weight|bodyweight|body weight|jeg vejer|vejer|vægt|min vægt er|kropsvægt)(?: is| er| i dag| today)? (\d+(?:\.\d+)?) ?(kg|kilo|kilos|lb|lbs|pounds|pund)?$/, s))) {
