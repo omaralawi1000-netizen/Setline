@@ -46,8 +46,6 @@ export async function listModels(key) {
 
 // ---------- synthesis ----------
 
-const STYLE = 'Say this briefly, calm and upbeat, like a training partner:';
-
 async function synth(text, { key, model, voice }) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), TIMEOUT);
@@ -57,28 +55,44 @@ async function synth(text, { key, model, voice }) {
       signal: ctl.signal,
       headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `${STYLE} ${text}` }] }],
+        contents: [{ parts: [{ text }] }],
         generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } }
       })
     });
     if (!res.ok) throw new Error('tts ' + res.status);
     const data = await res.json();
-    const b64 = data?.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.data)?.inlineData?.data;
-    if (!b64) throw new Error('tts empty');
-    const bin = atob(b64);
+    const part = data?.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.data)?.inlineData;
+    if (!part) throw new Error('tts empty');
+    const bin = atob(part.data);
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return bytes.buffer;
+    const rate = Number(/rate=(\d+)/.exec(part.mimeType || '')?.[1]) || RATE;
+    return { pcm: bytes.buffer, rate };
   } finally { clearTimeout(timer); }
 }
 
-function playPcm(buf, mine) {
+// 16-bit PCM → float, skipping a WAV header if one is present.
+export function pcmToFloat(buf) {
+  const u8 = new Uint8Array(buf);
+  const wav = u8.length > 44 && u8[0] === 0x52 && u8[1] === 0x49 && u8[2] === 0x46 && u8[3] === 0x46; // "RIFF"
+  const start = wav ? 44 : 0;
+  const n = Math.floor((u8.length - start) / 2);
+  const view = new DataView(buf, start, n * 2);
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) out[i] = view.getInt16(i * 2, true) / 32768;
+  // soft edges: a hard stop on a non-zero sample is the "thud" at the end
+  const fadeIn = Math.min(n, 240), fadeOut = Math.min(n, 1200);
+  for (let i = 0; i < fadeIn; i++) out[i] *= i / fadeIn;
+  for (let i = 0; i < fadeOut; i++) out[n - 1 - i] *= i / fadeOut;
+  return out;
+}
+
+function playPcm({ pcm, rate }, mine) {
   const ac = audioContext();
   if (!ac) throw new Error('no audio');
-  const pcm = new Int16Array(buf, 0, Math.floor(buf.byteLength / 2));
-  const audio = ac.createBuffer(1, pcm.length, RATE);
-  const ch = audio.getChannelData(0);
-  for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768;
+  const samples = pcmToFloat(pcm);
+  const audio = ac.createBuffer(1, samples.length, rate || RATE);
+  audio.getChannelData(0).set(samples);
   return new Promise(res => {
     if (mine !== seq) return res();
     const source = ac.createBufferSource();
@@ -112,10 +126,11 @@ export async function speak(text, opts) {
   if (!text) return;
   stop();
   const mine = ++seq;
-  const cacheKey = `${opts.model}|${opts.voice}|${text}`;
+  const cacheKey = `v2|${opts.model}|${opts.voice}|${text}`;
   if (opts.key) {
     try {
       let buf = await db.get('ttsCache', cacheKey).catch(() => null);
+      if (buf && !buf.pcm) buf = null;
       if (!buf) {
         buf = await synth(text, opts);
         db.put('ttsCache', buf, cacheKey).catch(() => {});

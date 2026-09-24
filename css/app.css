@@ -74,7 +74,8 @@ svg.i{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke
 .btn2.danger svg{color:var(--danger)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
 
-.rest{margin-top:12px;padding:12px 14px;border-radius:22px;display:flex;align-items:center;gap:14px;transform-origin:top center;animation:restin .5s var(--ease)}
+.rest{margin-top:12px;padding:12px 14px;border-radius:22px;display:flex;align-items:center;gap:14px;transform-origin:top center}
+.rest.in{animation:restin .5s var(--ease)}
 .rest.out{animation:restout .35s var(--ease) forwards}
 @keyframes restin{from{opacity:0;transform:translateY(-6px) scale(.98)}}
 @keyframes restout{to{opacity:0;transform:translateY(-6px) scale(.98)}}

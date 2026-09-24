@@ -26,7 +26,7 @@ export async function start({ onMaxed } = {}) {
   }
   const mimeType = pickMime();
   const recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 32000 } : undefined);
-  const r = { stream, recorder, chunks: [], analyser: null, source: null, startedAt: performance.now(), peak: 0, buf: null, timer: 0 };
+  const r = { stream, recorder, chunks: [], analyser: null, source: null, startedAt: performance.now(), peak: 0, buf: null, timer: 0, frames: 0 };
   recorder.ondataavailable = e => { if (e.data?.size) r.chunks.push(e.data); };
   const ac = audioContext();
   if (ac) {
@@ -37,6 +37,7 @@ export async function start({ onMaxed } = {}) {
       r.analyser.smoothingTimeConstant = 0.2;
       r.source.connect(r.analyser);
       r.buf = new Float32Array(r.analyser.fftSize);
+      if (ac.state !== 'running') ac.resume().catch(() => {});
     } catch { r.analyser = null; }
   }
   recorder.start(250);
@@ -47,6 +48,8 @@ export async function start({ onMaxed } = {}) {
 // Current input level, 0..1 (RMS, shaped for display).
 export function level() {
   if (!rec?.analyser) return 0;
+  if (audioContext()?.state !== 'running') return 0; // not measuring; don't judge silence from this
+  rec.frames++;
   rec.analyser.getFloatTimeDomainData(rec.buf);
   let sum = 0;
   for (let i = 0; i < rec.buf.length; i++) sum += rec.buf[i] * rec.buf[i];
@@ -71,7 +74,8 @@ export function stop() {
     const done = () => {
       release(r);
       const type = r.recorder.mimeType || 'audio/webm';
-      res({ blob: new Blob(r.chunks, { type }), ms: performance.now() - r.startedAt, peak: r.peak });
+      // measured: the level meter really ran, so a low peak means silence
+      res({ blob: new Blob(r.chunks, { type }), ms: performance.now() - r.startedAt, peak: r.peak, measured: r.frames > 8 });
     };
     if (r.recorder.state === 'inactive') return done();
     r.recorder.onstop = done;

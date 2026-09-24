@@ -126,27 +126,31 @@ function setPhase(phase) {
   el.layer.dataset.toggle = v.toggle ? '1' : '';
 }
 
+const translateY = node => { const t = getComputedStyle(node).transform; return t && t !== 'none' ? new DOMMatrix(t).m42 : 0; };
+const scaleOf = node => { const t = getComputedStyle(node).transform; return t && t !== 'none' ? new DOMMatrix(t).a : 1; };
+
+// FLIP the big orb to/from the dock orb. Works from wherever things are right now,
+// so reopening or closing mid-flight (or from the typing layout) doesn't jump.
 function flyOrb(open) {
   const from = document.querySelector('#dock .orbbtn .orb');
-  if (!from || reduced()) return;
-  const a = from.getBoundingClientRect();
-  const b = el.orbwrap.getBoundingClientRect();
-  if (!a.width || !b.width) return;
-  const dx = a.left + a.width / 2 - (b.left + b.width / 2);
-  // on close the dock is still 30px low (it slides back up while the orb flies home)
-  const dy = a.top + a.height / 2 - (b.top + b.height / 2) - (open ? 0 : 30);
-  const s = a.width / b.width;
-  const far = `translate(${dx}px, ${dy}px) scale(${s})`;
   const w = el.orbwrap;
-  if (open) {
-    w.style.transition = 'none';
-    w.style.transform = far;
-    void w.offsetWidth;
-    w.style.transition = '';
-    w.style.transform = '';
-  } else {
-    w.style.transform = far;
-  }
+  if (!from || reduced()) { w.style.transform = ''; return; }
+  const current = getComputedStyle(w).transform;
+  w.style.transition = 'none';
+  w.style.transform = 'none';
+  const b = w.getBoundingClientRect();            // resting box (inside the stage)
+  const a = from.getBoundingClientRect();
+  if (!a.width || !b.width) { w.style.transition = ''; w.style.transform = ''; return; }
+  const k = scaleOf(el.stage) || 1;               // the stage is scaled while typing
+  // the dock slides up as we close: aim for where it will be, not where it is
+  const dockShift = open ? 0 : translateY(document.getElementById('dock'));
+  const dx = (a.left + a.width / 2 - (b.left + b.width / 2)) / k;
+  const dy = (a.top + a.height / 2 - dockShift - (b.top + b.height / 2)) / k;
+  const far = `translate(${dx}px, ${dy}px) scale(${a.width / b.width})`;
+  w.style.transform = open ? far : (current === 'none' ? '' : current);
+  void w.offsetWidth;
+  w.style.transition = '';
+  w.style.transform = open ? '' : far;
 }
 
 export function openVoice() {
@@ -182,11 +186,15 @@ export function closeVoice({ fromPop = false } = {}) {
   el.input.blur();
   el.layer.classList.remove('on');
   el.layer.inert = true;
+  el.orb.style.transform = '';
   flyOrb(false);
   document.getElementById('app').classList.remove('voice');
   el.layer.classList.remove('carded');
-  setTimeout(() => { if (!v.open) document.getElementById('app').classList.remove('orbaway'); }, reduced() ? 0 : 520);
-  setTimeout(() => { if (!v.open) { el.layer.hidden = true; stopLoop(); el.orbwrap.style.transform = ''; } }, 600);
+  // show the dock orb again the moment the flying one lands
+  const land = () => { if (!v.open) document.getElementById('app').classList.remove('orbaway'); };
+  el.orbwrap.addEventListener('transitionend', land, { once: true });
+  setTimeout(land, reduced() ? 0 : 700);
+  setTimeout(() => { if (!v.open) { el.layer.hidden = true; stopLoop(); el.orbwrap.style.transform = ''; } }, 680);
   // only step back over our own entry, never past it (that would leave the app)
   if (fromPop || !history.state?.voice) return v.closing || Promise.resolve();
   v.closing = new Promise(res => { v.popWaiting++; v.popResolve = res; history.back(); }).then(() => { v.closing = null; });
@@ -253,6 +261,7 @@ async function startRec() {
   el.say.innerHTML = '';
   const token = ++v.token;
   setPhase('opening');
+  const opening = performance.now();
   try {
     await mic.start({ onMaxed: () => finishRec() });
   } catch (e) {
@@ -264,6 +273,14 @@ async function startRec() {
   }
   if (token !== v.token || !v.open) { mic.cancel(); return; }
   haptic('tap');
+  if (v.pendingStop && performance.now() - opening > 700) {
+    // released while Chrome asked for the mic: nothing useful was recorded
+    v.pendingStop = false;
+    mic.cancel();
+    setPhase('idle');
+    showCard({ kind: 'info', icon: 'info', title: state.t('voice.micReady'), sub: state.t('voice.micReadySub'), lang: state.lang });
+    return;
+  }
   setPhase('listening');
   if (v.pendingStop) { v.pendingStop = false; finishRec(); }
 }
@@ -276,7 +293,7 @@ async function finishRec() {
   setPhase('thinking');
   const r = await mic.stop();
   if (!r || token !== v.token) return;
-  if (r.ms < 450 || r.peak < 0.04) return showError('voice.tooShort', 'voice.tooShortSub');
+  if (r.ms < 400 || (r.measured && r.peak < 0.03) || r.blob.size < 800) return showError('voice.tooShort', 'voice.tooShortSub');
   const ex = state.active?.exercises[state.active.current];
   const recent = [...new Set([...(state.active?.exercises || []).map(e => e.exerciseId), ...Object.keys(state.usage).sort((a, b) => state.usage[b] - state.usage[a])])];
   let text;
@@ -289,7 +306,8 @@ async function finishRec() {
     if (token !== v.token) return;
     const map = { offline: ['voice.offline', 'voice.offlineSub'], badkey: ['voice.badKey', 'voice.badKeySub'], busy: ['voice.busy', 'voice.busySub'], nokey: ['voice.noKey', 'voice.noKeySub'] };
     const [a, b] = map[e.code] || ['voice.sttFailed', 'voice.sttFailedSub'];
-    return showError(a, b, { retry: true, type: true, settings: e.code === 'badkey' || e.code === 'nokey' });
+    // the code helps tell a blocked request from a bad key or a server error
+    return showError(a, b, { retry: true, type: true, settings: e.code === 'badkey' || e.code === 'nokey', code: e.status || e.code });
   }
   if (token !== v.token) return;
   if (!text) return showError('voice.tooShort', 'voice.tooShortSub', { retry: true });
@@ -345,7 +363,8 @@ function showError(titleKey, subKey, opts = {}) {
   mic.cancel();
   if (v.open) setPhase('error');
   haptic('error');
-  showCard({ kind: 'error', icon: 'alert', title: t(titleKey), sub: subKey ? t(subKey) : '', retry: !!opts.retry, settings: !!opts.settings, type: !!opts.type, local: true });
+  const sub = (subKey ? t(subKey) : '') + (opts.code ? ` (${opts.code})` : '');
+  showCard({ kind: 'error', icon: 'alert', title: t(titleKey), sub, retry: !!opts.retry, settings: !!opts.settings, type: !!opts.type, local: true });
 }
 
 // ---------- the intent card ----------

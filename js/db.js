@@ -1,6 +1,6 @@
 // Small IndexedDB wrapper. Schema version + ordered migrations.
 const NAME = 'setline';
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const MIGRATIONS = {
   1(db) {
@@ -12,6 +12,10 @@ const MIGRATIONS = {
     db.createObjectStore('chat', { keyPath: 'id' });
     db.createObjectStore('ttsCache');
     db.createObjectStore('meta'); // key/value: activeWorkout, flags
+  },
+  // v2: cached replies from 1.1/1.2 had the style prompt spoken into them
+  2(db, tx) {
+    tx.objectStore('ttsCache').clear();
   }
 };
 

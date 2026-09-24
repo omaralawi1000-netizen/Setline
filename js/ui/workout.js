@@ -185,7 +185,10 @@ function restHTML(w, now) {
   const left = W.restRemaining(w.rest, now);
   const off = C * (1 - W.restProgress(w.rest, now));
   const running = st === 'running';
-  return `<div class="rest solid" id="rest">
+  // the entrance plays once per rest, not on every re-render
+  const fresh = ui.restAnimated !== w.rest.startedAt;
+  ui.restAnimated = w.rest.startedAt;
+  return `<div class="rest solid${fresh ? ' in' : ''}" id="rest">
     <div class="ring${running && left <= 3 ? ' hot' : ''}" id="ring"><svg viewBox="0 0 60 60"><circle class="bg" cx="30" cy="30" r="25"/><circle class="fg" id="fg" cx="30" cy="30" r="25" style="stroke-dashoffset:${off}"/></svg><b id="rtime">${mss(left)}</b></div>
     <div class="rtxt"><strong id="rtitle">${t(running ? 'workout.rest' : 'workout.restDone')}</strong><span>${esc(running ? restNext(w) : t('workout.goTime'))}</span></div>
     <div class="chips" id="rchips"${running ? '' : ' hidden'}><button class="chip" data-act="rest-" aria-label="−15 s">−15</button><button class="chip" data-act="rest+" aria-label="+15 s">+15</button><button class="chip" data-act="rest-skip">${t('workout.skip')}</button></div>

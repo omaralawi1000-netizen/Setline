@@ -175,6 +175,8 @@ store.subscribe(reason => {
   keepAwake(!!state.active);
   if (reason === 'draft') return syncNums($('#s-workout'));
   if (reason === 'reset' && isVoiceOpen()) closeVoice();
+  // a re-render mid-entrance would restart the stagger; let the entrance end instead
+  document.querySelector('.screen.on.enter')?.classList.remove('enter');
   if (reason === 'error') {
     if (state.error) toast({ title: esc(state.t('toast.storageError')), error: true, ms: 6000 });
     return;
