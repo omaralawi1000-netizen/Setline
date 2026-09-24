@@ -17,7 +17,15 @@ const emit = on => { for (const fn of listeners) fn(on); };
 
 export function stop() {
   seq++;
-  if (current?.source) { try { current.source.stop(); } catch {} }
+  // fade out rather than cut: a hard stop mid-word clicks
+  if (current?.source) {
+    const { source, gain } = current;
+    try {
+      const ac = audioContext(), t0 = ac.currentTime;
+      gain?.gain.setTargetAtTime(0, t0, 0.012);
+      source.stop(t0 + 0.06);
+    } catch { try { source.stop(); } catch {} }
+  }
   if (current?.utter || globalThis.speechSynthesis?.speaking) { try { speechSynthesis.cancel(); } catch {} }
   if (current) { current = null; emit(false); }
 }
@@ -76,8 +84,8 @@ async function synth(text, { key, model, voice }) {
   } finally { clearTimeout(timer); }
 }
 
-// 16-bit PCM → float, skipping a WAV header if one is present.
-export function pcmToFloat(buf) {
+// 16-bit PCM → float, skipping a WAV header if one is present. Cleaned up for playback.
+export function pcmToFloat(buf, rate = RATE) {
   const u8 = new Uint8Array(buf);
   const wav = u8.length > 44 && u8[0] === 0x52 && u8[1] === 0x49 && u8[2] === 0x46 && u8[3] === 0x46; // "RIFF"
   const start = wav ? 44 : 0;
@@ -85,26 +93,76 @@ export function pcmToFloat(buf) {
   const view = new DataView(buf, start, n * 2);
   const out = new Float32Array(n);
   for (let i = 0; i < n; i++) out[i] = view.getInt16(i * 2, true) / 32768;
-  // soft edges: a hard stop on a non-zero sample is the "thud" at the end
-  const fadeIn = Math.min(n, 240), fadeOut = Math.min(n, 1200);
-  for (let i = 0; i < fadeIn; i++) out[i] *= i / fadeIn;
-  for (let i = 0; i < fadeOut; i++) out[n - 1 - i] *= i / fadeOut;
-  return out;
+  return cleanSpeech(out, rate);
+}
+
+// The model sometimes ends a clip with a stray thump or burst of noise after the last word.
+// Find where speech really ends, drop a short trailing burst that doesn't sound like speech
+// (very low or noise-like zero-crossing rate), then end on a smooth fade. Pure.
+export function cleanSpeech(x, rate = RATE) {
+  const n = x.length;
+  if (!n) return x;
+  let mean = 0;
+  for (let i = 0; i < n; i++) mean += x[i];
+  mean /= n;
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) out[i] = x[i] - mean;
+  const F = Math.max(1, Math.round(rate * 0.01)); // 10 ms frames
+  const frames = Math.ceil(n / F);
+  const rms = new Float32Array(frames);
+  let peak = 0;
+  for (let f = 0; f < frames; f++) {
+    let e = 0;
+    const a = f * F, b = Math.min(n, a + F);
+    for (let i = a; i < b; i++) e += out[i] * out[i];
+    rms[f] = Math.sqrt(e / (b - a));
+    if (rms[f] > peak) peak = rms[f];
+  }
+  const thr = Math.max(0.006, peak * 0.05);
+  const segs = [];
+  for (let f = 0; f < frames; f++) {
+    if (rms[f] <= thr) continue;
+    const last = segs[segs.length - 1];
+    if (last && f - last.end <= 8) last.end = f + 1; else segs.push({ start: f, end: f + 1 });
+  }
+  const zcr = (a, b) => { let z = 0; for (let i = a + 1; i < b; i++) if ((out[i - 1] < 0) !== (out[i] < 0)) z++; return z / Math.max(1, b - a); };
+  for (let k = 0; k < 2 && segs.length > 1; k++) {
+    const last = segs[segs.length - 1], prev = segs[segs.length - 2];
+    const len = last.end - last.start, gap = last.start - prev.end;
+    const z = zcr(last.start * F, Math.min(n, last.end * F));
+    const speechy = z * rate > 300 && z < 0.3; // crossings per second: voice sits well inside this
+    if (gap >= 8 && len <= 40 && !speechy) segs.pop(); else break;
+  }
+  let end = n;
+  if (segs.length) end = Math.min(n, (segs[segs.length - 1].end + 6) * F); // keep 60 ms of natural decay
+  const clip = out.subarray(0, end);
+  const fadeIn = Math.min(clip.length, Math.round(rate * 0.01)), fadeOut = Math.min(clip.length, Math.round(rate * 0.06));
+  for (let i = 0; i < fadeIn; i++) clip[i] *= i / fadeIn;
+  for (let i = 0; i < fadeOut; i++) clip[clip.length - 1 - i] *= 0.5 - 0.5 * Math.cos((Math.PI * i) / fadeOut);
+  return clip;
 }
 
 function playPcm({ pcm, rate }, mine) {
   const ac = audioContext();
   if (!ac) throw new Error('no audio');
-  const samples = pcmToFloat(pcm);
-  const audio = ac.createBuffer(1, samples.length, rate || RATE);
+  const samples = pcmToFloat(pcm, rate || RATE);
+  const audio = ac.createBuffer(1, Math.max(1, samples.length), rate || RATE);
   audio.getChannelData(0).set(samples);
   return new Promise(res => {
     if (mine !== seq) return res();
     const source = ac.createBufferSource();
     source.buffer = audio;
-    source.connect(ac.destination);
-    source.onended = () => { if (current?.source === source) { current = null; emit(false); } res(); };
-    current = { source };
+    // a gentle high-pass takes out thumps and rumble the voice doesn't need
+    const hp = ac.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 70; hp.Q.value = 0.707;
+    const gain = ac.createGain();
+    source.connect(hp).connect(gain).connect(ac.destination);
+    source.onended = () => {
+      setTimeout(() => { try { source.disconnect(); hp.disconnect(); gain.disconnect(); } catch {} }, 200);
+      if (current?.source === source) { current = null; emit(false); }
+      res();
+    };
+    current = { source, gain };
     emit(true);
     if (ac.state === 'suspended') ac.resume().catch(() => {});
     source.start();

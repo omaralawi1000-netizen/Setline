@@ -17,18 +17,19 @@ let nav = { openSettings: () => {} };
 let inflight = null; // {ctl, id}
 
 const errorText = (code, t) => ({
-  offline: t('coach.offline'), network: t('coach.offline'), badkey: t('coach.badKey'), busy: t('coach.busy'), nomodel: t('coach.noModel'), nokey: t('coach.noKey')
+  offline: t('coach.offline'), network: t('coach.offline'), badkey: t('coach.badKey'), busy: t('coach.busy'), empty: t('coach.empty'), timeout: t('coach.timeout'), nomodel: t('coach.noModel'), nokey: t('coach.noKey')
 }[code] || t('coach.failed', { code }));
 
 function bubble(m) {
   const { t } = state;
   if (m.role === 'user') return `<li class="msg me" data-id="${m.id}"><div class="bub">${esc(m.text)}</div></li>`;
   if (m.error) {
-    return `<li class="msg ai err" data-id="${m.id}"><div class="bub"><p>${esc(errorText(m.error, t))}</p>
+    return `<li class="msg ai is-err" data-id="${m.id}"><div class="bub"><p>${esc(errorText(m.error, t))}</p>
       ${m.error === 'badkey' || m.error === 'nokey' || m.error === 'nomodel' ? `<button class="chip" data-coach="settings">${t('voice.openSettings')}</button>` : `<button class="chip" data-coach="retry" data-q="${esc(m.q || '')}">${t('coach.retry')}</button>`}</div></li>`;
   }
   if (m.plan) return `<li class="msg ai plan" data-id="${m.id}"><div class="bub">${planCard(m)}</div></li>`;
-  return `<li class="msg ai${m.streaming ? ' live' : ''}" data-id="${m.id}"><div class="bub">${m.text ? formatAnswer(m.text) : '<span class="dots"><i></i><i></i><i></i></span>'}</div></li>`;
+  if (!m.text && !m.streaming) return `<li class="msg ai stopped" data-id="${m.id}"><div class="bub"><p>${esc(t('coach.stopped'))}</p>${m.q ? `<button class="chip" data-coach="retry" data-q="${esc(m.q)}">${t('coach.retry')}</button>` : ''}</div></li>`;
+  return `<li class="msg ai${m.streaming ? ' is-streaming' : ''}" data-id="${m.id}"><div class="bub">${m.text ? formatAnswer(m.text) : '<span class="dots"><i></i><i></i><i></i></span>'}</div></li>`;
 }
 
 function planCard(m) {
@@ -121,7 +122,7 @@ export async function ask(question, { root = $('#s-coach') } = {}) {
         const now = performance.now();
         if (now - last > 120) { last = now; scrollDown(root); }
       }
-    }));
+    }), { rounds: 2 });
     store.updateChat(reply.id, { text, streaming: false }, { persist: true });
     haptic('tap');
     if (text && state.settings.spoken !== 'off') {

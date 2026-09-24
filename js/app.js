@@ -21,6 +21,7 @@ import { initRoutine, setRoutineNav, renderRoutine, editRoutine, programsSheet, 
 import { setHistoryFilter } from './ui/history.js';
 import { renderProgress, renderExercise, setRange } from './ui/progress.js';
 import { countAll, burst } from './ui/fx.js';
+import { initPress } from './ui/press.js';
 import { cardioElapsed, cardioName } from './cardio.js';
 import { weekStart } from './stats.js';
 import { nextRoutine } from './routines.js';
@@ -202,6 +203,7 @@ Object.assign(actions, {
     go('workout');
   }
 });
+initPress(document);
 initWorkout($('#s-workout'), actions);
 initSettings(actions, $('#s-settings'));
 setWorkoutNav({ go, showDetail });

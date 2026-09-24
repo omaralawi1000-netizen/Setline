@@ -151,3 +151,36 @@ test('plan requests are recognised and validated against the catalog', () => {
   assert.equal(rs[0].exercises[0].sets.length, 4);
   assert.equal(rs[0].exercises[0].sets[0].reps, 10);
 });
+
+test('withFallback goes round again after a pause when every model was busy', async () => {
+  const tried = [], waits = [];
+  let n = 0;
+  const r = await withFallback(['a', 'b'], async m => { tried.push(m); if (++n <= 2) throw new AiError('busy', 503); return m; }, { rounds: 2, sleep: async ms => { waits.push(ms); } });
+  assert.equal(r, 'a');
+  assert.deepEqual(tried, ['a', 'b', 'a']);
+  assert.equal(waits.length, 1);
+  const seen = [];
+  await assert.rejects(withFallback(['a'], async m => { seen.push(m); throw new AiError('nomodel', 404); }, { rounds: 3, sleep: async () => {} }));
+  assert.deepEqual(seen, ['a'], 'a missing model is not retried');
+});
+
+// fake SSE responses for streamChat
+const sse = (chunks, { stall = false } = {}) => async () => ({
+  ok: true, status: 200,
+  body: { getReader() { let i = 0; return { read: () => (i < chunks.length ? Promise.resolve({ value: new TextEncoder().encode(chunks[i++]), done: false }) : stall ? new Promise(() => {}) : Promise.resolve({ done: true })), cancel: async () => {} }; } }
+});
+const ev = text => `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] })}\n\n`;
+
+test('streamChat: an empty answer is a retryable error', async () => {
+  const { streamChat, retryable } = await import('../js/ai.js');
+  globalThis.fetch = sse([`data: ${JSON.stringify({ candidates: [{ finishReason: 'MAX_TOKENS' }] })}\n\n`]);
+  await assert.rejects(streamChat({ key: 'k', model: 'm', system: '', contents: [] }), e => e.code === 'empty' && retryable(e));
+});
+
+test('streamChat: a stalled stream ends with what arrived, or times out', async () => {
+  const { streamChat } = await import('../js/ai.js');
+  globalThis.fetch = sse([ev('Hello '), ev('there')], { stall: true });
+  assert.equal(await streamChat({ key: 'k', model: 'm', system: '', contents: [], idleTimeout: 30 }), 'Hello there');
+  globalThis.fetch = sse([], { stall: true });
+  await assert.rejects(streamChat({ key: 'k', model: 'm', system: '', contents: [], idleTimeout: 30 }), e => e.code === 'timeout');
+});

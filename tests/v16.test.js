@@ -209,3 +209,10 @@ test('gps: a pause starts a new segment', () => {
   assert.ok(Math.abs(tr.m - 20) < 1, 'the walk home while paused is not counted');
   assert.equal(G.trackKm({ m: 2414.4 }), 2.414);
 });
+
+test('press depth: small buttons squish more than cards', async () => {
+  const { depthFor } = await import('../js/ui/press.js');
+  assert.ok(depthFor(40, 40) < depthFor(100, 50));
+  assert.ok(depthFor(100, 50) < depthFor(360, 120));
+  assert.ok(depthFor(360, 120) >= 0.98);
+});

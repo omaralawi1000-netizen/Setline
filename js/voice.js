@@ -19,7 +19,9 @@ export async function start({ onMaxed } = {}) {
   if (!navigator.mediaDevices?.getUserMedia || !globalThis.MediaRecorder) throw Object.assign(new Error('unsupported'), { code: 'unsupported' });
   let stream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    // No echo cancellation: nothing plays while recording, and on Android it switches the phone into
+    // call audio, which is slower to open, can clip the first word and pops the speaker on the way back.
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: true, autoGainControl: true } });
   } catch (e) {
     const code = e?.name === 'NotAllowedError' || e?.name === 'SecurityError' ? 'denied' : e?.name === 'NotFoundError' ? 'nomic' : 'busy';
     throw Object.assign(new Error(code), { code });

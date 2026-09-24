@@ -487,9 +487,9 @@ button.mini:active,button.pr:active{transform:scale(.98)}
 .msg.ai .bub p + p{margin-top:8px}
 .msg.ai .bub ul{margin:6px 0 0 18px}
 .msg.ai .bub b{color:var(--accent)}
-.msg.err .bub{color:var(--muted)}
-.msg.err .chip{margin-top:10px}
-.msg.live .bub > :last-child::after{content:"";display:inline-block;width:7px;height:15px;margin-left:3px;border-radius:2px;background:var(--accent);vertical-align:-2px;animation:blink .8s ease-in-out infinite alternate}
+.msg.is-err .bub{color:var(--muted)}
+.msg.is-err .chip{margin-top:10px}
+.msg.is-streaming .bub > :last-child::after{content:"";display:inline-block;width:7px;height:15px;margin-left:3px;border-radius:2px;background:var(--accent);vertical-align:-2px;animation:blink .8s ease-in-out infinite alternate}
 .dots{display:inline-flex;gap:4px;padding:4px 0}
 .dots i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:dot 1.1s ease-in-out infinite}
 .dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
@@ -888,3 +888,15 @@ html[data-motion=off] .osay .w{opacity:1;transform:none}
 .dlcard .row2{margin:0;grid-template-columns:1.5fr 1fr;align-items:stretch}
 .dlcard .row2 .log{margin:0;height:auto;min-height:50px}
 .dlcard .row2 .btn2{height:auto;min-height:50px}
+.msg.ai.stopped .bub{color:var(--muted);font-style:italic}
+.msg.ai.stopped .chip{margin-top:8px;font-style:normal}
+.owrap.drag{transition:transform .62s cubic-bezier(.34,1.5,.5,1),translate 0s,opacity .25s}
+.owrap{transition:transform .62s cubic-bezier(.34,1.5,.5,1),translate .55s cubic-bezier(.34,1.6,.45,1),opacity .25s}
+/* the moment it really listens: a bloom, so you know to talk */
+.ofloat[data-phase=listening] .oglow{animation:bloom .55s var(--ease)}
+@keyframes bloom{0%{scale:.6;opacity:.2}45%{scale:1.18;opacity:1}100%{scale:1}}
+.ofloat[data-phase=opening] .oglow{opacity:.25}
+.ofloat[data-phase=opening] .ostatus{opacity:.7}
+.msg.is-streaming .bub > .dots:last-child::after{content:none}
+/* touch presses are drawn by js/ui/press.js; keep :active from squishing twice */
+@media (hover:none){.js-press :is(button,[data-act],.rmain,.hitem,.lift):active:not(.orbbtn,.step,.hold,[data-o]){transform:none}}

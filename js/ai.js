@@ -224,18 +224,31 @@ export async function aiCommand(text, ctx, { key, model, timeout = 4000, signal 
 // ---------- streaming chat ----------
 
 // Stream an answer; onText(fullSoFar) per chunk. Resolves to the final text.
-export async function streamChat({ key, model, system, contents, onText, signal, firstByteTimeout = 12000 }) {
+// A stream that goes quiet for idleTimeout is cut off: with some text it counts as the answer,
+// with none it's a timeout. An empty answer (all tokens spent thinking, or blocked) is 'empty', worth a retry.
+export async function streamChat({ key, model, system, contents, onText, signal, firstByteTimeout = 12000, idleTimeout = 20000 }) {
   const { res, done } = await post(`models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, key, {
     systemInstruction: { parts: [{ text: system }] },
     contents,
-    generationConfig: { temperature: 0.6, maxOutputTokens: 900 }
+    generationConfig: { temperature: 0.6, maxOutputTokens: 2048 }
   }, { timeout: firstByteTimeout, signal });
-  done(); // headers arrived; the stream can take its time
+  done(); // headers arrived; the stream can take its time, but not forever between chunks
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = '', full = '';
+  const read = () => new Promise((resolve, reject) => {
+    let timer = 0;
+    const off = () => { clearTimeout(timer); signal?.removeEventListener('abort', onAbort); };
+    const onAbort = () => { off(); reader.cancel().catch(() => {}); reject(new AiError('aborted')); };
+    if (signal?.aborted) return onAbort();
+    timer = setTimeout(() => { off(); reader.cancel().catch(() => {}); reject(new AiError('timeout')); }, idleTimeout);
+    signal?.addEventListener('abort', onAbort, { once: true });
+    reader.read().then(r => { off(); resolve(r); }, () => { off(); reject(new AiError(signal?.aborted ? 'aborted' : 'network')); });
+  });
   for (;;) {
-    const { value, done: end } = await reader.read();
+    let r;
+    try { r = await read(); } catch (e) { if (e.code === 'timeout' && full.trim()) break; throw e; }
+    const { value, done: end } = r;
     if (end) break;
     buf += dec.decode(value, { stream: true });
     const { events, rest } = parseSSE(buf);
@@ -247,6 +260,7 @@ export async function streamChat({ key, model, system, contents, onText, signal,
   }
   const tail = parseSSE(buf + '\n\n');
   for (const ev of tail.events) { const piece = textOf(ev); if (piece) { full += piece; onText?.(full); } }
+  if (!full.trim()) throw new AiError('empty');
   return full.trim();
 }
 
@@ -259,14 +273,19 @@ export async function listModelsText(key) {
 }
 
 // Errors worth trying another model for: overloaded, rate limited, gone, server trouble.
-export const retryable = e => e instanceof AiError && (e.code === 'busy' || e.code === 'nomodel' || (e.code === 'failed' && e.status >= 500));
+export const retryable = e => e instanceof AiError && (e.code === 'busy' || e.code === 'nomodel' || e.code === 'empty' || (e.code === 'failed' && e.status >= 500));
 
 // Run fn(model) with the chosen model, then the runner-up, then Google's rolling alias.
-export async function withFallback(models, fn) {
+// With rounds > 1 the list is tried again after a pause when every model was busy.
+export async function withFallback(models, fn, { rounds = 1, wait = 1500, sleep = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
   const list = [...new Set(models.filter(Boolean))];
   let last;
-  for (const m of list) {
-    try { return await fn(m); } catch (e) { last = e; if (!retryable(e)) throw e; }
+  for (let round = 0; round < rounds; round++) {
+    if (round) await sleep(wait * round);
+    for (const m of list) {
+      try { return await fn(m); } catch (e) { last = e; if (!retryable(e)) throw e; }
+    }
+    if (last?.code !== 'busy' && last?.code !== 'empty') break;
   }
   throw last;
 }

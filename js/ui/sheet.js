@@ -79,7 +79,9 @@ function dismiss(entry) {
   entry.el.classList.remove('show');
   entry.scrim.classList.remove('show');
   const kill = () => { entry.el.remove(); entry.scrim.remove(); };
-  entry.el.addEventListener('transitionend', kill, { once: true });
+  // only the sheet's own slide counts; a button's transition inside it would cut the slide short
+  const onEnd = e => { if (e.target === entry.el && e.propertyName === 'transform') { entry.el.removeEventListener('transitionend', onEnd); kill(); } };
+  entry.el.addEventListener('transitionend', onEnd);
   setTimeout(kill, 600);
   entry.onClose?.();
 }

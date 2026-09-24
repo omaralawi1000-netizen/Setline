@@ -329,12 +329,16 @@ function startLoop() {
     v.hist[v.histAt = (v.histAt + 1) % v.hist.length] = v.lvl;
     if (reduced()) return;
     const l = v.lvl;
+    // alive, not mechanical: a slow breath, and a soft squash and stretch that follows the voice
+    const breath = v.phase === 'thinking' ? 0 : 0.012 * Math.sin(now / 700);
+    const sx = 1 + breath + l * 0.16 + l * 0.05 * Math.sin(now / 95);
+    const sy = 1 + breath + l * 0.2 + l * 0.05 * Math.cos(now / 110);
     if (v.mode === 'mini') {
-      el.oorb.style.transform = `scale(${1 + l * 0.2})`;
+      el.oorb.style.transform = `scale(${sx.toFixed(4)}, ${sy.toFixed(4)})`;
       el.owrap.style.setProperty('--l', l.toFixed(3));
       return;
     }
-    el.orb.style.transform = `scale(${1 + l * 0.12})`;
+    el.orb.style.transform = `scale(${(1 + (sx - 1) * 0.7).toFixed(4)}, ${(1 + (sy - 1) * 0.7).toFixed(4)})`;
     el.halo.style.opacity = String(listening ? 0.35 + l * 0.65 : v.phase === 'thinking' ? 0.5 : 0.22);
     el.halo.style.transform = `scale(${1 + l * 0.3})`;
     el.ripples.style.opacity = listening ? String(0.35 + l * 0.65) : '0';
@@ -762,6 +766,26 @@ function holdUp(tapMeansToggle) {
   };
 }
 
+// Pulling the lifted orb up: it tracks the finger with a little resistance, ticks at the
+// threshold and hands over to the full screen; a quick flick up does the same.
+const PULL_AT = 110;
+function pullTo(p, e) {
+  const raw = Math.min(0, e.clientY - p.y);
+  const now = performance.now();
+  const vel = p.lastY != null ? (e.clientY - p.lastY) / Math.max(1, now - p.lastT) : 0; // px/ms, negative is up
+  p.lastY = e.clientY; p.lastT = now;
+  const band = -PULL_AT * (1 - Math.exp(raw / PULL_AT)) * 1.15; // rubber band: eases off as it goes
+  el.owrap.classList.add('drag');
+  el.owrap.style.translate = `0 ${band.toFixed(1)}px`;
+  el.opull.style.opacity = String(Math.min(1, -raw / 80));
+  if (raw < -PULL_AT || (raw < -40 && vel < -1.1)) { p.expanded = true; releasePull(); expandFull(); }
+}
+function releasePull() {
+  el.owrap.classList.remove('drag');
+  el.owrap.style.translate = '';
+  el.opull.style.opacity = '';
+}
+
 export function initVoice(n) {
   nav = n;
   build();
@@ -798,6 +822,8 @@ export function initVoice(n) {
     unlockAudio();
     try { orb.setPointerCapture(e.pointerId); } catch {}
     haptic('tap');
+    // hands-free and the orb is up: touching the dock orb again sends, like tapping the floating one
+    if (v.open && v.mode === 'mini' && v.toggle && (mic.isRecording() || v.phase === 'opening')) { v.press = null; finishRec(); return; }
     openMini();
     if (state.settings.micMode === 'tap') { v.toggle = true; v.press = { t: performance.now(), orb: true, y: e.clientY, tapMode: true }; startRec(); return; }
     v.press = { t: performance.now(), orb: true, y: e.clientY };
@@ -807,18 +833,14 @@ export function initVoice(n) {
   document.getElementById('dock').addEventListener('pointermove', e => {
     const p = v.press;
     if (!p?.orb || !v.open || v.mode !== 'mini') return;
-    const dy = Math.min(0, e.clientY - p.y);
-    const pull = Math.max(dy, -140);
-    el.owrap.style.translate = `0 ${(pull * 0.6).toFixed(1)}px`;
-    el.opull.style.opacity = String(Math.min(1, -dy / 90));
-    if (dy < -120) { p.expanded = true; expandFull(); }
+    pullTo(p, e);
   });
   const orbUp = e => {
     if (!e.target.closest?.('.orbbtn') || !v.press?.orb) return;
     const p = v.press;
     const dt = performance.now() - p.t;
     v.press = null;
-    if (v.mode === 'mini') { el.owrap.style.translate = ''; el.opull.style.opacity = ''; }
+    if (v.mode === 'mini') releasePull();
     if (p.tapMode) return; // tap mode keeps listening until the orb is tapped again
     if (dt >= HOLD_MS || p.expanded) return finishRec();
     // a quick tap: keep listening hands-free; tap the floating orb to send
@@ -840,14 +862,11 @@ export function initVoice(n) {
     }
   });
   let drag = null;
-  el.owrap.addEventListener('pointerdown', e => { drag = { y: e.clientY }; });
-  el.owrap.addEventListener('pointermove', e => {
-    if (!drag || v.mode !== 'mini') return;
-    const dy = Math.min(0, e.clientY - drag.y);
-    el.owrap.style.translate = `0 ${(Math.max(dy, -140) * 0.6).toFixed(1)}px`;
-    if (dy < -110) { drag = null; expandFull(); }
-  });
-  el.owrap.addEventListener('pointerup', () => { drag = null; el.owrap.style.translate = ''; });
+  el.owrap.addEventListener('pointerdown', e => { drag = { y: e.clientY, t: performance.now() }; try { el.owrap.setPointerCapture(e.pointerId); } catch {} });
+  el.owrap.addEventListener('pointermove', e => { if (drag && v.mode === 'mini') pullTo(drag, e); });
+  const dragEnd = () => { if (drag) { drag = null; releasePull(); } };
+  el.owrap.addEventListener('pointerup', dragEnd);
+  el.owrap.addEventListener('pointercancel', dragEnd);
 
   tts.onSpeaking(on => document.getElementById('app').classList.toggle('speaking', on));
   store.subscribe(reason => { if (reason === 'settings' && v.open) paintStatic(); });
