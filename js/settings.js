@@ -50,6 +50,10 @@ export const DEFAULTS = Object.freeze({
   todayOrder: [],      // Today cards, in your order
   quickAdd: null,      // {kind: 'protein'|'kcal', values: [a, b, c]}
   kgSteps: null,       // {barbell, dumbbell, machine}: the − / + step in kg
+  memories: [],        // what you told the Coach that it keeps in mind [{id, text, at}]
+  weeklyCheckin: true, // the Coach's Monday look back and plan
+  weeklyFor: '',       // the week (its Monday) the last check-in was written for
+  weeklySeen: '',      // …and the one you've opened
   foodTargets: null,   // {kcal, protein, carbs, fat, water} set by hand; null = worked out from the profile
   todayHide: ['balance', 'routines'] // Today sections tucked away (Customize)
 });
@@ -94,6 +98,9 @@ export function sanitize(input) {
   if (Array.isArray(input.todayOrder)) s.todayOrder = order(input.todayOrder, TODAY_ORDER);
   if (input.quickAdd) s.quickAdd = sanitizeQuick(input.quickAdd);
   s.kgSteps = sanitizeSteps(input.kgSteps);
+  s.memories = sanitizeMemories(input.memories);
+  if (typeof input.weeklyCheckin === 'boolean') s.weeklyCheckin = input.weeklyCheckin;
+  for (const k of ['weeklyFor', 'weeklySeen']) if (typeof input[k] === 'string' && /^(\d{4}-\d{2}-\d{2})?$/.test(input[k])) s[k] = input[k];
   if (Array.isArray(input.foodHide)) s.foodHide = [...new Set(input.foodHide.filter(x => FOOD_PARTS.includes(x)))];
   if (Array.isArray(input.todayHide)) s.todayHide = [...new Set(input.todayHide.filter(x => TODAY_PARTS.includes(x)))];
   if (Array.isArray(input.favMeals)) s.favMeals = input.favMeals.filter(x => typeof x === 'string' && x.length <= 60).slice(0, 30);
@@ -113,6 +120,12 @@ export function sanitize(input) {
   if (['fast', 'accurate'].includes(input.stt)) s.stt = input.stt;
   for (const k of ['ttsModel', 'ttsLite', 'ttsOverride', 'cmdModel', 'coachModel', 'cmdOverride', 'coachOverride', 'cmdAlt', 'coachAlt']) if (typeof input[k] === 'string' && (input[k] === '' || MODEL_ID.test(input[k].trim()))) s[k] = input[k].trim();
   return s;
+}
+
+export function sanitizeMemories(list) {
+  if (!Array.isArray(list)) return [];
+  return list.filter(m => m && typeof m.id === 'string' && typeof m.text === 'string' && m.text.trim() && Number.isFinite(m.at))
+    .map(m => ({ id: m.id.slice(0, 60), text: m.text.trim().slice(0, 140), at: m.at })).slice(-40);
 }
 
 export const cmdModelId = s => s.cmdOverride || s.cmdModel || 'gemini-flash-lite-latest';

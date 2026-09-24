@@ -229,3 +229,15 @@ test('the plan schema locks exercise names to the catalog', () => {
   assert.ok(en.includes('Bench press') || en.some(n => /bench/i.test(n)));
   assert.equal(PLAN_SCHEMA.properties.days.items.properties.exercises.items.properties.exercise.enum, undefined, 'the base schema is untouched');
 });
+
+import { splitMemories, hideMemoryTail, addMemories } from '../js/coach.js';
+test('the coach remembers what you tell it, and the line stays hidden', () => {
+  const r = splitMemories('Noted, we will skip lunges.\nREMEMBER: hates lunges\nREMEMBER: wedding on 14 November.');
+  assert.equal(r.text, 'Noted, we will skip lunges.');
+  assert.deepEqual(r.facts, ['hates lunges', 'wedding on 14 November']);
+  assert.equal(hideMemoryTail('Sure thing.\nREMEM'), 'Sure thing.');
+  assert.equal(hideMemoryTail('Sure thing.\nREMEMBER: likes mornings'), 'Sure thing.');
+  let m = addMemories([], ['hates lunges'], 1);
+  m = addMemories(m, ['Hates lunges.', 'trains at 6 am'], 2);
+  assert.deepEqual(m.map(x => x.text), ['hates lunges', 'trains at 6 am'], 'no duplicates');
+});

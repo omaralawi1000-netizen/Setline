@@ -3,6 +3,9 @@ import * as store from '../store.js';
 import { state } from '../store.js';
 import { streamChat, AiError, withFallback, aiPlan, pickTextModels, nextQuotaReset } from '../ai.js';
 import { listModels, pickTtsModel } from '../tts.js';
+import { splitMemories, hideMemoryTail, addMemories } from '../coach.js';
+import { weekStart } from '../stats.js';
+import { dateKey } from '../body.js';
 import { buildContext, chatContents, systemPrompt, formatAnswer, speakable, isPlanRequest, PLAN_SCHEMA, planSchema, planSystem, validatePlan, planToRoutines } from '../coach.js';
 import { getKey } from '../keys.js';
 import { coachModels, ttsModelId, ttsAlt } from '../settings.js';
@@ -31,7 +34,9 @@ function bubble(m) {
   }
   if (m.plan) return `<li class="msg ai plan" data-id="${m.id}"><div class="bub">${planCard(m)}</div></li>`;
   if (!m.text && !m.streaming) return `<li class="msg ai stopped" data-id="${m.id}"><div class="bub"><p>${esc(t('coach.stopped'))}</p>${m.q ? `<button class="chip" data-coach="retry" data-q="${esc(m.q)}">${t('coach.retry')}</button>` : ''}</div></li>`;
-  return `<li class="msg ai${m.streaming ? ' is-streaming' : ''}" data-id="${m.id}"><div class="bub">${m.text ? formatAnswer(m.text) : '<span class="dots"><i></i><i></i><i></i></span>'}</div></li>`;
+  const head = m.weekly ? `<p class="wkhead">${I.chart}<span>${esc(t('weekly.head', { date: new Intl.DateTimeFormat(state.lang === 'da' ? 'da-DK' : 'en-GB', { day: 'numeric', month: 'short' }).format(new Date(m.weekly + 'T12:00')) }))}</span></p>` : '';
+  const kept = m.remembered?.length ? `<p class="memnote">${I.check}<span>${esc(t('memory.kept', { what: m.remembered.join(' · ') }))}</span></p>` : '';
+  return `<li class="msg ai${m.streaming ? ' is-streaming' : ''}${m.weekly ? ' weekly' : ''}" data-id="${m.id}"><div class="bub">${head}${m.text ? formatAnswer(hideMemoryTail(m.text)) : '<span class="dots"><i></i><i></i><i></i></span>'}${kept}</div></li>`;
 }
 
 function planCard(m) {
@@ -129,15 +134,20 @@ export async function ask(question, { root = $('#s-coach') } = {}) {
       onText: full => {
         store.updateChat(reply.id, { text: full }, { quiet: true });
         const li = root.querySelector(`[data-id="${reply.id}"] .bub`);
-        if (li) li.innerHTML = formatAnswer(full);
+        if (li) li.innerHTML = formatAnswer(hideMemoryTail(full));
         const now = performance.now();
         if (now - last > 120) { last = now; scrollDown(root); }
       }
     }), { rounds: 3, wait: 2500, alsoRetry: ['timeout'] }); // busy servers get a patient second and third go
-    store.updateChat(reply.id, { text, streaming: false }, { persist: true });
+    // "REMEMBER: …" lines become memories and leave the reply
+    const { text: said, facts: all } = splitMemories(text);
+    const before = state.settings.memories || [], mem = addMemories(before, all);
+    const facts = mem.slice(before.length).map(m => m.text); // only what's new
+    if (facts.length) store.setSettings({ memories: mem });
+    store.updateChat(reply.id, { text: said, streaming: false, ...(facts.length ? { remembered: facts } : {}) }, { persist: true });
     haptic('tap');
-    if (text && state.settings.spoken !== 'off') {
-      tts.speak(speakable(text), { key, model: ttsModelId(state.settings), alt: ttsAlt(state.settings), voice: state.settings.voice, lang, canSpeak: () => !isRecording() });
+    if (said && state.settings.spoken !== 'off') {
+      tts.speak(speakable(said), { key, model: ttsModelId(state.settings), alt: ttsAlt(state.settings), voice: state.settings.voice, lang, canSpeak: () => !isRecording() });
     }
   } catch (e) {
     const code = e instanceof AiError ? e.code : 'failed';
@@ -239,3 +249,34 @@ export function initCoach(n) {
     }
   });
 }
+
+// ---------- the weekly check-in: on the first open of a new week the Coach looks back and plans ahead ----------
+
+let weeklyBusy = false;
+export const thisMonday = (now = Date.now()) => dateKey(weekStart(now));
+export async function weeklyCheckin({ force = false } = {}) {
+  const s = state.settings, key = getKey('google'), monday = thisMonday();
+  if (weeklyBusy || !key || (!force && (!s.weeklyCheckin || s.weeklyFor === monday))) return;
+  const start = weekStart(Date.now());
+  const lastWeek = state.history.filter(w => w.startedAt >= start - 7 * 86_400_000 && w.startedAt < start);
+  if (!force && !lastWeek.length && !state.nutrition.some(n => n.date >= dateKey(start - 7 * 86_400_000) && n.date < monday)) return; // nothing to look back on
+  weeklyBusy = true;
+  try {
+    await ensureModels();
+    const lang = state.lang;
+    const context = buildContext(coachSnap());
+    const ask = [
+      'WEEKLY CHECK-IN (the app asked for this, not the user). Write the Monday check-in for the week that starts today.',
+      'First look back at last week (Monday to Sunday before today): sessions against the weekly goal, lifts that moved or stalled (with numbers), new records, food against the targets (average calories and protein) if logged, bodyweight change, sleep and readiness, goals.',
+      'Then the plan for this week: which days and routines, two or three concrete targets (e.g. "bench 82.5 × 8"), and the one thing to fix. Use their MEMORIES and PROFILE.',
+      'Warm and direct, like their coach. At most 140 words, short lines, no tables, no headings except "Last week" and "This week".'
+    ].join(' ');
+    const text = await withFallback(coachModels(state.settings), model => streamChat({ key, model, system: systemPrompt(lang), contents: chatContents([], context, ask) }), { rounds: 2, alsoRetry: ['timeout'] });
+    const { text: said } = splitMemories(text);
+    if (said) {
+      store.addChat('model', said, { weekly: monday });
+      store.setSettings({ weeklyFor: monday });
+    }
+  } catch { /* try again on the next open */ } finally { weeklyBusy = false; }
+}
+export const markWeeklySeen = () => { const m = thisMonday(); if (state.settings.weeklyFor === m && state.settings.weeklySeen !== m) store.setSettings({ weeklySeen: m }); };

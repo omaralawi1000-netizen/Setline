@@ -15,7 +15,7 @@ import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav } from
 import { renderHistory, renderDetail } from './ui/history.js';
 import { renderSettings, initSettings } from './ui/settings.js';
 import { initVoice, orbHTML, voiceHandlePop, closeVoice, isVoiceOpen, openVoice } from './ui/voice.js';
-import { renderCoach, initCoach, ask as askCoach, ensureModels } from './ui/coach.js';
+import { renderCoach, initCoach, ask as askCoach, ensureModels, weeklyCheckin, markWeeklySeen } from './ui/coach.js';
 import { initCardio, setCardioNav, tickCardio, renderCardioDetail, syncGps, startCardioSession, pickTypeSheet } from './ui/cardio.js';
 import { initBody } from './ui/body.js';
 import { initRoutine, setRoutineNav, renderRoutine, editRoutine, programsSheet, startRoutine } from './ui/routine.js';
@@ -151,6 +151,7 @@ function show(name, { back = false } = {}) {
   }
   app.classList.toggle('is-sub', SUB.includes(name));
   app.classList.toggle('coaching', name === 'coach');
+  if (name === 'coach') markWeeklySeen();
   requestAnimationFrame(() => app.dispatchEvent(new Event('screenchange')));
   renderAll();
 }
@@ -268,6 +269,7 @@ app.addEventListener('click', e => {
   const f = e.target.closest('[data-hfilter]');
   if (f) { setHistoryFilter(f.dataset.hfilter); haptic('tap'); renderScreen('history'); return; }
   if (e.target.closest('[data-review=ask]')) { go('coach'); askCoach(state.t('review.prompt')); }
+  if (e.target.closest('[data-weekly]')) { haptic('tap'); go('coach'); }
   const ck = e.target.closest('[data-ck]');
   if (ck && !ck.disabled) { onCheckinClick(ck, () => { renderScreen('today'); }); return; }
   const dl = e.target.closest('[data-deload]');
@@ -441,6 +443,9 @@ async function boot() {
   shortcut();
   autoBackup();
   if (!new URLSearchParams(location.search).has('go')) maybeOnboard();
+  // the Coach's Monday check-in is written quietly in the background
+  setTimeout(() => weeklyCheckin(), 5000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(() => weeklyCheckin(), 3000); });
 }
 
 // Home-screen shortcuts (long-press the icon): ?go=next | cardio | talk

@@ -8,6 +8,7 @@ import { dateKey } from '../body.js';
 import { VERSION } from '../version.js';
 import { LIMITS } from '../workout.js';
 import { STEP_GROUPS, STEP_CHOICES } from '../progression.js';
+import { addMemories } from '../coach.js';
 import { haptic } from '../haptics.js';
 import { I } from './icons.js';
 import { toast } from './toast.js';
@@ -92,6 +93,36 @@ function profileRow() {
     <span class="l"><strong>${esc(p?.name || t('profile.title'))}</strong><span>${esc(bits)}</span></span><span class="go">${I.fwd}</span></button>`;
 }
 
+// What the Coach remembers about you (it adds to this itself when you tell it things), and the weekly check-in.
+function memorySheet() {
+  const { t } = state;
+  openSheet(el => {
+    const paint = () => {
+      const list = state.settings.memories || [];
+      el.innerHTML = `<div class="sbody"><h2>${t('memory.title')}</h2><p class="lead">${t('memory.lead')}</p>
+        ${list.length ? `<ul class="memlist">${[...list].reverse().map(m => `<li><span>${esc(m.text)}</span><button class="iconbtn sm" data-mem-del="${esc(m.id)}" aria-label="${esc(t('common.delete'))}">${I.close}</button></li>`).join('')}</ul>` : `<p class="snote">${t('memory.none')}</p>`}
+        <form class="mdesc solid" data-mem-add><input name="m" maxlength="140" autocomplete="off" placeholder="${esc(t('memory.addPh'))}"><button class="send" aria-label="${esc(t('voice.send'))}">${I.plus}</button></form>
+        <div class="slist solid" style="margin-top:14px"><div class="srow"><span class="l"><strong>${t('memory.weekly')}</strong><small>${t('memory.weeklySub')}</small></span>
+          <button class="toggle" role="switch" aria-checked="${state.settings.weeklyCheckin}" aria-label="${t('memory.weekly')}" data-mem-weekly></button></div></div></div>`;
+    };
+    paint();
+    el.addEventListener('click', e => {
+      const d = e.target.closest('[data-mem-del]');
+      if (d) { haptic('tap'); setSettings({ memories: (state.settings.memories || []).filter(m => m.id !== d.dataset.memDel) }); return paint(); }
+      if (e.target.closest('[data-mem-weekly]')) { haptic('tap'); setSettings({ weeklyCheckin: !state.settings.weeklyCheckin }); return paint(); }
+    });
+    el.addEventListener('submit', e => {
+      e.preventDefault();
+      const v = String(e.target.m?.value || '').trim();
+      if (!v) return;
+      haptic('success');
+      setSettings({ memories: addMemories(state.settings.memories, [v]) });
+      paint();
+      el.querySelector('[data-mem-add] input')?.focus();
+    });
+  }, { label: t('memory.title') });
+}
+
 export function renderSettings(root) {
   const { t, settings: s } = state;
   root.innerHTML = `<header class="top">
@@ -100,6 +131,7 @@ export function renderSettings(root) {
     </header>
     <h1 class="h1">${t('settings.title')}</h1>
     ${profileRow()}
+    <div class="slist solid memlink"><button class="srow" data-act="memory"><span class="l"><strong>${t('memory.title')}</strong><small>${esc(t('memory.sub', { n: (s.memories || []).length }))}</small></span>${I.fwd}</button></div>
 
     <div class="sgroup"><h2>${t('settings.general')}</h2><div class="slist solid">
       <div class="srow"><span class="l"><strong>${t('settings.language')}</strong></span>${seg('lang', ['auto', 'da', 'en'], [t('lang.auto'), t('lang.da'), t('lang.en')])}</div>
@@ -224,6 +256,7 @@ export function initSettings(actions, root) {
     },
     set: el => { setSettings({ [el.dataset.key]: el.dataset.v }); haptic('tap'); },
     'kg-steps': () => { haptic('tap'); stepsSheet(); },
+    memory: () => { haptic('tap'); memorySheet(); },
     'rest-alerts': async () => {
       const { t } = state;
       if (state.settings.restAlerts) { setSettings({ restAlerts: false }); return; }

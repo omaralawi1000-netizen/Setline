@@ -46,7 +46,7 @@ export function resolve(intent, snap, t, lang) {
   const needWorkout = () => {
     if (w) return null;
     // clearly training ("I'm on T-bar row, 80 for 9") or nothing to choose from: just start and do it
-    const lifting = ['LogSet', 'LogSets', 'AddExercise'].includes(intent.type) && (intent.exerciseId || intent.routineId);
+    const lifting = (['LogSet', 'LogSets', 'AddExercise'].includes(intent.type) && (intent.exerciseId || intent.routineId)) || intent.type === 'LogBatch';
     if (lifting || !snap.routines.length) {
       const r = intent.routineId && snap.routines.find(x => x.id === intent.routineId);
       const then = { ...intent, routineId: undefined };
@@ -165,6 +165,30 @@ export function resolve(intent, snap, t, lang) {
     case 'LogSet': {
       const need = needWorkout(); if (need) return need;
       return logCommand(intent.kg, intent.reps, intent.count, intent.exerciseId || null);
+    }
+    case 'LogBatch': {
+      // a whole session said at once: every lift gets its sets, one card, one undo
+      const need = needWorkout(); if (need) return need;
+      for (const it of intent.items) {
+        const check = W.validateSet(it.kg, it.reps);
+        if (!check.ok) return err('voice.didntCatch', null, { title: t(check.error === 'kg' ? 'invalid.kg' : 'invalid.reps', { max: kgTxt(W.LIMITS.kgMax), unit: u }) });
+      }
+      const sets = intent.items.reduce((a, it) => a + it.count, 0);
+      const fn = (cw, now) => {
+        let x = cw;
+        for (const it of intent.items) {
+          let i = x.exercises.findIndex(e => e.exerciseId === it.exerciseId);
+          if (i === -1) { x = W.addExercise(x, it.exerciseId); i = x.exercises.length - 1; }
+          for (let k = 0; k < it.count; k++) x = W.logSet(x, i, { kg: it.kg, reps: it.reps }, now, W.restFor(x.exercises[i], settings.restByEx, settings.restSec)).workout;
+          x = { ...x, current: i };
+        }
+        return x;
+      };
+      return cmd('auto', {
+        title: t('voice.batchTitle', { n: intent.items.length, sets }),
+        sub: intent.items.map(it => `${name(it.exerciseId)} ${it.count} × ${setTxt(it.kg, it.reps)}`).join(' · '),
+        say: say(t('say.batch', { n: intent.items.length, sets })), run: { op: 'update', fn, nav: 'workout' }
+      });
     }
     case 'LogSets': {
       const need = needWorkout(); if (need) return need;

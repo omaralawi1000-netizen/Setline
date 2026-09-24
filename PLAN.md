@@ -272,3 +272,9 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] Word order doesn't matter: the sets, the weight, the reps and the exercise are found wherever they are ("tricep pushdowns with two sets and 50 kilograms for eight reps", "two sets of tricep pushdowns at 50 kilos for 8", "I did 8 reps of tricep pushdown at 50 kilograms, 2 sets", "rope pushdown 25 kg 12 reps 3 sets"); it also fills an exercise or a set count a stricter reading dropped
 - [x] No exercise named and none on screen: "Which exercise was that?" with your most-trained lifts as one tap, or Pick another (the list), then the set is logged; never a dead end
 - [x] Empty workout: your lifts as one-tap starts (with their figures) and an example of what to say
+
+## 1.19.0: a whole session in one breath, a Coach that remembers, Monday check-ins
+
+- [x] Say a whole session: "bench 3x8 at 80, then rows 3x10 at 60, then lateral raises 3 by 15 with 10" / "squats 5 sets of 5 at 120. After that leg press 3 sets of 12 at 200. Then leg curls 3 by 12 at 45" logs every lift and set in one card with one Undo; starts a workout if none is running (works during or after the gym)
+- [x] Coach memory: when you tell the Coach something lasting (dislikes, injuries, schedule, events, equipment), it keeps it ("Remembered: hates lunges" under the reply) and uses it in every answer, plan and check-in; Settings → What your coach knows lists it, add your own, delete any
+- [x] Weekly check-in: on the first open of a new week the Coach quietly writes a look back (sessions vs goal, lifts that moved or stalled, records, food vs targets, weight, sleep, goals) and this week's plan with concrete targets; a card on Today until you've read it; on/off in the memory sheet

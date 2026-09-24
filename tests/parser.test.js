@@ -283,3 +283,12 @@ test('word order does not matter for a set', () => {
   const r = p('rope pushdown 25 kg 12 reps 3 sets');
   assert.deepEqual([r.count, r.kg, r.reps], [3, 25, 12]);
 });
+
+test('a whole session in one sentence', () => {
+  const catalog = createCatalog();
+  const r = parse('Today I did squats 5 sets of 5 at 120. After that leg press 3 sets of 12 at 200. Then leg curls 3 by 12 at 45.', { catalog, lang: 'en', routines: [] });
+  assert.equal(r.type, 'LogBatch');
+  assert.deepEqual(r.items.map(i => [i.exerciseId, i.count, i.kg, i.reps]), [['back-squat', 5, 120, 5], ['leg-press', 3, 200, 12], ['lying-leg-curl', 3, 45, 12]]);
+  assert.equal(parse('bench 3x8 at 80, then rows 3x10 at 60', { catalog, lang: 'en' }).items.length, 2);
+  assert.equal(parse('bench 3x8 at 80', { catalog, lang: 'en' }).type, 'LogSet', 'one lift stays a set');
+});

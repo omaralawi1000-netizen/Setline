@@ -12,7 +12,7 @@ import { normalize } from './catalog.js';
 import { lbToKg, round } from './units.js';
 import { CARDIO_TYPES } from './cardio.js';
 
-export const INTENTS = ['LogSet', 'LogSets', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'CheckIn', 'LogRel', 'SetGoal', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
+export const INTENTS = ['LogSet', 'LogSets', 'LogBatch', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'CheckIn', 'LogRel', 'SetGoal', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
   'AddExercise', 'SwapExercise', 'StartRoutine', 'StartEmpty', 'Finish', 'Discard', 'StartRest', 'AdjustRest', 'SkipRest',
   'Query', 'Cancel', 'Help', 'Ask', 'Unknown'];
 
@@ -363,6 +363,8 @@ const R = (re, s) => re.exec(s);
 // Long, natural sentences ("just started my back workout, I'm on T-bar row, I've got 80 kilos on,
 // did 9 reps") parse as one command when they can; otherwise the gist is pulled out of them.
 export function parse(text, ctx = {}) {
+  const batch = parseBatch(text, ctx);
+  if (batch) return batch;
   const r = parseOne(text, ctx);
   if (r.type === 'Unknown') {
     const g = gist(text, ctx, r); // "I'm on C bar row" names the exercise better than word matching
@@ -378,6 +380,33 @@ export function parse(text, ctx = {}) {
     }
   }
   return r;
+}
+
+// A whole session in one go: "bench 3x8 at 80, then rows 3x10 at 60, then lateral raises 3 by 15 with 10".
+// Each piece that names its own lift and numbers becomes one item; needs two or more different lifts.
+const STRONG_SPLIT = /\b(?:and then|then|after that|afterwards|next|followed by|og så|så|derefter|bagefter|efter det)\b|[;\n]|[.!?](?=\s|$)/i;
+export function parseBatch(text, ctx = {}) {
+  const raw = String(text || '').trim();
+  const one = t => {
+    const r = parseOne(t, ctx);
+    if (r.type === 'LogSet' && r.exerciseId) return r;
+    const f = slots(t, ctx, r);
+    return f?.exerciseId ? f : null;
+  };
+  for (const splitter of [STRONG_SPLIT, /,/]) {
+    const parts = raw.split(new RegExp(splitter.source, 'gi')).map(x => x.trim()).filter(x => /\d/.test(x) || /[a-zæøå]{3}/i.test(x));
+    if (parts.length < 2) continue;
+    const items = [];
+    for (const p of parts) {
+      const r = one(p);
+      if (r) items.push({ exerciseId: r.exerciseId, kg: r.kg, reps: r.reps, count: r.count || 1 });
+      else if (/\d/.test(p)) { items.length = 0; break; } // a piece with numbers we can't read: not a batch
+    }
+    if (items.length >= 2 && new Set(items.map(i => i.exerciseId)).size >= 2) {
+      return { type: 'LogBatch', items: items.slice(0, 12), lang: detectLang(clean(raw), ctx.lang), heard: raw };
+    }
+  }
+  return null;
 }
 
 // Word order doesn't matter: "tricep pushdowns with two sets and 50 kilograms for eight reps",
@@ -471,7 +500,7 @@ const LIFT_VERBS = [
   [/\boverhead press(?:ed|ing)\b/g, 'overhead press'], [/\bleg press(?:ed|ing)\b/g, 'leg press'], [/\blunged\b/g, 'lunge'],
   [/\bhip thrust(?:ed|ing)\b/g, 'hip thrust'], [/\bpull(?:ed)? ups\b/g, 'pull ups'], [/\bshrugged\b/g, 'shrug']
 ];
-export const verbsToLifts = s => LIFT_VERBS.reduce((a, [re, to]) => a.replace(re, to), s);
+export const verbsToLifts = s => LIFT_VERBS.reduce((a, [re, to]) => a.replace(re, to), s).replace(/\b(\d+) by (\d+)\b/g, '$1 x $2');
 
 function parseOne(text, ctx = {}) {
   const heard = String(text || '').trim();

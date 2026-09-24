@@ -199,6 +199,18 @@ function bodyHTML() {
   return `<div class="section"><span class="label">${t('label.body')}</span><button class="textbtn" data-bodyscreen>${t('bodyx.link')} →</button></div><div class="grid2">${weightCard}${proteinCard}</div>`;
 }
 
+// The Coach's Monday check-in, until you've read it.
+function weeklyCardHTML() {
+  const { t } = state;
+  const s = state.settings;
+  const monday = dateKey(weekStart(Date.now()));
+  if (s.weeklyFor !== monday || s.weeklySeen === monday) return '';
+  const msg = [...state.chat].reverse().find(m => m.weekly === monday);
+  if (!msg) return '';
+  const preview = msg.text.replace(/\*\*?|#+\s/g, '').split('\n').map(x => x.trim()).filter(x => x && !/^(last week|this week|sidste uge|denne uge)\b:?$/i.test(x))[0] || '';
+  return `<button class="wkcard solid" data-weekly><span class="wki">${I.chat}</span><span class="l"><strong>${t('weekly.ready')}</strong><small>${esc(preview.slice(0, 110))}</small></span>${I.fwd}</button>`;
+}
+
 function reviewHTML() {
   const { t, lang, settings } = state;
   const r = weekReview(state.history, state.cardio);
@@ -251,7 +263,7 @@ export function renderToday(root) {
     <h1 class="greet">${greeting(t(greetingKey(hour))).split(' ').map((w, i) => `<span class="gw" style="--i:${i}">${esc(w)}</span>`).join(' ')}</h1>
     <p class="sub${!busy && weekStreak(state.history, state.cardio, state.settings.weeklyGoal).streak ? ' streak' : ''}">${esc(subline())}</p>
     ${busy ? '' : driveNudgeHTML({ stale: true })}
-    ${busy ? resumeHTML() : ''}
+    ${busy ? resumeHTML() : weeklyCardHTML()}
     ${busy ? '' : deloadHTML()}
     ${todayOrderOf(state.settings).map(k => part[k]()).join('')}
     <button class="custom" data-act="customize">${I.settings}<span>${t('cust.open')}</span></button>`;
