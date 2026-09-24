@@ -1472,3 +1472,30 @@ html{transition:background-color .4s}
 .exhead .exfig{width:50px;height:56px;align-self:center}
 .exhero{display:flex;align-items:center;gap:14px}
 .exhero .herofig{width:78px;height:86px;padding:4px;border-radius:22px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+
+/* =====================================================================
+   1.12: restraint. One quiet glow instead of a purple-to-blue wash, no
+   grain, solid cards on the page (glass only where something floats:
+   dock, sheets, toasts), flat primary buttons, neutral labels, more contrast.
+   The orb stays the one bold thing.
+   ===================================================================== */
+:root{--muted:#A6A7B8;--dim:#80829A;--card:#171A22;--card-line:rgba(255,255,255,.07)}
+.app::after{display:none}
+.ambient i:nth-child(2),.ambient i:nth-child(3),.ambient i:nth-child(4){display:none}
+.ambient i:nth-child(1){width:520px;height:420px;left:50%;top:-260px;margin-left:-260px;opacity:.32;background:radial-gradient(closest-side,var(--amb1),transparent)}
+.ambient::after{background:linear-gradient(180deg,transparent 40%,rgba(7,8,12,.5))}
+/* cards on the page: solid, one hairline, no rim light or inner glow */
+.screen .glass,.screen .solid,.sheet .solid{background:var(--card);border:1px solid var(--card-line);box-shadow:none}
+.screen .glass .label,.glass .label{color:var(--dim)}
+/* primary button: a flat, confident fill */
+.log{background:var(--accent);box-shadow:none}
+.log::after{display:none}
+.log:active{filter:brightness(.92)}
+.btn2.solid,.chip{box-shadow:none}
+/* floating glass keeps its blur, but no coloured glow */
+.dock.glass{box-shadow:0 16px 36px -14px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.12)}
+.glass:not(.screen .glass){box-shadow:0 20px 44px -18px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.1)}
+.dock .ind{background:rgba(255,255,255,.09);box-shadow:none}
+.app.compact .dock .tab.on{background:rgba(255,255,255,.09)}
+.tab.on svg{color:var(--ink)}
+.upcoming::before{display:none}
