@@ -72,6 +72,7 @@ function renderDock() {
     dock.dataset.lang = state.lang;
   }
   let on = null;
+  dock.dataset.on = TABS.includes(view.screen) ? view.screen : '';
   for (const b of dock.querySelectorAll('.tab')) {
     const is = b.dataset.to === view.screen;
     b.classList.toggle('on', is);
@@ -223,6 +224,7 @@ Object.assign(actions, {
 });
 initPress(document);
 initChrome();
+app.addEventListener('dockopen', () => renderDock());
 initHandsFree();
 initBodyScreen($('#s-body'));
 initGoals();

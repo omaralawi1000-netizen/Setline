@@ -1373,7 +1373,6 @@ p.ckwarn{margin:6px 0 0}
 .app.is-sub .edge.et{opacity:1}
 /* the dock tucks in while you read and comes back when you scroll up */
 .dock{transition:opacity .35s var(--ease),transform .6s cubic-bezier(.3,1.35,.5,1)}
-.app.compact:not(.is-sub):not(.voice):not(.kb) .dock{transform:translateY(10px) scale(.9)}
 .dock .ind{transition:transform .6s cubic-bezier(.3,1.25,.5,1),width .6s cubic-bezier(.3,1.25,.5,1),opacity .3s}
 html[data-motion=off] .edge::before,html[data-motion=off] .edge::after{transition:none}
 .app.orbland .orbbtn .orb{transition:none!important}
@@ -1418,3 +1417,23 @@ html{transition:background-color .4s}
 /* a pause: the orb holds its breath while it checks whether you're done */
 .ofloat[data-pause=check] .orb.lift{opacity:.82;transition:opacity .3s}
 .ofloat[data-pause=wait] .ostatus{color:var(--warm);background:rgba(255,217,168,.1)}
+
+/* the dock minimizes to a small pill (current tab + orb) while you scroll down, like iOS */
+.dock{--c-today:1fr;--c-workout:1fr;--c-coach:1fr;--c-history:1fr;grid-template-columns:var(--c-today) var(--c-workout) 88px var(--c-coach) var(--c-history);
+  transition:opacity .35s var(--ease),transform .6s cubic-bezier(.3,1.35,.5,1),left .55s cubic-bezier(.3,1.15,.4,1),right .55s cubic-bezier(.3,1.15,.4,1),
+  grid-template-columns .55s cubic-bezier(.3,1.15,.4,1),height .5s cubic-bezier(.3,1.2,.4,1),bottom .5s cubic-bezier(.3,1.2,.4,1)}
+.tab{min-width:0;overflow:hidden;transition:color .3s,transform .3s var(--ease),opacity .3s}
+.tab span{transition:opacity .25s,transform .4s var(--ease)}
+.app.compact:not(.is-sub):not(.voice):not(.kb) .dock{left:calc(50% - 82px);right:calc(50% - 82px);height:60px;bottom:calc(var(--dock-bottom) - 4px);
+  grid-template-columns:var(--c-today) var(--c-workout) 76px var(--c-coach) var(--c-history)}
+.app.compact .dock:not([data-on=today]){--c-today:0fr}
+.app.compact .dock:not([data-on=workout]){--c-workout:0fr}
+.app.compact .dock:not([data-on=coach]){--c-coach:0fr}
+.app.compact .dock:not([data-on=history]){--c-history:0fr}
+.app.compact .dock .tab:not(.on){opacity:0;pointer-events:none}
+.app.compact .dock .tab span{opacity:0;transform:translateY(4px)}
+.app.compact .dock .tab{height:48px}
+.app.compact .dock .ind{opacity:0!important}
+.app.compact .dock .tab.on{background:rgba(var(--a-rgb),.14)}
+.app.compact .dock .orbbtn{transform:scale(.8);margin-top:-14px}
+.orbbtn{transition:transform .5s cubic-bezier(.3,1.35,.5,1),margin .5s cubic-bezier(.3,1.2,.4,1)}

@@ -38,6 +38,15 @@ export function initChrome() {
     app.classList.toggle('under-top', !!s && s.scrollTop > 6);
     app.classList.toggle('under-bottom', !!s && s.scrollHeight - s.clientHeight - s.scrollTop > 6);
   });
+  // tapping the small pill opens the dock again (the orb still talks straight away)
+  const dock = document.getElementById('dock');
+  dock?.addEventListener('click', e => {
+    if (!app.classList.contains('compact') || e.target.closest('.orbbtn')) return;
+    e.preventDefault(); e.stopPropagation();
+    app.classList.remove('compact');
+  }, true);
+  // the indicator is placed from the laid-out tabs: place it again once the dock has opened
+  dock?.addEventListener('transitionend', e => { if (e.target === dock && e.propertyName === 'grid-template-columns' && !app.classList.contains('compact')) app.dispatchEvent(new Event('dockopen')); });
   repaint = paint;
   paint();
 }
