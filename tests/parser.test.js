@@ -261,3 +261,13 @@ test('a long, natural sentence gives the gist', () => {
   assert.equal(parse('Jeg er i gang med bænkpres. 60 kilo. Jeg lavede 8 gentagelser.', { catalog, lang: 'da' }).exerciseId, 'bench-press');
   assert.equal(parse('The weather is nice. See you soon.', { catalog, lang: 'en' }).type, 'Unknown', 'chat stays unknown');
 });
+
+test('past-tense lifts and "sets of <weight>"', () => {
+  const catalog = createCatalog();
+  const p = t => parse(t, { catalog, lang: 'en', routines: [] });
+  const a = p('I benched 3 sets of 100 kilos for 8 reps.');
+  assert.deepEqual([a.type, a.count, a.kg, a.reps, a.exerciseId], ['LogSet', 3, 100, 8, 'bench-press']);
+  assert.equal(p('I squatted 140 for 5').exerciseId, 'back-squat');
+  assert.equal(p('deadlifted 180 kilos for 3 reps').exerciseId, 'deadlift');
+  assert.equal(p('rowing 20 minutes').type === 'LogSet', false, 'rowing stays cardio');
+});

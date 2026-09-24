@@ -187,12 +187,13 @@ function bodyHTML() {
     </button>`;
   // the food card: calories left and protein, opens the Food screen; the chips still add protein
   const ft = foodTargets(), tot = dayTotals(state.nutrition.find(n => n.date === dateKey()));
-  const kLeft = ft.kcal - tot.kcal;
-  const pct = Math.min(1, tot.kcal / ft.kcal);
+  const cal = !(settings.foodHide || []).includes('calories'); // calories off: the card follows protein
+  const kLeft = cal ? ft.kcal - tot.kcal : ft.protein - tot.protein;
+  const pct = Math.min(1, cal ? tot.kcal / ft.kcal : tot.protein / ft.protein);
   const R = 2 * Math.PI * 21;
   const proteinCard = `<div class="mini solid protein foodcard" data-foodscreen role="button" tabindex="0" aria-label="${esc(t('food.title'))}"><span class="label">${t('food.title')} <span class="fgo">→</span></span>
       <div class="prow2"><div class="pring"><svg viewBox="0 0 52 52" aria-hidden="true"><circle class="bg" cx="26" cy="26" r="21"/><circle class="fg" cx="26" cy="26" r="21" style="stroke-dasharray:${R};stroke-dashoffset:${R * (1 - pct)}"/></svg><b>${Math.round(pct * 100)}<small>%</small></b></div>
-      <span class="bsub"><strong>${esc(new Intl.NumberFormat(lang === 'da' ? 'da-DK' : 'en-GB').format(Math.abs(kLeft)))}</strong> ${t(kLeft < 0 ? 'food.kcalOver' : 'food.kcalLeft')}<br>${esc(t('food.proteinOf', { g: tot.protein, target: ft.protein }))}</span></div>
+      <span class="bsub"><strong>${esc(new Intl.NumberFormat(lang === 'da' ? 'da-DK' : 'en-GB').format(Math.abs(kLeft)))}</strong> ${t(cal ? (kLeft < 0 ? 'food.kcalOver' : 'food.kcalLeft') : (kLeft < 0 ? 'food.gOver' : 'food.gLeft'))}${cal ? `<br>${esc(t('food.proteinOf', { g: tot.protein, target: ft.protein }))}` : ''}</span></div>
     </div>`;
   return `<div class="section"><span class="label">${t('label.body')}</span><button class="textbtn" data-bodyscreen>${t('bodyx.link')} →</button></div><div class="grid2">${weightCard}${proteinCard}</div>`;
 }

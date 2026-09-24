@@ -44,11 +44,13 @@ export const DEFAULTS = Object.freeze({
   goals: [],           // lift goals (goals.js)
   accent: 'violet',    // colour theme
   fullscreen: false,   // hide the phone's status bar (edge to edge)
+  foodHide: [],        // Food tab parts turned off (Customize)
   foodTargets: null,   // {kcal, protein, carbs, fat, water} set by hand; null = worked out from the profile
   todayHide: ['balance', 'routines'] // Today sections tucked away (Customize)
 });
 
 export const ACCENTS = ['violet', 'ocean', 'jade', 'ember', 'rose'];
+export const FOOD_PARTS = ['calories', 'carbs', 'fat', 'water', 'favourites', 'quickProtein', 'week'];
 export const TODAY_PARTS = ['checkin', 'goals', 'cardio', 'week', 'balance', 'body', 'review', 'routines'];
 
 // Gemini prebuilt voices and how they sound.
@@ -78,6 +80,7 @@ export function sanitize(input) {
   if (ACCENTS.includes(input.accent)) s.accent = input.accent;
   if (typeof input.fullscreen === 'boolean') s.fullscreen = input.fullscreen;
   s.foodTargets = sanitizeTargets(input.foodTargets);
+  if (Array.isArray(input.foodHide)) s.foodHide = [...new Set(input.foodHide.filter(x => FOOD_PARTS.includes(x)))];
   if (Array.isArray(input.todayHide)) s.todayHide = [...new Set(input.todayHide.filter(x => TODAY_PARTS.includes(x)))];
   if (Array.isArray(input.favMeals)) s.favMeals = input.favMeals.filter(x => typeof x === 'string' && x.length <= 60).slice(0, 30);
   for (const k of ['deloadUntil', 'deloadSnoozed']) if (Number.isFinite(input[k]) && input[k] >= 0) s[k] = input[k];

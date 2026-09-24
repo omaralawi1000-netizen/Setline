@@ -133,7 +133,7 @@ export async function ask(question, { root = $('#s-coach') } = {}) {
         const now = performance.now();
         if (now - last > 120) { last = now; scrollDown(root); }
       }
-    }), { rounds: 2 });
+    }), { rounds: 3, wait: 2500, alsoRetry: ['timeout'] }); // busy servers get a patient second and third go
     store.updateChat(reply.id, { text, streaming: false }, { persist: true });
     haptic('tap');
     if (text && state.settings.spoken !== 'off') {

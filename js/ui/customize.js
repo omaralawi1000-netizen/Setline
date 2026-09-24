@@ -1,9 +1,9 @@
 // Customize: the colour theme and which cards Today shows. Changes apply live behind the sheet.
 import * as store from '../store.js';
 import { state } from '../store.js';
-import { ACCENTS, TODAY_PARTS } from '../settings.js';
+import { ACCENTS, TODAY_PARTS, FOOD_PARTS } from '../settings.js';
 import { haptic } from '../haptics.js';
-import { openSheet } from './sheet.js';
+import { openSheet, closeTop } from './sheet.js';
 
 export function openCustomize() {
   const { t } = state;
@@ -32,4 +32,26 @@ export function openCustomize() {
       }
     });
   }, { label: t('cust.title') });
+}
+
+// Food tab: what to track. Calories off → the ring follows protein.
+export function openFoodCustomize({ targets = null } = {}) {
+  const { t } = state;
+  openSheet(el => {
+    const hide = () => new Set(state.settings.foodHide || []);
+    el.innerHTML = `<div class="sbody"><h2>${t('cust.foodTitle')}</h2><p class="lead">${t('cust.foodLead')}</p>
+      <div class="slist solid">${FOOD_PARTS.map(k => `<div class="srow"><span class="l"><strong>${t('cust.food.' + k)}</strong>${k === 'calories' ? `<small>${t('cust.food.caloriesSub')}</small>` : ''}</span>
+        <button class="toggle" role="switch" aria-checked="${!hide().has(k)}" aria-label="${t('cust.food.' + k)}" data-cf="${k}"></button></div>`).join('')}</div>
+      ${targets ? `<button class="btn2 solid wide" data-cf-targets>${t('food.targets')}</button>` : ''}</div>`;
+    el.addEventListener('click', async e => {
+      if (e.target.closest('[data-cf-targets]')) { haptic('tap'); await closeTop(); targets?.(); return; }
+      const b = e.target.closest('[data-cf]');
+      if (!b) return;
+      haptic('tap');
+      const h = hide(), k = b.dataset.cf;
+      if (h.has(k)) h.delete(k); else h.add(k);
+      store.setSettings({ foodHide: [...h] });
+      b.setAttribute('aria-checked', String(!h.has(k)));
+    });
+  }, { label: t('cust.foodTitle') });
 }

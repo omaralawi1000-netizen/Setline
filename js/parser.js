@@ -203,7 +203,8 @@ function setValues(tok, ctx) {
     if (isNum(tok[i]) && SETS.has(tok[i + 1])) {
       let k = i + 2;
       if (['of', 'af', 'med', 'x', 'á', 'a', 'på'].includes(tok[k])) k++;
-      if (isNum(tok[k] ?? '')) { count = Number(tok[i]); reps = Number(tok[k]); take(i, i + 1, k); if (k - i === 3) take(i + 2); if (REPS.has(tok[k + 1])) take(k + 1); }
+      if (isNum(tok[k] ?? '') && (KG.has(tok[k + 1]) || LB.has(tok[k + 1]))) { count = Number(tok[i]); take(i, i + 1); if (k - i === 3) take(i + 2); } // "3 sets of 100 kilos (for 8)"
+      else if (isNum(tok[k] ?? '')) { count = Number(tok[i]); reps = Number(tok[k]); take(i, i + 1, k); if (k - i === 3) take(i + 2); if (REPS.has(tok[k + 1])) take(k + 1); }
     }
   }
   // labeled numbers
@@ -403,11 +404,20 @@ function gist(text, ctx, unknown) {
   return null;
 }
 
+// "I benched 100", "squatted 140 for 5", "deadlifted 180": the verb names the lift.
+const LIFT_VERBS = [
+  [/\bbench(?:ed|ing)\b/g, 'bench'], [/\bsquat(?:ted|ting)\b/g, 'squat'], [/\bdeadlift(?:ed|ing)\b/g, 'deadlift'],
+  [/\bcurl(?:ed|ing)\b/g, 'curl'], [/\bshoulder press(?:ed|ing)\b/g, 'shoulder press'],
+  [/\boverhead press(?:ed|ing)\b/g, 'overhead press'], [/\bleg press(?:ed|ing)\b/g, 'leg press'], [/\blunged\b/g, 'lunge'],
+  [/\bhip thrust(?:ed|ing)\b/g, 'hip thrust'], [/\bpull(?:ed)? ups\b/g, 'pull ups'], [/\bshrugged\b/g, 'shrug']
+];
+export const verbsToLifts = s => LIFT_VERBS.reduce((a, [re, to]) => a.replace(re, to), s);
+
 function parseOne(text, ctx = {}) {
   const heard = String(text || '').trim();
   const base = clean(heard);
   const lang = detectLang(base, ctx.lang);
-  let s = wordsToNumbers(base, lang);
+  let s = verbsToLifts(wordsToNumbers(base, lang));
   const out = (type, fields = {}) => ({ type, ...fields, lang, heard });
   if (!s) return out('Unknown');
   // "4 plates", "2 plates a side", "3 plader": weight from plates, worked out once we know the exercise

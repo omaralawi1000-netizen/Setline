@@ -257,12 +257,25 @@ export async function aiCommand(text, ctx, { key, model, timeout = 4000, signal 
 // Stream an answer; onText(fullSoFar) per chunk. Resolves to the final text.
 // A stream that goes quiet for idleTimeout is cut off: with some text it counts as the answer,
 // with none it's a timeout. An empty answer (all tokens spent thinking, or blocked) is 'empty', worth a retry.
-export async function streamChat({ key, model, system, contents, onText, signal, firstByteTimeout = 12000, idleTimeout = 20000 }) {
-  const { res, done } = await post(`models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, key, {
-    systemInstruction: { parts: [{ text: system }] },
-    contents,
-    generationConfig: { temperature: 0.6, maxOutputTokens: 2048 }
-  }, { timeout: firstByteTimeout, signal });
+// Models that refused a thinking budget (older ones): asked without it from then on.
+const noThinking = new Set();
+
+// firstChunkTimeout: thinking models say nothing until they've thought, so the first words get longer
+// than the gaps between later ones. The thinking itself is capped so answers start sooner.
+export async function streamChat({ key, model, system, contents, onText, signal, firstByteTimeout = 15000, firstChunkTimeout = 45000, idleTimeout = 20000 }) {
+  const think = !noThinking.has(model);
+  let posted;
+  try {
+    posted = await post(`models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, key, {
+      systemInstruction: { parts: [{ text: system }] },
+      contents,
+      generationConfig: { temperature: 0.6, maxOutputTokens: 2048, ...(think ? { thinkingConfig: { thinkingBudget: 1024 } } : {}) }
+    }, { timeout: firstByteTimeout, signal });
+  } catch (e) {
+    if (think && e instanceof AiError && e.code === 'badrequest') { noThinking.add(model); return streamChat({ key, model, system, contents, onText, signal, firstByteTimeout, firstChunkTimeout, idleTimeout }); }
+    throw e;
+  }
+  const { res, done } = posted;
   done(); // headers arrived; the stream can take its time, but not forever between chunks
   const reader = res.body.getReader();
   const dec = new TextDecoder();
@@ -272,7 +285,7 @@ export async function streamChat({ key, model, system, contents, onText, signal,
     const off = () => { clearTimeout(timer); signal?.removeEventListener('abort', onAbort); };
     const onAbort = () => { off(); reader.cancel().catch(() => {}); reject(new AiError('aborted')); };
     if (signal?.aborted) return onAbort();
-    timer = setTimeout(() => { off(); reader.cancel().catch(() => {}); reject(new AiError('timeout')); }, idleTimeout);
+    timer = setTimeout(() => { off(); reader.cancel().catch(() => {}); reject(new AiError('timeout')); }, full ? idleTimeout : firstChunkTimeout);
     signal?.addEventListener('abort', onAbort, { once: true });
     reader.read().then(r => { off(); resolve(r); }, () => { off(); reject(new AiError(signal?.aborted ? 'aborted' : 'network')); });
   });
@@ -308,7 +321,8 @@ export const retryable = e => e instanceof AiError && (e.code === 'busy' || e.co
 // Run fn(model) with the chosen model, then the runner-ups. Models out of daily quota are skipped (and
 // remembered); a per-minute limit waits Google's suggested delay once; with rounds > 1 the list is tried
 // again after a pause when everything was busy.
-export async function withFallback(models, fn, { rounds = 1, wait = 1500, maxWait = 20000, sleep = ms => new Promise(r => setTimeout(r, ms)), now = () => Date.now() } = {}) {
+export async function withFallback(models, fn, { rounds = 1, wait = 1500, maxWait = 20000, alsoRetry = [], sleep = ms => new Promise(r => setTimeout(r, ms)), now = () => Date.now() } = {}) {
+  const again = e => retryable(e) || (e instanceof AiError && alsoRetry.includes(e.code));
   const all = [...new Set(models.filter(Boolean))];
   let list = all.filter(m => !isExhausted(m, now()));
   if (!list.length) throw new AiError('quota', 429, { resetAt: nextQuotaReset(now()) });
@@ -318,12 +332,12 @@ export async function withFallback(models, fn, { rounds = 1, wait = 1500, maxWai
     for (const m of list) {
       try { return await fn(m); } catch (e) {
         last = e;
-        if (!retryable(e)) throw e;
+        if (!again(e)) throw e;
         if (e.code === 'quota') markExhausted(m, now());
         else if (e.code === 'busy' && e.retryMs && e.retryMs <= maxWait && !waited && m === list[list.length - 1]) {
           waited = true; // the last option said "try again in N s": wait for it once
           await sleep(e.retryMs);
-          try { return await fn(m); } catch (e2) { last = e2; if (!retryable(e2)) throw e2; }
+          try { return await fn(m); } catch (e2) { last = e2; if (!again(e2)) throw e2; }
         }
       }
     }

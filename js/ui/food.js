@@ -14,6 +14,7 @@ import { openMealSheet, favRowHTML, toggleStar } from './meal.js';
 import { openScanner, scanIcon } from './scan.js';
 import { talkNow } from './voice.js';
 import { mealKey } from '../meals.js';
+import { openFoodCustomize } from './customize.js';
 
 const view = { date: null };
 const prev = new Map();     // what the ring, bars and numbers showed last time, by date
@@ -71,19 +72,24 @@ export function renderFood(root) {
   const week = weekOf(state.nutrition, today);
   const maxK = Math.max(tg.kcal * 1.25, ...week.map(d => d.kcal));
   const isToday = date === today;
+  const hide = new Set(state.settings.foodHide || []), on = k => !hide.has(k);
+  const cal = on('calories');
+  // the ring: calories, or protein when calories are switched off
+  const ringWas = cal ? was.kcal / tg.kcal : was.protein / tg.protein, ringNow = cal ? tot.kcal / tg.kcal : tot.protein / tg.protein;
+  const ringLeft = cal ? left : tg.protein - tot.protein, ringOver = ringLeft < 0;
 
   root.innerHTML = `<div class="tabtop"></div>
     <div class="fdayrow"><h1 class="h1 tabh">${t('food.title')}</h1>
       <div class="fday"><button class="iconbtn sm" data-f="day" data-d="-1" aria-label="${t('food.prevDay')}">${I.back}</button><span>${esc(dayLabel(date))}</span>
       <button class="iconbtn sm" data-f="day" data-d="1" aria-label="${t('food.nextDay')}" ${isToday ? 'disabled' : ''}>${I.fwd}</button></div></div>
 
-    <button class="fhero solid" data-f="targets" aria-label="${esc(t('food.targets'))}">
+    <button class="fhero solid${cal ? '' : ' pring-mode'}" data-f="targets" aria-label="${esc(t('food.targets'))}">
       <div class="fring"><svg viewBox="0 0 128 128" aria-hidden="true"><circle class="bg" cx="64" cy="64" r="${R}"/>
-        <circle class="fg${left < 0 ? ' over' : ''}" cx="64" cy="64" r="${R}" style="stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${(C * (1 - pct(was.kcal / tg.kcal))).toFixed(1)}" data-to="${(C * (1 - pct(tot.kcal / tg.kcal))).toFixed(1)}"/></svg>
-        <div class="fcenter"><b data-fcount="left" data-from="${Math.round(Math.abs(was.left))}" data-to="${Math.round(Math.abs(left))}">${nf().format(Math.round(Math.abs(was.left)))}</b><span>${t(left < 0 ? 'food.over' : 'food.left')}</span></div></div>
+        <circle class="fg${ringOver ? ' over' : ''}" cx="64" cy="64" r="${R}" style="stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${(C * (1 - pct(ringWas))).toFixed(1)}" data-to="${(C * (1 - pct(ringNow))).toFixed(1)}"/></svg>
+        <div class="fcenter"><b data-fcount="left" data-from="${Math.round(Math.abs(cal ? was.left : tg.protein - was.protein))}" data-to="${Math.round(Math.abs(ringLeft))}">${nf().format(Math.round(Math.abs(cal ? was.left : tg.protein - was.protein)))}</b><span>${t(cal ? (left < 0 ? 'food.over' : 'food.left') : (ringLeft < 0 ? 'food.gOver' : 'food.gLeft'))}</span></div></div>
       <div class="fmacs">
-        <div class="featen"><span>${t('food.eaten')}</span><b><span data-fcount="kcal" data-from="${Math.round(was.kcal)}" data-to="${Math.round(tot.kcal)}">${nf().format(Math.round(was.kcal))}</span><small> / ${nf().format(tg.kcal)} kcal</small></b></div>
-        ${macro('protein', 'p')}${macro('carbs', 'c')}${macro('fat', 'f')}
+        ${cal ? `<div class="featen"><span>${t('food.eaten')}</span><b><span data-fcount="kcal" data-from="${Math.round(was.kcal)}" data-to="${Math.round(tot.kcal)}">${nf().format(Math.round(was.kcal))}</span><small> / ${nf().format(tg.kcal)} kcal</small></b></div>` : `<div class="featen"><span>${t('food.protein')}</span><b>${nf().format(Math.round(tot.protein))}<small> / ${tg.protein} g</small></b></div>`}
+        ${cal ? macro('protein', 'p') : ''}${on('carbs') ? macro('carbs', 'c') : ''}${on('fat') ? macro('fat', 'f') : ''}
       </div>
     </button>
 
@@ -93,12 +99,11 @@ export function renderFood(root) {
       <button class="ftile" data-f="say" style="--i:2">${I.mic}<span>${t('food.say')}</span></button>
       <button class="ftile" data-f="type" style="--i:3">${I.pen}<span>${t('food.type')}</span></button>
     </div>
-    ${favRowHTML(10)}
-    <div class="fqp"><span>${t('food.quickProtein')}</span>${[20, 30, 40].map(g => `<button class="chip" data-body="protein" data-g="${g}">+${g} g</button>`).join('')}</div>` : `<button class="btn2 solid fback" data-f="today">${t('food.backToday')}</button>`}
+    ${on('favourites') ? favRowHTML(10) : ''}
+    ${on('quickProtein') ? `<div class="fqp"><span>${t('food.quickProtein')}</span>${[20, 30, 40].map(g => `<button class="chip" data-body="protein" data-g="${g}">+${g} g</button>`).join('')}</div>` : ''}` : `<button class="btn2 solid fback" data-f="today">${t('food.backToday')}</button>`}
 
-    <div class="section"><span class="label">${t('food.water')}</span><span class="fwl">${(tot.water / 1000).toLocaleString(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: 2 })} / ${(tg.water / 1000).toLocaleString(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: 1 })} L</span></div>
-    <div class="fwater" style="--n:${Math.min(12, glasses)}">${Array.from({ length: glasses }, (_, i) => `<button class="glass-w${i < full ? ' on' : ''}" data-f="water" data-n="${i + 1}" aria-label="${esc(t('food.glasses', { n: i + 1 }))}" style="--i:${i}"><i></i></button>`).join('')}</div>
-
+    ${on('water') ? `    <div class="section"><span class="label">${t('food.water')}</span><span class="fwl">${(tot.water / 1000).toLocaleString(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: 2 })} / ${(tg.water / 1000).toLocaleString(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: 1 })} L</span></div>
+    <div class="fwater" style="--n:${Math.min(12, glasses)}">${Array.from({ length: glasses }, (_, i) => `<button class="glass-w${i < full ? ' on' : ''}" data-f="water" data-n="${i + 1}" aria-label="${esc(t('food.glasses', { n: i + 1 }))}" style="--i:${i}"><i></i></button>`).join('')}</div>` : ''}
     ${anyMeals ? SLOTS.filter(s => slots[s].length).map(s => {
       const k = slots[s].reduce((a, m) => a + m.kcal, 0);
       return `<div class="section fslot"><span class="label">${t('food.slot.' + s)}</span><span class="fsk">${nf().format(k)} kcal</span></div>
@@ -106,15 +111,16 @@ export function renderFood(root) {
     }).join('') : `<div class="fempty"><span class="fei">${I.meal}</span><strong>${t(isToday ? 'food.emptyToday' : 'food.emptyDay')}</strong><small>${t('food.emptySub')}</small></div>`}
     ${tot.quickProtein > 0 ? `<p class="fquick">${esc(t('food.quick', { g: tot.quickProtein }))}</p>` : ''}
 
-    <div class="section"><span class="label">${t('food.week')}</span><span class="fwl">${esc(t('food.avg', { k: nf().format(Math.round(week.filter(d => d.kcal).reduce((a, d) => a + d.kcal, 0) / Math.max(1, week.filter(d => d.kcal).length))) }))}</span></div>
+    ${on('week') ? `    <div class="section"><span class="label">${t('food.week')}</span><span class="fwl">${esc(t('food.avg', { k: nf().format(Math.round(week.filter(d => d.kcal).reduce((a, d) => a + d.kcal, 0) / Math.max(1, week.filter(d => d.kcal).length))) }))}</span></div>
     <div class="fweek solid">
       <i class="ftarget" style="bottom:${(tg.kcal / maxK * 100).toFixed(1)}%"></i>
       ${week.map((d, i) => `<button class="fwd${d.date === date ? ' on' : ''}" data-f="goto" data-date="${d.date}" style="--i:${i}">
         <i class="fwb${d.kcal > tg.kcal * 1.08 ? ' hi' : ''}" style="--h:${(d.kcal / maxK).toFixed(3)}"></i>
         ${d.protein ? `<i class="fwp" style="--p:${Math.min(1, d.protein / tg.protein).toFixed(3)}"></i>` : ''}
         <span>${esc(new Intl.DateTimeFormat(state.lang === 'da' ? 'da-DK' : 'en-GB', { weekday: 'narrow' }).format(new Date(d.date + 'T12:00')))}</span></button>`).join('')}
-    </div>
-    <p class="fnote">${t(state.settings.foodTargets ? 'food.targetsCustom' : 'food.targetsAuto')}</p>`;
+    </div>` : ''}
+    <p class="fnote">${t(state.settings.foodTargets ? 'food.targetsCustom' : 'food.targetsAuto')}</p>
+    <button class="custom" data-f="custom">${I.settings}<span>${t('cust.open')}</span></button>`;
 
   // glide from the old values to the new ones
   prev.set(date, { kcal: tot.kcal, protein: tot.protein, carbs: tot.carbs, fat: tot.fat, left, water: tot.water });
@@ -240,6 +246,7 @@ export function initFood(root) {
     if (k === 'goto') { const d = Number(new Date(b.dataset.date) > new Date(view.date)) || -1; view.date = b.dataset.date; slide(root, d); return renderFood(root); }
     if (k === 'today') { view.date = dateKey(); slide(root, 1); return renderFood(root); }
     if (k === 'targets') return targetsSheet();
+    if (k === 'custom') return openFoodCustomize({ targets: targetsSheet });
     if (k === 'meal') return mealSheet(b.dataset.id);
     if (k === 'scan') return openScanner();
     if (k === 'snap') return openMealSheet();

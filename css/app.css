@@ -1683,3 +1683,11 @@ html[data-motion=off] #s-food *{animation:none!important}
 .fqp{margin-top:12px;display:flex;align-items:center;gap:8px}
 .fqp span{flex:1;font-size:13px;font-weight:800;color:var(--muted)}
 .foodcard{min-height:0}
+
+/* 1.15.1: phones that keep the status bar black (Samsung and others ignore the page's colour):
+   the app's top edge is that same black and melts into the glow below, so bar and app read as one. */
+.ambient::before{content:"";position:absolute;left:0;right:0;top:0;height:calc(var(--safe-top) + 150px);z-index:1;pointer-events:none;
+  background:linear-gradient(#000 0,rgba(0,0,0,.92) 18%,rgba(0,0,0,.55) 48%,rgba(0,0,0,0) 100%)}
+.edge.et::before{opacity:1;background:linear-gradient(#000,rgba(0,0,0,.7) 30%,rgba(0,0,0,0))}
+.app.under-top .edge.et::before{opacity:1}
+.sbody .btn2.wide{width:100%;margin-top:12px}
