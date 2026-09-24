@@ -7,6 +7,7 @@ import { clock } from './format.js';
 import { setHapticsGate, haptic } from './haptics.js';
 import { keepAwake } from './wakelock.js';
 import { $, esc } from './ui/dom.js';
+import { unlockAudio } from './audio.js';
 import { I, TAB_ICONS } from './ui/icons.js';
 import { toast } from './ui/toast.js';
 import { handlePop } from './ui/sheet.js';
@@ -94,6 +95,30 @@ function renderDock() {
   }
 }
 
+// While the bar squishes or stretches, the lens glides to its tab and tracks it every frame
+// (so it can't lag behind or land where the tab used to be).
+let lensRun = 0;
+function followLens(ms = 700) {
+  const dock = $('#dock'), ind = dock?.querySelector('.ind');
+  if (!ind) return;
+  const m = /translateX\(([-\d.]+)px\)/.exec(ind.style.transform || '');
+  const x0 = m ? Number(m[1]) : null, w0 = ind.offsetWidth;
+  const t0 = performance.now(), mine = ++lensRun;
+  const spring = k => 1 - Math.pow(1 - k, 3) * Math.cos(k * 2.2); // quick, with a little give at the end
+  ind.classList.add('follow');
+  const step = now => {
+    if (mine !== lensRun) return;
+    const on = dock.querySelector('.tab.on');
+    const k = Math.min(1, (now - t0) / ms), e = spring(k);
+    if (on) {
+      const x = x0 == null ? on.offsetLeft : x0 + (on.offsetLeft - x0) * e, w = w0 ? w0 + (on.offsetWidth - w0) * e : on.offsetWidth;
+      ind.style.transform = `translateX(${x.toFixed(1)}px)`; ind.style.width = w.toFixed(1) + 'px';
+    }
+    if (k < 1) requestAnimationFrame(step); else ind.classList.remove('follow');
+  };
+  requestAnimationFrame(step);
+}
+
 function renderMini() {
   const w = state.active;
   const a = state.activeCardio;
@@ -114,7 +139,7 @@ function renderAll() {
   document.documentElement.lang = state.lang;
   document.documentElement.dataset.motion = state.settings.motion;
   const glowWas = document.documentElement.dataset.glow;
-  Object.assign(document.documentElement.dataset, { text: state.settings.textSize, glow: state.settings.glow, dock: state.settings.dockLabels ? 'labels' : 'icons' });
+  Object.assign(document.documentElement.dataset, { text: state.settings.textSize, glow: state.settings.glow, dock: state.settings.dockLabels ? 'labels' : 'icons', fx: state.settings.fx, orbstyle: state.settings.orbStyle, bar: state.settings.bar, cards: state.settings.cards });
   if (glowWas !== state.settings.glow) refreshChrome();
   configureSteps(state.settings.kgSteps);
   if (document.documentElement.dataset.accent !== state.settings.accent) { document.documentElement.dataset.accent = state.settings.accent; refreshChrome(); }
@@ -191,6 +216,7 @@ function show(name, { back = false } = {}) {
   const wasCoach = app.classList.contains('coaching');
   if (wasCoach !== (name === 'coach') && !SUB.includes(name) && !SUB.includes(prev)) flyOrb(name === 'coach');
   app.classList.toggle('coaching', name === 'coach');
+  if (wasCoach !== (name === 'coach')) followLens(); // the bar changes shape: the lens rides along
   if (name === 'coach') { markWeeklySeen(); markDebriefSeen(); }
   requestAnimationFrame(() => app.dispatchEvent(new Event('screenchange')));
   renderAll();
@@ -565,6 +591,23 @@ function shortcut() {
 
 // "Set up these routines" in the brief: the Coach copies the routine written there
 window.addEventListener('setline:brief-routines', () => { if (SUB.includes(view.screen)) history.back(); setTimeout(() => { go('coach'); askCoach(state.t('brief.routinesAsk')); }, 350); });
+
+// every tap keeps sound and speech ready (Android only allows them after a touch)
+addEventListener('pointerdown', e => { unlockAudio(); ripple(e); }, { capture: true, passive: true });
+
+// Wow motion: a soft light spreads from where you touch the big buttons and tiles.
+function ripple(e) {
+  if (state.settings.fx !== 'wow' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const host = e.target.closest?.('.log, .ftile, .ttile, .frep, .plopt, .upcoming, .rrow .rmain, .cstart');
+  if (!host) return;
+  host.dataset.rip = '';
+  const r = host.getBoundingClientRect(), d = Math.max(r.width, r.height) * 2.2;
+  const s = document.createElement('span');
+  s.className = 'rip';
+  s.style.cssText = `width:${d}px;height:${d}px;left:${e.clientX - r.left - d / 2}px;top:${e.clientY - r.top - d / 2}px`;
+  host.appendChild(s);
+  setTimeout(() => s.remove(), 650);
+}
 
 boot();
 

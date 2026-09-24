@@ -22,6 +22,10 @@ export function openCustomize() {
           <div class="srow"><span class="l"><strong>${t('look.start')}</strong><small>${t('look.startSub')}</small></span>${seg('startTab', ['today', 'workout', 'food', 'coach'], k => t('tab.' + k))}</div>
           <div class="srow"><span class="l"><strong>${t('look.text')}</strong></span>${seg('textSize', ['small', 'normal', 'large'], k => t('look.text.' + k))}</div>
           <div class="srow"><span class="l"><strong>${t('look.glow')}</strong><small>${t('look.glowSub')}</small></span>${seg('glow', ['on', 'soft', 'off'], k => t('look.glow.' + k))}</div>
+          <div class="srow"><span class="l"><strong>${t('look.fx')}</strong><small>${t('look.fxSub')}</small></span>${seg('fx', ['calm', 'lively', 'wow'], k => t('look.fx.' + k))}</div>
+          <div class="srow"><span class="l"><strong>${t('look.orb')}</strong></span>${seg('orbStyle', ['aurora', 'glass', 'ring', 'dot'], k => t('look.orb.' + k))}</div>
+          <div class="srow"><span class="l"><strong>${t('look.bar')}</strong></span>${seg('bar', ['glass', 'solid', 'minimal'], k => t('look.bar.' + k))}</div>
+          <div class="srow"><span class="l"><strong>${t('look.cards')}</strong></span>${seg('cards', ['soft', 'glass', 'outline'], k => t('look.cards.' + k))}</div>
           ${tog('greeting', 'look.greeting', 'look.greetingSub')}
           ${tog('dockLabels', 'look.dock', 'look.dockSub')}
         </div></div>

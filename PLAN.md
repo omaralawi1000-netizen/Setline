@@ -332,3 +332,10 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] The dock keeps its shape on the Coach tab (the orb leaves its slot instead of the slot closing), so the tab lens never lands in the wrong place or lags
 - [x] Orb flight: sizes come from the layout (it no longer flies back tiny and pops), the copy starts where it takes off on the very first frame, both real orbs hide instantly while it flies, and it hands over with a short cross-fade
 - [x] Tab lens: quicker spring (0.44 s) and a smaller stretch
+
+## 1.24.0: the bar squishes, wow motion, style choices, reliable spoken replies
+
+- [x] On Coach the bottom bar squishes together where the orb was (springy), and stretches back when you leave; the tab lens glides and tracks its tab every frame so it never drifts
+- [x] Spoken replies (phone voice): waits for voices to load, a beat after cancelling, sentence by sentence with a watchdog and one retry, primed on the first tap (Android only speaks after a touch); conversation mode waits for the real end of speech
+- [x] Motion setting: Calm / Lively / Wow (default). Wow: screens arrive out of a soft blur with a spring, tab icons bounce, cards and toasts pop in, a light ripples from your finger on big buttons and tiles; presses spring everywhere
+- [x] Orb style: Aurora / Glass / Ring / Dot; Bottom bar: Glass / Solid / Minimal; Cards: Soft / Glass / Outline (Customize → Look and feel)

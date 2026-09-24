@@ -2010,3 +2010,51 @@ html[data-dock=icons] .dock .tab span{display:none}
 /* the tab lens: quicker, still springy */
 .dock .ind{transition:transform .44s cubic-bezier(.3,1.2,.45,1),width .44s cubic-bezier(.3,1.2,.45,1),opacity .3s}
 .dock .ind.moving{animation:liquid2 .44s cubic-bezier(.3,1.1,.45,1)}
+
+/* ---------- 1.24: on Coach the bar squishes together where the orb was ---------- */
+.app.coaching:not(.voice):not(.is-sub) .dock{left:36px;right:36px;grid-template-columns:var(--c-today) var(--c-workout) 0px var(--c-food) var(--c-coach)}
+.dock{transition:opacity .35s var(--ease),transform .5s var(--dk),left .62s cubic-bezier(.34,1.28,.5,1),right .62s cubic-bezier(.34,1.28,.5,1),grid-template-columns .62s cubic-bezier(.34,1.28,.5,1),height .5s var(--dk),bottom .5s var(--dk),padding .5s var(--dk)}
+.app.coaching .dock .orbbtn{transform:scale(.2)}
+.dock .ind.follow{transition:opacity .3s!important}
+
+/* ---------- 1.24: motion levels (Customize → Motion) ---------- */
+/* Wow: things arrive out of a soft blur with a little spring, icons bounce, presses ripple */
+html[data-fx=wow] .screen.enter > *:nth-child(-n+7){animation:risewow .62s cubic-bezier(.2,.9,.25,1) both}
+@keyframes risewow{from{opacity:0;transform:translateY(22px) scale(.965);filter:blur(10px)}60%{filter:blur(0)}}
+html[data-fx=wow] .tab.on svg.ti{animation:tabbounce .62s cubic-bezier(.3,1.7,.45,1)}
+@keyframes tabbounce{0%{transform:scale(.72) translateY(3px)}55%{transform:scale(1.16) translateY(-2px)}100%{transform:translateY(-1px) scale(1.06)}}
+html[data-fx=wow] :is(.toast,.intent).show{animation:popin .55s cubic-bezier(.25,1.4,.45,1)}
+@keyframes popin{from{opacity:0;transform:translateY(22px) scale(.9);filter:blur(8px)}}
+html[data-fx=wow] .sheet.show{animation:sheetin .6s cubic-bezier(.2,1.1,.3,1)}
+@keyframes sheetin{from{transform:translateY(40%) scale(.96);filter:blur(6px)}}
+html:not([data-fx=calm]) :is(.solid,.glass,.ftile,.ttile,.chip,.btn2,.log):active{transform:scale(.97);transition:transform .12s ease-out}
+html:not([data-fx=calm]) :is(.solid,.glass,.ftile,.ttile,.chip,.btn2,.log){transition:transform .45s cubic-bezier(.3,1.6,.45,1)}
+.rip{position:absolute;border-radius:50%;pointer-events:none;background:radial-gradient(closest-side,rgba(255,255,255,.35),rgba(255,255,255,0));transform:scale(0);animation:rip .6s cubic-bezier(.2,.8,.2,1) forwards;z-index:0}
+@keyframes rip{to{transform:scale(1);opacity:0}}
+[data-rip]{position:relative;overflow:hidden;isolation:isolate}
+/* Calm: fades only */
+html[data-fx=calm] .screen.enter > *{animation:fadein .3s ease both!important}
+html[data-fx=calm] .tab.on svg.ti{animation:none}
+html[data-fx=calm] .bub .w{animation:fadein .4s ease both}
+
+/* ---------- orb styles (Customize → Orb) ---------- */
+/* Glass: a clear sphere with a tint of the theme and a bright highlight */
+html[data-orbstyle=glass] .orb .core{background:radial-gradient(circle at 34% 28%,rgba(255,255,255,.95) 0 6%,rgba(255,255,255,.25) 16%,transparent 38%),radial-gradient(circle at 50% 62%,rgba(var(--a-rgb),.55),rgba(var(--v-rgb),.25) 55%,rgba(13,15,21,.6) 100%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.4),inset 0 -8px 18px rgba(var(--v-rgb),.45),0 10px 30px -6px rgba(var(--v-rgb),.55)}
+html[data-orbstyle=glass] .orb .core b{opacity:.35}
+/* Ring: a dark core in a glowing ring that turns */
+html[data-orbstyle=ring] .orb .core{background:radial-gradient(circle,#0D0F15 52%,transparent 54%),conic-gradient(from var(--ang),var(--accent),var(--blue),var(--violet),var(--accent));animation:angspin 3.2s linear infinite;box-shadow:0 0 calc(var(--s)*.35) rgba(var(--v-rgb),.55)}
+html[data-orbstyle=ring] .orb .core b{display:none}
+/* Dot: small and solid, nothing moving until you talk */
+html[data-orbstyle=dot] .orb .core{background:radial-gradient(circle at 38% 32%,var(--accent-hi),var(--accent) 45%,var(--violet));transform:scale(.62);animation:none;box-shadow:0 0 18px rgba(var(--a-rgb),.45)}
+html[data-orbstyle=dot] .orb .core b{display:none}
+
+/* ---------- bar styles (Customize → Bar) ---------- */
+html[data-bar=solid] .dock.glass{background:#171A22;-webkit-backdrop-filter:none;backdrop-filter:none;border:1px solid rgba(255,255,255,.07);box-shadow:0 14px 30px -12px rgba(0,0,0,.8)}
+html[data-bar=minimal] .dock.glass{background:transparent;border-color:transparent;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+html[data-bar=minimal] .dock .ind{background:rgba(var(--a-rgb),.12);box-shadow:none}
+html[data-bar=minimal] .edge.eb::after{opacity:1}
+
+/* ---------- card styles (Customize → Cards) ---------- */
+html[data-cards=glass] .screen :is(.solid,.glass){background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(255,255,255,.02) 50%),rgba(24,26,36,.42);-webkit-backdrop-filter:blur(18px) saturate(150%);backdrop-filter:blur(18px) saturate(150%);border:1px solid rgba(255,255,255,.09)}
+html[data-cards=outline] .screen :is(.solid,.glass){background:transparent;border:1px solid rgba(255,255,255,.12);box-shadow:none}

@@ -57,7 +57,11 @@ export const DEFAULTS = Object.freeze({
   accent: 'violet',    // colour theme
   startTab: 'today',   // the tab the app opens on (a running workout always opens Workout)
   textSize: 'normal',  // small | normal | large
-  glow: 'on',          // the coloured background glow: on | soft | off
+  glow: 'on',
+  fx: 'wow',           // motion: calm | lively | wow
+  orbStyle: 'aurora',  // aurora | glass | ring | dot
+  bar: 'glass',        // glass | solid | minimal
+  cards: 'soft',       // soft | glass | outline          // the coloured background glow: on | soft | off
   dockLabels: true,    // words under the tab icons
   greeting: true,      // Today's big greeting and week line
   exFigure: true,      // the moving figure on the workout screen
@@ -127,6 +131,10 @@ export function sanitize(input) {
   if (['today', 'workout', 'food', 'coach'].includes(input.startTab)) s.startTab = input.startTab;
   if (['small', 'normal', 'large'].includes(input.textSize)) s.textSize = input.textSize;
   if (['on', 'soft', 'off'].includes(input.glow)) s.glow = input.glow;
+  if (['calm', 'lively', 'wow'].includes(input.fx)) s.fx = input.fx;
+  if (['aurora', 'glass', 'ring', 'dot'].includes(input.orbStyle)) s.orbStyle = input.orbStyle;
+  if (['glass', 'solid', 'minimal'].includes(input.bar)) s.bar = input.bar;
+  if (['soft', 'glass', 'outline'].includes(input.cards)) s.cards = input.cards;
   for (const k of ['dockLabels', 'greeting', 'exFigure', 'exGhost', 'hfButton']) if (typeof input[k] === 'boolean') s[k] = input[k];
   if (typeof input.fullscreen === 'boolean') s.fullscreen = input.fullscreen;
   s.foodTargets = sanitizeTargets(input.foodTargets);

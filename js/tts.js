@@ -243,23 +243,69 @@ function playPcm({ pcm, rate }, mine, text = '') {
   });
 }
 
-function fallback(text, lang, mine) {
+// The phone's own voice. Android's speech engine is fussy: it has no voices until they've loaded,
+// drops a sentence spoken right after a cancel, sometimes never starts, and cuts long text off.
+// So: wait for the voices, give it a beat after cancelling, speak sentence by sentence, and retry a
+// sentence once if it never starts.
+let voicesReady = null;
+const loadVoices = ss => (ss.getVoices().length ? Promise.resolve() : (voicesReady ||= new Promise(r => {
+  const done = () => r();
+  try { ss.addEventListener('voiceschanged', done, { once: true }); } catch { ss.onvoiceschanged = done; }
+  setTimeout(done, 900);
+})));
+const pause = ms => new Promise(r => setTimeout(r, ms));
+export function speechChunks(text, max = 180) {
+  const out = [];
+  for (const sent of String(text || '').replace(/\s+/g, ' ').trim().split(/(?<=[.!?…:;])\s+/)) {
+    if (!sent) continue;
+    if (sent.length <= max) { out.push(sent); continue; }
+    let cur = '';
+    for (const w of sent.split(/(?<=,)\s+|\s+/)) { if ((cur + ' ' + w).trim().length > max && cur) { out.push(cur.trim()); cur = w; } else cur = (cur + ' ' + w).trim(); }
+    if (cur) out.push(cur);
+  }
+  // join very short bits so it doesn't sound choppy
+  return out.reduce((a, x) => (a.length && a[a.length - 1].length + x.length < 90 ? (a[a.length - 1] += ' ' + x, a) : (a.push(x), a)), []);
+}
+async function fallback(text, lang, mine) {
   const ss = globalThis.speechSynthesis;
   if (!ss || mine !== seq) return;
-  const u = new SpeechSynthesisUtterance(text);
+  await loadVoices(ss);
+  if (mine !== seq) return;
+  try { if (ss.speaking || ss.pending) ss.cancel(); ss.resume(); } catch {}
+  await pause(80); // speaking straight after a cancel gets dropped on Android
   const want = lang === 'da' ? 'da' : 'en';
   // network and "natural" voices sound far better than the default local ones
   const voices = ss.getVoices().filter(v => v.lang?.toLowerCase().startsWith(want));
   const score = v => (/natural|neural|online|premium|enhanced/i.test(v.name) ? 4 : 0) + (/google/i.test(v.name) ? 2 : 0) + (v.localService ? 0 : 1);
-  const v = voices.sort((a, b) => score(b) - score(a))[0];
-  if (v) u.voice = v;
-  u.lang = lang === 'da' ? 'da-DK' : 'en-GB';
-  u.rate = 1;
-  u.onend = u.onerror = () => { if (current?.utter === u) { current = null; emit(false); } };
-  // Android sometimes never fires onend: don't let "speaking" stick past a generous estimate
-  current = { utter: u, until: performance.now() + 3000 + text.length * 110 };
+  const voice = voices.sort((a, b) => score(b) - score(a))[0];
+  const one = (part, retry = true) => new Promise(resolve => {
+    const u = new SpeechSynthesisUtterance(part);
+    if (voice) u.voice = voice;
+    u.lang = lang === 'da' ? 'da-DK' : 'en-GB';
+    u.rate = 1.04;
+    let started = false, over = false;
+    const end = ok => { if (over) return; over = true; clearTimeout(kick); clearTimeout(guard); resolve(ok); };
+    u.onstart = () => { started = true; };
+    u.onend = () => end(true);
+    u.onerror = e => end(e?.error === 'interrupted' || e?.error === 'canceled' ? 'stop' : false);
+    current = { utter: u, until: performance.now() + 4000 + part.length * 120 };
+    // never started: nudge it once (cancel + speak again), then give up on this bit
+    const kick = setTimeout(async () => {
+      if (started || over) return;
+      try { ss.cancel(); } catch {}
+      if (retry && mine === seq) { over = true; clearTimeout(guard); await pause(80); resolve(await one(part, false)); } else end(false);
+    }, 1600);
+    // it started but onend never came (an Android habit): move on after a generous estimate
+    const guard = setTimeout(() => end(true), 4000 + part.length * 110);
+    try { ss.speak(u); } catch { end(false); }
+  });
   emit(true);
-  ss.speak(u);
+  for (const part of speechChunks(text)) {
+    if (mine !== seq) return;
+    const r = await one(part);
+    if (r === 'stop') break;
+  }
+  if (mine === seq && current) { current = null; emit(false); }
 }
 
 // speak(text, {key, model, voice, lang, canSpeak}) — fire and forget.
@@ -315,7 +361,7 @@ export async function speak(text, opts) {
   } else lastSpeech.error = opts.model === 'device' ? null : 'nokey';
   lastSpeech.engine = 'device';
   if (mine !== seq || !opts.canSpeak()) return;
-  fallback(text, opts.lang, mine);
+  await fallback(text, opts.lang, mine);
 }
 
 export const isSpeaking = () => {

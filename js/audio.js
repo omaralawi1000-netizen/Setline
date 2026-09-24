@@ -1,5 +1,5 @@
 // One shared AudioContext, unlocked on the first user gesture (used for the level meter and replies).
-let ctx = null;
+let ctx = null, primed = false;
 
 export function audioContext() {
   if (!ctx) {
@@ -13,6 +13,11 @@ export function audioContext() {
 export function unlockAudio() {
   const c = audioContext();
   if (c && c.state === 'suspended') c.resume().catch(() => {});
+  // Android only lets a page talk after it has spoken once inside a tap: a silent word does that
+  if (!primed && globalThis.speechSynthesis) {
+    primed = true;
+    try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch {}
+  }
 }
 
 // The rest-over bell: three bright notes (loud enough across a gym), or one soft tick.
