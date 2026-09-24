@@ -36,6 +36,7 @@ import { cardioElapsed, cardioName } from './cardio.js';
 import { weekStart } from './stats.js';
 import { nextRoutine } from './routines.js';
 import { repeatTemplate } from './insights.js';
+import { animateFigures } from './ui/figure.js';
 
 const TABS = ['today', 'workout', 'coach', 'history'];
 const SUB = ['detail', 'settings', 'routine', 'progress', 'exercise', 'body'];
@@ -109,6 +110,7 @@ function renderAll() {
   document.documentElement.dataset.motion = state.settings.motion;
   if (document.documentElement.dataset.accent !== state.settings.accent) { document.documentElement.dataset.accent = state.settings.accent; refreshChrome(); }
   renderScreen();
+  animateFigures($('#s-' + view.screen));
   renderDock();
   renderMini();
   // numbers count up the first time a screen is shown, not on every change
@@ -321,15 +323,19 @@ store.subscribe(reason => {
   morph(renderAll);
 });
 
-// Calm re-renders: on the read-only screens, cards that come, go or move glide there (View
-// Transitions) instead of popping. The workout screen updates in place and never waits on this.
-const CALM = ['today', 'history', 'progress', 'body'];
+// Calm re-renders: on Today, when cards come, go or change order, they glide there (View
+// Transitions) instead of popping. Only then: a transition briefly takes over taps, so ordinary
+// updates (a number changing) render straight away.
+const cardKeys = root => [...root.children].map(el => el.style.viewTransitionName).join('|');
 function morph(fn) {
   const s = $('#s-' + view.screen);
-  const calm = CALM.includes(view.screen) && document.startViewTransition && document.visibilityState === 'visible' &&
+  const calm = view.screen === 'today' && document.startViewTransition && document.visibilityState === 'visible' &&
     document.documentElement.dataset.motion !== 'off' && !matchMedia('(prefers-reduced-motion: reduce)').matches &&
     !isVoiceOpen() && !document.querySelector('.sheet') && s && !s.classList.contains('enter');
   if (!calm) return fn();
+  const probe = document.createElement('div');
+  renderToday(probe);
+  if (!s.children.length || cardKeys(probe) === cardKeys(s)) return fn(); // the first paint doesn't glide
   const y = s.scrollTop;
   try { document.startViewTransition(() => { fn(); s.scrollTop = y; }); } catch { fn(); }
 }

@@ -21,6 +21,7 @@ import { suggest } from '../progression.js';
 import { usualMinutes, timeStatus } from '../insights.js';
 import { handsFreeOn, hfPillHTML, toggleHandsFree } from './handsfree.js';
 import { goalAimHTML } from './goals.js';
+import { figureHTML } from './figure.js';
 
 const C = 157.08; // ring circumference, r=25
 const REST_LINGER = 4000; // keep the card up after rest ends
@@ -86,6 +87,7 @@ export function renderWorkout(root) {
 
   root.innerHTML = header + `
     <div class="exhead">
+      ${figureHTML(info || { id: ex.exerciseId }, { move: true, cls: 'exfig' })}
       <div class="txt">
         <p>${t('workout.exerciseOf', { i: i + 1, n: w.exercises.length })}</p>
         <h1><button data-act="overview">${esc(exName(ex.exerciseId))}</button></h1>

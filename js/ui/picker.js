@@ -6,11 +6,12 @@ import { haptic } from '../haptics.js';
 import { esc } from './dom.js';
 import { I } from './icons.js';
 import { openSheet, closeTop } from './sheet.js';
+import { figureHTML } from './figure.js';
 
 function rowHTML(e) {
   const { t, lang } = state;
   const sub = `${t('equip.' + e.equipment)}, ${joinList(e.muscles.slice(0, 2).map(m => t('muscle.' + m)), lang)}`;
-  return `<li><button class="prow" data-pick="${esc(e.id)}">
+  return `<li><button class="prow" data-pick="${esc(e.id)}">${figureHTML(e, { cls: 'pfig' })}
     <span class="l"><strong>${esc(state.catalog.name(e.id, lang))}</strong><small>${esc(sub)}${e.custom ? ` · ${t('picker.custom')}` : ''}</small></span>
     <span class="plus">${I.plus}</span></button></li>`;
 }

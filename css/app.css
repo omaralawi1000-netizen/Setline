@@ -1393,6 +1393,7 @@ html[data-motion=off] .edge::before,html[data-motion=off] .edge::after{transitio
 /* colour changes glide rather than snap */
 html{transition:background-color .4s}
 /* View Transitions: short and soft; the dock, edges and sheets stay put above the cards */
+::view-transition{pointer-events:none} /* taps go straight through to the new page while cards glide */
 ::view-transition-group(*){animation-duration:.42s;animation-timing-function:cubic-bezier(.2,.9,.25,1)}
 ::view-transition-old(*),::view-transition-new(*){animation-duration:.3s}
 .dock{view-transition-name:dock}
@@ -1458,3 +1459,16 @@ html{transition:background-color .4s}
 .ivtype button svg{width:18px;height:18px}
 .obnext.ready{animation:logflash .6s var(--ease)}
 .iv[data-phase=done] .ivtype{opacity:0;pointer-events:none}
+/* exercise figures */
+.fig{width:44px;height:48px;flex:none;overflow:visible}
+.fig path{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.fig .fg-near{stroke:var(--ink);stroke-width:3.4}
+.fig .fg-far{stroke:var(--ink);stroke-width:3.2;opacity:.38}
+.fig .fg-head{stroke:none;fill:var(--ink)}
+.fig .fg-prop{stroke:var(--accent);stroke-width:2.6}
+.fig .fg-scene{stroke:rgba(var(--a-rgb),.35);stroke-width:2.4}
+.fig .fg-floor{stroke:rgba(255,255,255,.1);stroke-width:1.6}
+.prow .pfig{width:40px;height:44px;padding:3px;border-radius:12px;background:rgba(255,255,255,.04)}
+.exhead .exfig{width:50px;height:56px;align-self:center}
+.exhero{display:flex;align-items:center;gap:14px}
+.exhero .herofig{width:78px;height:86px;padding:4px;border-radius:22px;background:rgba(255,255,255,.04);border:1px solid var(--line)}

@@ -12,6 +12,7 @@ import { barChart, lineChart } from './charts.js';
 import { sparkline } from '../stats.js';
 import { balanceHTML } from './today.js';
 import { sleepTrend } from '../checkin.js';
+import { figureHTML } from './figure.js';
 
 let range = 12;
 export const setRange = r => { range = r; };
@@ -94,7 +95,7 @@ export function renderExercise(root, id) {
       <button class="iconbtn" data-act="back" aria-label="${t('common.back')}">${I.back}</button>
       <div class="ttl"><strong>${esc(name)}</strong></div><span class="spacer"></span>
     </header>
-    <h1 class="h1">${esc(name)}</h1><p class="detail-date">${esc(sub)}</p>
+    <div class="exhero">${figureHTML(e || { id }, { move: true, cls: 'herofig' })}<div><h1 class="h1">${esc(name)}</h1><p class="detail-date">${esc(sub)}</p></div></div>
     ${lift ? `<div class="exhero glass">
       <span class="label">${t('progress.e1rm')}</span>
       <div class="exbig"><b data-count="${Math.round(lift.last * 10) / 10}" data-dp="${lift.last % 1 ? 1 : 0}">0</b><span>${u()}</span>
