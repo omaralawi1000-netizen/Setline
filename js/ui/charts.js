@@ -15,9 +15,9 @@ export function barChart(values, { h = 120, w = 340, color = 'lav', fmt = v => S
     const xPos = i * (bw + gap);
     return `<rect class="bar-r${x.hot ? ' hot' : ''}${x.v ? '' : ' zero'}" style="--i:${i}" x="${xPos.toFixed(1)}" y="${(h - bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="${Math.min(6, bw / 2).toFixed(1)}" fill="url(#${id})"><title>${esc(x.label || '')} ${esc(fmt(x.v))}</title></rect>`;
   }).join('');
-  const stops = color === 'blue' ? ['#5B86FF', '#3E5FCC'] : ['#D9D0FF', '#7A67F2'];
+  const stops = color === 'blue' ? ['#5B86FF', '#3E5FCC'] : ['var(--accent-hi)', 'var(--violet)'];
   return `<svg class="chart bars" viewBox="0 0 ${w} ${h + 18}" preserveAspectRatio="none" role="img">
-    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${stops[0]}"/><stop offset="1" stop-color="${stops[1]}" stop-opacity=".55"/></linearGradient></defs>
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:${stops[0]}"/><stop offset="1" style="stop-color:${stops[1]}" stop-opacity=".55"/></linearGradient></defs>
     <line class="base" x1="0" x2="${w}" y1="${h + .5}" y2="${h + .5}"/>
     ${bars}
     ${axis.map(a => `<text class="ax" x="${a.x === 'end' ? w : 0}" y="${h + 14}" text-anchor="${a.x === 'end' ? 'end' : 'start'}">${esc(a.text)}</text>`).join('')}
@@ -48,8 +48,8 @@ export function lineChart(points, { h = 150, w = 340, pad = 12, dots = true, war
   const dotEls = dots ? pts.map(([x, y], i) => `<circle class="dot" style="--i:${i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${i === pts.length - 1 ? 4.5 : 2.6}"${i === pts.length - 1 && warmLast ? ' fill="#FFD9A8"' : ''}><title>${esc(fmt(points[i].v))}</title></circle>`).join('') : '';
   return `<svg class="chart line" viewBox="0 0 ${w} ${h}" role="img">
     <defs>
-      <linearGradient id="${id}f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C6BBFA" stop-opacity=".3"/><stop offset="1" stop-color="#C6BBFA" stop-opacity="0"/></linearGradient>
-      <linearGradient id="${id}s" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7A67F2"/><stop offset="1" stop-color="#C6BBFA"/></linearGradient>
+      <linearGradient id="${id}f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--accent)" stop-opacity=".3"/><stop offset="1" style="stop-color:var(--accent)" stop-opacity="0"/></linearGradient>
+      <linearGradient id="${id}s" x1="0" y1="0" x2="1" y2="0"><stop offset="0" style="stop-color:var(--violet)"/><stop offset="1" style="stop-color:var(--accent)"/></linearGradient>
     </defs>
     ${yLabels ? `<text class="ax" x="0" y="10">${esc(fmt(hi))}</text><text class="ax" x="0" y="${h - 2}">${esc(fmt(lo))}</text>` : ''}
     <path class="area" d="${area}" fill="url(#${id}f)"/>

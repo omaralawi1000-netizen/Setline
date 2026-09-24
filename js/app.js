@@ -22,7 +22,8 @@ import { setHistoryFilter } from './ui/history.js';
 import { renderProgress, renderExercise, setRange } from './ui/progress.js';
 import { countAll, burst } from './ui/fx.js';
 import { initPress } from './ui/press.js';
-import { initChrome } from './ui/chrome.js';
+import { initChrome, refreshChrome } from './ui/chrome.js';
+import { openCustomize } from './ui/customize.js';
 import { autoBackup } from './ui/drive.js';
 import { initHandsFree } from './ui/handsfree.js';
 import { onCheckinClick } from './ui/checkin.js';
@@ -105,6 +106,7 @@ function renderMini() {
 function renderAll() {
   document.documentElement.lang = state.lang;
   document.documentElement.dataset.motion = state.settings.motion;
+  if (document.documentElement.dataset.accent !== state.settings.accent) { document.documentElement.dataset.accent = state.settings.accent; refreshChrome(); }
   renderScreen();
   renderDock();
   renderMini();
@@ -201,6 +203,7 @@ Object.assign(actions, {
   go: el => { if (el.closest('#dock')) haptic('tap'); go(el.dataset.to); },
   back: () => history.back(),
   'open-settings': () => pushSub('settings'),
+  customize: () => openCustomize(),
   detail: el => pushSub('detail', { detailId: el.dataset.id, detailKind: el.dataset.kind || 'workout' }),
   'start-routine': el => startRoutine(el.dataset.id),
   'repeat-workout': el => {
@@ -313,8 +316,21 @@ store.subscribe(reason => {
     if (state.error) toast({ title: esc(state.t('toast.storageError')), error: true, ms: 6000 });
     return;
   }
-  renderAll();
+  morph(renderAll);
 });
+
+// Calm re-renders: on the read-only screens, cards that come, go or move glide there (View
+// Transitions) instead of popping. The workout screen updates in place and never waits on this.
+const CALM = ['today', 'history', 'progress', 'body'];
+function morph(fn) {
+  const s = $('#s-' + view.screen);
+  const calm = CALM.includes(view.screen) && document.startViewTransition && document.visibilityState === 'visible' &&
+    document.documentElement.dataset.motion !== 'off' && !matchMedia('(prefers-reduced-motion: reduce)').matches &&
+    !isVoiceOpen() && !document.querySelector('.sheet') && s && !s.classList.contains('enter');
+  if (!calm) return fn();
+  const y = s.scrollTop;
+  try { document.startViewTransition(() => { fn(); s.scrollTop = y; }); } catch { fn(); }
+}
 
 // ---------- clock: derived from timestamps, only while visible ----------
 

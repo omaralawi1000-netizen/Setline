@@ -1,6 +1,9 @@
 // The phone's own bars: the status bar takes the colour of the app's top edge (darker under a sheet
 // or the voice layer), and soft blurred edges fade in at the top and bottom once content scrolls under them.
-export const EDGE = '#24233F', DIM = '#121220';
+export const DIM = '#121220';
+const edge = () => getComputedStyle(document.documentElement).getPropertyValue('--edge').trim() || '#24233F';
+let repaint = () => {};
+export const refreshChrome = () => repaint();
 
 export function initChrome() {
   const app = document.getElementById('app');
@@ -8,7 +11,7 @@ export function initChrome() {
   let color = '';
   const paint = () => {
     const dim = app.classList.contains('voice') || !!app.querySelector(':scope > .scrim.show');
-    const next = dim ? DIM : EDGE;
+    const next = dim ? DIM : edge();
     if (next !== color && meta) { color = next; meta.setAttribute('content', next); }
   };
   new MutationObserver(paint).observe(app, { attributes: true, attributeFilter: ['class'], childList: true, subtree: false });
@@ -35,5 +38,6 @@ export function initChrome() {
     app.classList.toggle('under-top', !!s && s.scrollTop > 6);
     app.classList.toggle('under-bottom', !!s && s.scrollHeight - s.clientHeight - s.scrollTop > 6);
   });
+  repaint = paint;
   paint();
 }

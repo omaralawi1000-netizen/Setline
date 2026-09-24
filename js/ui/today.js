@@ -30,14 +30,14 @@ export function workoutTitle(w) {
 const sortedRoutines = () => [...state.routines].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
 // "Up next" hero: the routine done least recently.
-function upNextHTML() {
+function upNextHTML({ more = false } = {}) {
   const { t, lang, catalog } = state;
   const r = nextRoutine(sortedRoutines(), state.history);
   if (!r) return `<div class="upcoming glass"><span class="label">${t('label.routines')}</span><h2>${t('routine.none')}</h2>
       <div class="row2"><button class="log" data-routine="new">${I.plus}<span>${t('routine.new')}</span></button><button class="btn2 solid" data-routine="programs">${t('routine.program')}</button></div></div>`;
   const names = r.exercises.map(e => catalog.name(e.exerciseId, lang));
   return `<div class="upcoming glass">
-      <span class="label">${t('label.upNext')}</span>
+      ${more ? `<div class="uphead"><span class="label">${t('label.upNext')}</span><button class="textbtn" data-act="go" data-to="workout">${t('today.otherRoutines')} →</button></div>` : `<span class="label">${t('label.upNext')}</span>`}
       <h2>${esc(routineName(r, lang))}</h2>
       <p>${t('today.exercisesAbout', { n: r.exercises.length, min: estimateMinutes(r) })}</p>
       <p class="exnames">${esc(names.slice(0, 4).join(' · '))}${names.length > 4 ? ` · +${names.length - 4}` : ''}</p>
@@ -184,7 +184,7 @@ function bodyHTML() {
   const weightCard = `<button class="mini solid body" data-body="weight"><span class="label">${t('body.weight')}</span>
       ${tr ? `<strong>${esc(weight(tr.latest.kg, unit, lang))} <small>${u}</small></strong>
         <span class="bsub">${tr.change30 != null ? esc(t('body.change', { sign: tr.change30 > 0 ? '+' : tr.change30 < 0 ? '−' : '±', kg: `${weight(Math.abs(tr.change30), unit, lang)} ${u}` })) : esc(t('body.avg', { kg: `${weight(tr.avg, unit, lang)} ${u}` }))}</span>
-        ${sp ? `<svg class="bspark" viewBox="0 0 96 40" aria-hidden="true"><polyline points="${sp.line}" fill="none" stroke="url(#sp)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${sp.last.x}" cy="${sp.last.y}" r="3" fill="#C6BBFA"/></svg>` : ''}`
+        ${sp ? `<svg class="bspark" viewBox="0 0 96 40" aria-hidden="true"><polyline points="${sp.line}" fill="none" stroke="url(#sp)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${sp.last.x}" cy="${sp.last.y}" r="3" style="fill:var(--accent)"/></svg>` : ''}`
       : `<span class="bsub">${t('body.noWeight')}</span><span class="bplus">${I.plus}</span>`}
     </button>`;
   const pct = target ? Math.min(1, today / target) : 0;
@@ -235,6 +235,7 @@ export function renderToday(root) {
   const { t } = state;
   const hour = new Date().getHours();
   const busy = state.active || state.activeCardio;
+  const hide = new Set(state.settings.todayHide || []), on = k => !hide.has(k);
   root.innerHTML = `<header class="brand">
       <div><strong>Setline</strong><span>${t('app.tagline')}</span></div>
       <button class="iconbtn" data-act="open-settings" aria-label="${t('settings.title')}">${I.settings}</button>
@@ -242,17 +243,19 @@ export function renderToday(root) {
     <h1 class="greet">${greeting(t(greetingKey(hour))).split(' ').map((w, i) => `<span class="gw" style="--i:${i}">${esc(w)}</span>`).join(' ')}</h1>
     <p class="sub${!busy && weekStreak(state.history, state.cardio, state.settings.weeklyGoal).streak ? ' streak' : ''}">${esc(subline())}</p>
     ${busy ? '' : driveNudgeHTML({ stale: true })}
-    ${busy ? '' : checkinHTML()}
+    ${busy || !on('checkin') ? '' : checkinHTML()}
     ${busy ? '' : deloadHTML()}
-    ${busy ? resumeHTML() : upNextHTML()}
-    ${goalCardsHTML()}
-    ${busy ? '' : cardioRowHTML()}
-    <div class="section"><span class="label">${t('today.thisWeek')}</span><button class="textbtn" data-progress>${t('progress.link')} →</button></div>
-    ${weekCardsHTML()}
-    ${balanceHTML()}
-    ${bodyHTML()}
-    ${reviewHTML()}
-    ${busy ? '' : routinesHTML()}`;
+    ${busy ? resumeHTML() : upNextHTML({ more: !on('routines') })}
+    ${on('goals') ? goalCardsHTML() : ''}
+    ${busy || !on('cardio') ? '' : cardioRowHTML()}
+    ${on('week') ? `<div class="section"><span class="label">${t('today.thisWeek')}</span><button class="textbtn" data-progress>${t('progress.link')} →</button></div>
+    ${weekCardsHTML()}` : ''}
+    ${on('balance') ? balanceHTML() : ''}
+    ${on('body') ? bodyHTML() : ''}
+    ${on('review') ? reviewHTML() : ''}
+    ${busy || !on('routines') ? '' : routinesHTML()}
+    <button class="custom" data-act="customize">${I.settings}<span>${t('cust.open')}</span></button>`;
+  nameParts(root);
   const fg = root.querySelector('.week .fg');
   if (fg) {
     const to = fg.dataset.to;
@@ -261,3 +264,14 @@ export function renderToday(root) {
   }
 }
 
+
+// Stable names so a card that moves (because one above it came or went) glides to its new place.
+function nameParts(root) {
+  const seen = {};
+  for (const el of root.children) {
+    const base = el.dataset.part || (el.classList.contains('section') ? 'h-' + (el.querySelector('.label')?.textContent || '') : el.classList[0] || 'x');
+    const key = base.toLowerCase().replace(/[^a-z0-9æøå-]+/g, '-');
+    const n = seen[key] = (seen[key] || 0) + 1;
+    el.style.viewTransitionName = `t-${key}${n > 1 ? '-' + n : ''}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+  }
+}

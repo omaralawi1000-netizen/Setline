@@ -12,7 +12,7 @@ export function burst(el, { warm = false, count = 12, spread = 56 } = {}) {
   layer.className = 'fx-burst';
   layer.style.left = `${x}px`;
   layer.style.top = `${y}px`;
-  const colors = warm ? ['#FFD9A8', '#FFE9CC', '#FFC27A', '#fff'] : ['#C6BBFA', '#D9D0FF', '#7A67F2', '#5B86FF'];
+  const colors = warm ? ['#FFD9A8', '#FFE9CC', '#FFC27A', '#fff'] : ['var(--accent)', 'var(--accent-hi)', 'var(--violet)', 'var(--blue)'];
   for (let i = 0; i < count; i++) {
     const p = document.createElement('i');
     const ang = (i / count) * Math.PI * 2 + Math.random() * 0.5;

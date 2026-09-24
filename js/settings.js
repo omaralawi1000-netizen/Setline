@@ -40,8 +40,13 @@ export const DEFAULTS = Object.freeze({
   favMeals: [],        // starred meal names
   profile: null,       // who you are and what you train for (profile.js)
   profileAsked: 0,     // when the onboarding was shown (so it's asked once)
-  goals: []            // lift goals (goals.js)
+  goals: [],           // lift goals (goals.js)
+  accent: 'violet',    // colour theme
+  todayHide: ['balance', 'routines'] // Today sections tucked away (Customize)
 });
+
+export const ACCENTS = ['violet', 'ocean', 'jade', 'ember', 'rose'];
+export const TODAY_PARTS = ['checkin', 'goals', 'cardio', 'week', 'balance', 'body', 'review', 'routines'];
 
 // Gemini prebuilt voices and how they sound.
 export const VOICES = ['Achird', 'Sulafat', 'Callirrhoe', 'Puck', 'Aoede', 'Despina', 'Zubenelgenubi', 'Leda', 'Kore', 'Charon'];
@@ -67,6 +72,8 @@ export function sanitize(input) {
   if (input.profile) s.profile = sanitizeProfile(input.profile);
   if (Array.isArray(input.goals)) s.goals = sanitizeGoals(input.goals);
   if (Number.isFinite(input.profileAsked)) s.profileAsked = input.profileAsked;
+  if (ACCENTS.includes(input.accent)) s.accent = input.accent;
+  if (Array.isArray(input.todayHide)) s.todayHide = [...new Set(input.todayHide.filter(x => TODAY_PARTS.includes(x)))];
   if (Array.isArray(input.favMeals)) s.favMeals = input.favMeals.filter(x => typeof x === 'string' && x.length <= 60).slice(0, 30);
   for (const k of ['deloadUntil', 'deloadSnoozed']) if (Number.isFinite(input[k]) && input[k] >= 0) s[k] = input[k];
   if (input.restByEx && typeof input.restByEx === 'object') {
