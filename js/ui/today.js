@@ -15,6 +15,7 @@ import { muscleBalance, deloadStatus } from '../insights.js';
 import { driveNudgeHTML } from './drive.js';
 import { checkinHTML } from './checkin.js';
 import { scanIcon } from './scan.js';
+import { favRowHTML } from './meal.js';
 
 const MIC = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.6 11.5a6.4 6.4 0 0 0 12.8 0M12 18v3"/></svg>';
 const C = 157.08; // ring r=25
@@ -198,7 +199,7 @@ function bodyHTML() {
       <span class="l"><strong>${t('meal.snap')}</strong><span>${meals ? esc(t('meal.todaySub', { n: meals, kcal: day.kcal || 0 })) : t('meal.snapSub')}</span></span>
       </button>`;
   const mealWrap = `<div class="mealwrap">${mealRow}<button class="mscanbtn solid" data-body="scan" aria-label="${esc(t('scan.title'))}">${scanIcon}</button></div>`;
-  return `<div class="section"><span class="label">${t('label.body')}</span><button class="textbtn" data-bodyscreen>${t('bodyx.link')} →</button></div><div class="grid2">${weightCard}${proteinCard}</div>${mealWrap}`;
+  return `<div class="section"><span class="label">${t('label.body')}</span><button class="textbtn" data-bodyscreen>${t('bodyx.link')} →</button></div><div class="grid2">${weightCard}${proteinCard}</div>${mealWrap}${favRowHTML(4)}`;
 }
 
 function reviewHTML() {

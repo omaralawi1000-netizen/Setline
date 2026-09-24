@@ -4,7 +4,7 @@ import { state } from '../store.js';
 import { aiMeal, withFallback, AiError } from '../ai.js';
 import { coachModels } from '../settings.js';
 import { getKey } from '../keys.js';
-import { MEAL_SCHEMA, mealPrompt, validateMeal, scaleMeal, dayOf } from '../meals.js';
+import { MEAL_SCHEMA, mealPrompt, validateMeal, scaleMeal, dayOf, favouriteMeals, mealKey } from '../meals.js';
 import { dateKey } from '../body.js';
 import { haptic } from '../haptics.js';
 import { esc } from './dom.js';
@@ -59,6 +59,7 @@ export function openMealSheet({ text = '' } = {}) {
     const chooser = () => {
       box.innerHTML = `<div class="sbody meal">
         <h2>${t('meal.title')}</h2><p class="lead">${t('meal.sub')}</p>
+        ${favRowHTML() ? `<div class="section"><span class="label">${t('meal.usual')}</span></div>${favRowHTML()}` : ''}
         <button class="mscan glass" data-m="scan">${scanIcon}<span><strong>${t('scan.title')}</strong><small>${t('scan.sub')}</small></span>${I.fwd}</button>
         <div class="mpick">
           <label class="mbig glass">${I.camera}<span>${t('meal.photo')}</span><input type="file" accept="image/*" capture="environment" hidden data-m="file"></label>
@@ -141,6 +142,10 @@ export function openMealSheet({ text = '' } = {}) {
     box.addEventListener('click', async e => {
       const p = e.target.closest('[data-p]');
       if (p) { s.portion = Number(p.dataset.p); s.draft = scaleMeal(s.base, s.portion); haptic('tap'); return result(); }
+      const fav = e.target.closest('[data-fav]');
+      if (fav) { await closeTop(); return logFavourite(fav.dataset.fav); }
+      const star = e.target.closest('[data-meal-star]');
+      if (star) { star.setAttribute('aria-pressed', String(toggleStar(star.dataset.mealStar))); return; }
       const del = e.target.closest('[data-meal-del]');
       if (del) { await store.deleteMeal(del.dataset.mealDel); haptic('tap'); return chooser(); }
       const k = e.target.closest('[data-m]')?.dataset.m;
@@ -169,5 +174,38 @@ function todayHTML() {
   return `<div class="section"><span class="label">${t('meal.today')}</span><span class="mtot">${d.protein || 0} g · ${d.kcal || 0} kcal</span></div>
     <ul class="mlist">${[...meals].reverse().map(m => `<li>${m.thumb ? `<img src="${esc(m.thumb)}" alt="">` : `<span class="mthumb icon sm">${I.meal}</span>`}
       <span class="l"><strong>${esc(m.name)}</strong><span>${m.protein} g · ${m.kcal} kcal</span></span>
+      <button class="iconbtn star" data-meal-star="${esc(m.name)}" aria-pressed="${(state.settings.favMeals || []).some(x => mealKey(x) === mealKey(m.name))}" aria-label="${esc(t('meal.star'))}">${STAR}</button>
       <button class="iconbtn" data-meal-del="${esc(m.id)}" aria-label="${esc(t('common.delete'))}">${I.trash}</button></li>`).join('')}</ul>`;
+}
+
+// ---------- favourites: one tap logs it again ----------
+
+const STAR = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.8l2.5 5.1 5.6.8-4 3.9.9 5.6-5-2.6-5 2.6.9-5.6-4-3.9 5.6-.8z"/></svg>';
+
+export function favRowHTML(n = 6) {
+  const favs = favouriteMeals(state.nutrition, state.settings.favMeals, Date.now(), n);
+  if (!favs.length) return '';
+  return `<div class="favrow" role="list">${favs.map((f, i) => `<button class="favchip solid" role="listitem" data-fav="${esc(f.key)}" style="--i:${i}">
+    ${f.meal.thumb ? `<img src="${esc(f.meal.thumb)}" alt="">` : `<span class="fi">${f.starred ? STAR : I.meal}</span>`}
+    <span class="fn">${esc(f.meal.name)}</span><b>${f.meal.protein} g</b></button>`).join('')}</div>`;
+}
+
+export async function logFavourite(key, chip = null) {
+  const { t } = state;
+  const f = favouriteMeals(state.nutrition, state.settings.favMeals, Date.now(), 30).find(x => x.key === key);
+  if (!f) return;
+  const m = f.meal;
+  chip?.classList.add('logged');
+  const meal = await store.logMeal({ name: m.name, protein: m.protein, kcal: m.kcal, carbs: m.carbs, fat: m.fat, source: m.source, thumb: m.thumb });
+  haptic('success');
+  toast({ title: `${esc(m.name)} <span class="v">+${m.protein} g</span>`, sub: `${m.kcal} kcal`, action: t('common.undo'), onAction: () => store.deleteMeal(meal.id) });
+}
+
+export function toggleStar(name) {
+  const k = mealKey(name);
+  const cur = state.settings.favMeals || [];
+  const on = cur.some(x => mealKey(x) === k);
+  store.setSettings({ favMeals: on ? cur.filter(x => mealKey(x) !== k) : [...cur, name] });
+  haptic('tap');
+  return !on;
 }

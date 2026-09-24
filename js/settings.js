@@ -34,7 +34,8 @@ export const DEFAULTS = Object.freeze({
   restByEx: {},        // exerciseId → seconds, learned when rest is adjusted
   autoAdvance: true,   // move to the next exercise when its planned sets are done
   deloadUntil: 0,      // timestamp: deload week running until then
-  deloadSnoozed: 0     // timestamp: don't suggest a deload before then
+  deloadSnoozed: 0,    // timestamp: don't suggest a deload before then
+  favMeals: []         // starred meal names
 });
 
 // Gemini prebuilt voices and how they sound.
@@ -58,6 +59,7 @@ export function sanitize(input) {
   if (typeof input.suggestions === 'boolean') s.suggestions = input.suggestions;
   if (typeof input.restAlerts === 'boolean') s.restAlerts = input.restAlerts;
   if (typeof input.autoAdvance === 'boolean') s.autoAdvance = input.autoAdvance;
+  if (Array.isArray(input.favMeals)) s.favMeals = input.favMeals.filter(x => typeof x === 'string' && x.length <= 60).slice(0, 30);
   for (const k of ['deloadUntil', 'deloadSnoozed']) if (Number.isFinite(input[k]) && input[k] >= 0) s[k] = input[k];
   if (input.restByEx && typeof input.restByEx === 'object') {
     s.restByEx = {};

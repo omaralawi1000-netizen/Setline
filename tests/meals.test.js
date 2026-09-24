@@ -80,3 +80,18 @@ test('voice: meals are recognised, sets and protein are not mistaken for meals',
   assert.equal(p('had 8 reps').type === 'LogMeal', false);
   assert.equal(p('80 kilo 8 reps').type, 'LogSet');
 });
+
+test('favourites: starred first, then repeated meals, newest values', () => {
+  const day = (date, meals) => ({ date, protein: 0, meals });
+  const now = Date.parse('2026-09-24T12:00:00');
+  const d = t => now - t * 86_400_000;
+  const entries = [
+    day('2026-09-20', [{ id: 1, t: d(4), name: 'Protein shake', protein: 30, kcal: 150 }, { id: 2, t: d(4), name: 'Chicken rice', protein: 50, kcal: 650 }]),
+    day('2026-09-23', [{ id: 3, t: d(1), name: 'protein  shake', protein: 32, kcal: 160 }, { id: 4, t: d(1), name: 'Pizza', protein: 35, kcal: 1100 }]),
+    day('2026-09-24', [{ id: 5, t: d(0), name: 'Oats', protein: 15, kcal: 380 }])
+  ];
+  const f = M.favouriteMeals(entries, ['Oats'], now);
+  assert.deepEqual(f.map(x => x.key), ['oats', 'protein shake']);
+  assert.equal(f[1].meal.protein, 32, 'latest version');
+  assert.equal(f[1].count, 2);
+});

@@ -1160,3 +1160,21 @@ p.ckwarn{margin:6px 0 0}
 .scode{font-size:13px;color:var(--dim);font-weight:700;letter-spacing:.08em;text-align:center}
 .mnum span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gram input:placeholder-shown + span{display:none}
+
+/* ---------- 1.8: favourite meals ---------- */
+.favrow{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:10px -20px 0;padding:2px 20px 4px;scroll-snap-type:x proximity}
+.sheet .favrow{margin:8px -20px 0}
+.favchip{flex:none;display:flex;align-items:center;gap:9px;height:48px;padding:0 14px 0 6px;border-radius:16px;scroll-snap-align:start;animation:rise .45s var(--ease) both;animation-delay:calc(var(--i) * 45ms);transition:transform .3s var(--ease),background .3s,border-color .3s}
+.favchip img,.favchip .fi{width:36px;height:36px;border-radius:11px;object-fit:cover;flex:none}
+.favchip .fi{display:grid;place-items:center;background:rgba(255,217,168,.12);color:var(--warm)}
+.favchip .fi .i{width:18px;height:18px}
+.favchip .fn{max-width:130px;font-size:13.5px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.favchip b{font-size:13px;color:var(--accent);font-weight:800;white-space:nowrap}
+.favchip.logged{border-color:rgba(111,227,165,.5);background:rgba(111,227,165,.1)}
+.favchip.logged b{color:#8FEBBB}
+.iconbtn.star .i{width:18px;height:18px}
+.iconbtn.star[aria-pressed=true]{color:var(--warm);background:rgba(255,217,168,.12)}
+.iconbtn.star[aria-pressed=true] .i{fill:currentColor}
+.mscan > .i:last-child{width:20px;height:20px;flex:none}
+.mthumb.icon .i{width:24px;height:24px}
+.mthumb.icon.sm .i{width:20px;height:20px}

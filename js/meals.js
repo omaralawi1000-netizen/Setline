@@ -96,3 +96,24 @@ export function removeMeal(entries, date, id) {
 export const validThumb = v => typeof v === 'string' && v.length < 40000 && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(v);
 
 export const dayOf = (entries, date) => entries.find(e => e.date === date) || { date, protein: 0, kcal: 0, meals: [] };
+
+// Favourites: starred meals first, then what you log again and again (twice or more in 60 days).
+export const mealKey = name => String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+export function favouriteMeals(entries, starred = [], now = Date.now(), n = 6) {
+  const since = now - 60 * 86_400_000;
+  const by = new Map();
+  for (const day of entries) for (const m of day.meals || []) {
+    const k = mealKey(m.name);
+    if (!k) continue;
+    const cur = by.get(k) || { key: k, count: 0, last: null };
+    if (m.t >= since) cur.count++;
+    if (!cur.last || m.t > cur.last.t) cur.last = m;
+    by.set(k, cur);
+  }
+  const star = new Set(starred.map(mealKey));
+  return [...by.values()]
+    .filter(f => star.has(f.key) || f.count >= 2)
+    .sort((a, b) => (star.has(b.key) - star.has(a.key)) || b.count - a.count || b.last.t - a.last.t)
+    .slice(0, n)
+    .map(f => ({ key: f.key, starred: star.has(f.key), count: f.count, meal: f.last }));
+}

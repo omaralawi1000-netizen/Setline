@@ -9,7 +9,7 @@ import { esc } from './dom.js';
 import { I } from './icons.js';
 import { toast } from './toast.js';
 import { openSheet, closeTop } from './sheet.js';
-import { openMealSheet } from './meal.js';
+import { openMealSheet, logFavourite } from './meal.js';
 import { openScanner } from './scan.js';
 
 function weightSheet() {
@@ -50,6 +50,8 @@ export async function addProteinQuick(g) {
 
 export function initBody() {
   document.getElementById('app').addEventListener('click', e => {
+    const fav = e.target.closest('[data-fav]');
+    if (fav && !fav.closest('.sheet')) { logFavourite(fav.dataset.fav, fav); return; }
     const b = e.target.closest('[data-body]');
     if (!b) return;
     if (b.dataset.body === 'weight') weightSheet();
