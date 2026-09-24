@@ -144,3 +144,7 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] Instant press feedback on every button (Android delays :active), spring release
 - [x] Sheets no longer vanish mid-slide when a button inside them finishes a transition
 - [x] Tests: every module parses; state classes can't collide with component classes
+
+## 1.6.2: voice ending fix
+
+- [x] Spoken replies: Gemini can split the audio over several parts; only the first was played, so longer replies were cut off mid-word ("broken" ending, thud). All parts are joined now; the tail trim keeps soft endings (−36 dB, 180 ms decay, 120 ms fade); cached clips re-fetched once; synthesis timeout scales with length

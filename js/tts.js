@@ -61,7 +61,7 @@ export async function listModels(key) {
 
 async function synth(text, { key, model, voice }) {
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), TIMEOUT);
+  const timer = setTimeout(() => ctl.abort(), Math.min(20000, TIMEOUT + text.length * 40)); // longer answers take longer
   try {
     const res = await fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
       method: 'POST',
@@ -73,15 +73,20 @@ async function synth(text, { key, model, voice }) {
       })
     });
     if (!res.ok) throw Object.assign(new Error('tts ' + res.status), { status: res.status });
-    const data = await res.json();
-    const part = data?.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.data)?.inlineData;
-    if (!part) throw new Error('tts empty');
-    const bin = atob(part.data);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    const rate = Number(/rate=(\d+)/.exec(part.mimeType || '')?.[1]) || RATE;
-    return { pcm: bytes.buffer, rate };
+    return audioFrom(await res.json());
   } finally { clearTimeout(timer); }
+}
+
+// The audio can come back split over several parts; playing only the first cut replies off mid-word.
+export function audioFrom(data) {
+  const parts = (data?.candidates?.[0]?.content?.parts || []).map(p => p.inlineData).filter(d => d?.data);
+  if (!parts.length) throw new Error('tts empty');
+  const chunks = parts.map(d => { const bin = atob(d.data); const b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return b; });
+  const bytes = new Uint8Array(chunks.reduce((a, c) => a + c.length, 0));
+  let o = 0;
+  for (const c of chunks) { bytes.set(c, o); o += c.length; }
+  const rate = Number(/rate=(\d+)/.exec(parts[0].mimeType || '')?.[1]) || RATE;
+  return { pcm: bytes.buffer, rate };
 }
 
 // 16-bit PCM → float, skipping a WAV header if one is present. Cleaned up for playback.
@@ -118,7 +123,7 @@ export function cleanSpeech(x, rate = RATE) {
     rms[f] = Math.sqrt(e / (b - a));
     if (rms[f] > peak) peak = rms[f];
   }
-  const thr = Math.max(0.006, peak * 0.05);
+  const thr = Math.max(0.004, peak * 0.015); // ~-36 dB: soft word endings still count as speech
   const segs = [];
   for (let f = 0; f < frames; f++) {
     if (rms[f] <= thr) continue;
@@ -134,9 +139,9 @@ export function cleanSpeech(x, rate = RATE) {
     if (gap >= 8 && len <= 40 && !speechy) segs.pop(); else break;
   }
   let end = n;
-  if (segs.length) end = Math.min(n, (segs[segs.length - 1].end + 6) * F); // keep 60 ms of natural decay
+  if (segs.length) end = Math.min(n, (segs[segs.length - 1].end + 18) * F); // keep 180 ms of natural decay
   const clip = out.subarray(0, end);
-  const fadeIn = Math.min(clip.length, Math.round(rate * 0.01)), fadeOut = Math.min(clip.length, Math.round(rate * 0.06));
+  const fadeIn = Math.min(clip.length, Math.round(rate * 0.01)), fadeOut = Math.min(clip.length, Math.round(rate * 0.12));
   for (let i = 0; i < fadeIn; i++) clip[i] *= i / fadeIn;
   for (let i = 0; i < fadeOut; i++) clip[clip.length - 1 - i] *= 0.5 - 0.5 * Math.cos((Math.PI * i) / fadeOut);
   return clip;
@@ -192,7 +197,7 @@ export async function speak(text, opts) {
   if (!text) return;
   stop();
   const mine = ++seq;
-  const cacheKey = `v2|${opts.model}|${opts.voice}|${text}`;
+  const cacheKey = `v3|${opts.model}|${opts.voice}|${text}`;
   if (opts.key) {
     try {
       let buf = await db.get('ttsCache', cacheKey).catch(() => null);

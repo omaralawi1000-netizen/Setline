@@ -13,17 +13,17 @@ const ms = x => (x.length / R) * 1000;
 
 test('a low thump after the last word is cut', () => {
   const clean = cleanSpeech(cat(voice(900), silence(200), tone(180, 55, 0.8), silence(100)), R);
-  assert.ok(ms(clean) < 1000, `ends after the speech, got ${ms(clean)} ms`);
+  assert.ok(ms(clean) < 1150, `ends after the speech, got ${ms(clean)} ms`);
 });
 
 test('a burst of noise after the last word is cut', () => {
   const clean = cleanSpeech(cat(voice(900), silence(150), noise(120, 0.6)), R);
-  assert.ok(ms(clean) < 1000, `got ${ms(clean)} ms`);
+  assert.ok(ms(clean) < 1150, `got ${ms(clean)} ms`);
 });
 
 test('a short last word is kept', () => {
   const clean = cleanSpeech(cat(voice(900), silence(160), voice(220), silence(300)), R);
-  assert.ok(ms(clean) > 1250 && ms(clean) < 1400, `kept "go", trimmed silence: ${ms(clean)} ms`);
+  assert.ok(ms(clean) > 1250 && ms(clean) < 1500, `kept "go", trimmed silence: ${ms(clean)} ms`);
 });
 
 test('ends on silence with no DC offset', () => {
@@ -40,4 +40,25 @@ test('pcm bytes and a WAV header decode', () => {
   wav.set([0x52, 0x49, 0x46, 0x46]); wav.set(new Uint8Array(pcm.buffer), 44);
   assert.ok(Math.abs(pcmToFloat(wav.buffer, R).length - pcmToFloat(pcm.buffer, R).length) < 2);
   assert.equal(cleanSpeech(new Float32Array(0)).length, 0);
+});
+
+test('audio split over several parts is joined, not cut after the first', async () => {
+  const { audioFrom } = await import('../js/tts.js');
+  const pcm = n => Buffer.from(new Int16Array(n).fill(1000).buffer).toString('base64');
+  const data = { candidates: [{ content: { parts: [
+    { inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data: pcm(4800) } },
+    { text: 'ignored' },
+    { inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data: pcm(2400) } }
+  ] } }] };
+  const a = audioFrom(data);
+  assert.equal(a.pcm.byteLength, (4800 + 2400) * 2);
+  assert.equal(a.rate, 24000);
+  assert.throws(() => audioFrom({ candidates: [{ content: { parts: [{ text: 'x' }] } }] }));
+});
+
+test('a soft final syllable is not chopped', () => {
+  // speech, then a quiet decaying tail (-30 dB) that is still part of the word
+  const tail = Float32Array.from({ length: R * 0.25 }, (_, i) => 0.012 * Math.sin(2 * Math.PI * 900 * i / R));
+  const clean = cleanSpeech(cat(voice(800), tail, silence(400)), R);
+  assert.ok(ms(clean) >= 1040, `kept the soft ending: ${ms(clean)} ms`);
 });
