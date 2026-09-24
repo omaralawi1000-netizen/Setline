@@ -230,3 +230,11 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] The product lookup starts the moment a code is seen, runs during the lock animation (shortened to 0.36 s), and gives up after 7 s instead of hanging; the product photo loads while you pick the amount, so Add closes at once
 - [x] Recent products as one-tap chips on the camera; the amount you had last time is preselected; the camera fades in once it's live and dims when a code locks
 - [x] Measured: code in view → product card in ~0.8 s with a slow (300 ms) server; a recent product in ~0.2 s
+
+## 1.13.2: second restraint pass (the "looks vibecoded" list, whole app)
+
+- [x] No violet-to-lilac/blue gradients left outside the orb: progress bars, toast and card timers, goal and muscle bars, onboarding bar and slider, voice wave, week ring and sparklines are one solid colour; "done" states are solid green
+- [x] No tinted gradient cards (Drive nudge, avatar, chat bubbles, meal numbers); state shows by colour alone
+- [x] One spacing rhythm on Today and Food: 28 px above a section title, 10 px below, 12 px between cards
+- [x] Copy: no symbols in labels ("Favourited"), and "Your log lives on this phone" instead of claiming everything stays on the phone (voice and Coach go to Groq and Gemini)
+- Kept on purpose: the orb (the app's one bold thing), Manrope (not Inter), the app's own icons, no emoji, no em dashes, glass only where something floats

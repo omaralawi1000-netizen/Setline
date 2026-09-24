@@ -1629,3 +1629,21 @@ html[data-motion=off] #s-food *{animation:none!important}
 .srchip .pi{display:grid;place-items:center;background:rgba(255,255,255,.1)}
 .srchip .pi svg{width:18px;height:18px}
 .srchip span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* =====================================================================
+   1.14: the second restraint pass. Every bar, meter and fill is one
+   solid colour (no violet-to-lilac sweeps); state is shown by colour
+   alone, never by a tinted card; one spacing rhythm on Today and Food.
+   ===================================================================== */
+.toast .bar,.intent .bar,.obbar i,.gbar .fill,.mrow i b,.cbar i{background:var(--accent)}
+.obrange::-webkit-slider-runnable-track{background:rgba(var(--a-rgb),.35)}
+.wave i{background:var(--accent)}
+.mrow.full i b,.gcard.done .gbar .fill,.gcard.ahead .gbar .fill{background:#8FE3C0}
+.mnum.hot{background:rgba(var(--a-rgb),.1)}
+.dnudge{background:var(--card);border-color:var(--card-line)}
+.pav{background:rgba(var(--a-rgb),.16);color:var(--accent)}
+.ivm.me{background:rgba(var(--a-rgb),.16)}
+/* spacing: 28 above a section title, 10 below it, 12 between cards */
+.section{margin:28px 4px 10px}
+:is(#s-today,#s-food) > :is(.glass,.solid,.upcoming,.grid2,.grid3,.mealwrap,.favrow,.crow,.dnudge,.fhero,.fadd,.fwater,.flist,.fweek,.fempty,.gcard,.rlist) + :is(.glass,.solid,.upcoming,.grid2,.grid3,.mealwrap,.favrow,.crow,.dnudge,.gcard,.fadd,.fwater){margin-top:12px}
+:is(#s-today,#s-food) > .section + *{margin-top:0}
