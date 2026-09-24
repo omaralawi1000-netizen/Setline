@@ -91,6 +91,15 @@ export function ensureModels() {
   return picking;
 }
 
+// Everything the Coach gets to see.
+export const coachSnap = () => ({
+  active: state.active, history: state.history, routines: state.routines, prs: state.prs, bodyweight: state.bodyweight,
+  cardio: state.cardio, activeCardio: state.activeCardio, nutrition: state.nutrition, daily: state.daily, measures: state.measures,
+  photoCount: state.photos?.length || 0, goals: goalLines(), catalog: state.catalog, settings: state.settings
+});
+let goalLines = () => [];
+export const setGoalLines = fn => { goalLines = fn; };
+
 // Ask the coach. Used by the composer, the example chips, and voice questions.
 export async function ask(question, { root = $('#s-coach') } = {}) {
   question = String(question || '').trim();
@@ -107,10 +116,7 @@ export async function ask(question, { root = $('#s-coach') } = {}) {
   syncButton();
   await ensureModels();
   if (isPlanRequest(question)) return buildPlan(question, reply, { key, lang, ctl, root });
-  const context = buildContext({
-    active: state.active, history: state.history, routines: state.routines, prs: state.prs, bodyweight: state.bodyweight,
-    cardio: state.cardio, activeCardio: state.activeCardio, nutrition: state.nutrition, daily: state.daily, measures: state.measures, catalog: state.catalog, settings: state.settings
-  });
+  const context = buildContext(coachSnap());
   try {
     let last = 0;
     const text = await withFallback(coachModels(state.settings), model => streamChat({
@@ -141,7 +147,7 @@ export async function ask(question, { root = $('#s-coach') } = {}) {
 // "make me a 4-day upper/lower, 60 minutes, dumbbells only" → an editable plan card
 async function buildPlan(question, reply, { key, lang, ctl, root }) {
   const { t } = state;
-  const context = buildContext({ active: state.active, history: state.history, routines: state.routines, prs: state.prs, bodyweight: state.bodyweight, cardio: state.cardio, nutrition: state.nutrition, catalog: state.catalog, settings: state.settings });
+  const context = buildContext(coachSnap());
   try {
     const raw = await withFallback(coachModels(state.settings), model => aiPlan({
       key, model, system: planSystem(lang, state.catalog), schema: PLAN_SCHEMA, signal: ctl.signal,
