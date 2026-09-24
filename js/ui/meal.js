@@ -1,7 +1,7 @@
 // Meal logging: snap a photo (or describe it) and Gemini estimates protein and calories.
 import * as store from '../store.js';
 import { state } from '../store.js';
-import { aiMeal, withFallback, AiError } from '../ai.js';
+import { aiMeal, withFallback, AiError, nextQuotaReset } from '../ai.js';
 import { coachModels } from '../settings.js';
 import { getKey } from '../keys.js';
 import { MEAL_SCHEMA, mealPrompt, validateMeal, scaleMeal, dayOf, favouriteMeals, mealKey } from '../meals.js';
@@ -95,7 +95,7 @@ export function openMealSheet({ text = '' } = {}) {
       </div>`;
     };
     const failed = (code) => {
-      const msg = code === 'nokey' ? t('meal.noKey') : code === 'notfood' ? t('meal.notFood') : code === 'offline' || code === 'network' ? t('coach.offline') : code === 'busy' ? t('coach.busy') : t('meal.failed');
+      const msg = code === 'nokey' ? t('meal.noKey') : code === 'notfood' ? t('meal.notFood') : code === 'offline' || code === 'network' ? t('coach.offline') : code === 'busy' ? t('coach.busy') : code === 'quota' ? t('coach.quota', { time: new Date(nextQuotaReset()).toLocaleTimeString(state.lang === 'da' ? 'da-DK' : 'en-GB', { hour: '2-digit', minute: '2-digit' }) }) : t('meal.failed');
       box.innerHTML = `<div class="sbody meal"><div class="empty"><div class="emptyglyph">${I.meal}</div><h2>${esc(msg)}</h2></div>
         <div class="acts">${code === 'nokey' ? '' : `<button class="log" data-m="retry"><span>${t('coach.retry')}</span></button>`}<button class="linkbtn muted" data-m="again">${t('meal.again')}</button></div></div>`;
     };

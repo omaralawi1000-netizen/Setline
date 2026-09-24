@@ -1,7 +1,7 @@
 // Coach tab: chat thread, composer, streamed answers, spoken when complete.
 import * as store from '../store.js';
 import { state } from '../store.js';
-import { streamChat, AiError, withFallback, aiPlan, pickTextModels } from '../ai.js';
+import { streamChat, AiError, withFallback, aiPlan, pickTextModels, nextQuotaReset } from '../ai.js';
 import { listModels, pickTtsModel } from '../tts.js';
 import { buildContext, chatContents, systemPrompt, formatAnswer, speakable, isPlanRequest, PLAN_SCHEMA, planSystem, validatePlan, planToRoutines } from '../coach.js';
 import { getKey } from '../keys.js';
@@ -17,7 +17,7 @@ let nav = { openSettings: () => {} };
 let inflight = null; // {ctl, id}
 
 const errorText = (code, t) => ({
-  offline: t('coach.offline'), network: t('coach.offline'), badkey: t('coach.badKey'), busy: t('coach.busy'), empty: t('coach.empty'), timeout: t('coach.timeout'), nomodel: t('coach.noModel'), nokey: t('coach.noKey')
+  offline: t('coach.offline'), network: t('coach.offline'), badkey: t('coach.badKey'), busy: t('coach.busy'), quota: t('coach.quota', { time: new Date(nextQuotaReset()).toLocaleTimeString(state.lang === 'da' ? 'da-DK' : 'en-GB', { hour: '2-digit', minute: '2-digit' }) }), empty: t('coach.empty'), timeout: t('coach.timeout'), nomodel: t('coach.noModel'), nokey: t('coach.noKey')
 }[code] || t('coach.failed', { code }));
 
 function bubble(m) {

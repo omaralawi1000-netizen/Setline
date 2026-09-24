@@ -82,7 +82,8 @@ export const cmdModelId = s => s.cmdOverride || s.cmdModel || 'gemini-flash-lite
 export const coachModelId = s => s.coachOverride || s.coachModel || 'gemini-flash-latest';
 // the order to try: chosen, runner-up, rolling alias
 export const cmdModels = s => [cmdModelId(s), s.cmdOverride ? '' : s.cmdAlt, 'gemini-flash-lite-latest'];
-export const coachModels = s => [coachModelId(s), s.coachOverride ? '' : s.coachAlt, 'gemini-flash-latest'];
+// Flash first; the Flash-Lite models have their own (bigger) free quotas, so they're the last resort
+export const coachModels = s => [coachModelId(s), s.coachOverride ? '' : s.coachAlt, 'gemini-flash-latest', s.cmdModel, 'gemini-flash-lite-latest'];
 export const ttsModelId = s => s.ttsOverride || (s.ttsQuality === 'fast' ? s.ttsLite || s.ttsModel : s.ttsModel || s.ttsLite) || DEFAULT_TTS_MODEL;
 // runner-up voice model: the other family
 export const ttsAlt = s => (s.ttsOverride ? [] : [s.ttsQuality === 'fast' ? s.ttsModel : s.ttsLite, DEFAULT_TTS_MODEL].filter(Boolean));

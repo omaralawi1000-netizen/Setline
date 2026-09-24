@@ -184,3 +184,32 @@ test('streamChat: a stalled stream ends with what arrived, or times out', async 
   globalThis.fetch = sse([], { stall: true });
   await assert.rejects(streamChat({ key: 'k', model: 'm', system: '', contents: [], idleTimeout: 30 }), e => e.code === 'timeout');
 });
+
+test('429/503 bodies: daily quota vs per-minute limit vs overload', async () => {
+  const { limitError, nextQuotaReset } = await import('../js/ai.js');
+  const daily = JSON.stringify({ error: { code: 429, status: 'RESOURCE_EXHAUSTED', details: [
+    { '@type': 'type.googleapis.com/google.rpc.QuotaFailure', violations: [{ quotaMetric: 'generativelanguage.googleapis.com/generate_content_free_tier_requests', quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }] },
+    { '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '3600s' }] } });
+  const minute = JSON.stringify({ error: { code: 429, details: [
+    { '@type': 'type.googleapis.com/google.rpc.QuotaFailure', violations: [{ quotaId: 'GenerateRequestsPerMinutePerProjectPerModel-FreeTier' }] },
+    { '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '34s' }] } });
+  assert.equal(limitError(429, daily, 'm').code, 'quota');
+  const e = limitError(429, minute, 'm');
+  assert.deepEqual([e.code, e.retryMs, e.model], ['busy', 34000, 'm']);
+  assert.equal(limitError(503, 'not json').code, 'busy');
+  // quota resets at midnight Pacific
+  const now = Date.parse('2026-09-24T10:00:00Z'); // 03:00 PDT
+  assert.equal(new Date(nextQuotaReset(now)).toISOString(), '2026-09-25T07:00:00.000Z');
+});
+
+test('withFallback: a model out of quota is skipped for the next; a short per-minute limit is waited out', async () => {
+  let tried = [];
+  const r = await withFallback(['a', 'b'], async m => { tried.push(m); if (m === 'a') throw new AiError('quota', 429); return m; });
+  assert.equal(r, 'b');
+  tried = []; const waits = [];
+  let n = 0;
+  const r2 = await withFallback(['x'], async m => { tried.push(m); if (n++ === 0) throw new AiError('busy', 429, { retryMs: 3000 }); return 'ok'; }, { sleep: async ms => { waits.push(ms); } });
+  assert.equal(r2, 'ok');
+  assert.deepEqual(waits, [3000]);
+  await assert.rejects(withFallback(['y'], async () => { throw new AiError('quota', 429); }), e => e.code === 'quota' || e.code === 'busy');
+});

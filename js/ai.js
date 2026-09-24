@@ -51,8 +51,39 @@ export const textOf = res => (res?.candidates?.[0]?.content?.parts || []).map(p 
 // ---------- requests ----------
 
 export class AiError extends Error {
-  constructor(code, status = 0) { super(code); this.code = code; this.status = status; }
+  constructor(code, status = 0, extra = {}) { super(code); this.code = code; this.status = status; Object.assign(this, extra); }
 }
+
+const model = path => decodeURIComponent(/models\/([^:/?]+)/.exec(path)?.[1] || '');
+
+// 429/503 → what kind of limit it is. A daily free-tier quota → 'quota' (that model is done until the
+// reset); a per-minute limit or an overloaded model → 'busy', with Google's suggested wait if it gave one.
+export function limitError(status, body, modelId = '') {
+  let j = null;
+  try { j = JSON.parse(body); } catch {}
+  const details = j?.error?.details || [];
+  const quotaIds = details.flatMap(d => d.violations || []).map(v => `${v.quotaId || ''} ${v.quotaMetric || ''}`).join(' ');
+  const delay = details.find(d => /RetryInfo/.test(d['@type'] || ''))?.retryDelay;
+  const retryMs = delay ? Math.round(parseFloat(delay) * 1000) : null;
+  if (status === 429 && /PerDay/i.test(quotaIds)) return new AiError('quota', 429, { model: modelId });
+  return new AiError('busy', status, { model: modelId, retryMs: Number.isFinite(retryMs) ? retryMs : null });
+}
+
+// Models whose daily quota ran out: skipped until the quota resets (midnight Pacific time).
+const EXHAUSTED = 'setline.exhausted';
+export function nextQuotaReset(now = Date.now()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }).formatToParts(new Date(now)).map(p => [p.type, p.value]));
+  const sinceMidnight = ((Number(parts.hour) * 60 + Number(parts.minute)) * 60 + Number(parts.second)) * 1000;
+  return now - sinceMidnight + 86_400_000;
+}
+const readEx = (st = globalThis.localStorage) => { try { return JSON.parse(st?.getItem(EXHAUSTED) || '{}') || {}; } catch { return {}; } };
+export function markExhausted(modelId, now = Date.now(), st = globalThis.localStorage) {
+  if (!modelId) return;
+  const ex = readEx(st);
+  ex[modelId] = nextQuotaReset(now);
+  try { st?.setItem(EXHAUSTED, JSON.stringify(ex)); } catch {}
+}
+export const isExhausted = (modelId, now = Date.now(), st = globalThis.localStorage) => (readEx(st)[modelId] || 0) > now;
 
 async function post(path, key, body, { timeout = 0, signal } = {}) {
   if (navigator.onLine === false) throw new AiError('offline');
@@ -68,7 +99,7 @@ async function post(path, key, body, { timeout = 0, signal } = {}) {
   }
   if (res.status === 400 || res.status === 401 || res.status === 403) { clearTimeout(timer); throw new AiError(res.status === 400 ? 'badrequest' : 'badkey', res.status); }
   if (res.status === 404) { clearTimeout(timer); throw new AiError('nomodel', 404); }
-  if (res.status === 429 || res.status === 503) { clearTimeout(timer); throw new AiError('busy', res.status); }
+  if (res.status === 429 || res.status === 503) { clearTimeout(timer); throw limitError(res.status, await res.text().catch(() => ''), model(path)); }
   if (!res.ok) { clearTimeout(timer); throw new AiError('failed', res.status); }
   return { res, done: () => clearTimeout(timer) };
 }
@@ -273,19 +304,32 @@ export async function listModelsText(key) {
 }
 
 // Errors worth trying another model for: overloaded, rate limited, gone, server trouble.
-export const retryable = e => e instanceof AiError && (e.code === 'busy' || e.code === 'nomodel' || e.code === 'empty' || (e.code === 'failed' && e.status >= 500));
-
-// Run fn(model) with the chosen model, then the runner-up, then Google's rolling alias.
-// With rounds > 1 the list is tried again after a pause when every model was busy.
-export async function withFallback(models, fn, { rounds = 1, wait = 1500, sleep = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
-  const list = [...new Set(models.filter(Boolean))];
-  let last;
+export const retryable = e => e instanceof AiError && (e.code === 'busy' || e.code === 'quota' || e.code === 'nomodel' || e.code === 'empty' || (e.code === 'failed' && e.status >= 500));
+// Run fn(model) with the chosen model, then the runner-ups. Models out of daily quota are skipped (and
+// remembered); a per-minute limit waits Google's suggested delay once; with rounds > 1 the list is tried
+// again after a pause when everything was busy.
+export async function withFallback(models, fn, { rounds = 1, wait = 1500, maxWait = 20000, sleep = ms => new Promise(r => setTimeout(r, ms)), now = () => Date.now() } = {}) {
+  const all = [...new Set(models.filter(Boolean))];
+  let list = all.filter(m => !isExhausted(m, now()));
+  if (!list.length) throw new AiError('quota', 429, { resetAt: nextQuotaReset(now()) });
+  let last, waited = false;
   for (let round = 0; round < rounds; round++) {
     if (round) await sleep(wait * round);
     for (const m of list) {
-      try { return await fn(m); } catch (e) { last = e; if (!retryable(e)) throw e; }
+      try { return await fn(m); } catch (e) {
+        last = e;
+        if (!retryable(e)) throw e;
+        if (e.code === 'quota') markExhausted(m, now());
+        else if (e.code === 'busy' && e.retryMs && e.retryMs <= maxWait && !waited && m === list[list.length - 1]) {
+          waited = true; // the last option said "try again in N s": wait for it once
+          await sleep(e.retryMs);
+          try { return await fn(m); } catch (e2) { last = e2; if (!retryable(e2)) throw e2; }
+        }
+      }
     }
-    if (last?.code !== 'busy' && last?.code !== 'empty') break;
+    list = list.filter(m => !isExhausted(m, now()));
+    if (!list.length) throw new AiError('quota', 429, { resetAt: nextQuotaReset(now()) });
+    if (last?.code !== 'busy' && last?.code !== 'empty' && last?.code !== 'quota') break;
   }
   throw last;
 }
