@@ -11,7 +11,7 @@ import { normalize } from './catalog.js';
 import { lbToKg, round } from './units.js';
 import { CARDIO_TYPES } from './cardio.js';
 
-export const INTENTS = ['LogSet', 'LogSets', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'CheckIn', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
+export const INTENTS = ['LogSet', 'LogSets', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'CheckIn', 'LogRel', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
   'AddExercise', 'SwapExercise', 'StartRoutine', 'StartEmpty', 'Finish', 'Discard', 'StartRest', 'AdjustRest', 'SkipRest',
   'Query', 'Cancel', 'Help', 'Ask', 'Unknown'];
 
@@ -256,6 +256,46 @@ function trimFiller(words) {
   return words.slice(a, z);
 }
 
+// ---------- plates and plan-relative sets ----------
+
+// "4 plates" → kg. One-end loaded (T-bar, landmine) and machines: the plates themselves. Barbells: the
+// gym meaning (plates on each side) plus the bar. Standard plate: 20 kg / 45 lb unless said.
+export function platesToKg({ n, size, perSide }, ex, exId = '', unit = 'kg') {
+  const lb = unit === 'lb';
+  const plate = size ?? (lb ? 45 : 20);
+  const oneEnd = /t-bar|landmine/.test(exId || '') || ex?.equipment === 'machine';
+  const bars = lb ? { barbell: 45, trapbar: 55, ezbar: 25, smith: 35 } : { barbell: 20, trapbar: 25, ezbar: 10, smith: 15 };
+  const bar = oneEnd ? 0 : bars[ex?.equipment] ?? null;
+  const total = bar == null ? n * plate : bar + n * plate * (perSide || bar ? 2 : 1);
+  return lb ? round(lbToKg(total), 4) : total;
+}
+
+// "2 kg more", "one rep short", "9 reps with 2 kilos more" → {kg?, reps?, kgDelta?, repsDelta?, relative}
+const UNIT = '(?:kg|kgs|kilo|kilos|kilogram|kilograms|lb|lbs|pounds?|pund)';
+function relPart(p, ctx) {
+  let m;
+  const toKg = (v, u) => ((u && /^(lb|lbs|pound|pounds|pund)$/.test(u)) || (!u && ctx.unit === 'lb') ? round(lbToKg(v), 4) : v);
+  if ((m = new RegExp(`^(\\d+(?:\\.\\d+)?) ?(${UNIT.slice(3, -1)}) (?:more|extra|heavier|up|mere|ekstra|tungere|op)$`).exec(p))) return { kgDelta: toKg(Number(m[1]), m[2]) };
+  if ((m = new RegExp(`^(\\d+(?:\\.\\d+)?) ?(${UNIT.slice(3, -1)}) (?:less|lighter|down|mindre|lettere|ned)$`).exec(p))) return { kgDelta: -toKg(Number(m[1]), m[2]) };
+  if ((m = /^(\d+) (?:more|extra|ekstra|mere|flere) (?:reps?|repetitions?|gentagelser?)$|^(\d+) (?:reps?|gentagelser?) (?:more|extra|mere|ekstra|til|over)$|^(\d+) (?:more|mere|til|ekstra)$/.exec(p))) return { repsDelta: Number(m[1] ?? m[2] ?? m[3]) };
+  if ((m = /^(\d+) (?:reps? )?(?:less|fewer|short|under|mindre|færre)(?: reps?)?$|^(\d+) (?:færre|mindre) (?:reps?|gentagelser?)$/.exec(p))) return { repsDelta: -Number(m[1] ?? m[2]) };
+  if ((m = /^(\d+) (?:reps?|repetitions?|gentagelser?)$/.exec(p))) return { reps: Number(m[1]) };
+  if ((m = new RegExp(`^(\\d+(?:\\.\\d+)?) ?(${UNIT.slice(3, -1)})$`).exec(p))) return { kg: toKg(Number(m[1]), m[2]) };
+  return null;
+}
+export function relPhrase(text, ctx = {}) {
+  const parts = String(text || '').split(/ (?:with|and|but|at|med|og|men|på) /).map(x => x.trim()).filter(Boolean);
+  if (!parts.length || parts.length > 3) return null;
+  const out = {};
+  for (const p of parts) {
+    const r = relPart(p, ctx);
+    if (!r) return null;
+    for (const [k, v] of Object.entries(r)) { if (out[k] != null) return null; out[k] = v; }
+  }
+  out.relative = out.kgDelta != null || out.repsDelta != null;
+  return out;
+}
+
 // ---------- rest durations ----------
 
 function readDuration(s) {
@@ -322,9 +362,21 @@ export function parse(text, ctx = {}) {
   const heard = String(text || '').trim();
   const base = clean(heard);
   const lang = detectLang(base, ctx.lang);
-  const s = wordsToNumbers(base, lang);
+  let s = wordsToNumbers(base, lang);
   const out = (type, fields = {}) => ({ type, ...fields, lang, heard });
   if (!s) return out('Unknown');
+  // "4 plates", "2 plates a side", "3 plader": weight from plates, worked out once we know the exercise
+  let plates = null;
+  { const pm = /(?:(?:with|med|at|på) )?\b(\d+) (?:plates?|plader|pladerne|skiver)(?: (?:of|på|a) (\d+(?:\.\d+)?)(?: ?(?:kg|kilo|kilos|lb|lbs))?)?((?: (?:a|per|each|on each|på hver|hver|pr) side)?)/.exec(s);
+    if (pm && !/\b(sets?|sæt)\b/.test(s.slice(pm.index + pm[0].length, pm.index + pm[0].length + 5))) {
+      plates = { n: Number(pm[1]), size: pm[2] ? Number(pm[2]) : null, perSide: !!pm[3].trim() };
+      s = (s.slice(0, pm.index) + ' ' + s.slice(pm.index + pm[0].length)).replace(/\s+/g, ' ').trim();
+    } }
+  const plateKg = exId => plates && platesToKg(plates, ctx.catalog?.get(exId || ctx.current?.exerciseId), exId || ctx.current?.exerciseId, ctx.unit);
+  if (plates && !s) {
+    const reps = ctx.current?.planned?.reps ?? ctx.current?.shown?.reps ?? null;
+    return reps ? out('LogSet', { kg: plateKg(null), reps, count: 1, exerciseId: null }) : out('Ask', { reason: 'reps', then: { type: 'LogSet', kg: plateKg(null), reps: null, count: 1, exerciseId: null } });
+  }
 
   const exercise = phrase => matchExercise(phrase, ctx);
   const withExercise = (type, phrase) => {
@@ -469,6 +521,29 @@ export function parse(text, ctx = {}) {
     if (!/\d/.test(m[3])) { const r = withExercise('AddExercise', m[3]); if (r) return r; }
   }
 
+  // --- a set you just did, told naturally: "i got 9 reps this time", "did 2 kg more", "as planned" ---
+  {
+    const PERF = /^(?:and |so |okay |ok )?(?:i |jeg )?(?:just |lige |then )?(?:got|get|did|do|hit|made|managed|completed|finished|lifted|pressed|repped|had|tog|lavede|fik|klarede|nåede|løftede|gennemførte|tager)(?: it)?(?: again| igen)? (.+)$/;
+    const TAIL = / (?:this time|that time|this set|on this set|on that set|on that one|for that set|there|this round|denne gang|den gang|i det sæt|på det sæt|nu)$/;
+    const PLANNED = /^(?:as planned|like planned|as prescribed|what was planned|the planned set|planned set(?: done)?|done as planned|all(?: of)?(?: the)? reps|all of them|full set|the whole set|som planlagt|det planlagte|hele sættet|alle gentagelser|alle)$/;
+    const pm = PERF.exec(s);
+    let rest = pm ? pm[1].replace(TAIL, '').trim() : null;
+    if (rest != null && /^(the )?same(?: again)?$|^samme(?: igen)?$/.test(rest)) return out('RepeatLast', { count: 1 });
+    if (rest != null && PLANNED.test(rest)) return out('LogRel', {});
+    if (/^(?:as planned|planned set done|done as planned|som planlagt)$/.test(s) ||
+        /^(?:i |jeg )?(?:just |lige )?(?:did|hit|nailed|crushed|smashed|made|klarede|lavede|tog) (?:it|that|them|den|det|dem)(?: all| alle)?$/.test(s)) return out('LogRel', {});
+    const rel = relPhrase(rest ?? s, ctx);
+    if (rel && (rest != null || rel.relative)) {
+      const kg = rel.kg ?? (plates ? plateKg(null) : undefined);
+      const f = { ...(kg != null ? { kg } : {}), ...(rel.reps != null ? { reps: rel.reps } : {}), ...(rel.kgDelta ? { kgDelta: rel.kgDelta } : {}), ...(rel.repsDelta ? { repsDelta: rel.repsDelta } : {}) };
+      // told as something you did → a new set; said on its own → the command decides (fix the last, or a new set)
+      if (rest != null) return out('LogRel', f);
+      if (rel.relative) return out('AdjustLast', f);
+    }
+    if (rest != null) s = rest.replace(/^(?:the )?same weight(?: but| and| with)? |^samme vægt(?: men| og| med)? /, '').trim(); // "i got 9 reps on the t-bar row" → "9 reps on the t-bar row"
+    else s = s.replace(/^(?:the )?same weight(?: but| and| with)? (?=\d)|^samme vægt(?: men| og| med)? (?=\d)/, '');
+  }
+
   // --- adjust / repeat / edit the last set ---
   if ((m = R(/^(\d+) (more|extra) (reps?|repetitions?|gentagelser?)$|^(\d+) (reps?|gentagelser?) (more|mere|til|ekstra|extra)$|^(\d+) (mere|ekstra) (rep|reps|gentagelser?)$|^(\d+) more rep$/, s))) {
     return out('AdjustLast', { repsDelta: Number(m[1] ?? m[4] ?? m[7] ?? m[10]) });
@@ -563,10 +638,25 @@ export function parse(text, ctx = {}) {
       }
     }
   }
+  // with plates giving the weight, one bare number is the reps: "t-bar row 3 plates for 10"
+  if (plates && v.kg == null && v.reps == null && v.bareLeft === 1) {
+    const n = Number(v.left.find(isNum));
+    if (Number.isInteger(n) && n >= 1 && n <= 100) { v.reps = n; v.left = v.left.filter(w => !isNum(w) && !['for', 'x', 'gange', 'times'].includes(w)); v.bareLeft = 0; words = trimFiller(v.left); }
+  }
+  if (v.kg == null && v.reps == null && v.count == null && plates && !words.length) {
+    const kg = plateKg(null), reps = ctx.current?.planned?.reps ?? ctx.current?.shown?.reps ?? null;
+    if (kg != null && reps != null) return out('LogSet', { kg, reps, count: 1, exerciseId: null });
+  }
   if (v.kg == null && v.reps == null && v.count == null) {
     // just an exercise name: jump to it or add it
     if (words.length && !/\d/.test(words.join(' '))) {
       const hit = exercise(words.join(' '));
+      if (hit?.exerciseId && plates) {
+        const same = hit.exerciseId === ctx.current?.exerciseId;
+        const reps = same ? ctx.current?.planned?.reps ?? ctx.current?.shown?.reps ?? null : null;
+        const f = { kg: plateKg(hit.exerciseId), reps, count: 1, exerciseId: hit.exerciseId };
+        return reps ? out('LogSet', f) : out('Ask', { reason: 'reps', then: { type: 'LogSet', ...f } });
+      }
       if (hit?.exerciseId && hit.score >= 60) return out('AddExercise', { exerciseId: hit.exerciseId });
       if (hit?.choices) return out('Ask', { reason: 'exercise', choices: hit.choices, then: { type: 'AddExercise' } });
     }
@@ -581,12 +671,14 @@ export function parse(text, ctx = {}) {
     exerciseId = hit.exerciseId;
   }
   let { kg, reps } = v;
+  if (kg == null && plates) kg = plateKg(exerciseId);
   const count = v.count ?? 1;
   const sameEx = !exerciseId || exerciseId === ctx.current?.exerciseId;
-  const lastKg = sameEx ? (ctx.current?.lastSet?.kg ?? ctx.current?.planned?.kg ?? null) : null;
+  // what's on screen wins: the steppers show the planned set (or what you dialed in)
+  const lastKg = sameEx ? (ctx.current?.shown?.kg ?? ctx.current?.lastSet?.kg ?? ctx.current?.planned?.kg ?? null) : null;
   const bodyweightEx = ctx.catalog?.get(exerciseId || ctx.current?.exerciseId)?.equipment === 'bodyweight';
   if (kg == null) kg = lastKg ?? (bodyweightEx ? 0 : null);
-  if (reps == null && sameEx) reps = ctx.current?.planned?.reps ?? null;
+  if (reps == null && sameEx) reps = ctx.current?.planned?.reps ?? ctx.current?.shown?.reps ?? null;
   if (reps != null && (!Number.isInteger(reps) || reps < 1)) return out('Unknown');
   if (kg == null) return out('Ask', { reason: 'weight', then: { type: 'LogSet', kg, reps, count, exerciseId } });
   if (reps == null) return out('Ask', { reason: 'reps', then: { type: 'LogSet', kg, reps, count, exerciseId } });

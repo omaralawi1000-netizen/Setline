@@ -22,6 +22,7 @@ import { suggest } from './progression.js';
 import { validBodyweight, proteinTarget, dateKey, bodyTrend } from './body.js';
 
 export const AUTO_MS = 1500;
+export const FRESH_MS = 90_000; // a relative phrase this soon after logging corrects that set
 
 export function resolve(intent, snap, t, lang) {
   const { active: w, settings } = snap;
@@ -130,6 +131,20 @@ export function resolve(intent, snap, t, lang) {
     });
   };
 
+  // A new set told relative to the plan: the planned set (what the steppers show) plus/minus.
+  const relCommand = intent => {
+    const ex = cur();
+    if (!ex) return err('voice.noExercise');
+    const bw = snap.catalog.get(ex.exerciseId)?.equipment === 'bodyweight';
+    const base = W.suggestNext(ex, W.lastSession(snap.history || [], ex.exerciseId), bw ? 0 : 20);
+    const kg = Math.max(0, Math.round(((intent.kg ?? base.kg) + (intent.kgDelta || 0)) * 1000) / 1000);
+    const reps = (intent.reps ?? base.reps) + (intent.repsDelta || 0);
+    if (!(reps >= 1)) return err('voice.didntCatch');
+    const change = [intent.kgDelta ? `${intent.kgDelta > 0 ? '+' : '−'}${kgTxt(Math.abs(intent.kgDelta))} ${u}` : '', intent.repsDelta ? `${intent.repsDelta > 0 ? '+' : '−'}${Math.abs(intent.repsDelta)} ${t('voice.repsWord')}` : ''].filter(Boolean).join(', ');
+    const sub = change ? t('voice.vsPlan', { change, plan: setTxt(base.kg, base.reps) }) : t('voice.asPlanned', { plan: setTxt(base.kg, base.reps) });
+    return logCommand(kg, reps, 1, null, sub);
+  };
+
   const exerciseCtx = id => id || cur()?.exerciseId || null;
 
   switch (intent.type) {
@@ -151,10 +166,16 @@ export function resolve(intent, snap, t, lang) {
     case 'AdjustLast': {
       const need = needWorkout(); if (need) return need;
       const last = lastDone(tgt());
-      if (!last) return err('voice.noSetYet');
-      const kg = Math.max(0, Math.round((last.set.kg + (intent.kgDelta || 0)) * 1000) / 1000);
-      const reps = last.set.reps + (intent.repsDelta || 0);
+      // right after logging it's a correction; later on it describes the set you just did
+      const fresh = last && (!last.set.completedAt || snap.now - last.set.completedAt < FRESH_MS);
+      if (!fresh) return relCommand(intent);
+      const kg = Math.max(0, Math.round(((intent.kg ?? last.set.kg) + (intent.kgDelta || 0)) * 1000) / 1000);
+      const reps = (intent.reps ?? last.set.reps) + (intent.repsDelta || 0);
       return editCommand(kg, reps);
+    }
+    case 'LogRel': {
+      const need = needWorkout(); if (need) return need;
+      return relCommand(intent);
     }
     case 'EditLast': {
       const need = needWorkout(); if (need) return need;

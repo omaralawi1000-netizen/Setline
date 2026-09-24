@@ -183,7 +183,8 @@ function logButton(ex) {
   const { t } = state;
   const label = `<span>${t('workout.logSet', { n: W.nextSetNumber(ex) })}</span>`;
   if (!getKey('groq')) return `<button class="log" data-act="log">${label}</button>`;
-  const hint = t(ex.sets.some(s => s.done) ? 'voice.hint.same' : 'voice.hint.log');
+  const planned = ex.sets[W.firstPlannedIndex(ex)];
+  const hint = t(planned?.kg != null ? 'voice.hint.planned' : ex.sets.some(s => s.done) ? 'voice.hint.same' : 'voice.hint.log');
   return `<button class="log split" data-act="log">${label}<small>${micSvg}${esc(t('workout.orSay', { text: hint.toLowerCase() }))}</small></button>`;
 }
 

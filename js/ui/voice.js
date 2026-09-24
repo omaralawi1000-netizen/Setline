@@ -10,7 +10,7 @@ import { resolve, AUTO_MS } from '../commands.js';
 import { translator } from '../i18n.js';
 import { getKey } from '../keys.js';
 import { sttModelId, ttsModelId, ttsAlt } from '../settings.js';
-import { firstPlannedIndex, lastDoneIndex, restRemaining } from '../workout.js';
+import { firstPlannedIndex, lastDoneIndex, restRemaining, suggestNext, lastSession } from '../workout.js';
 import { unlockAudio } from '../audio.js';
 import { haptic } from '../haptics.js';
 import { $, esc } from './dom.js';
@@ -47,6 +47,9 @@ const el = {};
 const tFor = lang => translator(lang || state.lang);
 const langFor = intent => (state.settings.voiceLang === 'auto' ? intent.lang : state.settings.voiceLang) || state.lang;
 
+// The numbers on the steppers right now (planned set, or what was dialed in).
+const shownValues = ex => suggestNext(ex, lastSession(state.history, ex.exerciseId), state.catalog.get(ex.exerciseId)?.equipment === 'bodyweight' ? 0 : 20);
+
 function parseCtx() {
   const w = state.active;
   const ex = w?.exercises[w.current];
@@ -55,7 +58,7 @@ function parseCtx() {
   return {
     lang: state.settings.voiceLang, unit: state.settings.unit, catalog: state.catalog, usage: state.usage,
     routines: state.routines, workoutExerciseIds: w ? w.exercises.map(e => e.exerciseId) : [],
-    current: ex ? { exerciseId: ex.exerciseId, lastSet: li >= 0 ? ex.sets[li] : null, planned: pi >= 0 ? ex.sets[pi] : null } : null,
+    current: ex ? { exerciseId: ex.exerciseId, lastSet: li >= 0 ? ex.sets[li] : null, planned: pi >= 0 ? ex.sets[pi] : null, shown: shownValues(ex) } : null,
     restRunning: !!(w && restRemaining(w.rest) > 0)
   };
 }
@@ -460,7 +463,7 @@ export function handleText(text, { typed = false } = {}) {
 
 // Hands-free: speech the app overheard. It acts only on what reads as a workout command, or on
 // anything said after "Coach"/"Setline"; everything else (chat, music, the gym) is ignored.
-const HF_OK = new Set(['LogSet', 'LogSets', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
+const HF_OK = new Set(['LogSet', 'LogSets', 'LogRel', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
   'StartRest', 'AdjustRest', 'SkipRest', 'Query', 'AddExercise', 'SwapExercise', 'LogProtein', 'LogBodyweight']);
 export const WAKE = /^\s*(?:hey |hej |ok |okay )?(?:coach|setline|set line|sætlajn)\b[\s,.:!-]*/i;
 export function handleAmbient(text) {
