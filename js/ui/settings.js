@@ -14,7 +14,7 @@ import { num } from '../format.js';
 import { getKey, setKey, mask } from '../keys.js';
 import { VOICES, VOICE_FEEL, DEFAULT_TTS_MODEL, ttsModelId, ttsAlt } from '../settings.js';
 import { testGroqKey } from '../stt.js';
-import { listModels, pickTtsModel, speak, lastSpeech, onSpeaking } from '../tts.js';
+import { listModels, pickTtsModel, speak, lastSpeech, onSpeaking, lastClipWav } from '../tts.js';
 import { unlockAudio } from '../audio.js';
 import { pickTextModels, FALLBACK_MODELS } from '../ai.js';
 
@@ -74,6 +74,7 @@ export function renderSettings(root) {
       <div class="srow"><span class="l"><strong>${t('settings.voiceName')}</strong><small id="speechstat">${esc(speechStatus())}</small></span>
         <span class="stepper"><select class="select" data-set="voice" aria-label="${t('settings.voiceName')}">${VOICES.map(n => `<option value="${n}" ${n === s.voice ? 'selected' : ''}>${n} · ${t('feel.' + VOICE_FEEL[n])}</option>`).join('')}</select>
         <button class="chip" data-act="preview-voice">${t('settings.preview')}</button></span></div>
+      <button class="srow" data-act="save-reply"><span class="l"><strong>${t('settings.saveReply')}</strong><small>${t('settings.saveReplySub')}</small></span>${I.download.replace('class="i"', 'class="i" style="width:20px;height:20px;color:var(--accent)"')}</button>
     </div></div>
 
     <div class="sgroup"><h2>${t('settings.keys')}</h2><div class="slist solid">
@@ -198,6 +199,17 @@ export function initSettings(actions, root) {
       setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
       haptic('success');
       toast({ title: esc(t('backup.exported')) });
+    },
+    'save-reply': () => {
+      const c = lastClipWav();
+      if (!c) { toast({ title: esc(state.t('settings.saveReplyNone')) }); return; }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(c.blob);
+      a.download = `setline-reply-${Date.now()}.wav`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      haptic('tap');
     },
     'backup-import': () => root.querySelector('#backupfile').click(),
     toggle: el => { setSettings({ [el.dataset.key]: !state.settings[el.dataset.key] }); haptic('tap'); },

@@ -62,3 +62,29 @@ test('a soft final syllable is not chopped', () => {
   const clean = cleanSpeech(cat(voice(800), tail, silence(400)), R);
   assert.ok(ms(clean) >= 1040, `kept the soft ending: ${ms(clean)} ms`);
 });
+
+test('a ghost voice after the reply is cut, using how long the text should take', () => {
+  // "Bench press, set 3." ≈ 1.2 s of speech, then a pause and 1.4 s of garbled voice-like audio
+  const text = 'Bench press, set 3.';
+  const clean = cleanSpeech(cat(voice(1200), silence(300), voice(1400, 0.25), silence(200)), R, text);
+  assert.ok(ms(clean) < 1500, `cut after the real speech, got ${ms(clean)} ms`);
+});
+
+test('a quiet ghost after a pause is cut even without the text', () => {
+  const clean = cleanSpeech(cat(voice(1500), silence(260), voice(900, 0.05), silence(100)), R);
+  assert.ok(ms(clean) < 1800, `got ${ms(clean)} ms`);
+});
+
+test('a long real reply with pauses is left whole', () => {
+  const text = 'Nice work today. You beat last week on bench by two and a half kilos, and your squat moved well. Rest up.';
+  // ~7 s of speech with natural pauses
+  const parts = [];
+  for (let i = 0; i < 6; i++) parts.push(voice(1000), silence(220));
+  const clean = cleanSpeech(cat(...parts), R, text);
+  assert.ok(ms(clean) > 7000, `kept all of it: ${ms(clean)} ms`);
+});
+
+test('the reply as received can be saved as a WAV', async () => {
+  const { lastClipWav } = await import('../js/tts.js');
+  assert.equal(lastClipWav(), null);
+});

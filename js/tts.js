@@ -8,6 +8,18 @@ const TIMEOUT = 6000;
 const RATE = 24000;
 
 let current = null;   // {source} | {utter}
+let lastClip = null;  // the last reply as received, for Settings → save audio
+// The last reply exactly as Gemini sent it (a WAV file), so a bad ending can be shared and checked.
+export function lastClipWav() {
+  if (!lastClip) return null;
+  const pcm = new Uint8Array(lastClip.pcm), n = pcm.length - (pcm.length % 2);
+  const buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+  const str = (o, x) => { for (let i = 0; i < x.length; i++) v.setUint8(o + i, x.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVE'); str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, lastClip.rate, true); v.setUint32(28, lastClip.rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, n, true);
+  new Uint8Array(buf, 44).set(pcm.subarray(0, n));
+  return { blob: new Blob([buf], { type: 'audio/wav' }), text: lastClip.text };
+}
 // What spoke last and why, for Settings: {engine: 'gemini'|'device', error: code|null}
 export const lastSpeech = { engine: null, error: null };
 let seq = 0;
@@ -68,7 +80,7 @@ async function synth(text, { key, model, voice }) {
       signal: ctl.signal,
       headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text }] }],
+        contents: [{ parts: [{ text: /[.!?…]["”']?$/.test(text.trim()) ? text.trim() : `${text.trim()}.` }] }], // a clear full stop: models ramble less after one
         generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } }
       })
     });
@@ -90,7 +102,7 @@ export function audioFrom(data) {
 }
 
 // 16-bit PCM → float, skipping a WAV header if one is present. Cleaned up for playback.
-export function pcmToFloat(buf, rate = RATE) {
+export function pcmToFloat(buf, rate = RATE, text = '') {
   const u8 = new Uint8Array(buf);
   const wav = u8.length > 44 && u8[0] === 0x52 && u8[1] === 0x49 && u8[2] === 0x46 && u8[3] === 0x46; // "RIFF"
   const start = wav ? 44 : 0;
@@ -98,13 +110,13 @@ export function pcmToFloat(buf, rate = RATE) {
   const view = new DataView(buf, start, n * 2);
   const out = new Float32Array(n);
   for (let i = 0; i < n; i++) out[i] = view.getInt16(i * 2, true) / 32768;
-  return cleanSpeech(out, rate);
+  return cleanSpeech(out, rate, text);
 }
 
 // The model sometimes ends a clip with a stray thump or burst of noise after the last word.
 // Find where speech really ends, drop a short trailing burst that doesn't sound like speech
 // (very low or noise-like zero-crossing rate), then end on a smooth fade. Pure.
-export function cleanSpeech(x, rate = RATE) {
+export function cleanSpeech(x, rate = RATE, text = '') {
   const n = x.length;
   if (!n) return x;
   let mean = 0;
@@ -131,15 +143,36 @@ export function cleanSpeech(x, rate = RATE) {
     if (last && f - last.end <= 8) last.end = f + 1; else segs.push({ start: f, end: f + 1 });
   }
   const zcr = (a, b) => { let z = 0; for (let i = a + 1; i < b; i++) if ((out[i - 1] < 0) !== (out[i] < 0)) z++; return z / Math.max(1, b - a); };
-  for (let k = 0; k < 2 && segs.length > 1; k++) {
+  const segRms = sg => { let e = 0, c = 0; for (let f = sg.start; f < sg.end; f++) { e += rms[f]; c++; } return e / Math.max(1, c); };
+  // 1. what the model adds after it's done: a short non-voice blip, or a quiet "ghost" after a pause
+  for (let k = 0; k < 3 && segs.length > 1; k++) {
     const last = segs[segs.length - 1], prev = segs[segs.length - 2];
     const len = last.end - last.start, gap = last.start - prev.end;
     const z = zcr(last.start * F, Math.min(n, last.end * F));
     const speechy = z * rate > 300 && z < 0.3; // crossings per second: voice sits well inside this
-    if (gap >= 8 && len <= 40 && !speechy) segs.pop(); else break;
+    const body = segs.slice(0, -1).map(segRms).sort((a, b) => a - b);
+    const typical = body[body.length >> 1] || 0;
+    const ghost = gap >= 20 && len <= 150 && segRms(last) < typical * 0.3;
+    if ((gap >= 8 && len <= 40 && !speechy) || ghost) segs.pop(); else break;
+  }
+  let hardEnd = Infinity;
+  // 2. longer than the text could take: end at the last pause that fits the text
+  if (text && segs.length > 1) {
+    const chars = String(text).length + (String(text).match(/\d/g) || []).length * 4; // numbers take longer to say
+    const expected = chars / 14, allowed = expected * 1.45 + 0.35;
+    const endS = seg => (seg.end * F) / rate;
+    if (endS(segs[segs.length - 1]) > allowed) {
+      let cut = -1;
+      for (let i = 0; i < segs.length - 1; i++) {
+        if (endS(segs[i]) > allowed) break;
+        if (segs[i + 1].start - segs[i].end >= 12 && endS(segs[i]) >= expected * 0.6) cut = i;
+      }
+      if (cut >= 0) segs.length = cut + 1;
+      else if (endS(segs[segs.length - 1]) > expected * 2 + 0.5) hardEnd = Math.round((allowed * rate) / F); // no pause to end on: fade out there
+    }
   }
   let end = n;
-  if (segs.length) end = Math.min(n, (segs[segs.length - 1].end + 18) * F); // keep 180 ms of natural decay
+  if (segs.length) end = Math.min(n, (segs[segs.length - 1].end + 18) * F, hardEnd * F); // keep 180 ms of natural decay
   const clip = out.subarray(0, end);
   const fadeIn = Math.min(clip.length, Math.round(rate * 0.01)), fadeOut = Math.min(clip.length, Math.round(rate * 0.12));
   for (let i = 0; i < fadeIn; i++) clip[i] *= i / fadeIn;
@@ -147,10 +180,11 @@ export function cleanSpeech(x, rate = RATE) {
   return clip;
 }
 
-function playPcm({ pcm, rate }, mine) {
+function playPcm({ pcm, rate }, mine, text = '') {
   const ac = audioContext();
   if (!ac) throw new Error('no audio');
-  const samples = pcmToFloat(pcm, rate || RATE);
+  lastClip = { pcm, rate: rate || RATE, text };
+  const samples = pcmToFloat(pcm, rate || RATE, text);
   const audio = ac.createBuffer(1, Math.max(1, samples.length), rate || RATE);
   audio.getChannelData(0).set(samples);
   return new Promise(res => {
@@ -215,7 +249,7 @@ export async function speak(text, opts) {
       }
       if (mine !== seq || !opts.canSpeak()) return;
       lastSpeech.engine = 'gemini'; lastSpeech.error = null;
-      await playPcm(buf, mine);
+      await playPcm(buf, mine, text);
       return;
     } catch (e) {
       lastSpeech.error = e?.status ? String(e.status) : e?.name === 'AbortError' ? 'timeout' : 'failed';
