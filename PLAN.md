@@ -238,3 +238,9 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] One spacing rhythm on Today and Food: 28 px above a section title, 10 px below, 12 px between cards
 - [x] Copy: no symbols in labels ("Favourited"), and "Your log lives on this phone" instead of claiming everything stays on the phone (voice and Coach go to Groq and Gemini)
 - Kept on purpose: the orb (the app's one bold thing), Manrope (not Inter), the app's own icons, no emoji, no em dashes, glass only where something floats
+
+## 1.14.0: a look over the whole app
+
+- [x] Workout: weight and reps each sit in their own panel with bigger −/+ (they crowded into each other around the ×); the panel you're typing in lights up
+- [x] Settings: rows with a long description or a wide control (reply voice, languages) wrap the control under the label instead of squeezing the label into a thin column
+- [x] Session highlights on every workout (shown right after Finish): "Stronger on 2 of 3 lifts", volume against the last time you did that routine, where the week stands, and each lift's best set against last time (↑ ↓ = or first time), compared by estimated max
