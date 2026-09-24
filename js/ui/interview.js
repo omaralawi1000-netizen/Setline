@@ -1,7 +1,7 @@
 // "Let's get to know you": the Coach asks, you answer out loud (or type), it reacts and asks the
 // next thing it doesn't know yet. Fills the onboarding answers as it goes.
 import { state } from '../store.js';
-import { INTERVIEW_SCHEMA, interviewSystem, interviewPrompt, firstQuestion, mergeHeard } from '../profile.js';
+import { interviewSchema, interviewSystem, interviewPrompt, firstQuestion, mergeHeard } from '../profile.js';
 import { aiPlan, withFallback } from '../ai.js';
 import { coachModels, sttModelId, ttsModelId, ttsAlt } from '../settings.js';
 import { getKey } from '../keys.js';
@@ -13,7 +13,7 @@ import { listenSmart } from './listen.js';
 import { esc } from './dom.js';
 import { I } from './icons.js';
 
-const MAX_TURNS = 14;
+const MAX_TURNS = 24;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // a: the onboarding answers (mutated). onChange(heard: Set) after every turn; onDone() when it wraps up.
@@ -87,7 +87,7 @@ export function mountInterview(root, a, { onChange = () => {}, onDone = () => {}
     c.turns++;
     let raw;
     try {
-      raw = await withFallback(coachModels(state.settings), model => aiPlan({ key: getKey('google'), model, system: interviewSystem(lang), prompt: interviewPrompt(a, c.msgs), schema: INTERVIEW_SCHEMA }));
+      raw = await withFallback(coachModels(state.settings), model => aiPlan({ key: getKey('google'), model, system: interviewSystem(lang), prompt: interviewPrompt(a, c.msgs), schema: interviewSchema(state.catalog) }));
     } catch {
       if (!c.alive) return;
       c.phase = 'idle'; paint();
@@ -97,6 +97,7 @@ export function mountInterview(root, a, { onChange = () => {}, onDone = () => {}
     if (!c.alive) return;
     for (const k of mergeHeard(a, raw)) c.heard.add(k);
     for (const k of raw?.answered || []) a.asked[k] = true;
+    if (Array.isArray(raw?.routines) && raw.routines.length) a.routines = raw.routines.slice(0, 7); // their split, as they told it
     haptic('tap');
     onChange(c.heard);
     c.finished = !!raw?.done || c.turns >= MAX_TURNS;

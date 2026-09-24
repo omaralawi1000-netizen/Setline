@@ -263,33 +263,55 @@ function fallback(text, lang, mine) {
 }
 
 // speak(text, {key, model, voice, lang, canSpeak}) — fire and forget.
+// Longer replies are spoken in two pieces: the first sentence is synthesized on its own so it can
+// start playing while the rest is still being made (the voice starts in about half the time).
+export function splitSpeech(text) {
+  const t = String(text || '').trim();
+  const m = /^(.{12,}?[.!?…])\s+(?=\S)/.exec(t);
+  if (!m || t.length < 70 || t.length - m[0].length < 12) return [t];
+  return [m[1], t.slice(m[0].length)];
+}
+
+async function clip(text, opts) {
+  const cacheKey = `v4|${opts.model}|${opts.voice}|${text}`;
+  let buf = await db.get('ttsCache', cacheKey).catch(() => null);
+  if (buf && !buf.pcm) buf = null;
+  if (buf) return buf;
+  // chosen model, then its runner-up
+  const models = [...new Set([opts.model, ...(opts.alt || [])].filter(Boolean))];
+  let last;
+  for (const model of models) {
+    try { buf = await synth(text, { ...opts, model }); break; } catch (e) { last = e; if (e.status === 400 || e.status === 403) break; }
+  }
+  if (!buf) throw last;
+  db.put('ttsCache', buf, cacheKey).catch(() => {});
+  return buf;
+}
+
 export async function speak(text, opts) {
   if (!text) return;
   stop();
   const mine = ++seq;
-  const cacheKey = `v4|${opts.model}|${opts.voice}|${text}`;
   if (opts.key) {
+    const parts = splitSpeech(text);
+    const jobs = parts.map(p => clip(p, opts));
+    jobs.forEach(j => j.catch(() => {})); // a later piece failing is handled when we get to it
+    let played = 0;
     try {
-      let buf = await db.get('ttsCache', cacheKey).catch(() => null);
-      if (buf && !buf.pcm) buf = null;
-      if (!buf) {
-        // chosen model, then its runner-up
-        const models = [...new Set([opts.model, ...(opts.alt || [])].filter(Boolean))];
-        let last;
-        for (const model of models) {
-          try { buf = await synth(text, { ...opts, model }); break; } catch (e) { last = e; if (e.status === 400 || e.status === 403) break; }
-        }
-        if (!buf) throw last;
-        db.put('ttsCache', buf, cacheKey).catch(() => {});
+      for (let i = 0; i < parts.length; i++) {
+        const buf = await jobs[i];
+        if (mine !== seq || !opts.canSpeak()) return;
+        lastSpeech.engine = 'gemini'; lastSpeech.error = null;
+        await playPcm(buf, mine, parts[i]);
+        played++;
+        if (mine !== seq) return;
       }
-      if (mine !== seq || !opts.canSpeak()) return;
-      lastSpeech.engine = 'gemini'; lastSpeech.error = null;
-      await playPcm(buf, mine, text);
       return;
     } catch (e) {
       lastSpeech.error = e?.status ? String(e.status) : e?.name === 'AbortError' ? 'timeout' : 'failed';
       console.warn('tts fallback', lastSpeech.error);
     }
+    text = parts.slice(played).join(' ');
   } else lastSpeech.error = 'nokey';
   lastSpeech.engine = 'device';
   if (mine !== seq || !opts.canSpeak()) return;

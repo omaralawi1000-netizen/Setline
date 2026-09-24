@@ -60,3 +60,17 @@ test('the interview asks only for what is still missing', () => {
   assert.match(p, /USER: Omar, muscle/);
   assert.ok(INTERVIEW_SCHEMA.required.includes('reply') && INTERVIEW_SCHEMA.properties.goal.enum);
 });
+
+import { interviewSchema } from '../js/profile.js';
+import { createCatalog } from '../js/catalog.js';
+test('the interview asks for the split and locks its exercises to the catalog', () => {
+  const a = { name: 'Omar', goal: 'muscle', level: 'some', days: 5, minutes: 75, equipment: 'gym', injuries: [], cardio: 'some', asked: { injuries: true, age: true, body: true } };
+  assert.match(missingTopics(a).join(), /current split/);
+  a.routines = [{ name: 'Push', exercises: [{ exercise: 'Bench press', sets: 4, reps: 8 }] }];
+  assert.match(missingTopics(a).join(), /rest of their split/);
+  assert.match(interviewPrompt(a, []), /"split":\[\{"name":"Push","exercises":\["Bench press 4x8"\]\}\]/);
+  a.asked.split = true;
+  assert.equal(missingTopics(a).length, 0);
+  const s = interviewSchema(createCatalog());
+  assert.ok(s.properties.routines.items.properties.exercises.items.properties.exercise.enum.includes('Bench press'));
+});

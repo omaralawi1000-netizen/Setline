@@ -134,12 +134,23 @@ export const INTERVIEW_SCHEMA = {
   properties: {
     ...PROFILE_SCHEMA.properties,
     notes: { type: 'STRING', description: 'everything else useful for a coach from the WHOLE conversation so far, in short phrases (preferences, favourite or disliked exercises, schedule, sports, targets, history). Empty if nothing.' },
-    answered: { type: 'ARRAY', items: { type: 'STRING', enum: ['injuries', 'age', 'body', 'cardio'] }, description: 'topics the user has answered so far, even when the answer was "none" or "rather not say"' },
+    answered: { type: 'ARRAY', items: { type: 'STRING', enum: ['injuries', 'age', 'body', 'cardio', 'split'] }, description: 'topics the user has answered so far, even when the answer was "none", "no fixed split" or "rather not say"' },
+    routines: {
+      type: 'ARRAY', description: 'the training days they do NOW, as they described them (the whole split so far, every day with its exercises); empty until they describe it',
+      items: { type: 'OBJECT', properties: { name: { type: 'STRING', description: 'e.g. Push, Pull, Legs, Upper A' }, exercises: { type: 'ARRAY', items: { type: 'OBJECT', properties: { exercise: { type: 'STRING' }, sets: { type: 'INTEGER' }, reps: { type: 'INTEGER' } }, required: ['exercise', 'sets', 'reps'] } } }, required: ['name', 'exercises'] }
+    },
     reply: { type: 'STRING', description: 'what you say next, spoken aloud' },
     done: { type: 'BOOLEAN' }
   },
-  required: ['injuries', 'notes', 'answered', 'reply', 'done']
+  required: ['injuries', 'notes', 'answered', 'routines', 'reply', 'done']
 };
+
+// With the exercise names locked to the catalog, so their split can be saved as routines as-is.
+export function interviewSchema(catalog) {
+  const sch = structuredClone(INTERVIEW_SCHEMA);
+  sch.properties.routines.items.properties.exercises.items.properties.exercise.enum = [...new Set(catalog.all.map(e => e.en))];
+  return sch;
+}
 
 // What the Coach still wants to know, most important first.
 export function missingTopics(a) {
@@ -150,6 +161,8 @@ export function missingTopics(a) {
   if (!a.days) out.push('how many days a week they can train');
   if (!a.minutes) out.push('how long a session can be');
   if (!a.equipment) out.push('where they train / what equipment');
+  if (!a.asked?.split && !a.routines?.length) out.push('their current split: which days they train and the exercises, sets and reps on each day');
+  else if (a.routines?.length && !a.asked?.split) out.push('the rest of their split (days or exercises not described yet), then confirm it');
   if (!a.asked?.injuries && !a.injuries?.length) out.push('injuries or pain');
   if (!a.asked?.age && !a.age) out.push('age');
   if (!a.asked?.body) out.push('height and weight');
@@ -163,13 +176,16 @@ export const interviewSystem = lang => [
   'React briefly and genuinely to what they just said (a few words), then ask ONE question, or two that belong together (height and weight).',
   'Never ask again what you already know. If they give a vague answer, you may ask one natural follow-up.',
   'Also fill the profile fields from everything said so far (null when unknown; convert units; "a couple of years" → some).',
+  'Their split matters most: get each training day and its exercises with sets and reps. Let them list a whole day in one go, and ask about the next day naturally ("and what does leg day look like?"). Map each exercise to the closest name in the list; guess 3 sets of 10 when they do not say.',
+  'Keep routines complete: every day described so far, not only the latest. Mark "split" answered once all their days are covered, or when they have no fixed split.',
   'Set done=true when STILL TO LEARN is empty or they want to stop, and then reply with a short, warm wrap-up that says you\'ll use this for their plan (no question).'
 ].join(' ');
 
 export function interviewPrompt(a, msgs) {
   const known = {
     name: a.name || null, age: a.ageSaid ? a.age : null, sex: a.sex, heightCm: a.heightSaid ? a.height : null, weightKg: a.weightTouched ? a.weight : null,
-    level: a.level, goal: a.goal, days: a.days, minutes: a.minutes, equipment: a.equipment, injuries: a.injuries, cardio: a.cardio, notes: a.notes || ''
+    level: a.level, goal: a.goal, days: a.days, minutes: a.minutes, equipment: a.equipment, injuries: a.injuries, cardio: a.cardio, notes: a.notes || '',
+    split: (a.routines || []).map(r => ({ name: r.name, exercises: r.exercises.map(x => `${x.exercise} ${x.sets}x${x.reps}`) }))
   };
   const talk = msgs.map(m => `${m.who === 'ai' ? 'COACH' : 'USER'}: ${m.text}`).join('\n');
   return `KNOWN SO FAR: ${JSON.stringify(known)}\nSTILL TO LEARN: ${missingTopics(a).join(', ') || 'nothing, wrap up'}\n\nCONVERSATION:\n${talk}`;

@@ -9,6 +9,7 @@ import { toDisplay, fromDisplay } from '../units.js';
 import { weight as fmtW } from '../format.js';
 import { getKey } from '../keys.js';
 import { mountInterview } from './interview.js';
+import { validatePlan, planToRoutines } from '../coach.js';
 import { haptic } from '../haptics.js';
 import { esc } from './dom.js';
 import { I } from './icons.js';
@@ -111,7 +112,8 @@ export function openOnboarding({ edit = false } = {}) {
       }
       if (st.kind === 'plan') {
         const pr = PROGRAMS.find(x => x.id === programFor(profile()));
-        const opts = [getKey('google') && ['coach', t('ob.plan.coach'), t('ob.plan.coach.sub')], ['program', t('ob.plan.program', { name: state.lang === 'da' ? pr.da : pr.en }), t('ob.plan.program.sub', { n: pr.perWeek })], ['keep', t('ob.plan.keep'), t('ob.plan.keep.sub')]].filter(Boolean);
+        const mine = a.routines?.length ? validatePlan({ name: t('ob.plan.mineName'), days: a.routines }, state.catalog) : null;
+        const opts = [mine && ['mine', t('ob.plan.mine'), mine.days.map(d => d.name).join(' · ')], getKey('google') && ['coach', t('ob.plan.coach'), t('ob.plan.coach.sub')], ['program', t('ob.plan.program', { name: state.lang === 'da' ? pr.da : pr.en }), t('ob.plan.program.sub', { n: pr.perWeek })], ['keep', t('ob.plan.keep'), t('ob.plan.keep.sub')]].filter(Boolean);
         return `${q}<div class="obopts">${opts.map(([v, l, sub], k) => `<button class="obopt${a.plan === v ? ' on' : ''}" data-ob="plan" data-v="${v}" style="--i:${k}"><strong>${esc(l)}</strong><small>${esc(sub)}</small><span class="obck">${I.check}</span></button>`).join('')}</div>`;
       }
       // done
@@ -150,7 +152,16 @@ export function openOnboarding({ edit = false } = {}) {
       await save();
       await closeTop();
       haptic('success');
-      if (a.plan === 'coach') { nav.go('coach'); setTimeout(() => nav.ask(planRequest(profile(), state.lang)), 300); }
+      if (a.plan === 'mine') {
+        const plan = validatePlan({ name: t('ob.plan.mineName'), days: a.routines }, state.catalog);
+        if (plan) {
+          await store.replaceRoutines(planToRoutines(plan));
+          toast({ title: esc(t('ob.plan.mineSaved', { n: plan.days.length })) });
+        }
+      } else if (a.plan === 'coach') {
+        const split = a.routines?.length ? ` ${state.lang === 'da' ? 'Min nuværende split' : 'My current split'}: ${a.routines.map(r => `${r.name}: ${r.exercises.map(x => `${x.exercise} ${x.sets}x${x.reps}`).join(', ')}`).join('; ')}.` : '';
+        nav.go('coach'); setTimeout(() => nav.ask(planRequest(profile(), state.lang) + split), 300);
+      }
       else if (a.plan === 'program') {
         const id = programFor(profile());
         const pr = PROGRAMS.find(x => x.id === id);
