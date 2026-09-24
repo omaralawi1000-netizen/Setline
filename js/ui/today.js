@@ -16,9 +16,7 @@ import { cardioIcon, favouriteTypes } from './cardio.js';
 import { muscleBalance, deloadStatus } from '../insights.js';
 import { driveNudgeHTML } from './drive.js';
 import { checkinHTML } from './checkin.js';
-import { scanIcon } from './scan.js';
 import { goalCardsHTML } from './goals.js';
-import { favRowHTML } from './meal.js';
 
 const MIC = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.6 11.5a6.4 6.4 0 0 0 12.8 0M12 18v3"/></svg>';
 const C = 157.08; // ring r=25
@@ -195,15 +193,8 @@ function bodyHTML() {
   const proteinCard = `<div class="mini solid protein foodcard" data-foodscreen role="button" tabindex="0" aria-label="${esc(t('food.title'))}"><span class="label">${t('food.title')} <span class="fgo">→</span></span>
       <div class="prow2"><div class="pring"><svg viewBox="0 0 52 52" aria-hidden="true"><circle class="bg" cx="26" cy="26" r="21"/><circle class="fg" cx="26" cy="26" r="21" style="stroke-dasharray:${R};stroke-dashoffset:${R * (1 - pct)}"/></svg><b>${Math.round(pct * 100)}<small>%</small></b></div>
       <span class="bsub"><strong>${esc(new Intl.NumberFormat(lang === 'da' ? 'da-DK' : 'en-GB').format(Math.abs(kLeft)))}</strong> ${t(kLeft < 0 ? 'food.kcalOver' : 'food.kcalLeft')}<br>${esc(t('food.proteinOf', { g: tot.protein, target: ft.protein }))}</span></div>
-      <div class="padd">${[20, 30, 40].map(g => `<button class="chip" data-body="protein" data-g="${g}">+${g}</button>`).join('')}</div>
     </div>`;
-  const day = state.nutrition.find(n => n.date === dateKey());
-  const meals = day?.meals?.length || 0;
-  const mealRow = `<button class="mealrow solid" data-body="meal"><span class="mcam">${I.camera}</span>
-      <span class="l"><strong>${t('meal.snap')}</strong><span>${meals ? esc(t('meal.todaySub', { n: meals, kcal: day.kcal || 0 })) : t('meal.snapSub')}</span></span>
-      </button>`;
-  const mealWrap = `<div class="mealwrap">${mealRow}<button class="mscanbtn solid" data-body="scan" aria-label="${esc(t('scan.title'))}">${scanIcon}</button></div>`;
-  return `<div class="section"><span class="label">${t('label.body')}</span><button class="textbtn" data-bodyscreen>${t('bodyx.link')} →</button></div><div class="grid2">${weightCard}${proteinCard}</div>${mealWrap}${favRowHTML(4)}`;
+  return `<div class="section"><span class="label">${t('label.body')}</span><button class="textbtn" data-bodyscreen>${t('bodyx.link')} →</button></div><div class="grid2">${weightCard}${proteinCard}</div>`;
 }
 
 function reviewHTML() {

@@ -250,3 +250,14 @@ test('bodyweight, protein and what to lift', () => {
   is('what should I lift', { type: 'Query', what: 'suggest' });
   is('hvad skal jeg løfte', { type: 'Query', what: 'suggest' });
 });
+
+test('a long, natural sentence gives the gist', () => {
+  const catalog = createCatalog();
+  const r = parse('Just started my batch workout. I am on C bar row. I have 80 kilos on. I did 9 reps. Istit Sivarong.', { catalog, lang: 'en', routines: [] });
+  assert.equal(r.type, 'LogSet');
+  assert.deepEqual([r.kg, r.reps, r.exerciseId], [80, 9, 't-bar-row']);
+  const s = parse('start my back workout', { catalog, lang: 'en', routines: [{ id: 'r1', name: 'Back day' }] });
+  assert.deepEqual([s.type, s.routineId], ['StartRoutine', 'r1']);
+  assert.equal(parse('Jeg er i gang med bænkpres. 60 kilo. Jeg lavede 8 gentagelser.', { catalog, lang: 'da' }).exerciseId, 'bench-press');
+  assert.equal(parse('The weather is nice. See you soon.', { catalog, lang: 'en' }).type, 'Unknown', 'chat stays unknown');
+});

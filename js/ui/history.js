@@ -57,8 +57,12 @@ export function renderHistory(root) {
       + (earlier.length ? `<p class="group">${t('history.earlier')}</p><ul class="hlist">${earlier.map(item).join('')}</ul>` : '')
       + (!all.length ? `<p class="none">${t('history.empty')}</p>` : '');
   }
-  root.innerHTML = `<div class="tabtop"></div>
-    <div class="hhead"><h1 class="h1 tabh">${t('history.title')}</h1><button class="iconbtn" data-progress aria-label="${t('progress.title')}">${I.chart}</button></div>${seg}${body}`;
+  root.innerHTML = `<header class="top">
+      <button class="iconbtn" data-act="back" aria-label="${t('common.back')}">${I.back}</button>
+      <div class="ttl"><strong>${t('history.title')}</strong></div>
+      <button class="iconbtn" data-progress aria-label="${t('progress.title')}">${I.chart}</button>
+    </header>
+    <h1 class="h1">${t('history.title')}</h1>${seg}${body}`;
 }
 
 function prLabel(p) {

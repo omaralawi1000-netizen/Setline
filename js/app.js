@@ -39,8 +39,8 @@ import { nextRoutine } from './routines.js';
 import { repeatTemplate } from './insights.js';
 import { animateFigures } from './ui/figure.js';
 
-const TABS = ['today', 'workout', 'coach', 'history'];
-const SUB = ['detail', 'settings', 'routine', 'progress', 'exercise', 'body', 'food'];
+const TABS = ['today', 'workout', 'food', 'coach'];
+const SUB = ['history', 'detail', 'settings', 'routine', 'progress', 'exercise', 'body'];
 const view = { screen: 'today', detailId: null, detailKind: 'workout', parent: 'history' };
 const actions = {};
 const app = $('#app');
@@ -70,7 +70,7 @@ function renderDock() {
   const dock = $('#dock');
   const tab = (name, icon, cls = '') => `<button class="tab${cls}" data-act="go" data-to="${name}">${icon}<span>${t('tab.' + name)}</span></button>`;
   if (!dock.dataset.built || dock.dataset.lang !== state.lang) {
-    dock.innerHTML = '<span class="ind" aria-hidden="true"></span>' + tab('today', I.home) + tab('workout', I.workout) + orbHTML() + tab('coach', I.chat) + tab('history', I.history);
+    dock.innerHTML = '<span class="ind" aria-hidden="true"></span>' + tab('today', I.home) + tab('workout', I.workout) + orbHTML() + tab('food', I.meal) + tab('coach', I.chat);
     dock.dataset.built = '1';
     dock.dataset.lang = state.lang;
   }
@@ -122,7 +122,7 @@ function renderAll() {
 }
 
 // Direction for the transition: tabs by position, sub screens push in from the right.
-const ORDER = { today: 0, workout: 1, coach: 2, history: 3, detail: 4, settings: 4, routine: 4, progress: 4, body: 4, food: 4, exercise: 5 };
+const ORDER = { today: 0, workout: 1, food: 2, coach: 3, history: 4, detail: 5, settings: 4, routine: 4, progress: 5, body: 4, exercise: 6 };
 function show(name, { back = false } = {}) {
   const prev = view.screen;
   view.screen = name;
@@ -173,9 +173,9 @@ function pushSub(name, extra = {}) {
 function showDetail(id, { fromFinish = false, kind = 'workout' } = {}) {
   view.detailKind = kind;
   if (fromFinish) {
-    // After finishing, land in History with the detail on top.
-    history.replaceState({ screen: 'history' }, '');
-    view.screen = 'history';
+    // After finishing, the workout's page sits on top of Today (back goes home).
+    history.replaceState({ screen: 'today' }, '');
+    view.screen = 'today';
   }
   pushSub('detail', { detailId: id, detailKind: kind });
   if (fromFinish) setTimeout(celebrate, 380);
@@ -259,7 +259,8 @@ app.addEventListener('click', e => {
   if (ex) { haptic('tap'); pushSub('exercise', { exerciseId: ex.dataset.ex }); return; }
   if (e.target.closest('[data-progress]')) { haptic('tap'); pushSub('progress'); return; }
   if (e.target.closest('[data-bodyscreen]')) { haptic('tap'); pushSub('body'); return; }
-  if (e.target.closest('[data-foodscreen]') && !e.target.closest('[data-body]')) { haptic('tap'); openFoodDay(); pushSub('food'); return; }
+  if (e.target.closest('[data-foodscreen]') && !e.target.closest('[data-body]')) { haptic('tap'); openFoodDay(); go('food'); return; }
+  if (e.target.closest('[data-historyscreen]')) { haptic('tap'); pushSub('history'); return; }
   const pr = e.target.closest('[data-prange]');
   if (pr) { setRange(Number(pr.dataset.prange)); haptic('tap'); renderScreen('progress'); countAll($('#s-progress'), state.lang); return; }
   const f = e.target.closest('[data-hfilter]');

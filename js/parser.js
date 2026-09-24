@@ -359,7 +359,51 @@ function readZone(s) {
 
 const R = (re, s) => re.exec(s);
 
+// Long, natural sentences ("just started my back workout, I'm on T-bar row, I've got 80 kilos on,
+// did 9 reps") parse as one command when they can; otherwise the gist is pulled out of them.
 export function parse(text, ctx = {}) {
+  const r = parseOne(text, ctx);
+  return r.type === 'Unknown' ? gist(text, ctx, r) || r : r;
+}
+
+const KG_RE = /(\d+(?:\.\d+)?)\s*(kg|kgs|kilo|kilos|kilogram|kilograms|kilo s|kiloer|pounds?|lbs?)\b/;
+const REPS_RE = /(\d+)\s*(reps?|repetitions?|gentagelser|gentagelse|times|gange)\b|\b(?:did|made|got|hit|lavede|tog|fik)\s+(\d+)\b(?!\s*(?:kg|kilo|kilos|pounds|lbs|sets?|sæt))/;
+const CUE_RE = /(?:^|\b)(?:i am on|im on|i m on|i am doing|im doing|doing|now on|on to|onto|moving to|starting with|next is|jeg er på|jeg er i gang med|jeg laver|nu)\s+(?:the\s+|some\s+)?(.+)$/;
+const START_RE = /\b(?:start(?:ed|ing)?|began|begin|kicked off|startede|starter|begyndte)\b.*?\b([a-zæøå]+)?\s*(?:workout|session|day|træning|dag)\b/;
+
+function gist(text, ctx, unknown) {
+  const raw = String(text || '');
+  const parts = raw.split(/[.!?;\n]+|,\s+/).map(x => wordsToNumbers(clean(x), unknown.lang)).filter(Boolean);
+  const all = parts.join(' . ');
+  if (parts.length < 2) { // one clause: only "start(ed) my back workout" is worth guessing at
+    const m1 = START_RE.exec(all);
+    if (!m1 || ctx.active) return null;
+    const rid = m1[1] ? (ctx.routines || []).find(r => normalize(r.name || '').includes(m1[1]))?.id : null;
+    return rid ? { type: 'StartRoutine', routineId: rid, lang: unknown.lang, heard: unknown.heard, gist: true } : { type: 'StartEmpty', lang: unknown.lang, heard: unknown.heard, gist: true };
+  }
+  const out = (type, fields = {}) => ({ type, ...fields, lang: unknown.lang, heard: unknown.heard, gist: true });
+  let kg = null, reps = null, exerciseId = null, routineWord = null;
+  let m;
+  if ((m = KG_RE.exec(all))) kg = /pound|lb/.test(m[2]) || (ctx.unit === 'lb' && !/kg|kilo/.test(m[2])) ? round(lbToKg(Number(m[1])), 4) : Number(m[1]);
+  if ((m = REPS_RE.exec(all))) reps = Number(m[1] || m[3]);
+  // the exercise: a clause that names one after a cue ("I'm on C bar row"), else any clause that is one
+  for (const p of parts) {
+    const c = CUE_RE.exec(p);
+    const phrase = (c ? c[1] : p).replace(/\b\d+(\.\d+)?\b.*$/, '').trim();
+    if (!phrase || phrase.split(' ').length > 5) continue;
+    const hit = matchExercise(phrase, ctx);
+    if (hit?.exerciseId && (c || hit.score >= 60)) { exerciseId = hit.exerciseId; break; }
+  }
+  if ((m = START_RE.exec(all))) routineWord = m[1] || '';
+  const routineId = routineWord ? (ctx.routines || []).find(r => normalize(r.name || '').includes(routineWord))?.id || null : null;
+  if (kg != null && reps && Number.isInteger(reps) && reps > 0 && reps <= 100) return out('LogSet', { kg, reps, count: 1, ...(exerciseId ? { exerciseId } : {}), ...(routineId ? { routineId } : {}) });
+  if (exerciseId) return out('AddExercise', { exerciseId, ...(routineId ? { routineId } : {}) });
+  if (routineId) return out('StartRoutine', { routineId });
+  if (routineWord != null && !ctx.active) return out('StartEmpty');
+  return null;
+}
+
+function parseOne(text, ctx = {}) {
   const heard = String(text || '').trim();
   const base = clean(heard);
   const lang = detectLang(base, ctx.lang);

@@ -45,6 +45,13 @@ export function resolve(intent, snap, t, lang) {
 
   const needWorkout = () => {
     if (w) return null;
+    // clearly training ("I'm on T-bar row, 80 for 9") or nothing to choose from: just start and do it
+    const lifting = ['LogSet', 'LogSets', 'AddExercise'].includes(intent.type) && (intent.exerciseId || intent.routineId);
+    if (lifting || !snap.routines.length) {
+      const r = intent.routineId && snap.routines.find(x => x.id === intent.routineId);
+      const then = { ...intent, routineId: undefined };
+      return resolve(r ? { type: 'StartRoutine', routineId: r.id, then, heard: intent.heard, lang } : { type: 'StartEmpty', then, heard: intent.heard, lang }, snap, t, lang);
+    }
     const choices = snap.routines.map(r => ({ label: routineName(r, lang), intent: { type: 'StartRoutine', routineId: r.id, then: intent } }));
     choices.push({ label: t('today.startEmpty'), intent: { type: 'StartEmpty', then: intent } });
     return cmd('ask', { title: t('voice.noWorkout'), sub: t('voice.noWorkoutSub'), choices, say: say(t('voice.noWorkout')) });

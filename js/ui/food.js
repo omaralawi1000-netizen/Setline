@@ -72,11 +72,8 @@ export function renderFood(root) {
   const maxK = Math.max(tg.kcal * 1.25, ...week.map(d => d.kcal));
   const isToday = date === today;
 
-  root.innerHTML = `<header class="top">
-      <button class="iconbtn" data-act="back" aria-label="${t('common.back')}">${I.back}</button>
-      <div class="ttl"><strong>${t('food.title')}</strong></div><span class="spacer"></span>
-    </header>
-    <div class="fdayrow"><h1 class="h1">${t('food.title')}</h1>
+  root.innerHTML = `<div class="tabtop"></div>
+    <div class="fdayrow"><h1 class="h1 tabh">${t('food.title')}</h1>
       <div class="fday"><button class="iconbtn sm" data-f="day" data-d="-1" aria-label="${t('food.prevDay')}">${I.back}</button><span>${esc(dayLabel(date))}</span>
       <button class="iconbtn sm" data-f="day" data-d="1" aria-label="${t('food.nextDay')}" ${isToday ? 'disabled' : ''}>${I.fwd}</button></div></div>
 
@@ -96,7 +93,8 @@ export function renderFood(root) {
       <button class="ftile" data-f="say" style="--i:2">${I.mic}<span>${t('food.say')}</span></button>
       <button class="ftile" data-f="type" style="--i:3">${I.pen}<span>${t('food.type')}</span></button>
     </div>
-    ${favRowHTML(10)}` : `<button class="btn2 solid fback" data-f="today">${t('food.backToday')}</button>`}
+    ${favRowHTML(10)}
+    <div class="fqp"><span>${t('food.quickProtein')}</span>${[20, 30, 40].map(g => `<button class="chip" data-body="protein" data-g="${g}">+${g} g</button>`).join('')}</div>` : `<button class="btn2 solid fback" data-f="today">${t('food.backToday')}</button>`}
 
     <div class="section"><span class="label">${t('food.water')}</span><span class="fwl">${(tot.water / 1000).toLocaleString(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: 2 })} / ${(tg.water / 1000).toLocaleString(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: 1 })} L</span></div>
     <div class="fwater" style="--n:${Math.min(12, glasses)}">${Array.from({ length: glasses }, (_, i) => `<button class="glass-w${i < full ? ' on' : ''}" data-f="water" data-n="${i + 1}" aria-label="${esc(t('food.glasses', { n: i + 1 }))}" style="--i:${i}"><i></i></button>`).join('')}</div>

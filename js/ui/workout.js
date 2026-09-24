@@ -50,7 +50,7 @@ export function renderWorkout(root) {
   if (!w) {
     ui.restVisible = false;
     root.innerHTML = `<div class="tabtop"></div>
-      <h1 class="greet tabh">${t('workout.noneTitle')}</h1><p class="sub">${t('workout.noneSub')}</p>${startCardsHTML()}`;
+      <div class="hhead"><h1 class="greet tabh">${t('workout.noneTitle')}</h1><button class="iconbtn" data-historyscreen aria-label="${t('history.title')}">${I.history}</button></div><p class="sub">${t('workout.noneSub')}</p>${startCardsHTML()}`;
     return;
   }
 
