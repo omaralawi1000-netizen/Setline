@@ -1,6 +1,7 @@
 // Settings: language, units, rest, voice and keys, haptics, motion, reset.
-import { state, setSettings, resetAll, importBackup } from '../store.js';
-import { makeBackup, validateBackup } from '../backup.js';
+import { state, setSettings, resetAll } from '../store.js';
+import { makeBackup } from '../backup.js';
+import { driveGroupHTML, driveActions, setDriveRender, confirmImport } from './drive.js';
 import { dateKey } from '../body.js';
 import { VERSION } from '../version.js';
 import { LIMITS } from '../workout.js';
@@ -108,6 +109,8 @@ export function renderSettings(root) {
       <div class="srow"><span class="l"><strong>${t('settings.motion')}</strong></span>${seg('motion', ['auto', 'on', 'off'], [t('settings.motion.auto'), t('settings.motion.on'), t('settings.motion.off')])}</div>
     </div></div>
 
+    ${driveGroupHTML()}
+
     <div class="sgroup"><h2>${t('settings.advanced')}</h2><div class="slist solid">
       <div class="srow"><span class="l"><strong>${t('settings.sttModel')}</strong></span>${seg('stt', ['fast', 'accurate'], [t('stt.fast'), t('stt.accurate')])}</div>
       <div class="srow"><span class="l"><strong>${t('settings.coachModel')}</strong><small>${esc(t('settings.modelUsing', { id: s.coachOverride || s.coachModel }))}</small></span></div>
@@ -152,23 +155,9 @@ async function testKey(name, root) {
 }
 
 async function importFile(file) {
-  const { t, lang } = state;
   let obj = null;
   try { obj = JSON.parse(await file.text()); } catch { obj = null; }
-  const v = validateBackup(obj);
-  if (!v.ok) { haptic('error'); toast({ title: esc(t('backup.bad', { why: obj ? v.error : 'JSON' })), error: true, ms: 6000 }); return; }
-  openSheet(el => {
-    el.insertAdjacentHTML('beforeend', `<h2>${t('backup.confirmTitle')}</h2><p class="lead">${esc(t('backup.confirmBody', { w: v.data.workouts.length, c: v.data.cardio.length, date: obj.exportedAt ? new Date(obj.exportedAt).toLocaleDateString(lang === 'da' ? 'da-DK' : 'en-GB') : '?' }))}</p>
-      <div class="acts"><button class="btn2 solid danger" data-k="yes">${I.upload}<span>${t('backup.confirm')}</span></button><button class="btn2 solid" data-k="no">${t('common.cancel')}</button></div>`);
-    el.querySelector('[data-k=no]').onclick = () => closeTop();
-    el.querySelector('[data-k=yes]').onclick = async e => {
-      e.currentTarget.disabled = true;
-      await closeTop();
-      await importBackup(v.data);
-      haptic('success');
-      toast({ title: esc(state.t('backup.done')) });
-    };
-  }, { label: t('backup.confirmTitle') });
+  confirmImport(obj);
 }
 
 export function initSettings(actions, root) {
@@ -180,7 +169,8 @@ export function initSettings(actions, root) {
     const set = e.target.dataset.set;
     if (set) setSettings({ [set]: e.target.value });
   });
-  Object.assign(actions, {
+  setDriveRender(() => { if (root.classList.contains('on')) renderSettings(root); });
+  Object.assign(actions, driveActions, {
     'test-key': el => testKey(el.dataset.k, root),
     'clear-key': el => { setKey(el.dataset.k, ''); delete keyStatus[el.dataset.k]; haptic('tap'); renderSettings(root); },
     'preview-voice': () => {

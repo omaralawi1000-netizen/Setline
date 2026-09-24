@@ -959,3 +959,25 @@ html[data-motion=off] .osay .w{opacity:1;transform:none}
 .mlist .l{flex:1;min-width:0;display:grid;gap:1px}
 .mlist .l strong{font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mlist .l span{font-size:12.5px;color:var(--muted);font-weight:600}
+
+/* ---------- 1.7: Drive backup ---------- */
+.dnudge{margin-top:14px;width:100%;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:22px;text-align:left;border-color:rgba(91,134,255,.28);background:linear-gradient(135deg,rgba(91,134,255,.12),rgba(25,28,37,.72) 60%)}
+.dicon2{width:40px;height:40px;flex:none;border-radius:13px;display:grid;place-items:center;background:rgba(91,134,255,.16);color:#9DB6FF}
+.dnudge .l{flex:1;min-width:0;display:grid;gap:2px}
+.dnudge .l strong{font-size:15px;font-weight:800}
+.dnudge .l span{font-size:12.5px;color:var(--muted);font-weight:600}
+.dnudge .go{color:var(--dim)}
+.dstat{width:34px;height:34px;display:grid;place-items:center;border-radius:11px;background:rgba(255,255,255,.06);color:var(--dim)}
+.dstat.ok{background:rgba(111,227,165,.12);color:#8FEBBB}
+.dstat .i{width:19px;height:19px}
+.dhelp{padding:4px 16px 12px;font-size:13.5px;color:var(--muted)}
+.dhelp summary{cursor:pointer;font-weight:800;color:var(--accent);padding:10px 0;list-style:none}
+.dhelp summary::-webkit-details-marker{display:none}
+.dhelp ol{margin:4px 0 8px;padding-left:20px;display:grid;gap:6px;line-height:1.45}
+.dhelp code{font-size:12.5px;background:rgba(255,255,255,.07);padding:2px 6px;border-radius:6px;color:var(--ink);word-break:break-all}
+.snote.bad{color:var(--danger);padding:0 16px 8px;margin:0}
+.srow .log{margin:0}
+.dfiles{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:8px}
+.dfiles .srow{width:100%;border-radius:18px}
+.dnudge.gone{opacity:0;transform:scale(.96);transition:opacity .3s,transform .3s var(--ease)}
+.srow > svg.i{flex:none}

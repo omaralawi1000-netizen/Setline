@@ -4,6 +4,8 @@ import { volume, doneSetCount, elapsedSec } from '../workout.js';
 import { day, dayLong, time, minutes, total, weight, num } from '../format.js';
 import { esc } from './dom.js';
 import { I } from './icons.js';
+import { driveNudgeHTML } from './drive.js';
+import { dateKey } from '../body.js';
 import { workoutTitle } from './today.js';
 import { cardioName, paceText } from '../cardio.js';
 import { toDisplay } from '../units.js';
@@ -96,6 +98,7 @@ export function renderDetail(root, id) {
     ${w.exercises.map(ex => `<div class="exblock solid"><h3><button data-ex="${esc(ex.exerciseId)}">${esc(state.catalog.name(ex.exerciseId, lang))} <span class="chev">›</span></button></h3><ol>
       ${ex.sets.map((s, k) => `<li><span class="idx">${k + 1}</span><span class="val"><b>${weight(s.kg, state.settings.unit, lang)}</b> ${u()} × <b>${s.reps}</b></span>${prSets.has(s.id) ? `<span class="tag sm">${t('workout.pr')}</span>` : '<span></span>'}</li>`).join('')}
     </ol></div>`).join('')}
+    ${dateKey(w.startedAt) === dateKey() ? driveNudgeHTML() : ''}
     ${w.exercises.length ? `<button class="log again" data-act="repeat-workout" data-id="${esc(w.id)}">${I.play}<span>${t('history.again')}</span></button>
     <p class="hint">${t('history.againSub')}</p>` : ''}`;
 }

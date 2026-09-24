@@ -12,6 +12,7 @@ import { cardioMinutes, cardioName, cardioElapsed, paceText } from '../cardio.js
 import { bodyTrend, proteinTarget, dateKey } from '../body.js';
 import { cardioIcon, favouriteTypes } from './cardio.js';
 import { muscleBalance, deloadStatus } from '../insights.js';
+import { driveNudgeHTML } from './drive.js';
 
 const MIC = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.6 11.5a6.4 6.4 0 0 0 12.8 0M12 18v3"/></svg>';
 const C = 157.08; // ring r=25
@@ -232,6 +233,7 @@ export function renderToday(root) {
     </header>
     <h1 class="greet">${t(greetingKey(hour)).split(' ').map((w, i) => `<span class="gw" style="--i:${i}">${esc(w)}</span>`).join(' ')}</h1>
     <p class="sub${!busy && weekStreak(state.history, state.cardio, state.settings.weeklyGoal).streak ? ' streak' : ''}">${esc(subline())}</p>
+    ${busy ? '' : driveNudgeHTML({ stale: true })}
     ${busy ? '' : deloadHTML()}
     ${busy ? resumeHTML() : upNextHTML()}
     ${busy ? '' : cardioRowHTML()}

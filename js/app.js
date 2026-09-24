@@ -22,6 +22,7 @@ import { setHistoryFilter } from './ui/history.js';
 import { renderProgress, renderExercise, setRange } from './ui/progress.js';
 import { countAll, burst } from './ui/fx.js';
 import { initPress } from './ui/press.js';
+import { autoBackup } from './ui/drive.js';
 import { cardioElapsed, cardioName } from './cardio.js';
 import { weekStart } from './stats.js';
 import { nextRoutine } from './routines.js';
@@ -278,6 +279,7 @@ function scheduleRestAlert() {
 
 store.subscribe(reason => {
   keepAwake(!!state.active || !!state.activeCardio);
+  if (reason === 'finish' || (reason === 'cardio' && !state.activeCardio)) setTimeout(autoBackup, 1500);
   syncGps();
   scheduleRestAlert();
   if (reason === 'draft') return syncNums($('#s-workout'));
@@ -365,6 +367,7 @@ async function boot() {
   initSW();
   ensureModels();
   shortcut();
+  autoBackup();
 }
 
 // Home-screen shortcuts (long-press the icon): ?go=next | cardio | talk
