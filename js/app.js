@@ -14,8 +14,9 @@ import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav } from
 import { renderHistory, renderDetail } from './ui/history.js';
 import { renderSettings, initSettings } from './ui/settings.js';
 import { initVoice, orbHTML, voiceHandlePop, closeVoice, isVoiceOpen } from './ui/voice.js';
+import { renderCoach, initCoach } from './ui/coach.js';
 
-const TABS = ['today', 'workout', 'history'];
+const TABS = ['today', 'workout', 'coach', 'history'];
 const SUB = ['detail', 'settings'];
 const view = { screen: 'today', detailId: null, parent: 'history' };
 const actions = {};
@@ -30,6 +31,7 @@ function renderScreen(name = view.screen) {
   if (name === 'today') renderToday(root);
   else if (name === 'workout') renderWorkout(root);
   else if (name === 'history') renderHistory(root);
+  else if (name === 'coach') renderCoach(root);
   else if (name === 'detail') renderDetail(root, view.detailId);
   else if (name === 'settings') renderSettings(root);
 }
@@ -40,7 +42,7 @@ function renderDock() {
   const dock = $('#dock');
   const tab = (name, icon, cls = '') => `<button class="tab${cls}" data-act="go" data-to="${name}">${icon}<span>${t('tab.' + name)}</span></button>`;
   if (!dock.dataset.built || dock.dataset.lang !== state.lang) {
-    dock.innerHTML = '<span class="ind" aria-hidden="true"></span>' + tab('today', I.home) + tab('workout', I.workout) + orbHTML() + tab('history', I.history, ' wide');
+    dock.innerHTML = '<span class="ind" aria-hidden="true"></span>' + tab('today', I.home) + tab('workout', I.workout) + orbHTML() + tab('coach', I.chat) + tab('history', I.history);
     dock.dataset.built = '1';
     dock.dataset.lang = state.lang;
   }
@@ -78,7 +80,7 @@ function renderAll() {
 }
 
 // Direction for the transition: tabs by position, sub screens push in from the right.
-const ORDER = { today: 0, workout: 1, history: 2, detail: 3, settings: 3 };
+const ORDER = { today: 0, workout: 1, coach: 2, history: 3, detail: 4, settings: 4 };
 function show(name, { back = false } = {}) {
   const prev = view.screen;
   view.screen = name;
@@ -101,6 +103,7 @@ function show(name, { back = false } = {}) {
     s.inert = !on;
   }
   app.classList.toggle('sub', SUB.includes(name));
+  app.classList.toggle('coaching', name === 'coach');
   renderAll();
 }
 
@@ -163,6 +166,7 @@ initWorkout($('#s-workout'), actions);
 initSettings(actions, $('#s-settings'));
 setWorkoutNav({ go, showDetail });
 initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings') });
+initCoach({ openSettings: () => pushSub('settings') });
 
 app.addEventListener('click', e => {
   const el = e.target.closest('[data-act]');
@@ -174,6 +178,7 @@ app.addEventListener('click', e => {
 store.subscribe(reason => {
   keepAwake(!!state.active);
   if (reason === 'draft') return syncNums($('#s-workout'));
+  if (reason === 'chat' && view.screen !== 'coach') return;
   if (reason === 'reset' && isVoiceOpen()) closeVoice();
   // a re-render mid-entrance would restart the stagger; let the entrance end instead
   document.querySelector('.screen.on.enter')?.classList.remove('enter');
@@ -255,3 +260,15 @@ boot();
 
 addEventListener('pageshow', e => { if (e.persisted) renderAll(); });
 addEventListener('resize', () => renderDock());
+
+// Android keeps the layout size when the keyboard opens; lift the composer above it and hide the dock.
+if (globalThis.visualViewport) {
+  const vv = visualViewport;
+  const onVV = () => {
+    const kb = Math.max(0, innerHeight - vv.height - vv.offsetTop);
+    app.style.setProperty('--kb', kb + 'px');
+    app.classList.toggle('kb', kb > 120);
+  };
+  vv.addEventListener('resize', onVV);
+  vv.addEventListener('scroll', onVV);
+}

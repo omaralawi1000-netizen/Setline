@@ -7,8 +7,8 @@ Source: SPEC.md section 7. Work one phase at a time; stop after each and wait fo
 | Phase | Status |
 | --- | --- |
 | 1. Foundation and touch workout loop (no AI) | Done |
-| 2. Voice | Done, awaiting phone test |
-| 3. AI brain and Coach | Not started |
+| 2. Voice | Done (1.2.1 fixes after phone test) |
+| 3. AI brain and Coach | Done, awaiting phone test |
 | 4. Routines and plans | Not started |
 | 5. Progress and extras | Not started |
 
@@ -70,7 +70,22 @@ Decisions made in phase 2:
 
 ## Phase 3: AI brain and Coach
 
-Gemini command fallback, Coach tab, spoken answers, history-aware context, model auto-selection.
+- [x] Model auto-selection on Google key test: newest stable Flash-Lite (commands), Flash not lite/tts/image/live (Coach), Flash-Lite TTS; shown in Advanced with overrides
+- [x] Command fallback: parser misses go to Flash-Lite with JSON schema output and small context; strict validation; 4 s timeout, then "Didn't catch that" with Retry and Edit
+- [x] Local commands never wait on the AI; if state changed meanwhile the AI result comes back as a suggestion to confirm
+- [x] Questions (by voice, typed, or classified by the AI) go to the Coach
+- [x] Coach tab: thread, composer (lifted above the Android keyboard), example questions, streamed answers (SSE), spoken when complete per the spoken-reply setting, stop button, clear chat, persisted in IndexedDB
+- [x] Coach context built locally (~6k tokens max): current workout, per-exercise best/e1RM trend/last 3 sessions, 8 weeks of volume, routines, bodyweight, last 12 turns
+- [x] Coach system prompt per spec (language, voice-friendly, data only, injury guidance)
+- [x] Tests: model choice, SSE parsing, AI intent validation, context, question detection, safe formatting
+
+Fixes shipped alongside (from phone testing of phase 2):
+- Spoken replies read the style prompt aloud: removed; PCM edges faded (the "thud"); sample rate read from the response; old cache cleared (DB v2).
+- Dictation: silence is only judged when the level meter really ran; first mic prompt handled; error codes shown on failures.
+- Orb flight measured from the current state (mid-flight, typing layout, sliding dock); dock orb reappears on landing.
+- Rest card and screen entrances no longer replay on re-render.
+- The app frame could be scrolled sideways by off-stage screens (whole UI shifted ~26px): frame now clips.
+- The app shrank to 128px during workouts (class name clash): fixed in 1.2.0.
 
 ## Phase 4: Routines and plans
 

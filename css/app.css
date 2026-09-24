@@ -10,7 +10,7 @@ svg.i{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* app frame: full screen on the phone, centered column on desktop */
-.app{position:fixed;inset:0;margin:0 auto;max-width:520px;overflow:hidden;isolation:isolate;background:var(--bg)}
+.app{position:fixed;inset:0;margin:0 auto;max-width:520px;overflow:hidden;overflow:clip;isolation:isolate;background:var(--bg)}
 @media (min-width:560px){.app{box-shadow:0 0 0 1px rgba(207,199,255,.08)}}
 
 /* ambient light */
@@ -209,7 +209,6 @@ button.chip:active{transform:scale(.93);background:rgba(198,187,250,.16)}
 .tab svg{width:22px;height:22px;transition:color .3s}
 .tab.on{color:var(--ink)}
 .tab.on svg{color:var(--accent);animation:tabpop .5s var(--ease)}
-.tab.wide{grid-column:span 2;justify-self:center;width:calc(50% - 4px)}
 @keyframes tabpop{40%{transform:translateY(-2px) scale(1.12)}}
 .app.sub .dock,.app.voice .dock{opacity:0;transform:translateY(30px);pointer-events:none}
 
@@ -471,3 +470,45 @@ button.mini:active,button.pr:active{transform:scale(.98)}
 @keyframes fadein{from{opacity:0}}
 @keyframes prpulse{50%{transform:scale(1.5);opacity:.05}}
 .screen:not(.on){pointer-events:none}
+
+/* ---------- coach ---------- */
+.coachhead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.coachhead .h1{margin-top:14px}
+.coachhero{margin-top:18px;padding:22px 18px 18px;border-radius:30px;text-align:center;position:relative}
+.coachhero::before{content:"";position:absolute;left:20%;right:20%;top:8px;height:90px;background:radial-gradient(closest-side,rgba(122,103,242,.35),transparent);filter:blur(14px);z-index:-1;pointer-events:none}
+.coachhero .orb{--s:64px;margin:0 auto 14px}
+.coachhero h2{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.coachhero p{margin-top:6px;font-size:14px;color:var(--muted);font-weight:600;line-height:1.4}
+.exq{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:16px}
+.exq .chip{height:auto;min-height:38px;padding:8px 14px;white-space:normal;text-align:center;color:var(--ink)}
+.thread{list-style:none;margin-top:16px;display:flex;flex-direction:column;gap:10px}
+.msg{display:flex;animation:rise .4s var(--ease)}
+.msg.me{justify-content:flex-end}
+.msg .bub{max-width:86%;padding:11px 14px;border-radius:20px;font-size:15.5px;line-height:1.45;font-weight:600;overflow-wrap:anywhere;-webkit-user-select:text;user-select:text}
+.msg.me .bub{background:rgba(198,187,250,.16);border:1px solid rgba(198,187,250,.22);border-bottom-right-radius:8px}
+.msg.ai .bub{background:rgba(25,28,37,.72);border:1px solid var(--line);border-bottom-left-radius:8px}
+.msg.ai .bub p + p{margin-top:8px}
+.msg.ai .bub ul{margin:6px 0 0 18px}
+.msg.ai .bub b{color:var(--accent)}
+.msg.err .bub{color:var(--muted)}
+.msg.err .chip{margin-top:10px}
+.msg.live .bub > :last-child::after{content:"";display:inline-block;width:7px;height:15px;margin-left:3px;border-radius:2px;background:var(--accent);vertical-align:-2px;animation:blink .8s ease-in-out infinite alternate}
+.dots{display:inline-flex;gap:4px;padding:4px 0}
+.dots i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:dot 1.1s ease-in-out infinite}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes dot{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+.composer{position:absolute;z-index:6;left:16px;right:16px;bottom:calc(var(--dock-bottom) + var(--dock-h) + 10px);height:54px;border-radius:22px;padding:0 6px 0 16px;display:flex;align-items:center;gap:8px;opacity:0;transform:translateY(12px);pointer-events:none;transition:opacity .35s var(--ease),transform .5s var(--ease),bottom .25s var(--ease)}
+.app.coaching:not(.sub):not(.voice) .composer{opacity:1;transform:none;pointer-events:auto}
+.composer input{flex:1;min-width:0;height:100%;outline:none;font-size:16px;font-weight:600}
+.composer input::placeholder{color:var(--dim)}
+.composer button{width:42px;height:42px;border-radius:15px;display:grid;place-items:center;background:linear-gradient(180deg,#D9D0FF,#C6BBFA);color:var(--accent-ink);transition:transform .25s var(--ease)}
+.composer button:active{transform:scale(.92)}
+.composer button svg{width:20px;height:20px;stroke-width:2.4}
+.composer button.stop{background:rgba(255,255,255,.1);color:var(--ink)}
+.app.coaching .screen#s-coach{padding-bottom:calc(var(--dock-bottom) + var(--dock-h) + 84px)}
+.app.coaching.has-mini .composer{bottom:calc(var(--dock-bottom) + var(--dock-h) + 70px)}
+.app.coaching.has-mini #s-coach{padding-bottom:calc(var(--dock-bottom) + var(--dock-h) + 144px)}
+.app.kb .dock,.app.kb .minibar{opacity:0;pointer-events:none;transform:translateY(20px)}
+.app.kb .composer{bottom:calc(var(--kb, 0px) + 10px)}
+.app.kb #s-coach{padding-bottom:calc(var(--kb, 0px) + 80px)}
+.intent .spin2{width:22px;height:22px;border-radius:50%;border:2.5px solid rgba(198,187,250,.25);border-top-color:var(--accent);animation:spin .8s linear infinite}

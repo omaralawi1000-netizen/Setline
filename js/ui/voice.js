@@ -16,6 +16,10 @@ import { haptic } from '../haptics.js';
 import { $, esc } from './dom.js';
 import { I } from './icons.js';
 import { hideToast } from './toast.js';
+import { aiCommand } from '../ai.js';
+import { isQuestion } from '../coach.js';
+import { ask as askCoach } from './coach.js';
+import { cmdModelId } from '../settings.js';
 
 const HOLD_MS = 280;          // shorter press = tap
 const BARS = 27;
@@ -335,7 +339,54 @@ export function handleText(text, { typed = false } = {}) {
   if (card.cmd && !card.committed && card.cmd.kind === 'auto') commitNow(); // a new command lands the previous one
   if (v.open) showWords(text);
   const intent = parse(text, parseCtx());
+  if (intent.type === 'Unknown') {
+    if (isQuestion(text)) return toCoach(text);
+    if (getKey('google')) return aiFallback(text, intent, { typed });
+  }
   present(intent, { typed });
+}
+
+// Questions land in the Coach thread; the answer is streamed there and spoken when complete.
+async function toCoach(text) {
+  dismissCard();
+  if (v.open) { setPhase('result'); await new Promise(r => setTimeout(r, 380)); await closeVoice(); }
+  nav.go('coach');
+  askCoach(text);
+}
+
+// What the parser couldn't read goes to Flash-Lite. Never blocks local commands:
+// if anything changed while it was thinking, the answer comes back as a suggestion.
+let aiSeq = 0;
+const stateSig = () => {
+  const w = state.active;
+  return w ? `${w.id}|${w.current}|${w.exercises.map(e => e.sets.filter(x => x.done).length).join(',')}|${w.rest?.startedAt || 0}` : 'none';
+};
+async function aiFallback(text, parsed, { typed }) {
+  const mine = ++aiSeq;
+  const sig = stateSig();
+  const lang = langFor(parsed);
+  const t = tFor(lang);
+  if (v.open) setPhase('thinking');
+  showCard({ kind: 'wait', icon: 'info', title: t('voice.thinkingAi'), sub: t('voice.heard', { text }), lang, intent: parsed });
+  let intent;
+  try {
+    const ctx = { ...parseCtx(), hasWorkout: !!state.active };
+    intent = await aiCommand(text, ctx, { key: getKey('google'), model: cmdModelId(state.settings) });
+  } catch {
+    intent = null;
+  }
+  if (mine !== aiSeq) return; // a newer AI request superseded this one
+  if (intent?.type === 'question') return toCoach(text);
+  const full = intent ? { ...intent, heard: text, lang: parsed.lang } : parsed;
+  if (card.cmd?.kind === 'auto' && !card.committed) await commitNow();
+  if (!intent || stateSig() === sig) return present(full, { typed });
+  // state moved on: ask before acting
+  const cmd = resolve(full, snapshot(), t, lang);
+  cmd.lang = lang;
+  if (cmd.kind === 'auto') { cmd.kind = 'confirm'; cmd.icon = 'ask'; cmd.sub = t('voice.suggestion'); }
+  speak(cmd.say, lang);
+  showCard(cmd);
+  if (v.open) setPhase('result');
 }
 
 function present(intent, { typed = false } = {}) {
@@ -390,7 +441,8 @@ function showCard(cmd) {
     if (cmd.settings) list.push(btn('settings', t('voice.openSettings')));
     if (cmd.type || (cmd.retry && !cmd.local)) list.push(btn('edit', cmd.local ? t('voice.type') : t('voice.edit')));
     actions = list.length ? `<span class="pair">${list.slice(0, 2).join('')}</span>` : btn('close', '×', 'x');
-  } else actions = btn('close', '×', 'x');
+  } else if (cmd.kind === 'wait') actions = '<span class="spin2" aria-hidden="true"></span>';
+  else actions = btn('close', '×', 'x');
   const chips = cmd.kind === 'ask' && cmd.choices?.length
     ? `<div class="cchips">${cmd.choices.map((ch, i) => `<button class="chip" data-c="choice" data-i="${i}">${esc(ch.label)}</button>`).join('')}</div>` : '';
   const value = cmd.value ? ` <span class="v">${esc(cmd.value)}</span>` : '';

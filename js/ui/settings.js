@@ -12,6 +12,7 @@ import { VOICES, DEFAULT_TTS_MODEL, ttsModelId } from '../settings.js';
 import { testGroqKey } from '../stt.js';
 import { listModels, pickTtsModel, speak } from '../tts.js';
 import { unlockAudio } from '../audio.js';
+import { pickTextModels, FALLBACK_MODELS } from '../ai.js';
 
 const KEYS = {
   groq: { link: 'https://console.groq.com/keys', title: 'settings.groqKey', sub: 'settings.groqSub' },
@@ -83,6 +84,10 @@ export function renderSettings(root) {
 
     <div class="sgroup"><h2>${t('settings.advanced')}</h2><div class="slist solid">
       <div class="srow"><span class="l"><strong>${t('settings.sttModel')}</strong></span>${seg('stt', ['fast', 'accurate'], [t('stt.fast'), t('stt.accurate')])}</div>
+      <div class="srow"><span class="l"><strong>${t('settings.coachModel')}</strong><small>${esc(t('settings.modelUsing', { id: s.coachOverride || s.coachModel }))}</small></span></div>
+      <div class="keyedit"><input data-set="coachOverride" value="${esc(s.coachOverride)}" placeholder="${esc(s.coachModel || FALLBACK_MODELS.coach)}" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="${t('settings.coachModel')}"></div>
+      <div class="srow"><span class="l"><strong>${t('settings.cmdModel')}</strong><small>${esc(t('settings.modelUsing', { id: s.cmdOverride || s.cmdModel }))}</small></span></div>
+      <div class="keyedit"><input data-set="cmdOverride" value="${esc(s.cmdOverride)}" placeholder="${esc(s.cmdModel || FALLBACK_MODELS.command)}" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="${t('settings.cmdModel')}"></div>
       <div class="srow"><span class="l"><strong>${t('settings.ttsModel')}</strong><small>${esc(t('settings.ttsModelSub', { id: s.ttsOverride || s.ttsModel }))}</small></span></div>
       <div class="keyedit"><input data-set="ttsOverride" value="${esc(s.ttsOverride)}" placeholder="${esc(s.ttsModel || DEFAULT_TTS_MODEL)}" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="${t('settings.ttsOverride')}"></div>
     </div></div>
@@ -106,7 +111,10 @@ async function testKey(name, root) {
     try {
       const r = await listModels(key);
       st = r.status;
-      if (st === 'ok') setSettings({ ttsModel: pickTtsModel(r.models, DEFAULT_TTS_MODEL) || '' });
+      if (st === 'ok') {
+        const text = pickTextModels(r.models);
+        setSettings({ ttsModel: pickTtsModel(r.models, DEFAULT_TTS_MODEL) || '', cmdModel: text.command || '', coachModel: text.coach || '' });
+      }
     } catch { st = 'offline'; }
   }
   keyStatus[name] = st;

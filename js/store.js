@@ -22,6 +22,8 @@ export const state = {
   prs: [],         // PR records
   usage: {},       // exerciseId -> number of workouts
   active: null,
+  chat: [],        // coach thread, oldest first
+  bodyweight: [],
   undo: [],
   error: null
 };
@@ -42,9 +44,12 @@ function computeUsage() {
 
 export async function init() {
   applyLang();
-  const [custom, routines, workouts, prs, active] = await Promise.all([
-    db.getAll('exercises'), db.getAll('routines'), db.getAll('workouts'), db.getAll('prs'), db.get('meta', 'activeWorkout')
+  const [custom, routines, workouts, prs, active, chat, bodyweight] = await Promise.all([
+    db.getAll('exercises'), db.getAll('routines'), db.getAll('workouts'), db.getAll('prs'), db.get('meta', 'activeWorkout'),
+    db.getAll('chat'), db.getAll('bodyweight')
   ]);
+  state.chat = chat.sort((a, b) => a.at - b.at);
+  state.bodyweight = bodyweight;
   state.custom = custom;
   state.catalog = createCatalog(custom);
   state.routines = routines;
@@ -136,6 +141,31 @@ export async function discard() {
   emit('discard');
 }
 
+// ---- coach thread ----
+export function addChat(role, text, extra = {}) {
+  const msg = { id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`, role, text, at: Date.now(), ...extra };
+  state.chat = [...state.chat, msg];
+  db.put('chat', msg).catch(() => {});
+  emit('chat');
+  return msg;
+}
+
+// Streaming updates stay in memory; persist once the answer is complete.
+export function updateChat(id, patch, { persist = false, quiet = false } = {}) {
+  const i = state.chat.findIndex(m => m.id === id);
+  if (i === -1) return;
+  const msg = { ...state.chat[i], ...patch };
+  state.chat = state.chat.map((m, k) => (k === i ? msg : m));
+  if (persist) db.put('chat', msg).catch(() => {});
+  if (!quiet) emit('chat');
+}
+
+export async function clearChat() {
+  await db.tx('chat', 'readwrite', s => { s.chat.clear(); });
+  state.chat = [];
+  emit('chat');
+}
+
 export async function addCustomExercise(ex) {
   await db.put('exercises', ex);
   state.custom = [...state.custom, ex];
@@ -161,6 +191,7 @@ export async function resetAll() {
   state.history = [];
   state.prs = [];
   state.custom = [];
+  state.chat = [];
   await init();
   emit('reset');
 }

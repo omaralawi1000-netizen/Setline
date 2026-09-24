@@ -17,5 +17,7 @@ export const I = {
   trash: svg('<path d="M5 7h14M10 7V5h4v2M7 7l.8 12h8.4L17 7"/>'),
   alert: svg('<path d="M12 7.5v5.5M12 16.4v.1"/><circle cx="12" cy="12" r="8.5"/>'),
   play: svg('<path d="M8 6.5v11l9-5.5z"/>'),
+  chat: svg('<path d="M5 18.5V7a2.5 2.5 0 0 1 2.5-2.5h9A2.5 2.5 0 0 1 19 7v6.5a2.5 2.5 0 0 1-2.5 2.5H9.2z"/><path d="M9 9.5h6M9 12.5h3.5"/>'),
+  stop: svg('<rect x="7" y="7" width="10" height="10" rx="2.5"/>'),
   undo: svg('<path d="M9 7 5 11l4 4"/><path d="M5.5 11H14a5 5 0 0 1 0 10h-2"/>')
 };

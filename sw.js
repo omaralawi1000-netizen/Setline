@@ -1,6 +1,6 @@
 // Service worker: precached app shell, runtime cache for Google Fonts.
 // Bump VERSION on every release (keep js/version.js in sync).
-const VERSION = '1.2.1';
+const VERSION = '1.3.0';
 const CACHE = 'setline-' + VERSION;
 const FONTS = 'setline-fonts';
 const SHELL = [
@@ -10,8 +10,10 @@ const SHELL = [
   'css/tokens.css',
   'css/app.css',
   'data/exercises.js',
+  'js/ai.js',
   'js/app.js',
   'js/audio.js',
+  'js/coach.js',
   'js/commands.js',
   'js/keys.js',
   'js/parser.js',
@@ -32,6 +34,7 @@ const SHELL = [
   'js/version.js',
   'js/wakelock.js',
   'js/workout.js',
+  'js/ui/coach.js',
   'js/ui/dom.js',
   'js/ui/icons.js',
   'js/ui/sheet.js',
