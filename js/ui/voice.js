@@ -26,6 +26,9 @@ import { planFor } from './routine.js';
 import { orbPulse } from './fx.js';
 import { ask as askCoach, ensureModels } from './coach.js';
 import { cmdModels } from '../settings.js';
+import { createEndpointer } from '../vad.js';
+
+const endpoint = createEndpointer();
 
 const HOLD_MS = 280;          // shorter press = tap
 const BARS = 27;
@@ -157,6 +160,27 @@ function setPhase(phase) {
 const translateY = node => { const t = getComputedStyle(node).transform; return t && t !== 'none' ? new DOMMatrix(t).m42 : 0; };
 const scaleOf = node => { const t = getComputedStyle(node).transform; return t && t !== 'none' ? new DOMMatrix(t).a : 1; };
 
+// The dock orb and the flying orbs are separate elements running the same blob animations. Line
+// their clocks up before one hands over to the other, so the swap is invisible.
+const dockOrb = () => document.querySelector('#dock .orbbtn .orb');
+function syncOrb(src, dst) {
+  if (!src || !dst) return;
+  const a = src.querySelectorAll('.core, .core b'), b = dst.querySelectorAll('.core, .core b');
+  b.forEach((d, i) => {
+    const from = a[i]?.getAnimations?.() || [], to = d.getAnimations?.() || [];
+    to.forEach((anim, j) => { if (from[j] && from[j].currentTime != null) anim.currentTime = from[j].currentTime; });
+  });
+}
+// land: the flying orb and the dock orb swap in the same frame
+function landOrb(src, after) {
+  const app = document.getElementById('app');
+  syncOrb(src, dockOrb());
+  app.classList.add('orbland');
+  app.classList.remove('orbaway');
+  after?.();
+  requestAnimationFrame(() => requestAnimationFrame(() => app.classList.remove('orbland')));
+}
+
 // FLIP the big orb to/from the dock orb. Works from wherever things are right now,
 // so reopening or closing mid-flight (or from the typing layout) doesn't jump.
 function flyOrb(open, fromEl = null) {
@@ -219,6 +243,7 @@ export function openMini() {
   setPhase('idle');
   document.getElementById('app').classList.add('voice-mini', 'orbaway');
   el.mini.hidden = false;
+  syncOrb(dockOrb(), el.oorb);
   void el.mini.offsetWidth;
   el.mini.classList.add('on');
   flyMini(true);
@@ -240,6 +265,8 @@ function expandFull() {
   el.layer.hidden = false;
   el.layer.inert = false;
   el.orbwrap.style.transform = '';
+  el.orbwrap.style.visibility = '';
+  syncOrb(from, el.orb);
   void el.layer.offsetWidth;
   el.layer.classList.add('on');
   flyOrb(true, from);
@@ -263,6 +290,8 @@ export function openVoice() {
   el.layer.hidden = false;
   el.layer.inert = false;
   el.orbwrap.style.transform = '';
+  el.orbwrap.style.visibility = '';
+  syncOrb(dockOrb(), el.orb);
   void el.layer.offsetWidth;
   el.layer.classList.add('on');
   flyOrb(true);
@@ -286,9 +315,14 @@ export function closeVoice({ fromPop = false } = {}) {
     el.oorb.style.transform = '';
     el.owrap.style.translate = '';
     flyMini(false);
-    const land = () => { if (!v.open) document.getElementById('app').classList.remove('orbaway', 'voice-mini'); };
-    el.owrap.addEventListener('transitionend', land, { once: true });
-    setTimeout(land, reduced() ? 0 : 560);
+    let landed = false;
+    const land = e => {
+      if (landed || v.open || (e && e.propertyName !== 'transform')) return;
+      landed = true;
+      landOrb(el.oorb, () => { el.mini.hidden = true; document.getElementById('app').classList.remove('voice-mini'); });
+    };
+    el.owrap.addEventListener('transitionend', land);
+    setTimeout(() => { el.owrap.removeEventListener('transitionend', land); land(); }, reduced() ? 0 : 640);
     setTimeout(() => { if (!v.open) { el.mini.hidden = true; stopLoop(); el.owrap.style.transform = ''; el.owrap.style.transition = ''; } }, 600);
     if (fromPop || !history.state?.voice) return v.closing || Promise.resolve();
     v.closing = new Promise(res => { v.popWaiting++; v.popResolve = res; history.back(); }).then(() => { v.closing = null; });
@@ -302,10 +336,15 @@ export function closeVoice({ fromPop = false } = {}) {
   document.getElementById('app').classList.remove('voice');
   el.layer.classList.remove('carded');
   // show the dock orb again the moment the flying one lands
-  const land = () => { if (!v.open) document.getElementById('app').classList.remove('orbaway'); };
-  el.orbwrap.addEventListener('transitionend', land, { once: true });
-  setTimeout(land, reduced() ? 0 : 700);
-  setTimeout(() => { if (!v.open) { el.layer.hidden = true; stopLoop(); el.orbwrap.style.transform = ''; } }, 680);
+  let landed = false;
+  const land = e => {
+    if (landed || v.open || (e && (e.target !== el.orbwrap || e.propertyName !== 'transform'))) return;
+    landed = true;
+    landOrb(el.orb, () => { el.orbwrap.style.visibility = 'hidden'; });
+  };
+  el.orbwrap.addEventListener('transitionend', land);
+  setTimeout(() => { el.orbwrap.removeEventListener('transitionend', land); land(); }, reduced() ? 0 : 700);
+  setTimeout(() => { if (!v.open) { el.orbwrap.style.visibility = ''; el.layer.hidden = true; stopLoop(); el.orbwrap.style.transform = ''; } }, 680);
   // only step back over our own entry, never past it (that would leave the app)
   if (fromPop || !history.state?.voice) return v.closing || Promise.resolve();
   v.closing = new Promise(res => { v.popWaiting++; v.popResolve = res; history.back(); }).then(() => { v.closing = null; });
@@ -332,6 +371,10 @@ function startLoop() {
     const target = listening ? mic.level() : 0;
     v.lvl += (target - v.lvl) * (target > v.lvl ? 0.45 : 0.12);
     v.hist[v.histAt = (v.histAt + 1) % v.hist.length] = v.lvl;
+    // tapped to talk: a pause after you've spoken sends it, no second tap needed
+    const dt = v.lastTick ? now - v.lastTick : 0;
+    v.lastTick = now;
+    if (listening && v.toggle && endpoint.push(target, dt)) { endpoint.reset(); finishRec(); }
     if (reduced()) return;
     const l = v.lvl;
     // alive, not mechanical: a slow breath, and a soft squash and stretch that follows the voice
@@ -401,6 +444,7 @@ async function startRec() {
     showCard({ kind: 'info', icon: 'info', title: state.t('voice.micReady'), sub: state.t('voice.micReadySub'), lang: state.lang });
     return;
   }
+  endpoint.reset();
   setPhase('listening');
   if (v.pendingStop) { v.pendingStop = false; finishRec(); }
 }

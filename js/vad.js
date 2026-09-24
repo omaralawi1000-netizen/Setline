@@ -103,3 +103,22 @@ export function toWav(samples, rate, outRate = 16000) {
   }
   return buf;
 }
+
+// Tap-to-talk end of speech, from the display level (0..1) the orb already reads each frame:
+// once you've spoken for a moment, a pause of `endMs` means you're done. The floor follows the
+// room, so a noisy gym doesn't keep it listening forever.
+export function createEndpointer({ endMs = 1000, startMs = 240 } = {}) {
+  let floor = null, heard = 0, quiet = 0;
+  return {
+    push(level, dt) {
+      if (!Number.isFinite(level) || !(dt > 0)) return false;
+      dt = Math.min(dt, 100); // a stalled frame isn't a second of silence
+      floor = floor == null ? level : level < floor ? floor + (level - floor) * 0.3 : floor + (level - floor) * Math.min(1, dt / 4000);
+      const speech = level > Math.max(0.24, floor + 0.16), silent = level < Math.max(0.15, floor + 0.07);
+      if (speech) { heard += dt; quiet = 0; }
+      else if (silent && heard >= startMs) quiet += dt;
+      return heard >= startMs && quiet >= endMs;
+    },
+    reset() { floor = null; heard = 0; quiet = 0; }
+  };
+}

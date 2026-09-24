@@ -1376,3 +1376,4 @@ p.ckwarn{margin:6px 0 0}
 .app.compact:not(.is-sub):not(.voice):not(.kb) .dock{transform:translateY(10px) scale(.9)}
 .dock .ind{transition:transform .6s cubic-bezier(.3,1.25,.5,1),width .6s cubic-bezier(.3,1.25,.5,1),opacity .3s}
 html[data-motion=off] .edge::before,html[data-motion=off] .edge::after{transition:none}
+.app.orbland .orbbtn .orb{transition:none!important}
