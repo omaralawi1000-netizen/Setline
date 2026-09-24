@@ -38,7 +38,7 @@ export function readiness(c, groupsToday = []) {
   if (s != null) parts.push([s, 0.35]);
   if (c.energy != null) parts.push([c.energy, 0.4]);
   const soreHit = (c.sore || []).filter(g => groupsToday.includes(g));
-  if (c.sleepH != null || c.energy != null || c.sore?.length) parts.push([Math.max(1, 5 - (c.sore?.length ? 1 : 0) - soreHit.length * 1.5), 0.25]);
+  if (c.sore?.length) parts.push([Math.max(1, 4 - soreHit.length * 1.5), 0.25]); // only soreness you mention counts
   if (!parts.length) return null;
   const w = parts.reduce((a, [, k]) => a + k, 0);
   const score = Math.max(1, Math.min(5, Math.round(parts.reduce((a, [v, k]) => a + v * k, 0) / w)));

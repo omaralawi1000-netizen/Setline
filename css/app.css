@@ -1072,3 +1072,26 @@ p.ckwarn{margin:6px 0 0}
 .cpt{flex:none;width:52px;height:68px;border-radius:12px;overflow:hidden;border:2px solid transparent;opacity:.6;transition:opacity .25s,border-color .25s}
 .cpt[aria-pressed=true]{border-color:var(--accent);opacity:1}
 .cpt img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* ---------- 1.8: one-tap check-in ---------- */
+.ckq{margin-top:16px;padding:18px 16px 14px;border-radius:26px;display:grid;gap:14px;animation:rise .5s var(--ease)}
+.ckq > strong{font-size:18px;font-weight:800;letter-spacing:-.01em}
+.feel{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.fbtn{display:grid;justify-items:center;gap:6px;padding:10px 0 8px;border-radius:18px;background:rgba(255,255,255,.04);border:1px solid transparent;font-size:12px;font-weight:800;color:var(--muted);transition:background .3s,border-color .3s,color .3s,transform .35s var(--ease)}
+.fbtn .face{width:34px;height:34px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;transition:transform .45s cubic-bezier(.34,1.6,.5,1)}
+.fbtn .face .eye{fill:currentColor;stroke:none}
+.fbtn.f1{color:#FFB38A}.fbtn.f2{color:#FFD9A8}.fbtn.f3{color:#D8D4EE}.fbtn.f4{color:#C6BBFA}.fbtn.f5{color:#8FEBBB}
+.fbtn span{color:var(--muted)}
+.fbtn[aria-pressed=true]{background:rgba(255,255,255,.09);border-color:currentColor}
+.fbtn[aria-pressed=true] .face,.fbtn:active .face{transform:scale(1.15) rotate(-4deg)}
+.ckdone{display:grid;gap:10px;padding:14px 14px 12px 14px}
+.ckdone.arrive{animation:ckarrive .6s cubic-bezier(.34,1.4,.5,1)}
+@keyframes ckarrive{from{opacity:.4;transform:scale(.96)}}
+.ckmain{display:flex;align-items:center;gap:14px}
+.ckring{border-radius:50%}
+.ckadd{display:flex;gap:6px;flex-wrap:wrap}
+.ckadd .chip{height:32px;font-size:13px;color:var(--muted)}
+.ckadd .chip.is-set{color:var(--ink);background:rgba(198,187,250,.12);border-color:rgba(198,187,250,.3)}
+.ckadd .chip[aria-expanded=true]{border-color:rgba(198,187,250,.5)}
+.ckextra{animation:rise .35s var(--ease)}
+.ckextra .chip.done{background:rgba(198,187,250,.18);color:var(--ink)}
