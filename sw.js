@@ -1,6 +1,6 @@
 // Service worker: precached app shell, runtime cache for Google Fonts.
 // Bump VERSION on every release (keep js/version.js in sync).
-const VERSION = '1.25.0';
+const VERSION = '1.26.0';
 const CACHE = 'setline-' + VERSION;
 const FONTS = 'setline-fonts';
 const SHELL = [
@@ -9,6 +9,7 @@ const SHELL = [
   'data/foods-dk.js',
   'js/fooddb.js',
   'js/plateau.js',
+  'js/ui/you.js',
   'js/ui/foodsearch.js',
   'manifest.webmanifest',
   'css/tokens.css',

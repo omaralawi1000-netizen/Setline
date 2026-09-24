@@ -211,6 +211,16 @@ export function isQuestion(text) {
 }
 
 // Minimal, safe formatting for answers: escape, **bold**, line breaks, "- " bullets.
+// Talk mode: a lone word like "Sink." is usually the mic catching a noise (or the speech model
+// guessing at one), not something said to the coach. Real short answers still count.
+const SHORT_REPLIES = /^(yes|yeah|yep|no|nope|ok|okay|sure|thanks|stop|done|next|more|why|how|hi|hello|hey|ja|nej|jo|tak|færdig|næste|mere|hvorfor|hvordan|hej)$/i;
+export function isNoise(text) {
+  const words = String(text || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  if (words.length > 1) return false;
+  return !SHORT_REPLIES.test(words[0]) && !/\d/.test(words[0]);
+}
+
 export function formatAnswer(text) {
   const esc = String(text || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const lines = esc.split('\n');

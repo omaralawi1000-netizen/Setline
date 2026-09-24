@@ -21,6 +21,7 @@ import { cardioName, validateCardio, makeCardioSession, paceText } from './cardi
 import { suggest } from './progression.js';
 import { warmupsFor, pendingWarmup } from './warmup.js';
 import { parseMealLocal } from './fooddb.js';
+import { splitMeal } from './meals.js';
 import { syncTargets, TARGET_LIMITS } from './nutrition.js';
 import { validBodyweight, proteinTarget, dateKey, bodyTrend } from './body.js';
 
@@ -179,8 +180,8 @@ export function resolve(intent, snap, t, lang) {
 
   // a meal worked out (from the food list, or by the AI): logged with Undo like a set
   const mealCommand = (m, slot, heardText) => cmd('auto', {
-    title: m.name, value: `${m.kcal} kcal · ${m.protein} g ${t('food.protein').toLowerCase()}`, sub: t('voice.heard', { text: heardText }),
-    say: say(t('say.meal', { k: m.kcal, p: m.protein })), run: { op: 'meal-log', meal: { name: m.name, kcal: m.kcal, protein: m.protein, carbs: m.carbs || 0, fat: m.fat || 0, source: 'voice', ...(slot ? { slot } : {}) } }
+    title: m.name, value: `${m.kcal} kcal · ${m.protein} g ${t('food.protein').toLowerCase()}`, sub: m.items?.length > 1 ? m.items.map(i => `${i.name} ${i.kcal}`).join(' · ') + ' kcal' : t('voice.heard', { text: heardText }),
+    say: say(t('say.meal', { k: m.kcal, p: m.protein })), run: { op: 'meal-log', meals: splitMeal({ ...m, source: 'voice', ...(slot ? { slot } : {}) }) }
   });
 
   // tick off a warm-up set, and say what comes next (the next warm-up or the first real set)
@@ -552,6 +553,6 @@ export function checkinText(c, t, lang = 'en') {
 function resolveMeal(intent, t, snap, lang) {
   const m = { ...intent.meal, protein: Math.round(intent.meal.protein), kcal: Math.round(intent.meal.kcal), carbs: Math.round(intent.meal.carbs || 0), fat: Math.round(intent.meal.fat || 0) };
   const say = x => (snap.settings.spoken === 'off' ? '' : x);
-  return { kind: 'auto', icon: 'check', title: m.name, value: `${m.kcal} kcal · ${m.protein} g ${t('food.protein').toLowerCase()}`, sub: t('voice.heard', { text: intent.heard || '' }), say: say(t('say.meal', { k: m.kcal, p: m.protein })), choices: null, intent,
-    run: { op: 'meal-log', meal: { name: m.name, kcal: m.kcal, protein: m.protein, carbs: m.carbs || 0, fat: m.fat || 0, source: 'voice', ...(intent.slot ? { slot: intent.slot } : {}) } } };
+  return { kind: 'auto', icon: 'check', title: m.name, value: `${m.kcal} kcal · ${m.protein} g ${t('food.protein').toLowerCase()}`, sub: m.items?.length > 1 ? m.items.map(i => `${i.name} ${Math.round(i.kcal)}`).join(' · ') + ' kcal' : t('voice.heard', { text: intent.heard || '' }), say: say(t('say.meal', { k: m.kcal, p: m.protein })), choices: null, intent,
+    run: { op: 'meal-log', meals: splitMeal({ ...m, source: 'voice', ...(intent.slot ? { slot: intent.slot } : {}) }) } };
 }

@@ -44,6 +44,25 @@ const dayLabel = date => {
 };
 const shiftDate = (date, d) => { const x = new Date(date + 'T12:00'); x.setDate(x.getDate() + d); return dateKey(x.getTime()); };
 
+// Foods logged together sit under one line with the meal's total; each keeps its own row and calories.
+function groupedRows(list, row) {
+  const { t } = state;
+  let out = '';
+  for (let i = 0; i < list.length; i++) {
+    const m = list[i], g = m.group;
+    if (g && list[i - 1]?.group !== g) {
+      const all = list.filter(x => x.group === g);
+      if (all.length > 1) {
+        const k = all.reduce((a, x) => a + x.kcal, 0), p = all.reduce((a, x) => a + x.protein, 0);
+        const at = new Intl.DateTimeFormat(state.lang === 'da' ? 'da-DK' : 'en-GB', { hour: '2-digit', minute: '2-digit' }).format(m.t || Date.now());
+        out += `<li class="fgroup"><span>${esc(t('food.together', { n: all.length, time: at }))}</span><b>${nf().format(k)} kcal · ${p} g</b></li>`;
+      }
+    }
+    out += row(m).replace('<li class="frow', `<li class="frow${g && list.filter(x => x.group === g).length > 1 ? ' ingroup' : ''}`);
+  }
+  return out;
+}
+
 function mealRowHTML(m, fresh, i) {
   const { t } = state;
   return `<li class="frow${fresh ? ' fresh' : ''}" data-meal="${esc(m.id)}" style="--i:${i}">
@@ -132,7 +151,7 @@ export function renderFood(root) {
       const k = slots[s].reduce((a, m) => a + m.kcal, 0);
       const saved = (state.settings.mealTemplates || []).some(x => x.slot === s && x.items.length === slots[s].length && x.items.every((it, j) => it.name === slots[s][j].name));
       return `<div class="section fslot"><span class="label">${t('food.slot.' + s)}</span><span class="fsk">${nf().format(k)} kcal${slots[s].length > 1 && !saved ? `<button class="fsave" data-f="savetpl" data-slot="${s}" aria-label="${esc(t('tpl.save'))}">${BOOKMARK}</button>` : ''}</span></div>
-        <ul class="flist solid">${slots[s].map(m => mealRowHTML(m, seen && !seen.has(m.id), idx++)).join('')}</ul>`;
+        <ul class="flist solid">${groupedRows(slots[s], m => mealRowHTML(m, seen && !seen.has(m.id), idx++))}</ul>`;
     }).join('') : isToday && repeatHTML(slots) ? '' : `<div class="fempty"><span class="fei">${I.meal}</span><strong>${t(isToday ? 'food.emptyToday' : 'food.emptyDay')}</strong><small>${t('food.emptySub')}</small></div>`) + (tot.quickProtein > 0 ? `<p class="fquick">${esc(t('food.quick', { g: tot.quickProtein }))}</p>` : ''),
     week: () => (on('week') ? `    <div class="section"><span class="label">${t('food.week')}</span><span class="fwl">${esc(t('food.avg', { k: nf().format(Math.round(week.filter(d => d.kcal).reduce((a, d) => a + d.kcal, 0) / Math.max(1, week.filter(d => d.kcal).length))) }))}</span></div>
     <div class="fweek solid">

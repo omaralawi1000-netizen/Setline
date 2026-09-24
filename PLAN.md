@@ -346,3 +346,14 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] Orb: tap = the Coach, which grows out of the orb (a circle opening over the tab you're on) and closes back into it (✓ button or Back); everything it said is there to read. Hold = a quick voice command from anywhere (as before). The "Orb: hold/tap" setting is gone
 - [x] Cards open into their page: Food card, Progress / History / Body tiles and past workouts grow into the new screen (shared-element transition; off with Motion: Calm)
 - [x] Haptics matched to motion: a tick for tabs and sheets, a soft double for opening a card or the Coach, a firm press for logging, a drum roll for records
+
+## 1.26.0: one calm look, the orb in the middle, food split into items, smoother everything
+
+- [x] Bar: Today · Train · orb · Food · You, the orb in the middle where the thumb is. The glass now really blurs what's behind it (a view-transition name on the wrapper had cut it off, same for the top edge). Scrolling down, the whole bar scales down from its bottom edge (transform only, nothing re-lays out), labels slip away; the lens stays on its tab
+- [x] You tab: profile card, Progress, Body, History, What your coach knows, Make it yours, Settings
+- [x] Coach: the orb flies from the bar into the message box when it opens and back when it closes (landing spot from the layout, so the moving bar can't skew it); no bounce; Today's numbers don't count up again when you close it
+- [x] Food said together is logged as separate items in one group ("500 g blueberries and 100 g skyr" → two rows with their own kcal and macros under "2 foods · time"), from voice, the Coach box and meal photos; Undo removes the group
+- [x] One look: Motion, Orb style, Bottom bar, Cards, Glow and Dock labels settings removed (glass bar, aurora orb, soft cards, soft glow)
+- [x] Quieter colours: Violet, Slate, Sage, Sand, Clay, Graphite (old colours map to their nearest)
+- [x] Lag: no blur filters in any animation (screens, pop-ups, sheets, coach words, thinking steps), no full-screen blur behind sheets, no blur on every chat bubble; a sheet's content no longer ran a second slide on top of the sheet's own
+- [x] Talk mode: a lone noise word ("Sink.") is ignored and it keeps listening

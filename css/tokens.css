@@ -18,20 +18,14 @@
   --dock-h:72px;
 }
 
-/* accent themes (Settings or Today → Customize). Violet is the default above. */
-html[data-accent=ocean]{--accent:#A8E1FF;--a-rgb:168,225,255;--violet:#3B9EEA;--v-rgb:59,158,234;--blue:#46D2C8;--b-rgb:70,210,200;--accent-ink:#0E2233;
-  --accent-soft:#8CC4E0;--accent-hi:#DDF3FF;--edge:#0D0F15;--orb1:#3C8FEA;--orb2:#1F55B9;--orb3:#0B1F5C;--amb1:#2F7FD0;--amb2:#1FA6A0}
-html[data-accent=jade]{--accent:#B5F2D0;--a-rgb:181,242,208;--violet:#3FCB8A;--v-rgb:63,203,138;--blue:#4FB8FF;--b-rgb:79,184,255;--accent-ink:#0E2A1C;
-  --accent-soft:#92D0AE;--accent-hi:#E0FFEE;--edge:#0D0F15;--orb1:#3FCB8A;--orb2:#1F8A5C;--orb3:#0B3D28;--amb1:#2FA673;--amb2:#1F7FA6}
-html[data-accent=ember]{--accent:#FFD0A8;--a-rgb:255,208,168;--violet:#F2804A;--v-rgb:242,128,74;--blue:#FF5F7A;--b-rgb:255,95,122;--accent-ink:#331A0E;
-  --accent-soft:#E0B08C;--accent-hi:#FFEBDA;--edge:#0D0F15;--orb1:#F28A4A;--orb2:#B9462C;--orb3:#5C1A10;--amb1:#D8653A;--amb2:#B8364F}
-html[data-accent=rose]{--accent:#FFC2DE;--a-rgb:255,194,222;--violet:#E567B0;--v-rgb:229,103,176;--blue:#9A7BFF;--b-rgb:154,123,255;--accent-ink:#33102A;
-  --accent-soft:#E0A2C0;--accent-hi:#FFE3F0;--edge:#0D0F15;--orb1:#E567B0;--orb2:#A83A86;--orb3:#4A1040;--amb1:#C44A94;--amb2:#7A4ADB}
-html[data-accent=gold]{--accent:#FFE3A1;--a-rgb:255,227,161;--violet:#E8A93A;--v-rgb:232,169,58;--blue:#FF8A5B;--b-rgb:255,138,91;--accent-ink:#2E2208;
-  --accent-soft:#E0C98C;--accent-hi:#FFF3D6;--edge:#0D0F15;--orb1:#F0B545;--orb2:#B97A1F;--orb3:#4A300B;--amb1:#C98F2E;--amb2:#B8583A}
-html[data-accent=crimson]{--accent:#FFB3B3;--a-rgb:255,179,179;--violet:#E5484D;--v-rgb:229,72,77;--blue:#FF8A4C;--b-rgb:255,138,76;--accent-ink:#330D0E;
-  --accent-soft:#E09898;--accent-hi:#FFE0E0;--edge:#0D0F15;--orb1:#E5484D;--orb2:#A3232A;--orb3:#45090D;--amb1:#C43A40;--amb2:#B8612F}
-html[data-accent=lime]{--accent:#DDF7A1;--a-rgb:221,247,161;--violet:#9BD93A;--v-rgb:155,217,58;--blue:#3FCBB8;--b-rgb:63,203,184;--accent-ink:#1C2A08;
-  --accent-soft:#BCD68A;--accent-hi:#F0FFD6;--edge:#0D0F15;--orb1:#9BD93A;--orb2:#5E9A1F;--orb3:#23400B;--amb1:#7DB82F;--amb2:#2FA68F}
+/* accent themes (Customize). Quiet, low-saturation tones; violet is the default above. */
+html[data-accent=slate]{--accent:#C9D6E6;--a-rgb:201,214,230;--violet:#6F86A6;--v-rgb:111,134,166;--blue:#8FA9C4;--b-rgb:143,169,196;--accent-ink:#141B25;
+  --accent-soft:#A9B8CB;--accent-hi:#E8EFF7;--edge:#0D0F15;--orb1:#7C93B3;--orb2:#3F5573;--orb3:#161F2D;--amb1:#4E6582;--amb2:#34475F}
+html[data-accent=sage]{--accent:#CFE0CC;--a-rgb:207,224,204;--violet:#7E9B7A;--v-rgb:126,155,122;--blue:#9DB8A6;--b-rgb:157,184,166;--accent-ink:#152015;
+  --accent-soft:#AFC3AB;--accent-hi:#EAF3E8;--edge:#0D0F15;--orb1:#88A683;--orb2:#4B6647;--orb3:#18241A;--amb1:#5B7657;--amb2:#3C5A55}
+html[data-accent=sand]{--accent:#EADCC4;--a-rgb:234,220,196;--violet:#B39A74;--v-rgb:179,154,116;--blue:#C9A98A;--b-rgb:201,169,138;--accent-ink:#241C10;
+  --accent-soft:#CFBFA4;--accent-hi:#F7EFE2;--edge:#0D0F15;--orb1:#BFA47C;--orb2:#7A6443;--orb3:#2A2216;--amb1:#8A7250;--amb2:#6B5840}
+html[data-accent=clay]{--accent:#EDCBBE;--a-rgb:237,203,190;--violet:#B7806E;--v-rgb:183,128,110;--blue:#C99A8E;--b-rgb:201,154,142;--accent-ink:#271512;
+  --accent-soft:#D2ADA0;--accent-hi:#F8E9E3;--edge:#0D0F15;--orb1:#C28874;--orb2:#7E4E40;--orb3:#2B1813;--amb1:#8F5E4F;--amb2:#6E4A4F}
 html[data-accent=mono]{--accent:#ECECF2;--a-rgb:236,236,242;--violet:#9A9CB0;--v-rgb:154,156,176;--blue:#C9CCD8;--b-rgb:201,204,216;--accent-ink:#15161C;
   --accent-soft:#C4C5D0;--accent-hi:#FFFFFF;--edge:#0D0F15;--orb1:#B8BACB;--orb2:#6D7085;--orb3:#23252F;--amb1:#6D7085;--amb2:#3F4252}

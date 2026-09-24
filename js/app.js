@@ -31,6 +31,7 @@ import { autoBackup } from './ui/drive.js';
 import { initHandsFree } from './ui/handsfree.js';
 import { onCheckinClick } from './ui/checkin.js';
 import { renderBody, initBodyScreen, monthly } from './ui/bodyscreen.js';
+import { renderYou } from './ui/you.js';
 import { dateKey } from './body.js';
 import { renderFood, initFood, openFoodDay } from './ui/food.js';
 import { openScanner } from './ui/scan.js';
@@ -43,7 +44,7 @@ import { nextRoutine } from './routines.js';
 import { repeatTemplate } from './insights.js';
 import { animateFigures } from './ui/figure.js';
 
-const TABS = ['today', 'workout', 'food', 'coach'];
+const TABS = ['today', 'workout', 'food', 'you', 'coach'];
 const SUB = ['history', 'detail', 'settings', 'routine', 'progress', 'exercise', 'body'];
 const view = { screen: 'today', detailId: null, detailKind: 'workout', parent: 'history' };
 const actions = {};
@@ -66,6 +67,7 @@ function renderScreen(name = view.screen) {
   else if (name === 'settings') renderSettings(root);
   else if (name === 'body') renderBody(root);
   else if (name === 'food') renderFood(root);
+  else if (name === 'you') renderYou(root);
 }
 
 // Built once; later renders only move the pill and relabel, so the indicator can glide.
@@ -73,11 +75,12 @@ function renderDock() {
   const { t } = state;
   const dock = $('#dock');
   const tab = (name, icon, cls = '') => `<button class="tab${cls}" data-act="go" data-to="${name}">${icon}<span>${t('tab.' + name)}</span></button>`;
-  if (dock.dataset.built !== '3' || dock.dataset.lang !== state.lang) {
+  if (dock.dataset.built !== '4' || dock.dataset.lang !== state.lang) {
     // a glass pill with the three places, and the orb (the Coach) on its own beside it
-    dock.innerHTML = '<div class="dpill"><span class="ind" aria-hidden="true"></span>' + tab('today', TAB_ICONS.today) + tab('workout', TAB_ICONS.workout) + tab('food', TAB_ICONS.food) + '</div>' + orbHTML();
+    // the glass pill: two places either side of the orb (the Coach) in the middle, where the thumb is
+    dock.innerHTML = '<div class="dpill"><span class="ind" aria-hidden="true"></span>' + tab('today', TAB_ICONS.today) + tab('workout', TAB_ICONS.workout) + orbHTML() + tab('food', TAB_ICONS.food) + tab('you', TAB_ICONS.you) + '</div>';
     dock.classList.add('v2');
-    dock.dataset.built = '3';
+    dock.dataset.built = '4';
     dock.dataset.lang = state.lang;
   }
   let on = null;
@@ -141,8 +144,9 @@ function renderAll() {
   document.documentElement.lang = state.lang;
   document.documentElement.dataset.motion = state.settings.motion;
   const glowWas = document.documentElement.dataset.glow;
-  Object.assign(document.documentElement.dataset, { text: state.settings.textSize, glow: state.settings.glow, dock: state.settings.dockLabels ? 'labels' : 'icons', fx: state.settings.fx, orbstyle: state.settings.orbStyle, bar: state.settings.bar, cards: state.settings.cards });
-  if (glowWas !== state.settings.glow) refreshChrome();
+  // one look: liquid glass bar, aurora orb, soft cards, motion that only moves and fades (1.26 dropped the choices)
+  Object.assign(document.documentElement.dataset, { text: state.settings.textSize, glow: 'soft', dock: 'labels', fx: 'wow', orbstyle: 'aurora', bar: 'glass', cards: 'soft' });
+  if (glowWas !== 'soft') refreshChrome();
   configureSteps(state.settings.kgSteps);
   if (document.documentElement.dataset.accent !== state.settings.accent) { document.documentElement.dataset.accent = state.settings.accent; refreshChrome(); }
   renderScreen();
@@ -161,7 +165,7 @@ function renderAll() {
 function heroNav(el, fn) {
   const card = el.closest('.solid, .glass, .ttile, .grid2 > *, .upcoming, .pr, .hitem') || el;
   const vt = document.startViewTransition && document.documentElement.dataset.motion !== 'off' && !matchMedia('(prefers-reduced-motion: reduce)').matches
-    && state.settings.fx !== 'calm' && card.getBoundingClientRect().height < innerHeight * 0.8;
+    && card.getBoundingClientRect().height < innerHeight * 0.8;
   if (!vt) return fn();
   const was = card.style.viewTransitionName;
   card.style.viewTransitionName = 'hero';
@@ -190,13 +194,12 @@ function revealCoach(open, prevEl = null) {
       prevEl.style.transition = 'opacity .15s ease .45s, transform .3s ease .45s, visibility 0s .6s';
       setTimeout(() => { prevEl.style.transition = ''; }, 700);
     }
-    s.animate([{ clipPath: small, filter: 'blur(6px)' }, { clipPath: big, filter: 'blur(0)' }], { duration: 560, easing: 'cubic-bezier(.3,.9,.2,1)' });
+    s.animate([{ clipPath: small }, { clipPath: big }], { duration: 520, easing: 'cubic-bezier(.3,.9,.2,1)' });
   } else {
     // keep it on top and visible while it closes into the orb
     Object.assign(s.style, { opacity: '1', visibility: 'visible', transition: 'none', zIndex: '4' });
     const anim = s.animate([{ clipPath: big }, { clipPath: small, opacity: 0.6 }], { duration: 420, easing: 'cubic-bezier(.5,0,.2,1)' });
     anim.onfinish = anim.oncancel = () => Object.assign(s.style, { opacity: '', visibility: '', transition: '', zIndex: '' });
-    orb.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.18)', offset: 0.85 }, { transform: 'scale(1)' }], { duration: 520, easing: 'ease-out' });
   }
   haptic(open ? 'open' : 'tick');
 }
@@ -207,8 +210,13 @@ function flyOrb(toCoach) {
   if (document.documentElement.dataset.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const dockOrb = $('#dock .orbbtn .orb'), boxOrb = $('#composer .corb .orb');
   if (!dockOrb || !boxOrb) return;
-  // sizes from the layout (not the screen), so a half-shrunk orb never sets the size
-  const at = el => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, s: el.offsetWidth }; };
+  // where each orb sits in the layout, ignoring the dock and message box sliding in or out,
+  // so the copy lands exactly where the real one ends up
+  const at = el => {
+    let x = 0, y = 0;
+    for (let n = el; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }
+    return { x: x + el.offsetWidth / 2, y: y + el.offsetHeight / 2, s: el.offsetWidth };
+  };
   const home = at(dockOrb), box = at(boxOrb);
   const [from, to] = toCoach ? [home, box] : [box, home];
   $('.orbfly')?.remove();
@@ -235,7 +243,7 @@ function flyOrb(toCoach) {
 }
 
 // Direction for the transition: tabs by position, sub screens push in from the right.
-const ORDER = { today: 0, workout: 1, food: 2, coach: 3, history: 4, detail: 5, settings: 4, routine: 4, progress: 5, body: 4, exercise: 6 };
+const ORDER = { today: 0, workout: 1, food: 2, you: 3, coach: 4, history: 4, detail: 5, settings: 4, routine: 4, progress: 5, body: 4, exercise: 6 };
 function show(name, { back = false } = {}) {
   const prev = view.screen;
   view.screen = name;
@@ -251,7 +259,7 @@ function show(name, { back = false } = {}) {
       void s.offsetWidth;
       s.classList.remove('instant');
       s.classList.add('on', 'enter');
-      s._counted = false;
+      s._counted = prev === 'coach'; // back from the Coach: the page was there all along, no count-up
       clearTimeout(s._enter);
       s._enter = setTimeout(() => s.classList.remove('enter'), 800);
     } else if (!on && was) {
@@ -264,6 +272,7 @@ function show(name, { back = false } = {}) {
   const wasCoach = app.classList.contains('coaching');
   if (wasCoach !== (name === 'coach')) revealCoach(name === 'coach', $('#s-' + prev));
   app.classList.toggle('coaching', name === 'coach');
+  if (wasCoach !== (name === 'coach')) flyOrb(name === 'coach');
   if (name === 'coach') { markWeeklySeen(); markDebriefSeen(); }
   requestAnimationFrame(() => app.dispatchEvent(new Event('screenchange')));
   renderAll();
@@ -658,7 +667,7 @@ addEventListener('pointerdown', e => { unlockAudio(); ripple(e); }, { capture: t
 
 // Wow motion: a soft light spreads from where you touch the big buttons and tiles.
 function ripple(e) {
-  if (state.settings.fx !== 'wow' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const host = e.target.closest?.('.log, .ftile, .ttile, .frep, .plopt, .upcoming, .rrow .rmain, .cstart');
   if (!host) return;
   host.dataset.rip = '';

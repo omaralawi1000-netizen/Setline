@@ -78,7 +78,8 @@ export function addMeal(entries, date, meal, now = Date.now(), id = uid()) {
     protein: Math.round(clamp(meal.protein, MEAL_LIMITS.protein)), kcal: Math.round(clamp(meal.kcal, MEAL_LIMITS.kcal)),
     carbs: Math.round(clamp(meal.carbs, MEAL_LIMITS.carbs)), fat: Math.round(clamp(meal.fat, MEAL_LIMITS.fat)),
     source: ['photo', 'barcode'].includes(meal.source) ? meal.source : 'text', ...(validThumb(meal.thumb) ? { thumb: meal.thumb } : {}),
-    ...(['breakfast', 'lunch', 'dinner', 'snack'].includes(meal.slot) ? { slot: meal.slot } : {})
+    ...(['breakfast', 'lunch', 'dinner', 'snack'].includes(meal.slot) ? { slot: meal.slot } : {}),
+    ...(typeof meal.group === 'string' && meal.group.length <= 40 ? { group: meal.group } : {})
   };
   const cur = entries.find(e => e.date === date) || { date, protein: 0 };
   const next = { ...cur, protein: Math.min(1000, (cur.protein || 0) + m.protein), kcal: Math.min(20000, (cur.kcal || 0) + m.kcal), meals: [...(cur.meals || []), m] };
@@ -153,3 +154,14 @@ export function makeTemplate(name, meals, slot = null, id = 't-' + globalThis.cr
   return sanitizeTemplates([{ id, name, slot, items: meals }])[0] || null;
 }
 export const templateTotals = tpl => tpl.items.reduce((a, i) => ({ kcal: a.kcal + i.kcal, protein: a.protein + i.protein }), { kcal: 0, protein: 0 });
+
+// Foods said or photographed together: one entry each (their own calories and macros), tied by a
+// group so they show as one meal. Items without carbs/fat get their share of the meal's by calories.
+export function splitMeal(m, group = 'g-' + globalThis.crypto.randomUUID()) {
+  const items = (m.items || []).filter(i => i && i.name && (i.kcal > 0 || i.protein > 0));
+  if (items.length < 2) return [m];
+  const kc = items.reduce((a, i) => a + (i.kcal || 0), 0) || 1;
+  const share = (k, i) => (i[k] != null ? i[k] : ((m[k] || 0) * (i.kcal || 0)) / kc);
+  const base = { source: m.source, ...(m.slot ? { slot: m.slot } : {}), ...(m.thumb ? { thumb: m.thumb } : {}), group };
+  return items.map(i => ({ ...base, name: i.grams ? `${i.name} · ${i.grams} g` : i.name, kcal: Math.round(i.kcal || 0), protein: Math.round(share('protein', i)), carbs: Math.round(share('carbs', i)), fat: Math.round(share('fat', i)) }));
+}

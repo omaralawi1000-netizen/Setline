@@ -7,7 +7,7 @@ import { splitMemories, hideMemoryTail, addMemories } from '../coach.js';
 import { weekStart } from '../stats.js';
 import { dateKey } from '../body.js';
 import { weight } from '../format.js';
-import { buildContext, chatContents, systemPrompt, formatAnswer, speakable, isPlanRequest, PLAN_SCHEMA, planSchema, planSystem, validatePlan, planToRoutines, isRoutineImport, IMPORT_SCHEMA, importSystem, validateImport } from '../coach.js';
+import { buildContext, chatContents, systemPrompt, formatAnswer, speakable, isPlanRequest, PLAN_SCHEMA, planSchema, planSystem, validatePlan, planToRoutines, isRoutineImport, IMPORT_SCHEMA, importSystem, validateImport, isNoise } from '../coach.js';
 import { getKey } from '../keys.js';
 import { coachModels, ttsModelId, ttsAlt, sttModelId } from '../settings.js';
 import * as tts from '../tts.js';
@@ -310,7 +310,7 @@ export function initCoach(n) {
   // spoken, then it listens again, so it's a conversation. Tap while it listens to send at once;
   // tap while it thinks or speaks (or say nothing) to end it.
   const input = composer.querySelector('input'), orbBtn = composer.querySelector('.corb');
-  const talk = { on: false, l: null };
+  const talk = { on: false, l: null, misses: 0 };
   const setTalk = phase => {
     composer.dataset.talk = phase || '';
     composer.classList.toggle('talking', !!phase);
@@ -333,6 +333,8 @@ export function initCoach(n) {
     orbBtn.style.removeProperty('--lv');
     if (!talk.on) return;
     if (!text) return stopTalk(); // nothing said: the conversation rests
+    if (isNoise(text) && talk.misses < 2) { talk.misses++; return listenTurn(); } // a stray noise: keep listening
+    talk.misses = 0;
     setTalk('thinking');
     await ask(text, { root, voice: true });
     if (!talk.on) return;
@@ -347,6 +349,7 @@ export function initCoach(n) {
     unlockAudio();
     input.blur();
     talk.on = true;
+    talk.misses = 0;
     const typed = input.value.trim();
     if (typed) { input.value = ''; talk.on = true; setTalk('thinking'); ask(typed, { root, voice: true }).then(() => talk.on && setTimeout(listenTurn, 300)); return; }
     listenTurn();

@@ -76,7 +76,8 @@ export function parseMealLocal(text, lang = 'en') {
   }
   const sum = k => Math.round(items.reduce((a, i) => a + i.product.per100[k] * i.grams / 100, 0));
   const label = items.map(i => i.product.name.split(',')[0]).join(', ');
-  return { name: label.charAt(0).toUpperCase() + label.slice(1), kcal: sum('kcal'), protein: sum('protein'), carbs: sum('carbs'), fat: sum('fat'), items };
+  const each = items.map(i => { const k = x => Math.round(i.product.per100[x] * i.grams / 100); return { name: i.product.name.split(',')[0], grams: i.grams, kcal: k('kcal'), protein: k('protein'), carbs: k('carbs'), fat: k('fat') }; });
+  return { name: label.charAt(0).toUpperCase() + label.slice(1), kcal: sum('kcal'), protein: sum('protein'), carbs: sum('carbs'), fat: sum('fat'), items: each };
 }
 
 export const OFF_SEARCH = 'https://world.openfoodfacts.org/cgi/search.pl';

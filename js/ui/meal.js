@@ -1,5 +1,6 @@
 // Meal logging: snap a photo (or describe it) and Gemini estimates protein and calories.
 import * as store from '../store.js';
+import { splitMeal } from '../meals.js';
 import { state } from '../store.js';
 import { aiMeal, withFallback, AiError, nextQuotaReset } from '../ai.js';
 import { coachModels } from '../settings.js';
@@ -166,10 +167,11 @@ export function openMealSheet({ text = '' } = {}) {
       if (k === 'save') {
         const d = s.draft;
         e.target.closest('button').disabled = true;
-        const meal = await store.logMeal({ ...d, source: s.image ? 'photo' : 'text', thumb: s.image?.thumb });
+        // several foods: one entry each, shown together as one meal
+        const logged = await store.logMeals(splitMeal({ ...d, source: s.image ? 'photo' : 'text', thumb: s.image?.thumb }));
         await closeTop();
         haptic('success');
-        toast({ title: `${esc(d.name)} <span class="v">+${d.protein} g</span>`, sub: `${d.kcal} kcal`, action: t('common.undo'), onAction: () => store.deleteMeal(meal.id) });
+        toast({ title: `${esc(d.name)} <span class="v">+${d.protein} g</span>`, sub: `${d.kcal} kcal`, action: t('common.undo'), onAction: () => store.deleteMeals(logged.map(m => m.id)) });
       }
     });
     if (text) { s.text = text; estimate(); } else chooser();

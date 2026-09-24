@@ -68,7 +68,7 @@ export function initChrome() {
     app.dispatchEvent(new Event('dockshape'));
   }, true);
   // the indicator is placed from the laid-out tabs: place it again once the dock has opened
-  dock?.addEventListener('transitionend', e => { if (e.target === dock && e.propertyName === 'grid-template-columns' && !app.classList.contains('compact')) app.dispatchEvent(new Event('dockopen')); });
+  dock?.addEventListener('transitionend', e => { if (e.target === dock && e.propertyName === 'transform' && !app.classList.contains('compact')) app.dispatchEvent(new Event('dockopen')); });
   // Full screen (Settings): the browser only allows it from a tap, so ask on the next one, and
   // again after coming back to the app (Android leaves full screen when the app is left).
   const wantFull = () => {

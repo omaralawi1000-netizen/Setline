@@ -823,7 +823,7 @@ async function execute(run, cmd) {
   if (run.op === 'goal') { addGoal(run.goal); return true; }
   if (run.op === 'checkin') { const r = await store.saveCheckin(run.patch); card.undoOp = { op: 'checkin', prev: r.prev }; return true; }
   if (run.op === 'meal') { dismissCard(); if (v.open) await closeVoice(); openMealSheet({ text: run.text }); return false; }
-  if (run.op === 'meal-log') { const m = await store.logMeal(run.meal); card.undoOp = { op: 'meal-del', id: m.id }; return true; }
+  if (run.op === 'meal-log') { const ms = await store.logMeals(run.meals); card.undoOp = { op: 'meals-del', ids: ms.map(m => m.id) }; return true; }
   if (run.op === 'water') { await store.logWater(run.ml); card.undoOp = { op: 'water', ml: run.ml }; return true; }
   if (run.op === 'targets') { store.setSettings({ foodTargets: run.targets }); card.undoOp = { op: 'targets', prev: state.settings.foodTargets ?? null, was: run.prev }; return true; }
   if (run.op === 'discard') {
@@ -858,6 +858,7 @@ function undoCard() {
   else if (u?.op === 'bw') { if (u.prev == null) store.deleteBodyweight(u.date); else store.logBodyweight(u.prev, u.date); }
   else if (u?.op === 'protein') store.undoProtein(u.grams);
   else if (u?.op === 'meal-del') store.deleteMeal(u.id);
+  else if (u?.op === 'meals-del') store.deleteMeals(u.ids);
   else if (u?.op === 'water') store.logWater(-u.ml);
   else if (u?.op === 'targets') store.setSettings({ foodTargets: u.prev });
   else if (u?.op === 'checkin') store.restoreCheckin(u.prev);

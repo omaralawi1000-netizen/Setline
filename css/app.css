@@ -1233,10 +1233,10 @@ p.ckwarn{margin:6px 0 0}
   @keyframes headmelt{to{opacity:0;transform:translateY(-14px) scale(.97)}}
 }
 
-/* sheets: the page behind dims and blurs a little */
-.scrim{-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
-.sheet .sin{animation:sheetin .5s var(--ease) both}
-@keyframes sheetin{from{opacity:0;transform:translateY(14px)}}
+/* sheets: the page behind dims (a full-screen blur here made every sheet stutter on the phone) */
+.sheet .sin{animation:sinfade .45s var(--ease) both}
+@keyframes sinfade{from{opacity:0}}
+.sheet.glass{-webkit-backdrop-filter:blur(22px) saturate(160%);backdrop-filter:blur(22px) saturate(160%)}
 
 /* ---------- 1.9: onboarding ---------- */
 .sheet.obsheet{top:0;max-height:none;height:100%;border-radius:0;padding:calc(var(--safe-top) + 6px) 22px calc(var(--safe-bottom) + 20px);--gl-fill:rgba(12,14,20,.86)}
@@ -1382,18 +1382,15 @@ html[data-motion=off] .edge::before,html[data-motion=off] .edge::after{transitio
 .custom{display:flex;align-items:center;justify-content:center;gap:8px;margin:26px auto 4px;height:40px;padding:0 16px;border-radius:999px;color:var(--dim);font-size:13px;font-weight:800;background:rgba(255,255,255,.04);border:1px solid var(--line);transition:color .25s,background .25s}
 .custom svg{width:16px;height:16px}
 .custom:active{color:var(--ink);background:rgba(255,255,255,.08)}
-.swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.swatches{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
 .swatch{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 0;border-radius:18px;font-size:11.5px;font-weight:800;color:var(--muted);transition:background .25s,color .25s}
 .swatch i{width:38px;height:38px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25),0 6px 16px -6px rgba(0,0,0,.6);transition:transform .45s cubic-bezier(.3,1.4,.5,1),box-shadow .3s}
 .swatch[data-accent=violet] i{background:radial-gradient(circle at 35% 30%,#E2DBFF,#7A67F2 55%,#3B2CB9)}
-.swatch[data-accent=ocean] i{background:radial-gradient(circle at 35% 30%,#DDF3FF,#3B9EEA 55%,#1F55B9)}
-.swatch[data-accent=jade] i{background:radial-gradient(circle at 35% 30%,#E0FFEE,#3FCB8A 55%,#1F8A5C)}
-.swatch[data-accent=ember] i{background:radial-gradient(circle at 35% 30%,#FFEBDA,#F2804A 55%,#B9462C)}
-.swatch[data-accent=rose] i{background:radial-gradient(circle at 35% 30%,#FFE3F0,#E567B0 55%,#A83A86)}
-.swatch[data-accent=gold] i{background:radial-gradient(circle at 35% 30%,#FFF3D6,#F0B545 55%,#B97A1F)}
-.swatch[data-accent=crimson] i{background:radial-gradient(circle at 35% 30%,#FFE0E0,#E5484D 55%,#A3232A)}
-.swatch[data-accent=lime] i{background:radial-gradient(circle at 35% 30%,#F0FFD6,#9BD93A 55%,#5E9A1F)}
-.swatch[data-accent=mono] i{background:radial-gradient(circle at 35% 30%,#FFFFFF,#B8BACB 55%,#4A4D5E)}
+.swatch[data-accent=slate] i{background:radial-gradient(circle at 35% 30%,#E8EFF7,#6F86A6 55%,#3F5573)}
+.swatch[data-accent=sage] i{background:radial-gradient(circle at 35% 30%,#EAF3E8,#7E9B7A 55%,#4B6647)}
+.swatch[data-accent=sand] i{background:radial-gradient(circle at 35% 30%,#F7EFE2,#B39A74 55%,#7A6443)}
+.swatch[data-accent=clay] i{background:radial-gradient(circle at 35% 30%,#F8E9E3,#B7806E 55%,#7E4E40)}
+.swatch[data-accent=mono] i{background:radial-gradient(circle at 35% 30%,#FFFFFF,#9A9CB0 55%,#4A4C5C)}
 .swatch[aria-pressed=true]{color:var(--ink);background:rgba(255,255,255,.06)}
 .swatch[aria-pressed=true] i{transform:scale(1.1);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35),0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
 /* colour changes glide rather than snap */
@@ -1402,9 +1399,9 @@ html{transition:background-color .4s}
 ::view-transition{pointer-events:none} /* taps go straight through to the new page while cards glide */
 ::view-transition-group(*){animation-duration:.42s;animation-timing-function:cubic-bezier(.2,.9,.25,1)}
 ::view-transition-old(*),::view-transition-new(*){animation-duration:.3s}
-.dock{view-transition-name:dock}
-.edge.et{view-transition-name:edge-top}
-.edge.eb{view-transition-name:edge-bottom}
+/* a view-transition-name cuts an element off from what's behind it, so it goes on the glass itself
+   (never on a wrapper, or the blur inside has nothing to blur); the edges just ride along in the page */
+.dock .dpill{view-transition-name:dock}
 #toast{view-transition-name:toast}
 .minibar{view-transition-name:minibar}
 .uphead{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -1829,7 +1826,6 @@ html[data-dock=icons] .dock .tab span{display:none}
 @keyframes shimmer{from{background-position:120% 0}to{background-position:-100% 0}}
 .msg.ai:not(.is-streaming):not(.seen) .bub{animation:settle .9s ease-out}
 @keyframes settle{0%{box-shadow:0 0 0 1px rgba(var(--a-rgb),.45),0 0 24px -6px rgba(var(--a-rgb),.55)}100%{box-shadow:0 0 0 1px transparent,0 0 0 0 transparent}}
-.msg.ai .bub{backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%)}
 .msg.is-streaming .bub{transition:height .2s}
 
 /* targets that add up: the numbers that followed your change glow for a moment */
@@ -1949,8 +1945,8 @@ html[data-dock=icons] .dock .tab span{display:none}
 .msg.ai.weekly .bub,.msg.ai.plan .bub,.msg.ai.is-err .bub,.msg.ai.stopped .bub{background:rgba(25,28,37,.72);border:1px solid var(--line);padding:12px 15px;border-radius:22px}
 .msg.me .bub{border-radius:22px;border-bottom-right-radius:8px;padding:11px 15px}
 .msg.is-streaming .bub > :last-child::after{display:none}
-.bub .w{display:inline-block;animation:wordin .65s cubic-bezier(.2,.8,.2,1) both}
-@keyframes wordin{0%{opacity:0;filter:blur(9px);transform:translateY(.3em) scale(.96);color:var(--accent-hi);text-shadow:0 0 16px rgba(var(--a-rgb),.9)}55%{opacity:1;filter:blur(0);color:var(--accent-hi);text-shadow:0 0 10px rgba(var(--a-rgb),.35)}100%{opacity:1;filter:none;transform:none}}
+.bub .w{display:inline-block;animation:wordin .5s cubic-bezier(.2,.8,.2,1) both}
+@keyframes wordin{0%{opacity:0;transform:translateY(.35em)}100%{opacity:1;transform:none}}
 .msg.ai:not(.is-streaming):not(.seen) .bub{animation:none}
 
 /* thinking: the bubble gets a glow that runs round its edge, the orb breathes, the steps change */
@@ -1958,14 +1954,14 @@ html[data-dock=icons] .dock .tab span{display:none}
 .msg.ai.is-thinking .bub{position:relative;isolation:isolate;padding:12px 16px;border-radius:24px;background:rgba(22,24,33,.7);max-width:max-content}
 .msg.ai.is-thinking .bub::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;background:conic-gradient(from var(--ang),rgba(var(--a-rgb),0) 0 15%,var(--accent) 30%,var(--blue) 45%,rgba(var(--a-rgb),0) 62% 100%);
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);animation:angspin 2.2s linear infinite;pointer-events:none}
-.msg.ai.is-thinking .bub::after{content:"";position:absolute;inset:-14px;border-radius:34px;background:radial-gradient(closest-side,rgba(var(--v-rgb),.4),transparent);filter:blur(16px);z-index:-1;animation:breathe 2.4s ease-in-out infinite;pointer-events:none}
+.msg.ai.is-thinking .bub::after{content:"";position:absolute;inset:-14px;border-radius:34px;background:radial-gradient(closest-side,rgba(var(--v-rgb),.32),transparent);z-index:-1;animation:breathe 2.4s ease-in-out infinite;pointer-events:none}
 @keyframes angspin{to{--ang:360deg}}
 .think{display:inline-flex;align-items:center;gap:11px}
 .think .orb{--s:24px}
 .think .tsteps{display:grid;min-width:170px}
 .think .tl{grid-area:1/1;opacity:0;font-weight:700;background:linear-gradient(90deg,var(--muted) 0%,var(--ink) 45%,var(--muted) 90%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
   animation:shimmer 1.8s linear infinite,stepcycle 8s ease infinite;animation-delay:0s,calc(var(--i) * 2s)}
-@keyframes stepcycle{0%{opacity:0;transform:translateY(7px);filter:blur(4px)}5%,21%{opacity:1;transform:none;filter:none}26%,100%{opacity:0;transform:translateY(-7px);filter:blur(4px)}}
+@keyframes stepcycle{0%{opacity:0;transform:translateY(7px)}5%,21%{opacity:1;transform:none}26%,100%{opacity:0;transform:translateY(-7px)}}
 
 /* ---------- 1.23: the top edge ---------- */
 /* the status bar's colour at the very top, melting into the glow within a finger's width */
@@ -2020,13 +2016,13 @@ html[data-dock=icons] .dock .tab span{display:none}
 /* ---------- 1.24: motion levels (Customize → Motion) ---------- */
 /* Wow: things arrive out of a soft blur with a little spring, icons bounce, presses ripple */
 html[data-fx=wow] .screen.enter > *:nth-child(-n+7){animation:risewow .62s cubic-bezier(.2,.9,.25,1) both}
-@keyframes risewow{from{opacity:0;transform:translateY(22px) scale(.965);filter:blur(10px)}60%{filter:blur(0)}}
+@keyframes risewow{from{opacity:0;transform:translateY(22px) scale(.965)}}
 html[data-fx=wow] .tab.on svg.ti{animation:tabbounce .62s cubic-bezier(.3,1.7,.45,1)}
 @keyframes tabbounce{0%{transform:scale(.72) translateY(3px)}55%{transform:scale(1.16) translateY(-2px)}100%{transform:translateY(-1px) scale(1.06)}}
 html[data-fx=wow] :is(.toast,.intent).show{animation:popin .55s cubic-bezier(.25,1.4,.45,1)}
-@keyframes popin{from{opacity:0;transform:translateY(22px) scale(.9);filter:blur(8px)}}
+@keyframes popin{from{opacity:0;transform:translateY(22px) scale(.9)}}
 html[data-fx=wow] .sheet.show{animation:sheetin .6s cubic-bezier(.2,1.1,.3,1)}
-@keyframes sheetin{from{transform:translateY(40%) scale(.96);filter:blur(6px)}}
+@keyframes sheetin{from{transform:translateY(40%) scale(.97)}}
 html:not([data-fx=calm]) :is(.solid,.glass,.ftile,.ttile,.chip,.btn2,.log):active{transform:scale(.97);transition:transform .12s ease-out}
 html:not([data-fx=calm]) :is(.solid,.glass,.ftile,.ttile,.chip,.btn2,.log){transition:transform .45s cubic-bezier(.3,1.6,.45,1)}
 .rip{position:absolute;border-radius:50%;pointer-events:none;background:radial-gradient(closest-side,rgba(255,255,255,.35),rgba(255,255,255,0));transform:scale(0);animation:rip .6s cubic-bezier(.2,.8,.2,1) forwards;z-index:0}
@@ -2059,43 +2055,36 @@ html[data-bar=minimal] .edge.eb::after{opacity:1}
 html[data-cards=glass] .screen :is(.solid,.glass){background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(255,255,255,.02) 50%),rgba(24,26,36,.42);-webkit-backdrop-filter:blur(18px) saturate(150%);backdrop-filter:blur(18px) saturate(150%);border:1px solid rgba(255,255,255,.09)}
 html[data-cards=outline] .screen :is(.solid,.glass){background:transparent;border:1px solid rgba(255,255,255,.12);box-shadow:none}
 
-/* ======================= 1.25: the bar, rebuilt =======================
-   A glass pill with Today / Train / Food and the orb (the Coach) as its own round button beside it.
-   Scrolling down it shrinks: the pill gets shorter and narrower, labels slip away, icons get small,
-   the orb shrinks with it. One spring for every part, so it moves as one piece. */
-@property --orb-d{syntax:'<length>';inherits:true;initial-value:68px}
-@property --pill-w{syntax:'<length-percentage>';inherits:true;initial-value:100%}
-.dock.v2{--sp:cubic-bezier(.34,1.26,.5,1);--orb-d:68px;display:flex;align-items:center;justify-content:center;gap:10px;
-  left:16px;right:16px;height:var(--dock-h);padding:0;grid-template-columns:none;
+/* ======================= 1.26: the bar =======================
+   One glass pill: Today, Train, the orb (the Coach) in the middle where the thumb is, Food, You.
+   Scrolling down it shrinks as one piece (a scale, nothing re-lays out), so it can't stutter or
+   leave the highlight behind: labels slip away and the icons get small. */
+.dock.v2{display:block;left:16px;right:16px;height:var(--dock-h);padding:0;transform-origin:50% 100%;
   background:none!important;border:0!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;
-  transition:opacity .35s var(--ease),transform .55s var(--sp),--orb-d .6s var(--sp)}
-.dock.v2 .dpill{position:relative;flex:none;width:calc(100% - var(--orb-d) - 10px);height:var(--dock-h);border-radius:36px;display:flex;align-items:center;padding:0 7px;isolation:isolate;
-  background:radial-gradient(90% 120% at 50% -30%,rgba(255,255,255,.16),rgba(255,255,255,0) 60%) padding-box,linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,0) 50%,rgba(0,0,0,.08)) padding-box,linear-gradient(rgba(18,20,28,.66),rgba(18,20,28,.66)) padding-box,linear-gradient(170deg,rgba(255,255,255,.5),rgba(255,255,255,.08) 28%,rgba(255,255,255,.03) 60%,rgba(var(--a-rgb),.35)) border-box;
-  border:1px solid transparent;-webkit-backdrop-filter:blur(26px) saturate(210%) brightness(1.08);backdrop-filter:blur(26px) saturate(210%) brightness(1.08);
-  box-shadow:0 22px 44px -14px rgba(0,0,0,.8),0 6px 14px -6px rgba(0,0,0,.5),inset 0 1px 1px rgba(255,255,255,.28),inset 0 -16px 26px -20px rgba(var(--v-rgb),.45);
-  transition:width .6s var(--sp),height .6s var(--sp),border-radius .6s var(--sp),padding .6s var(--sp)}
-.dock.v2 .tab{flex:1;min-width:0;height:58px;margin:0;border-radius:26px;background:none;opacity:1;pointer-events:auto;transition:height .6s var(--sp),color .3s}
-.dock.v2 .tab span{max-height:14px;overflow:hidden;transition:opacity .25s,transform .5s var(--sp),max-height .5s var(--sp)}
-.dock.v2 .tab svg.ti{transition:transform .6s var(--sp),color .3s}
+  transition:opacity .35s var(--ease),transform .6s cubic-bezier(.32,1.2,.5,1)}
+.dock.v2 .dpill{position:relative;width:100%;height:100%;border-radius:36px;display:grid;grid-template-columns:1fr 1fr 84px 1fr 1fr;align-items:center;padding:0 6px;isolation:isolate;
+  background:radial-gradient(90% 120% at 50% -30%,rgba(255,255,255,.15),rgba(255,255,255,0) 60%) padding-box,linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,0) 50%,rgba(0,0,0,.08)) padding-box,linear-gradient(rgba(18,20,28,.58),rgba(18,20,28,.58)) padding-box,linear-gradient(170deg,rgba(255,255,255,.46),rgba(255,255,255,.07) 28%,rgba(255,255,255,.03) 60%,rgba(var(--a-rgb),.3)) border-box;
+  border:1px solid transparent;-webkit-backdrop-filter:blur(24px) saturate(190%);backdrop-filter:blur(24px) saturate(190%);
+  box-shadow:0 22px 44px -14px rgba(0,0,0,.8),0 6px 14px -6px rgba(0,0,0,.5),inset 0 1px 1px rgba(255,255,255,.26),inset 0 -16px 26px -20px rgba(var(--v-rgb),.4)}
+.dock.v2 .tab{height:58px;margin:0 2px;border-radius:26px;background:none;opacity:1;pointer-events:auto}
+.dock.v2 .tab span{transition:opacity .22s,transform .45s cubic-bezier(.32,1.2,.5,1)}
+.dock.v2 .tab svg.ti{transition:transform .5s cubic-bezier(.32,1.3,.5,1),color .3s}
 .dock.v2 .ind{top:7px;bottom:7px;height:auto;border-radius:26px;opacity:1}
-.dock.v2 .orbbtn{position:relative;flex:none;width:var(--orb-d);height:var(--orb-d);margin:0;border-radius:50%;transform:none;opacity:1;pointer-events:auto;transition:transform .35s var(--sp)}
-.dock.v2 .orbbtn::before{inset:0;opacity:1;background:radial-gradient(90% 90% at 50% 0%,rgba(255,255,255,.18),rgba(255,255,255,0) 60%),rgba(18,20,28,.6);border:1px solid rgba(255,255,255,.14);box-shadow:0 18px 36px -12px rgba(0,0,0,.8),inset 0 1px 1px rgba(255,255,255,.25)}
-.dock.v2 .orbbtn .orb{--s:calc(var(--orb-d) - 16px)}
-.dock.v2 .orbbtn.pressing{transform:scale(.9)}
-.dock.v2 .orbbtn:active{transform:scale(.9)}
-/* shrunk */
-.app.compact:not(.is-sub):not(.voice):not(.kb) .dock.v2{left:16px;right:16px;height:var(--dock-h);padding:0;--orb-d:50px;grid-template-columns:none}
-.app.compact .dock.v2 .dpill{width:156px;height:50px;padding:0 4px;border-radius:26px}
-.app.compact .dock.v2 .tab{height:42px;border-radius:21px;opacity:1;pointer-events:auto;background:none;box-shadow:none}
-.app.compact .dock.v2 .tab span{opacity:0;max-height:0;transform:translateY(5px) scale(.8)}
-.app.compact .dock.v2 .tab svg.ti,.app.compact .dock.v2 .tab.on svg.ti{transform:scale(.8)}
-.app.compact .dock.v2 .ind{opacity:1!important;top:4px;bottom:4px;border-radius:21px}
-.app.compact .dock.v2 .orbbtn{transform:none;margin:0}
+.dock.v2 .orbbtn{justify-self:center;width:74px;height:74px;margin-top:-28px;border-radius:50%;transform:none;opacity:1;pointer-events:auto;transition:transform .35s cubic-bezier(.3,1.5,.5,1),opacity .2s}
+.dock.v2 .orbbtn::before{inset:-2px;opacity:1}
+.dock.v2 .orbbtn .orb{--s:60px}
+.dock.v2 .orbbtn.pressing,.dock.v2 .orbbtn:active{transform:scale(.9)}
+/* shrunk: the whole bar scales down from its bottom edge; labels go, icons settle in the middle */
+.app.compact:not(.is-sub):not(.voice):not(.kb) .dock.v2{left:16px;right:16px;height:var(--dock-h);padding:0;transform:translateY(10px) scale(.7)}
+.app.compact .dock.v2 .tab:not(.on){opacity:1;pointer-events:auto}
+.app.compact .dock.v2 .tab{height:58px;background:none}
+.app.compact .dock.v2 .tab span{opacity:0;transform:translateY(6px) scale(.7)}
+.app.compact .dock.v2 .tab svg.ti{transform:translateY(8px) scale(1.05)}
+.app.compact .dock.v2 .tab.on svg.ti{transform:translateY(8px) scale(1.12)}
+.app.compact .dock.v2 .ind{opacity:1!important}
+.app.compact .dock.v2 .orbbtn{transform:none;margin-top:-28px}
 .app.compact .dock.v2 .orbbtn::before{opacity:1}
-/* bar styles on the pill and the orb button */
-html[data-bar=solid] .dock.v2 .dpill{background:#171A22;-webkit-backdrop-filter:none;backdrop-filter:none;border:1px solid rgba(255,255,255,.07)}
-html[data-bar=minimal] .dock.v2 .dpill{background:rgba(13,15,21,.35);border-color:transparent;box-shadow:none}
-html[data-bar=minimal] .dock.v2 .orbbtn::before{background:transparent;border-color:transparent;box-shadow:none}
+.app.coaching:not(.voice):not(.is-sub) .dock.v2{left:16px;right:16px}
 
 /* ======================= 1.25: the Coach is the orb =======================
    It opens as a layer over the tab you were on (the bar steps aside) and closes back into the orb. */
@@ -2116,5 +2105,27 @@ html[data-bar=minimal] .dock.v2 .orbbtn::before{background:transparent;border-co
 ::view-transition-new(hero){animation:vtin .38s cubic-bezier(.2,.8,.2,1) .08s both}
 ::view-transition-old(root){animation:vtout .2s ease-out both}
 ::view-transition-new(root){animation:vtin .3s ease .12s both}
-@keyframes vtout{to{opacity:0;filter:blur(4px)}}
-@keyframes vtin{from{opacity:0;filter:blur(6px)}}
+@keyframes vtout{to{opacity:0}}
+@keyframes vtin{from{opacity:0}}
+
+/* foods logged together: one meal line, each food its own row */
+.fgroup{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px 4px;font-size:12px;font-weight:800;color:var(--muted);letter-spacing:.01em}
+.fgroup b{color:var(--ink);font-weight:800}
+.frow.ingroup .fmain{padding-left:22px;position:relative}
+.frow.ingroup .fmain::before{content:"";position:absolute;left:12px;top:6px;bottom:6px;width:2px;border-radius:2px;background:rgba(var(--a-rgb),.35)}
+.frow.ingroup + .frow.ingroup{border-top-color:transparent}
+.fgroup + .frow{border-top:0}
+
+/* ======================= 1.26: You ======================= */
+#s-you .yhero{width:100%;margin-top:14px;padding:16px;border-radius:28px;display:flex;align-items:center;gap:14px;text-align:left}
+#s-you .yav{width:54px;height:54px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:22px;font-weight:800;color:var(--accent-ink);
+  background:radial-gradient(circle at 35% 30%,var(--accent-hi),var(--accent) 55%,var(--violet));box-shadow:0 8px 22px -8px rgba(var(--v-rgb),.7)}
+#s-you :is(.yhero,.ytile) .l{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+#s-you :is(.yhero,.ytile) strong{font-size:17px;font-weight:800;letter-spacing:-.01em}
+#s-you :is(.yhero,.ytile) small{font-size:13px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#s-you :is(.yhero,.ytile) > svg{width:18px;height:18px;flex:none;color:var(--dim);stroke-width:2.4}
+#s-you .ylist{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+#s-you .ytile{width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:22px;text-align:left}
+#s-you .ytile .tic{width:40px;height:40px;flex:none;border-radius:14px;display:grid;place-items:center;background:rgba(var(--a-rgb),.1);color:var(--accent)}
+#s-you .ytile .tic svg{width:21px;height:21px}
+#s-you .ytile strong{font-size:16px}
