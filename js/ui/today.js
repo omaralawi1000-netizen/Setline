@@ -196,7 +196,7 @@ function bodyHTML() {
   const mealRow = `<button class="mealrow solid" data-body="meal"><span class="mcam">${I.camera}</span>
       <span class="l"><strong>${t('meal.snap')}</strong><span>${meals ? esc(t('meal.todaySub', { n: meals, kcal: day.kcal || 0 })) : t('meal.snapSub')}</span></span>
       <span class="go">${I.fwd}</span></button>`;
-  return `<div class="section"><span class="label">${t('label.body')}</span></div><div class="grid2">${weightCard}${proteinCard}</div>${mealRow}`;
+  return `<div class="section"><span class="label">${t('label.body')}</span><button class="textbtn" data-bodyscreen>${t('bodyx.link')} →</button></div><div class="grid2">${weightCard}${proteinCard}</div>${mealRow}`;
 }
 
 function reviewHTML() {

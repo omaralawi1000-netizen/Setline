@@ -1029,3 +1029,46 @@ html[data-motion=off] .osay .w{opacity:1;transform:none}
 p.ckwarn{margin:6px 0 0}
 .ckbars{display:flex;align-items:flex-end;gap:3px;height:34px;flex:none}
 .ckbars i{display:block;width:5px;height:100%;border-radius:3px;background:linear-gradient(to top,#5B86FF,#C6BBFA);transform-origin:bottom;animation:grow .7s var(--ease) both;animation-delay:calc(var(--i) * 50ms + .1s)}
+
+/* ---------- 1.7: body screen ---------- */
+.chartcard .btn2{margin-top:12px;width:100%}
+.bnote{color:var(--muted);font-size:14px;margin:10px 0 0}
+.msites{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.msite{padding:12px;border-radius:18px;display:grid;gap:4px;text-align:left;animation:rise .45s var(--ease) both;animation-delay:calc(var(--i) * 40ms);transition:border-color .3s,background .3s}
+.msite.on{border-color:rgba(198,187,250,.45);background:rgba(198,187,250,.1)}
+.msite b{font-size:20px;font-weight:800;letter-spacing:-.02em}
+.msite b small{font-size:12px;color:var(--muted);font-weight:700}
+.msite .delta{font-size:12px}
+.msites + .chartcard{margin-top:10px}
+.mform{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.mfield{display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px 8px;padding:10px 12px;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid var(--line)}
+.mfield span{grid-column:1/-1;font-size:12px;font-weight:800;color:var(--muted)}
+.mfield input{min-width:0;background:none;border:0;outline:none;font-size:20px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+.mfield input::placeholder{color:var(--dim)}
+.mfield em{font-style:normal;font-size:12px;color:var(--dim);font-weight:700}
+.row2.one{grid-template-columns:1fr}
+.row2.one .log{margin:0}
+.pday{margin-top:14px}
+.pdate{display:block;font-size:12.5px;font-weight:800;color:var(--muted);margin-bottom:8px}
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pthumb{position:relative;aspect-ratio:3/4;border-radius:16px;overflow:hidden;background:rgba(255,255,255,.04);animation:rise .45s var(--ease) both;animation-delay:calc(var(--i) * 50ms)}
+.pthumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .4s var(--ease)}
+.pthumb:active img{transform:scale(1.04)}
+.pthumb span{position:absolute;left:6px;bottom:6px;height:20px;line-height:20px;padding:0 7px;border-radius:999px;background:rgba(8,9,14,.6);font-size:11px;font-weight:800;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.snote.center,.lead.center{text-align:center}
+.pview{border-radius:22px;overflow:hidden;background:#000;max-height:62vh;display:grid;place-items:center}
+.pview img{max-width:100%;max-height:62vh;display:block;animation:fadein .4s}
+.cmp{position:relative;margin-top:12px;aspect-ratio:3/4;max-height:56vh;width:100%;border-radius:22px;overflow:hidden;background:#000;touch-action:none;user-select:none}
+.cmp img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}
+.cmp .cb{clip-path:inset(0 0 0 calc(var(--x) * 100%))}
+.chandle{position:absolute;top:0;bottom:0;left:calc(var(--x) * 100%);width:2px;margin-left:-1px;background:rgba(255,255,255,.9);box-shadow:0 0 12px rgba(0,0,0,.6);pointer-events:none}
+.chandle i{position:absolute;top:50%;left:50%;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;background:rgba(255,255,255,.92);box-shadow:0 6px 20px rgba(0,0,0,.5)}
+.chandle i::before,.chandle i::after{content:"";position:absolute;top:50%;width:0;height:0;border:6px solid transparent;margin-top:-6px}
+.chandle i::before{left:6px;border-right-color:#222}
+.chandle i::after{right:6px;border-left-color:#222}
+.ctag{position:absolute;top:10px;height:24px;line-height:24px;padding:0 9px;border-radius:999px;background:rgba(8,9,14,.62);font-size:12px;font-weight:800;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.ctag.l{left:10px}.ctag.r{right:10px}
+.cpick{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px}
+.cpt{flex:none;width:52px;height:68px;border-radius:12px;overflow:hidden;border:2px solid transparent;opacity:.6;transition:opacity .25s,border-color .25s}
+.cpt[aria-pressed=true]{border-color:var(--accent);opacity:1}
+.cpt img{width:100%;height:100%;object-fit:cover;display:block}

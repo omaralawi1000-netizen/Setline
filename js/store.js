@@ -11,6 +11,7 @@ import { startCardio, pauseCardio, resumeCardio, finishCardio, cardioRecords } f
 import { upsertBodyweight, addProtein, dateKey } from './body.js';
 import { addMeal, removeMeal } from './meals.js';
 import { mergeCheckin } from './checkin.js';
+import { upsertMeasures } from './measures.js';
 import { easyDay } from './progression.js';
 import { deloadDay } from './insights.js';
 
@@ -35,6 +36,7 @@ export const state = {
   nutrition: [],
   daily: [],       // morning check-ins, by date
   measures: [],    // body measurements, by date
+  photos: [],      // progress photos {id, date, pose, t, thumb, blob}
   undo: [],
   error: null
 };
@@ -62,6 +64,7 @@ export async function init() {
   const [cardio, activeCardio, nutrition, daily, measures] = await Promise.all([db.getAll('cardio'), db.get('meta', 'activeCardio'), db.getAll('nutrition'), db.getAll('daily'), db.getAll('measures')]);
   state.daily = daily;
   state.measures = measures;
+  state.photos = await db.getAll('photos').catch(() => []);
   state.cardio = cardio.sort((a, b) => b.startedAt - a.startedAt);
   state.activeCardio = activeCardio || null;
   state.nutrition = nutrition;
@@ -249,6 +252,24 @@ export async function undoProtein(grams, date = dateKey()) {
   emit('body');
 }
 
+// ---- measurements and progress photos ----
+export async function saveMeasures(patch, date = dateKey()) {
+  state.measures = upsertMeasures(state.measures, date, patch);
+  const e = state.measures.find(m => m.date === date);
+  if (e) await db.put('measures', e); else await db.del('measures', date);
+  emit('body');
+}
+export async function addPhoto(photo) {
+  await db.put('photos', photo);
+  state.photos = [...state.photos, photo];
+  emit('photos');
+}
+export async function deletePhoto(id) {
+  await db.del('photos', id);
+  state.photos = state.photos.filter(p => p.id !== id);
+  emit('photos');
+}
+
 // ---- morning check-in ----
 export async function saveCheckin(patch, date = dateKey()) {
   const prev = state.daily.find(d => d.date === date) || null;
@@ -284,7 +305,7 @@ export async function importBackup(d) {
   await db.tx(['workouts', 'cardio', 'routines', 'exercises', 'prs', 'bodyweight', 'nutrition', 'chat', 'daily', 'measures'], 'readwrite', s => {
     for (const k of ['workouts', 'cardio', 'routines', 'exercises', 'prs', 'bodyweight', 'nutrition', 'chat', 'daily', 'measures']) {
       s[k].clear();
-      for (const x of d[k]) s[k].put(x);
+      for (const x of d[k] || []) s[k].put(x);
     }
   });
   state.settings = sanitize({ ...d.settings, ttsModel: state.settings.ttsModel, ttsLite: state.settings.ttsLite, cmdModel: state.settings.cmdModel, coachModel: state.settings.coachModel, cmdAlt: state.settings.cmdAlt, coachAlt: state.settings.coachAlt });
@@ -370,6 +391,7 @@ export async function resetAll() {
   state.bodyweight = [];
   state.daily = [];
   state.measures = [];
+  state.photos = [];
   await init();
   emit('reset');
 }

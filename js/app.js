@@ -25,13 +25,14 @@ import { initPress } from './ui/press.js';
 import { autoBackup } from './ui/drive.js';
 import { initHandsFree } from './ui/handsfree.js';
 import { onCheckinClick } from './ui/checkin.js';
+import { renderBody, initBodyScreen } from './ui/bodyscreen.js';
 import { cardioElapsed, cardioName } from './cardio.js';
 import { weekStart } from './stats.js';
 import { nextRoutine } from './routines.js';
 import { repeatTemplate } from './insights.js';
 
 const TABS = ['today', 'workout', 'coach', 'history'];
-const SUB = ['detail', 'settings', 'routine', 'progress', 'exercise'];
+const SUB = ['detail', 'settings', 'routine', 'progress', 'exercise', 'body'];
 const view = { screen: 'today', detailId: null, detailKind: 'workout', parent: 'history' };
 const actions = {};
 const app = $('#app');
@@ -51,6 +52,7 @@ function renderScreen(name = view.screen) {
   else if (name === 'progress') renderProgress(root);
   else if (name === 'exercise') renderExercise(root, view.exerciseId);
   else if (name === 'settings') renderSettings(root);
+  else if (name === 'body') renderBody(root);
 }
 
 // Built once; later renders only move the pill and relabel, so the indicator can glide.
@@ -106,7 +108,7 @@ function renderAll() {
 }
 
 // Direction for the transition: tabs by position, sub screens push in from the right.
-const ORDER = { today: 0, workout: 1, coach: 2, history: 3, detail: 4, settings: 4, routine: 4, progress: 4, exercise: 5 };
+const ORDER = { today: 0, workout: 1, coach: 2, history: 3, detail: 4, settings: 4, routine: 4, progress: 4, body: 4, exercise: 5 };
 function show(name, { back = false } = {}) {
   const prev = view.screen;
   view.screen = name;
@@ -208,6 +210,7 @@ Object.assign(actions, {
 });
 initPress(document);
 initHandsFree();
+initBodyScreen($('#s-body'));
 initWorkout($('#s-workout'), actions);
 initSettings(actions, $('#s-settings'));
 setWorkoutNav({ go, showDetail });
@@ -232,6 +235,7 @@ app.addEventListener('click', e => {
   const ex = e.target.closest('[data-ex]');
   if (ex) { haptic('tap'); pushSub('exercise', { exerciseId: ex.dataset.ex }); return; }
   if (e.target.closest('[data-progress]')) { haptic('tap'); pushSub('progress'); return; }
+  if (e.target.closest('[data-bodyscreen]')) { haptic('tap'); pushSub('body'); return; }
   const pr = e.target.closest('[data-prange]');
   if (pr) { setRange(Number(pr.dataset.prange)); haptic('tap'); renderScreen('progress'); countAll($('#s-progress'), state.lang); return; }
   const f = e.target.closest('[data-hfilter]');
