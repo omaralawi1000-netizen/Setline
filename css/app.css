@@ -1612,3 +1612,20 @@ html{transition:background-color .4s}
 .foodcard .pring b small{font-size:9px;color:var(--muted)}
 .foodcard .bsub strong{color:var(--ink);font-size:15px}
 html[data-motion=off] #s-food *{animation:none!important}
+/* scanner 1.14: video eases in once the camera is live, recent products above the buttons */
+.scanview video{animation:none;opacity:0;transform:scale(1.04);transition:opacity .35s ease,transform .6s cubic-bezier(.22,1,.36,1)}
+.scanview.is-live video{opacity:1;transform:none}
+.scanview.got video{filter:brightness(.7) saturate(.8);transition:filter .3s}
+.scanwin{transition:translate .32s cubic-bezier(.3,1.3,.5,1),scale .32s cubic-bezier(.3,1.3,.5,1),box-shadow .3s}
+.scanbottom{position:absolute;left:0;right:0;bottom:calc(var(--safe-bottom) + 20px);z-index:2;display:flex;flex-direction:column;gap:12px}
+.scanbottom .scanbar{position:static}
+.scanrecent{display:flex;gap:8px;overflow-x:auto;padding:0 16px;scrollbar-width:none;scroll-snap-type:x proximity}
+.scanrecent::-webkit-scrollbar{display:none}
+.srchip{flex:none;display:flex;align-items:center;gap:8px;height:48px;max-width:190px;padding:0 14px 0 5px;border-radius:999px;scroll-snap-align:start;
+  background:rgba(20,22,30,.55);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:13px;font-weight:800;
+  animation:rise .45s var(--ease) both;animation-delay:calc(.15s + var(--i) * .04s);transition:transform .3s cubic-bezier(.3,1.4,.5,1)}
+.srchip:active{transform:scale(.94)}
+.srchip img,.srchip .pi{width:38px;height:38px;border-radius:50%;object-fit:cover;background:#fff;flex:none}
+.srchip .pi{display:grid;place-items:center;background:rgba(255,255,255,.1)}
+.srchip .pi svg{width:18px;height:18px}
+.srchip span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

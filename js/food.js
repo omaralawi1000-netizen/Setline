@@ -81,10 +81,13 @@ export function fromLabel(raw, code = '') {
 }
 
 // Look a barcode up. {status: 'ok', product} | {status: 'missing'} | {status: 'offline'|'failed'}
-export async function lookup(code, lang = 'en', fetchFn = globalThis.fetch) {
+export async function lookup(code, lang = 'en', fetchFn = globalThis.fetch, timeoutMs = 7000) {
   let res;
-  try { res = await fetchFn(`${OFF_URL}${encodeURIComponent(code)}.json?fields=${FIELDS}`); }
-  catch { return { status: navigator?.onLine === false ? 'offline' : 'failed' }; }
+  const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), timeoutMs) : 0; // a slow server shouldn't leave you staring at a spinner
+  try { res = await fetchFn(`${OFF_URL}${encodeURIComponent(code)}.json?fields=${FIELDS}`, ctl ? { signal: ctl.signal } : undefined); }
+  catch { return { status: globalThis.navigator?.onLine === false ? 'offline' : 'failed' }; }
+  finally { clearTimeout(timer); }
   if (res.status === 404) return { status: 'missing' };
   if (!res.ok) return { status: 'failed' };
   const data = await res.json().catch(() => null);

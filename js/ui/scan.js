@@ -24,6 +24,13 @@ export const canDetect = async () => {
   try { return 'BarcodeDetector' in globalThis && (await BarcodeDetector.getSupportedFormats()).some(f => FORMATS.includes(f)); } catch { return false; }
 };
 
+// the last few scanned products, one tap each
+async function recentHTML() {
+  const list = (await products()).filter(p => p.name).slice(0, 8);
+  if (!list.length) return '';
+  return `<div class="scanrecent">${list.map((p, i) => `<button class="srchip" data-s="recent" data-code="${esc(p.code)}" style="--i:${i}">${p.image ? `<img src="${esc(p.image)}" alt="" loading="lazy">` : `<span class="pi">${BARCODE}</span>`}<span>${esc(p.name)}</span></button>`).join('')}</div>`;
+}
+
 async function products() { return (await db.get('meta', 'products').catch(() => null)) || []; }
 async function keep(p) { if (p.code) await db.put('meta', remember(await products(), p), 'products').catch(() => {}); }
 
@@ -43,8 +50,8 @@ async function thumbOf(url) {
 
 export function openScanner() {
   const { t } = state;
-  const s = { stream: null, det: null, timer: 0, last: null, seen: 0, done: false, product: null, grams: 100, code: '' };
-  const stop = () => { clearTimeout(s.timer); s.stream?.getTracks().forEach(x => x.stop()); s.stream = null; };
+  const s = { stream: null, det: null, timer: 0, last: null, seen: 0, done: false, product: null, grams: 100, code: '', pending: null, thumb: null };
+  const stop = () => { clearTimeout(s.timer); cancelAnimationFrame(s.timer); s.stream?.getTracks().forEach(x => x.stop()); s.stream = null; };
   const api = openSheet(box => {
     const render = html => { box.innerHTML = html; };
 
@@ -55,38 +62,67 @@ export function openScanner() {
         <video playsinline muted autoplay></video>
         <div class="scanwin" id="scanwin"><i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i><i class="laser"></i></div>
         <div class="scantop"><span class="scanhint" id="scanhint">${t('scan.point')}</span><button class="iconbtn glassbtn" data-s="torch" hidden aria-label="${esc(t('scan.torch'))}">${TORCH}</button></div>
-        <div class="scanbar"><button class="glasspill" data-s="manual">${t('scan.type')}</button><button class="glasspill" data-s="label">${I.camera}<span>${t('scan.label')}</span></button></div>
+        <div class="scanbottom">${await recentHTML()}
+        <div class="scanbar"><button class="glasspill" data-s="manual">${t('scan.type')}</button><button class="glasspill" data-s="label">${I.camera}<span>${t('scan.label')}</span></button></div></div>
       </div>`);
-      if (!(await canDetect())) return manual(t('scan.noDetector'));
-      try {
-        s.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
-      } catch (e) { return manual(t(e?.name === 'NotAllowedError' ? 'scan.denied' : 'scan.noCamera')); }
+      // ask for the camera while checking for the detector, not after
+      const cam = navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } }, audio: false });
+      cam.catch(() => {});
+      if (!(await canDetect())) { cam.then(st => st.getTracks().forEach(x => x.stop()), () => {}); return manual(t('scan.noDetector')); }
+      try { s.stream = await cam; } catch (e) { return manual(t(e?.name === 'NotAllowedError' ? 'scan.denied' : 'scan.noCamera')); }
+      if (s.done || !box.isConnected) return stop();
       const video = box.querySelector('video');
       if (!video) return stop();
       video.srcObject = s.stream;
       await video.play().catch(() => {});
       const track = s.stream.getVideoTracks()[0];
-      if (track?.getCapabilities?.().torch) box.querySelector('[data-s=torch]').hidden = false;
+      const caps = track?.getCapabilities?.() || {};
+      if (caps.torch) box.querySelector('[data-s=torch]').hidden = false;
+      // keep refocusing, and zoom in a little: codes read from further away and small ones get bigger
+      const adv = {};
+      if (caps.focusMode?.includes('continuous')) adv.focusMode = 'continuous';
+      if (caps.zoom?.max >= 2) adv.zoom = Math.min(caps.zoom.max, Math.max(caps.zoom.min || 1, 1.6));
+      if (Object.keys(adv).length) track.applyConstraints({ advanced: [adv] }).catch(() => {});
+      box.querySelector('.scanview')?.classList.add('is-live');
       s.det = new BarcodeDetector({ formats: FORMATS });
       loop(video);
     }
 
+    // Read every new camera frame. A 12–13 digit code with a valid check digit is trusted on the
+    // first read; short 8-digit ones (weaker check) need to be seen twice. The lookup starts at once.
     async function loop(video) {
       if (!s.stream || s.done) return;
       try {
-        const found = (await s.det.detect(video)).find(b => validBarcode(b.rawValue));
-        if (found) {
-          if (found.rawValue === s.last && performance.now() - s.seen < 1200) return lock(video, found);
+        const found = video.readyState >= 2 ? (await s.det.detect(video)).find(b => validBarcode(b.rawValue)) : null;
+        if (found && !s.done) {
+          const strong = found.rawValue.length >= 12;
+          if (strong || (found.rawValue === s.last && performance.now() - s.seen < 1500)) return lock(video, found);
           s.last = found.rawValue; s.seen = performance.now();
+          prefetch(found.rawValue);
         }
       } catch {}
-      s.timer = setTimeout(() => loop(video), 110);
+      if (!s.stream || s.done) return;
+      if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(() => loop(video));
+      else s.timer = requestAnimationFrame(() => loop(video));
+    }
+    // start looking the product up (and its photo) as soon as we have a code
+    function prefetch(code) {
+      if (s.pending?.code === code) return s.pending.p;
+      const p = (async () => {
+        const known = (await products()).find(x => x.code === code);
+        if (known) return { status: 'ok', product: known, known: true };
+        return lookup(code, state.lang);
+      })();
+      s.pending = { code, p };
+      p.then(r => { if (r.status === 'ok' && r.product.image) s.thumb = { code, p: thumbOf(r.product.image) }; }, () => {});
+      return p;
     }
 
     // the window snaps onto the code, flashes, and the product card rises
     function lock(video, found) {
       s.done = true;
       s.code = found.rawValue;
+      prefetch(s.code);
       haptic('success');
       const win = box.querySelector('#scanwin');
       const r = video.getBoundingClientRect();
@@ -105,25 +141,26 @@ export function openScanner() {
       }
       win?.classList.add('locked');
       video.pause();
-      setTimeout(() => burst(win, { count: 16, spread: 90 }), 180);
-      setTimeout(() => { stop(); find(s.code); }, 520);
+      box.querySelector('.scanview')?.classList.add('got');
+      setTimeout(() => burst(win, { count: 14, spread: 80 }), 140);
+      setTimeout(() => { stop(); find(s.code); }, 360);
     }
 
     // ---------- lookup and product ----------
     async function find(code) {
       s.code = code;
       render(`<div class="pwrap"><div class="fcard glass loading"><div class="sk a"></div><div class="sk b"></div><div class="sk c"></div><p class="scode">${esc(code)}</p></div></div>`);
-      const known = (await products()).find(p => p.code === code);
-      if (known) return show(known);
-      const r = await lookup(code, state.lang);
-      if (r.status === 'ok') { await keep(r.product); return show(r.product); }
+      const r = await prefetch(code);
+      if (s.code !== code) return;
+      if (r.status === 'ok') { if (!r.known) await keep(r.product); return show(r.product); }
+      s.pending = null; // let a retry ask again
       missing(r.status);
     }
 
     function show(p) {
       s.product = p;
       const choices = amountChoices(p);
-      s.grams = choices[0]?.g || 100;
+      s.grams = p.lastGrams || choices[0]?.g || 100; // what you had last time
       paintProduct(true);
     }
 
@@ -202,12 +239,19 @@ export function openScanner() {
         inp.onchange = () => { if (inp.files?.[0]) { stop(); readLabel(inp.files[0]); } };
         inp.click();
       } else if (k === 'again') { s.product = null; s.code = ''; camera(); }
+      else if (k === 'recent') {
+        const p = (await products()).find(x => x.code === e.target.closest('[data-code]').dataset.code);
+        if (!p) return;
+        haptic('tap'); s.done = true; stop(); s.code = p.code;
+        show(p);
+      }
       else if (k === 'add') {
         const p = s.product, n = forAmount(p, s.grams);
         e.target.closest('button').disabled = true;
         const name = `${p.name || t('scan.unnamed')} · ${s.grams} g`;
-        const thumb = await thumbOf(p.image);
+        const thumb = s.thumb?.code === p.code ? await Promise.race([s.thumb.p, new Promise(r => setTimeout(r, 600))]) : undefined;
         const meal = await store.logMeal({ name, ...n, source: 'barcode', thumb });
+        if (p.code) keep({ ...p, lastGrams: s.grams });
         await closeTop();
         haptic('success');
         toast({ title: `${esc(p.name || t('scan.unnamed'))} <span class="v">+${n.protein} g</span>`, sub: `${s.grams} g · ${n.kcal} kcal`, action: t('common.undo'), onAction: () => store.deleteMeal(meal.id) });
