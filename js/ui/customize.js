@@ -7,6 +7,10 @@ import { I } from './icons.js';
 import { haptic } from '../haptics.js';
 import { openSheet, closeTop } from './sheet.js';
 
+// a segmented choice and an on/off row, bound to a setting
+const seg = (key, vals, label) => `<div class="seg">${vals.map(v => `<button data-cu="set" data-k="${key}" data-v="${v}" aria-pressed="${state.settings[key] === v}">${label(v)}</button>`).join('')}</div>`;
+const tog = (key, title, sub) => `<div class="srow"><span class="l"><strong>${state.t(title)}</strong><small>${state.t(sub)}</small></span><button class="toggle" role="switch" aria-checked="${!!state.settings[key]}" aria-label="${state.t(title)}" data-cu="flip" data-k="${key}"></button></div>`;
+
 export function openCustomize() {
   const { t } = state;
   openSheet(el => {
@@ -14,6 +18,19 @@ export function openCustomize() {
       const s = state.settings, hide = new Set(s.todayHide || []);
       el.innerHTML = `<div class="sbody"><h2>${t('cust.title')}</h2><p class="lead">${t('cust.lead')}</p>
         <div class="field"><label>${t('cust.colour')}</label><div class="swatches">${ACCENTS.map(a => `<button class="swatch" data-accent="${a}" data-cu="accent" aria-pressed="${a === s.accent}" aria-label="${t('accent.' + a)}"><i></i><span>${t('accent.' + a)}</span></button>`).join('')}</div></div>
+        <div class="field"><label>${t('look.title')}</label><div class="slist solid">
+          <div class="srow"><span class="l"><strong>${t('look.start')}</strong><small>${t('look.startSub')}</small></span>${seg('startTab', ['today', 'workout', 'food', 'coach'], k => t('tab.' + k))}</div>
+          <div class="srow"><span class="l"><strong>${t('look.text')}</strong></span>${seg('textSize', ['small', 'normal', 'large'], k => t('look.text.' + k))}</div>
+          <div class="srow"><span class="l"><strong>${t('look.glow')}</strong><small>${t('look.glowSub')}</small></span>${seg('glow', ['on', 'soft', 'off'], k => t('look.glow.' + k))}</div>
+          ${tog('greeting', 'look.greeting', 'look.greetingSub')}
+          ${tog('dockLabels', 'look.dock', 'look.dockSub')}
+        </div></div>
+        <div class="field"><label>${t('look.workout')}</label><div class="slist solid">
+          ${tog('exFigure', 'look.figure', 'look.figureSub')}
+          ${tog('exGhost', 'look.ghost', 'look.ghostSub')}
+          ${tog('autoWarmup', 'settings.autoWarmup', 'settings.autoWarmupSub')}
+          ${tog('suggestions', 'settings.suggestions', 'settings.suggestionsSub')}
+        </div></div>
         <div class="field"><label>${t('cust.cards')}</label><div class="slist solid">${todayOrderOf(s).map((k, i, ord) => `<div class="srow ord"><span class="l"><strong>${t('cust.part.' + k)}</strong></span>
           <span class="ordbtns"><button class="iconbtn sm" data-cu="move" data-k="${k}" data-d="-1" aria-label="${t('cust.up')}" ${i === 0 ? 'disabled' : ''}>${I.up}</button><button class="iconbtn sm dn" data-cu="move" data-k="${k}" data-d="1" aria-label="${t('cust.down')}" ${i === ord.length - 1 ? 'disabled' : ''}>${I.up}</button></span>
           ${TODAY_PARTS.includes(k) ? `<button class="toggle" role="switch" aria-checked="${!hide.has(k)}" aria-label="${t('cust.part.' + k)}" data-cu="part" data-k="${k}"></button>` : '<span class="togph"></span>'}</div>`).join('')}</div></div></div>`;
@@ -29,6 +46,8 @@ export function openCustomize() {
         store.setSettings({ todayOrder: ord });
         return paint();
       }
+      if (b.dataset.cu === 'set') { store.setSettings({ [b.dataset.k]: b.dataset.v }); return paint(); }
+      if (b.dataset.cu === 'flip') { store.setSettings({ [b.dataset.k]: !state.settings[b.dataset.k] }); return paint(); }
       if (b.dataset.cu === 'accent') {
         store.setSettings({ accent: b.dataset.accent });
         el.querySelectorAll('.swatch').forEach(x => x.setAttribute('aria-pressed', String(x === b)));

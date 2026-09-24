@@ -99,7 +99,11 @@ function memorySheet() {
   openSheet(el => {
     const paint = () => {
       const list = state.settings.memories || [];
-      el.innerHTML = `<div class="sbody"><h2>${t('memory.title')}</h2><p class="lead">${t('memory.lead')}</p>
+      el.innerHTML = `<div class="sbody"><h2>${t('memory.title')}</h2>
+        <div class="field"><label>${t('brief.title')}</label><p class="snote">${t('brief.lead')}</p>
+          <textarea class="brief solid" data-brief rows="7" maxlength="5000" placeholder="${esc(t('brief.ph'))}">${esc(state.settings.coachBrief || '')}</textarea>
+          <div class="briefbar"><small data-brief-n>${(state.settings.coachBrief || '').length} / 5000</small><button class="btn2 solid" data-brief-save>${I.check}<span>${t('common.save')}</span></button></div></div>
+        <div class="field"><label>${t('memory.facts')}</label><p class="snote">${t('memory.lead')}</p></div>
         ${list.length ? `<ul class="memlist">${[...list].reverse().map(m => `<li><span>${esc(m.text)}</span><button class="iconbtn sm" data-mem-del="${esc(m.id)}" aria-label="${esc(t('common.delete'))}">${I.close}</button></li>`).join('')}</ul>` : `<p class="snote">${t('memory.none')}</p>`}
         <form class="mdesc solid" data-mem-add><input name="m" maxlength="140" autocomplete="off" placeholder="${esc(t('memory.addPh'))}"><button class="send" aria-label="${esc(t('voice.send'))}">${I.plus}</button></form>
         <div class="slist solid" style="margin-top:14px"><div class="srow"><span class="l"><strong>${t('memory.weekly')}</strong><small>${t('memory.weeklySub')}</small></span>
@@ -109,8 +113,13 @@ function memorySheet() {
     el.addEventListener('click', e => {
       const d = e.target.closest('[data-mem-del]');
       if (d) { haptic('tap'); setSettings({ memories: (state.settings.memories || []).filter(m => m.id !== d.dataset.memDel) }); return paint(); }
+      if (e.target.closest('[data-brief-save]')) {
+        setSettings({ coachBrief: el.querySelector('[data-brief]').value.trim() });
+        haptic('success'); toast({ title: esc(t('brief.saved')) }); return paint();
+      }
       if (e.target.closest('[data-mem-weekly]')) { haptic('tap'); setSettings({ weeklyCheckin: !state.settings.weeklyCheckin }); return paint(); }
     });
+    el.addEventListener('input', e => { if (e.target.matches('[data-brief]')) el.querySelector('[data-brief-n]').textContent = `${e.target.value.length} / 5000`; });
     el.addEventListener('submit', e => {
       e.preventDefault();
       const v = String(e.target.m?.value || '').trim();
@@ -131,11 +140,12 @@ export function renderSettings(root) {
     </header>
     <h1 class="h1">${t('settings.title')}</h1>
     ${profileRow()}
-    <div class="slist solid memlink"><button class="srow" data-act="memory"><span class="l"><strong>${t('memory.title')}</strong><small>${esc(t('memory.sub', { n: (s.memories || []).length }))}</small></span>${I.fwd}</button></div>
+    <div class="slist solid memlink"><button class="srow" data-act="memory"><span class="l"><strong>${t('memory.title')}</strong><small>${esc([s.coachBrief ? t('brief.has') : '', t('memory.sub', { n: (s.memories || []).length })].filter(Boolean).join(' · '))}</small></span>${I.fwd}</button></div>
 
     <div class="sgroup"><h2>${t('settings.general')}</h2><div class="slist solid">
       <div class="srow"><span class="l"><strong>${t('settings.language')}</strong></span>${seg('lang', ['auto', 'da', 'en'], [t('lang.auto'), t('lang.da'), t('lang.en')])}</div>
       <div class="srow"><span class="l"><strong>${t('settings.units')}</strong></span>${seg('unit', ['kg', 'lb'], [t('unit.kg'), t('unit.lb')])}</div>
+      <button class="srow" data-act="customize"><span class="l"><strong>${t('cust.title')}</strong><small>${t('look.settingsSub')}</small></span>${I.fwd}</button>
     </div></div>
 
     <div class="sgroup"><h2>${t('settings.voice')}</h2><div class="slist solid">

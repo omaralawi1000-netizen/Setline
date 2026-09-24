@@ -6,7 +6,8 @@ import { listModels, pickTtsModel } from '../tts.js';
 import { splitMemories, hideMemoryTail, addMemories } from '../coach.js';
 import { weekStart } from '../stats.js';
 import { dateKey } from '../body.js';
-import { buildContext, chatContents, systemPrompt, formatAnswer, speakable, isPlanRequest, PLAN_SCHEMA, planSchema, planSystem, validatePlan, planToRoutines } from '../coach.js';
+import { weight } from '../format.js';
+import { buildContext, chatContents, systemPrompt, formatAnswer, speakable, isPlanRequest, PLAN_SCHEMA, planSchema, planSystem, validatePlan, planToRoutines, isRoutineImport, IMPORT_SCHEMA, importSystem, validateImport } from '../coach.js';
 import { getKey } from '../keys.js';
 import { coachModels, ttsModelId, ttsAlt } from '../settings.js';
 import * as tts from '../tts.js';
@@ -44,7 +45,7 @@ function planCard(m) {
   const p = m.plan;
   return `<div class="pcard"><div class="phead"><strong>${esc(p.name)}</strong><span class="tag sm soft">${t('plan.days', { n: p.days.length })}</span></div>
     ${p.summary ? `<p>${esc(p.summary)}</p>` : ''}
-    ${p.days.map(d => `<div class="pday"><b>${esc(d.name)}</b><ul>${d.exercises.map(e => `<li><span>${esc(state.catalog.name(e.exerciseId, lang))}</span><span class="psr">${e.sets} × ${e.reps}</span></li>`).join('')}</ul></div>`).join('')}
+    ${p.days.map(d => `<div class="pday"><b>${esc(d.name)}</b><ul>${d.exercises.map(e => `<li><span>${esc(p.customs?.find(c => c.id === e.exerciseId)?.en || state.catalog.name(e.exerciseId, lang))}</span><span class="psr">${e.sets} × ${e.repsGuessed ? '?' : e.reps}${e.kg ? ` · ${weight(e.kg, state.settings.unit, lang)} ${t('unit.' + state.settings.unit)}` : ''}</span></li>`).join('')}</ul></div>`).join('')}
     ${m.saved ? `<p class="psaved">${I.check}${t(m.saved === 'replace' ? 'plan.replaced' : 'plan.saved')}</p>`
       : `<div class="pacts"><button class="log" data-coach="saveplan" data-mode="replace" data-id="${m.id}">${I.check}<span>${t('plan.replace')}</span></button>
         <button class="btn2 solid" data-coach="saveplan" data-mode="add" data-id="${m.id}">${I.plus}<span>${t('plan.add')}</span></button></div>`}</div>`;
@@ -125,6 +126,7 @@ export async function ask(question, { root = $('#s-coach') } = {}) {
   inflight = { ctl, id: reply.id };
   syncButton();
   await ensureModels();
+  if (isRoutineImport(question)) return buildPlan(question, reply, { key, lang, ctl, root, copy: true });
   if (isPlanRequest(question)) return buildPlan(question, reply, { key, lang, ctl, root });
   const context = buildContext(coachSnap());
   try {
@@ -160,10 +162,17 @@ export async function ask(question, { root = $('#s-coach') } = {}) {
 }
 
 // "make me a 4-day upper/lower, 60 minutes, dumbbells only" → an editable plan card
-async function buildPlan(question, reply, { key, lang, ctl, root }) {
+async function buildPlan(question, reply, { key, lang, ctl, root, copy = false }) {
   const { t } = state;
   const context = buildContext(coachSnap());
   try {
+    if (copy) { // your own routine: copied, not designed
+      const raw = await withFallback(coachModels(state.settings), model => aiPlan({ key, model, system: importSystem(lang, state.catalog), schema: IMPORT_SCHEMA, signal: ctl.signal, prompt: question }));
+      const plan = validateImport(raw, state.catalog);
+      if (!plan) store.updateChat(reply.id, { streaming: false, text: t('plan.invalid') }, { persist: true });
+      else { store.updateChat(reply.id, { streaming: false, text: plan.summary || plan.name, plan }, { persist: true }); haptic('success'); }
+      return;
+    }
     const prompt = `Training data:\n${context}\n\nRequest: ${question}`;
     const once = schema => withFallback(coachModels(state.settings), model => aiPlan({ key, model, system: planSystem(lang, state.catalog), schema, signal: ctl.signal, prompt }));
     let plan = null;
@@ -191,6 +200,7 @@ async function savePlan(id, mode = 'replace') {
   const { t } = state;
   const m = state.chat.find(x => x.id === id);
   if (!m?.plan || m.saved) return;
+  for (const c of m.plan.customs || []) if (!state.catalog.get(c.id)) await store.addCustomExercise(c); // exercises your routine has that the catalog doesn't
   const fresh = planToRoutines(m.plan);
   const oldGoal = state.settings.weeklyGoal;
   let undo;

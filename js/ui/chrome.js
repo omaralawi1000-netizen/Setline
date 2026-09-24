@@ -2,7 +2,7 @@
 // or the voice layer), and soft blurred edges fade in at the top and bottom once content scrolls under them.
 import * as store from '../store.js';
 
-export const DIM = '#000000';
+export const DIM = '#07080B';
 const edge = () => getComputedStyle(document.documentElement).getPropertyValue('--edge').trim() || '#000000';
 let repaint = () => {};
 export const refreshChrome = () => repaint();

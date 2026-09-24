@@ -285,3 +285,13 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] Smart warm-ups: added automatically before the first lift for each muscle, worked out from the working weight (bar ramp for barbells, longer when heavy; two lighter sets for dumbbells and machines; one feeler set on muscles already worked); unticked ones drop away at the first work set; hands-free speaks them; say "warm up" / "warm-up done", or just the warm-up numbers; Settings → Workout → Smart warm-ups
 - [x] Plateau: when a lift in your plan has had no new best in 3 sessions over 2+ weeks, a Today card offers a concrete change applied to every routine in one tap (switch rep range, or swap for a close variation), with Undo, "Ask the Coach", or "Not now"; the Coach sees stalled lifts too
 - [x] Monthly photos: Body screen shows your latest photo beside the one from about a month before (same pose), with the weight and waist change and a "Coach's take" (numbers only; photos never leave the phone); a Today card when a new month is ready, and a photo-day nudge when the last photo is a month old
+
+## 1.21.0: your own routine, a Coach brief, "one more rep on pushdowns", status bar, customization
+
+- [x] Paste (or say) your own routine in the Coach ("this is my routine: …"): copied as written, not redesigned: days with weekdays, every exercise with its sets and weights; exercises the catalog lacks (Incline Smith press, Chest-supported row…) are created; anything unconfirmed is left out and named; card → Use this plan / Add
+- [x] Coach brief (Settings → What your coach knows): paste who you are and how to coach you (up to 5000 characters); it leads every Coach answer, plan and check-in
+- [x] Smarter Coach: judges trends not single days, flags problems unasked with one concrete fix, doesn't just agree, never invents targets, names your own lifts and numbers; routines with planned weights and stalled lifts in its context
+- [x] Voice: "I did one more rep on tricep pushdown today", "2 kg more on leg press", "one rep less on bench", "I did 12 on pushdowns", "en gentagelse mere på bænkpres", "I needed one more rep" (= one short): relative to that lift's plan (this workout, else your routine, else last time), starting a workout if needed; asks for the weight when none is known
+- [x] Status bar: the app's own background colour (no black band); the black top fade is gone
+- [x] Fixed: huge arrows on Settings rows
+- [x] Make it yours (Today → Customize, or Settings → Make it yours): opens on Today/Workout/Food/Coach, text size, background glow on/soft/off, Today greeting on/off, tab names on/off, workout screen figure and last/best line on/off, smart warm-ups and coach tips; plus colours and Today cards as before

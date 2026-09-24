@@ -983,7 +983,7 @@ html[data-motion=off] .osay .w{opacity:1;transform:none}
 .dfiles{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:8px}
 .dfiles .srow{width:100%;border-radius:18px}
 .dnudge.gone{opacity:0;transform:scale(.96);transition:opacity .3s,transform .3s var(--ease)}
-.srow > svg.i{flex:none}
+.srow > svg.i{flex:none;width:18px;height:18px;color:var(--dim)}
 
 /* ---------- 1.7: hands-free ---------- */
 .topacts{display:flex;align-items:center;gap:8px}
@@ -1685,11 +1685,11 @@ html[data-motion=off] #s-food *{animation:none!important}
 .fqp span{flex:1;font-size:13px;font-weight:800;color:var(--muted)}
 .foodcard{min-height:0}
 
-/* 1.15.1: phones that keep the status bar black (Samsung and others ignore the page's colour):
-   the app's top edge is that same black and melts into the glow below, so bar and app read as one. */
+/* the app's top edge is the status bar's colour (--bg) and melts into the glow below, so bar and app read as one. */
 .ambient::before{content:"";position:absolute;left:0;right:0;top:0;height:calc(var(--safe-top) + 150px);z-index:1;pointer-events:none;
-  background:linear-gradient(#000 0,rgba(0,0,0,.92) 18%,rgba(0,0,0,.55) 48%,rgba(0,0,0,0) 100%)}
-.edge.et::before{opacity:1;background:linear-gradient(#000,rgba(0,0,0,.7) 30%,rgba(0,0,0,0))}
+  background:linear-gradient(var(--bg) 0,color-mix(in srgb,var(--bg) 85%,transparent) 22%,transparent 100%)}
+/* 1.21: the status bar is the app's own colour (no black band); the top edge melts into it */
+.edge.et::before{opacity:1;background:linear-gradient(var(--bg),color-mix(in srgb,var(--bg) 70%,transparent) 30%,transparent)}
 .app.under-top .edge.et::before{opacity:1}
 .sbody .btn2.wide{width:100%;margin-top:12px}
 /* reorder rows in Customize */
@@ -1786,3 +1786,22 @@ html[data-motion=off] #s-food *{animation:none!important}
 .mtoday strong{font-size:15px;font-weight:800}
 .mtoday small{font-size:12.5px;color:var(--muted);font-weight:600}
 .mtoday > svg{width:16px;height:16px;color:var(--dim);flex:none}
+
+/* coach brief */
+textarea.brief{width:100%;margin-top:8px;padding:14px;border-radius:18px;font:inherit;font-size:15px;line-height:1.45;color:var(--ink);resize:vertical;min-height:150px;outline:none}
+textarea.brief:focus{box-shadow:0 0 0 2px var(--accent)}
+.briefbar{display:flex;align-items:center;justify-content:space-between;margin-top:8px}
+.briefbar small{color:var(--dim);font-size:12px;font-weight:700}
+.briefbar .btn2{height:40px;padding:0 16px}
+.srow > svg.i{margin-left:auto;width:18px;height:18px;max-width:18px;flex:none}
+
+/* 1.21: look & feel */
+html[data-text=small] :is(.screen,.sheet){zoom:.92}
+html[data-text=large] :is(.screen,.sheet){zoom:1.1}
+html[data-glow=soft] .ambient > i{opacity:.45}
+html[data-glow=off] .ambient > i{display:none}
+html[data-dock=icons] .dock .tab span{display:none}
+.pcard .pacts{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.pcard .pacts > button{width:auto;min-width:0;margin-top:14px}
+.pcard .pacts .log span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcard .pacts .btn2{padding:0 18px}

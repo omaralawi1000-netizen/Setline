@@ -12,6 +12,7 @@ import { deloadStatus, muscleBalance, usualMinutes } from './insights.js';
 import { measureSummary } from './measures.js';
 import { nextRoutine } from './routines.js';
 import { stalledLifts } from './plateau.js';
+import { EQUIPMENT, MUSCLES, makeCustom, normalize } from './catalog.js';
 
 export const MAX_CONTEXT_CHARS = 22000; // ~6k tokens
 export const CHAT_TURNS = 12;
@@ -22,6 +23,12 @@ export function systemPrompt(lang) {
     `Answer in ${lang === 'da' ? 'Danish' : 'English'} unless the user writes in the other language; then answer in theirs.`,
     'Answers are often spoken aloud: be voice-friendly, three sentences or fewer unless the user asks for detail. No tables, no headings.',
     'Use only the training data provided below. If the data needed is missing, say so plainly instead of guessing.',
+    'If there is a COACH BRIEF, it is the user\'s own description of who they are, what they want and how to coach them: follow it in every answer. Newer logged data and MEMORIES win over it where they differ.',
+    'Coach like a sharp, honest human coach who knows this person: judge trends (bodyweight over weeks, each lift over sessions, weekly volume), never a single workout or weigh-in.',
+    'Be proactive: when the data shows a problem that matters for their goal (a stalled lift, weight dropping too fast or not at all, protein short, sessions missed, recovery or sleep suffering, other sports adding fatigue, junk volume), say it briefly with one concrete fix, even if they didn\'t ask.',
+    'Do not just agree. If something they do or propose works against their goal, say so and give the better option.',
+    'Never invent numbers (calorie or macro targets, maxes, weights): use the targets and data shown, or say what is missing and how to add it in the app.',
+    'Refer to their own routines, exercises and recent numbers by name when you advise; be specific (sets, reps, kg, grams, days).',
     'Weights are in kg in the data; answer in the user\'s unit.',
     'For pain or injury, give general guidance only and suggest seeing a physiotherapist or doctor.',
     'Use the PROFILE (age, goal, experience, days, equipment, injuries) to tailor every answer. "Planned" sets are what the plan says for the workout in progress.',
@@ -36,9 +43,9 @@ export function systemPrompt(lang) {
 export const APP_GUIDE = [
   'APP GUIDE (Setline, a voice-first gym app).',
   'Voice orb in the middle of the bottom bar: hold to talk, a quick tap listens hands-free (tap the orb again to send), pull it up for the full voice screen.',
-  'Things to say during a workout: "80 kilo 8", "same again", "I got 9 reps", "2 kg more" or "one rep more" (relative to the planned set), "as planned", "4 plates", "9, 8 and 8 at 100", "next exercise", "skip rest", "add 30 seconds", "swap to incline press", "undo", "finish".',
+  'Things to say during a workout: "one more rep on tricep pushdowns" or "2 kg more on leg press" (relative to that lift\'s plan), "80 kilo 8", "same again", "I got 9 reps", "2 kg more" or "one rep more" (relative to the planned set), "as planned", "4 plates", "9, 8 and 8 at 100", "next exercise", "skip rest", "add 30 seconds", "swap to incline press", "undo", "finish".',
   'A whole session at once: "bench 3x8 at 80, then rows 3x10 at 60, then lateral raises 3 by 15 with 10" logs every lift and set (it starts a workout if none is running). Sets can be said in any word order.',
-  'The Coach keeps MEMORIES (Settings → What your coach knows) and writes a weekly check-in every Monday (shown on Today until read).',
+  'Paste a routine into the Coach ("this is my routine: …") and it becomes your routines with your weights (Replace or Add). Settings → What your coach knows holds the COACH BRIEF (paste who you are and how to be coached) and MEMORIES. The Coach keeps MEMORIES and writes a weekly check-in every Monday (shown on Today until read).',
   'Other voice: "start push day", "30 minutes zone 2 on the bike", "slept 7 hours, legs sore", "I ate 3 eggs and toast", "30 g protein", "I weigh 82", "what should I lift?", or any question for you.',
   'Headphones button on the workout screen: hands-free mode listens for sets and speaks rest cues.',
   'Workout screen: steppers and Log set, rest timer (+15/-15 teaches that exercise its rest), warm-up ramp, plate calculator, swipe a set left to delete, tap a set to edit, auto-advance after the last planned set, Finish.',
@@ -74,6 +81,8 @@ export function buildContext(snap) {
   out.unshift(profileText(settings.profile, now));
   const mem = (settings.memories || []).map(m => m.text);
   if (mem.length) out.splice(1, 0, `MEMORIES (what the user told you before): ${mem.join('; ')}.`);
+  const brief = String(settings.coachBrief || '').trim();
+  if (brief) out.splice(1, 0, `COACH BRIEF (the user's own words):\n${brief}\n(end of brief)`);
   const w = snap.active;
   if (w) {
     const restLeft = w.rest ? Math.max(0, Math.round((w.rest.endsAt - now) / 1000)) : 0;
@@ -124,7 +133,7 @@ export function buildContext(snap) {
 
   if (snap.routines?.length) {
     out.push('', 'ROUTINES:');
-    for (const r of snap.routines) out.push(`- ${r.name}: ${r.exercises.map(e => `${name(e.exerciseId)} ${e.sets.length}x${e.sets[0]?.reps ?? '?'}`).join(', ')}`);
+    for (const r of snap.routines) out.push(`- ${r.name}: ${r.exercises.map(e => `${name(e.exerciseId)} ${e.sets.length}x${e.sets[0]?.reps ?? '?'}${e.sets[0]?.kg ? ` @ ${r1(e.sets[0].kg)} kg` : ''}`).join(', ')}`);
   }
   const stalls = snap.routines?.length && snap.catalog ? stalledLifts(hist, snap.routines, { catalog: snap.catalog, now }) : [];
   if (stalls.length) out.push('', 'STALLED LIFTS (no new e1RM in the last 3 sessions over 2+ weeks):', ...stalls.map(x => `- ${name(x.exerciseId)}: best e1RM ${x.best} kg, planned ${x.sets}x${x.reps}${x.swapTo ? `, variation: ${name(x.swapTo)}` : ''}`));
@@ -295,12 +304,105 @@ export function validatePlan(raw, catalog) {
   };
 }
 
+// ---------- your own routine, pasted or said: copied as it is, not redesigned ----------
+
+const SETS_LINE = /\b\d+\s*(?:sets?|sæt)\b|\b\d+\s*[x×]\s*\d+/i;
+export const isRoutineImport = text => {
+  const t = String(text || '');
+  const lines = t.split(/\n/).filter(l => SETS_LINE.test(l)).length;
+  const mine = /\b(?:this is|here is|here's|heres|these are|that's|thats|use|save|set up|dette er|her er|brug|gem)\b.{0,20}\b(?:my|min|mit|mine)\s+(?:current\s+|nuværende\s+)?(?:routines?|split|program|workouts?|training|rutiner?|træningsprogram|træning)\b/i.test(t);
+  return lines >= 3 || (mine && (lines >= 1 || t.length > 120));
+};
+
+export const IMPORT_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    name: { type: 'STRING', description: 'short name for the whole split' },
+    summary: { type: 'STRING', description: 'one or two sentences in the user\'s language: what was set up, and anything left out or guessed that they should fill in' },
+    days: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          name: { type: 'STRING', description: 'the day as the user named it, with the weekday if given, e.g. "Monday: Legs + Shoulders"' },
+          exercises: {
+            type: 'ARRAY',
+            items: {
+              type: 'OBJECT',
+              properties: {
+                exercise: { type: 'STRING', description: 'the catalog name when it is the same movement and equipment, otherwise the user\'s own short name' },
+                inCatalog: { type: 'BOOLEAN' },
+                equipment: { type: 'STRING', enum: EQUIPMENT },
+                muscle: { type: 'STRING', enum: MUSCLES, description: 'main muscle' },
+                sets: { type: 'INTEGER' },
+                reps: { type: 'INTEGER', description: '0 if not given' },
+                kg: { type: 'NUMBER', description: 'the weight as written, 0 if not given' }
+              },
+              required: ['exercise', 'inCatalog', 'equipment', 'muscle', 'sets', 'reps', 'kg']
+            }
+          }
+        },
+        required: ['name', 'exercises']
+      }
+    }
+  },
+  required: ['name', 'summary', 'days']
+};
+
+export function importSystem(lang, catalog) {
+  return [
+    'You copy the user\'s OWN training routine into structured data for their workout app. Do not redesign, improve, add or remove anything.',
+    `Write day names and the summary in ${lang === 'da' ? 'Danish' : 'English'}.`,
+    'Keep every day, in order, with the weekday in the name when given. Keep every exercise with its sets and weight exactly as written (for plate-loaded machines the number is the plates added; keep it as is).',
+    'If reps are not given, use 0. If a weight is not given or not tracked, use 0.',
+    'Leave out an exercise the user says is not confirmed or unknown, and say so in the summary so they can add it.',
+    'Exercise names: when the movement and equipment match one of these catalog exercises, use its name exactly and inCatalog=true:',
+    catalog.all.map(e => `${e.en} (${e.equipment})`).join(', ') + '.',
+    'Otherwise inCatalog=false with a short clear name (e.g. "Incline Smith press", "Chest-supported row", "Single-arm pushdown"), its equipment and main muscle. A machine version is not the barbell version.'
+  ].join(' ');
+}
+
+// The model's copy → a plan the card can show and save, plus any new exercises it needs. Null if empty.
+export function validateImport(raw, catalog, uid = () => 'c-' + globalThis.crypto.randomUUID()) {
+  if (!raw || !Array.isArray(raw.days)) return null;
+  const customs = [];
+  const exact = n => catalog.findExact(n) || catalog.findExact(n.replace(/s\b/gi, ''));
+  const days = [];
+  for (const d of raw.days.slice(0, 7)) {
+    const exercises = [];
+    for (const x of (d?.exercises || []).slice(0, 14)) {
+      const nm = String(x?.exercise || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+      if (nm.length < 2) continue;
+      let e = exact(nm);
+      if (!e && x.inCatalog) { const r = catalog.rank?.(nm)?.[0]; if (r && r.s >= 60) e = r.e; }
+      let id = e?.id;
+      if (!id) {
+        const have = customs.find(c => normalize(c.en) === normalize(nm));
+        if (have) id = have.id;
+        else {
+          const c = makeCustom({ name: nm, muscle: MUSCLES.includes(x.muscle) ? x.muscle : 'chest', equipment: EQUIPMENT.includes(x.equipment) ? x.equipment : 'machine' }, uid());
+          if (!c.ok) continue;
+          customs.push(c.exercise); id = c.exercise.id;
+        }
+      }
+      if (exercises.some(y => y.exerciseId === id)) continue;
+      const sets = Math.max(1, Math.min(10, Math.round(Number(x.sets) || 3)));
+      const reps = Math.round(Number(x.reps) || 0);
+      const kg = Number(x.kg) > 0 && Number(x.kg) <= 1000 ? Math.round(Number(x.kg) * 4) / 4 : null;
+      exercises.push({ exerciseId: id, sets, reps: reps >= 1 && reps <= 50 ? reps : 10, repsGuessed: !(reps >= 1 && reps <= 50), kg });
+    }
+    if (exercises.length) days.push({ name: String(d.name || '').trim().slice(0, 40) || `Day ${days.length + 1}`, exercises });
+  }
+  if (!days.length) return null;
+  return { name: String(raw.name || '').trim().slice(0, 30) || 'My split', perWeek: days.length, summary: String(raw.summary || '').trim().slice(0, 400), days, customs, imported: true };
+}
+
 export function planToRoutines(plan, now = Date.now()) {
   return plan.days.map((d, i) => ({
     id: 'r-' + globalThis.crypto.randomUUID(),
     name: d.name.slice(0, 40),
     plan: plan.name,
-    exercises: d.exercises.map(e => ({ exerciseId: e.exerciseId, sets: Array.from({ length: e.sets }, () => ({ reps: e.reps, kg: null })) })),
+    exercises: d.exercises.map(e => ({ exerciseId: e.exerciseId, sets: Array.from({ length: e.sets }, () => ({ reps: e.reps, kg: e.kg ?? null })) })),
     createdAt: now + i
   }));
 }

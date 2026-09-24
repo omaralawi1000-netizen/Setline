@@ -113,6 +113,7 @@ function renderMini() {
 function renderAll() {
   document.documentElement.lang = state.lang;
   document.documentElement.dataset.motion = state.settings.motion;
+  Object.assign(document.documentElement.dataset, { text: state.settings.textSize, glow: state.settings.glow, dock: state.settings.dockLabels ? 'labels' : 'icons' });
   configureSteps(state.settings.kgSteps);
   if (document.documentElement.dataset.accent !== state.settings.accent) { document.documentElement.dataset.accent = state.settings.accent; refreshChrome(); }
   renderScreen();
@@ -479,7 +480,7 @@ async function boot() {
     const { seed } = await import('./seed.js');
     await seed(store);
   }
-  const start = state.active || state.activeCardio ? 'workout' : 'today';
+  const start = state.active || state.activeCardio ? 'workout' : state.settings.startTab || 'today';
   history.replaceState({ screen: start }, '');
   show(start);
   startClock();

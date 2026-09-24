@@ -48,12 +48,20 @@ export const DEFAULTS = Object.freeze({
   profileAsked: 0,     // when the onboarding was shown (so it's asked once)
   goals: [],           // lift goals (goals.js)
   accent: 'violet',    // colour theme
+  startTab: 'today',   // the tab the app opens on (a running workout always opens Workout)
+  textSize: 'normal',  // small | normal | large
+  glow: 'on',          // the coloured background glow: on | soft | off
+  dockLabels: true,    // words under the tab icons
+  greeting: true,      // Today's big greeting and week line
+  exFigure: true,      // the moving figure on the workout screen
+  exGhost: true,       // "Last time / Best" under the steppers
   fullscreen: false,   // hide the phone's status bar (edge to edge)
   foodHide: [],        // Food tab parts turned off (Customize)
   foodOrder: [],       // Food tab sections, in your order
   todayOrder: [],      // Today cards, in your order
   quickAdd: null,      // {kind: 'protein'|'kcal', values: [a, b, c]}
   kgSteps: null,       // {barbell, dumbbell, machine}: the − / + step in kg
+  coachBrief: '',      // who you are and how to coach you, in your own words (the Coach follows it)
   memories: [],        // what you told the Coach that it keeps in mind [{id, text, at}]
   weeklyCheckin: true, // the Coach's Monday look back and plan
   weeklyFor: '',       // the week (its Monday) the last check-in was written for
@@ -102,6 +110,10 @@ export function sanitize(input) {
   if (Array.isArray(input.goals)) s.goals = sanitizeGoals(input.goals);
   if (Number.isFinite(input.profileAsked)) s.profileAsked = input.profileAsked;
   if (ACCENTS.includes(input.accent)) s.accent = input.accent;
+  if (['today', 'workout', 'food', 'coach'].includes(input.startTab)) s.startTab = input.startTab;
+  if (['small', 'normal', 'large'].includes(input.textSize)) s.textSize = input.textSize;
+  if (['on', 'soft', 'off'].includes(input.glow)) s.glow = input.glow;
+  for (const k of ['dockLabels', 'greeting', 'exFigure', 'exGhost']) if (typeof input[k] === 'boolean') s[k] = input[k];
   if (typeof input.fullscreen === 'boolean') s.fullscreen = input.fullscreen;
   s.foodTargets = sanitizeTargets(input.foodTargets);
   if (Array.isArray(input.foodOrder)) s.foodOrder = order(input.foodOrder, FOOD_ORDER);
@@ -115,6 +127,7 @@ export function sanitize(input) {
   if (Array.isArray(input.todayHide)) s.todayHide = [...new Set(input.todayHide.filter(x => TODAY_PARTS.includes(x)))];
   if (Array.isArray(input.favMeals)) s.favMeals = input.favMeals.filter(x => typeof x === 'string' && x.length <= 60).slice(0, 30);
   for (const k of ['deloadUntil', 'deloadSnoozed']) if (Number.isFinite(input[k]) && input[k] >= 0) s[k] = input[k];
+  if (typeof input.coachBrief === 'string') s.coachBrief = input.coachBrief.slice(0, 5000);
   if (typeof input.monthSeen === 'string' && input.monthSeen.length <= 80) s.monthSeen = input.monthSeen;
   if (typeof input.photoNudge === 'string' && /^(\d{4}-\d{2})?$/.test(input.photoNudge)) s.photoNudge = input.photoNudge;
   if (input.plateauSnooze && typeof input.plateauSnooze === 'object') {

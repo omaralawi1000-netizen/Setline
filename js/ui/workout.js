@@ -92,7 +92,7 @@ export function renderWorkout(root) {
 
   root.innerHTML = header + `
     <div class="exhead">
-      ${figureHTML(info || { id: ex.exerciseId }, { move: true, cls: 'exfig' })}
+      ${state.settings.exFigure ? figureHTML(info || { id: ex.exerciseId }, { move: true, cls: 'exfig' }) : ''}
       <div class="txt">
         <p>${t('workout.exerciseOf', { i: i + 1, n: w.exercises.length })}</p>
         <h1><button data-act="overview">${esc(exName(ex.exerciseId))}</button></h1>
@@ -112,7 +112,7 @@ export function renderWorkout(root) {
         <div class="col"><span class="lab">${t('workout.reps')}</span>
           <div class="row3"><button class="step" data-act="reps-" aria-label="${t('workout.fewer')}">−</button><input class="num" id="in-reps" inputmode="numeric" enterkeyhint="done" autocomplete="off" aria-label="${t('workout.reps')}" value="${v.reps}"><button class="step" data-act="reps+" aria-label="${t('workout.more')}">+</button></div></div>
       </div>
-      <div class="ghost">${ghost}</div>
+      ${state.settings.exGhost ? `<div class="ghost">${ghost}</div>` : ''}
       ${suggestionHTML(ex)}
       ${goalAimHTML(ex.exerciseId)}
       <div class="tools">

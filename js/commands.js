@@ -47,7 +47,7 @@ export function resolve(intent, snap, t, lang) {
   const needWorkout = () => {
     if (w) return null;
     // clearly training ("I'm on T-bar row, 80 for 9") or nothing to choose from: just start and do it
-    const lifting = (['LogSet', 'LogSets', 'AddExercise'].includes(intent.type) && (intent.exerciseId || intent.routineId)) || intent.type === 'LogBatch';
+    const lifting = (['LogSet', 'LogSets', 'AddExercise', 'LogRel'].includes(intent.type) && (intent.exerciseId || intent.routineId)) || intent.type === 'LogBatch';
     if (lifting || !snap.routines.length) {
       const r = intent.routineId && snap.routines.find(x => x.id === intent.routineId);
       const then = { ...intent, routineId: undefined };
@@ -147,17 +147,29 @@ export function resolve(intent, snap, t, lang) {
   };
 
   // A new set told relative to the plan: the planned set (what the steppers show) plus/minus.
+  // the exercise a relative phrase is about: the one it names (in this workout, or from your plan), else the current one
+  const relTarget = id => {
+    if (!id || cur()?.exerciseId === id) return cur();
+    const inW = w.exercises.find(e => e.exerciseId === id);
+    if (inW) return inW;
+    const planned = (snap.routines || []).flatMap(r => r.exercises).find(e => e.exerciseId === id);
+    return { exerciseId: id, sets: (planned?.sets || []).map(x => ({ kg: x.kg ?? null, reps: x.reps, done: false, type: 'normal' })) };
+  };
   const relCommand = intent => {
-    const ex = cur();
+    const ex = relTarget(intent.exerciseId);
     if (!ex) return err('voice.noExercise');
     const bw = snap.catalog.get(ex.exerciseId)?.equipment === 'bodyweight';
-    const base = W.suggestNext(ex, W.lastSession(snap.history || [], ex.exerciseId), bw ? 0 : 20);
+    const last = W.lastSession(snap.history || [], ex.exerciseId);
+    const known = bw || ex.sets.some(x => x.kg != null) || last;
+    // a lift with no weight anywhere (no plan weight, never logged): ask rather than guess
+    if (!known && intent.kg == null) return cmd('ask', { title: t('voice.askWeight'), value: name(ex.exerciseId), sub: t('voice.askSub'), say: say(t('voice.askWeight')), choices: [] });
+    const base = W.suggestNext(ex, last, bw ? 0 : 20);
     const kg = Math.max(0, Math.round(((intent.kg ?? base.kg) + (intent.kgDelta || 0)) * 1000) / 1000);
     const reps = (intent.reps ?? base.reps) + (intent.repsDelta || 0);
     if (!(reps >= 1)) return err('voice.didntCatch');
     const change = [intent.kgDelta ? `${intent.kgDelta > 0 ? '+' : '−'}${kgTxt(Math.abs(intent.kgDelta))} ${u}` : '', intent.repsDelta ? `${intent.repsDelta > 0 ? '+' : '−'}${Math.abs(intent.repsDelta)} ${t('voice.repsWord')}` : ''].filter(Boolean).join(', ');
     const sub = change ? t('voice.vsPlan', { change, plan: setTxt(base.kg, base.reps) }) : t('voice.asPlanned', { plan: setTxt(base.kg, base.reps) });
-    return logCommand(kg, reps, 1, null, sub);
+    return logCommand(kg, reps, 1, intent.exerciseId && intent.exerciseId !== cur()?.exerciseId ? intent.exerciseId : null, sub);
   };
 
   const exerciseCtx = id => id || cur()?.exerciseId || null;

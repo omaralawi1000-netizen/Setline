@@ -300,8 +300,8 @@ export function renderToday(root) {
       <div><strong>Setline</strong><span>${t('app.tagline')}</span></div>
       <button class="iconbtn" data-act="open-settings" aria-label="${t('settings.title')}">${I.settings}</button>
     </header>
-    <h1 class="greet">${greeting(t(greetingKey(hour))).split(' ').map((w, i) => `<span class="gw" style="--i:${i}">${esc(w)}</span>`).join(' ')}</h1>
-    <p class="sub${!busy && weekStreak(state.history, state.cardio, state.settings.weeklyGoal).streak ? ' streak' : ''}">${esc(subline())}</p>
+${state.settings.greeting ? `<h1 class="greet">${greeting(t(greetingKey(hour))).split(' ').map((w, i) => `<span class="gw" style="--i:${i}">${esc(w)}</span>`).join(' ')}</h1>
+    <p class="sub${!busy && weekStreak(state.history, state.cardio, state.settings.weeklyGoal).streak ? ' streak' : ''}">${esc(subline())}</p>` : ''}
     ${busy ? '' : driveNudgeHTML({ stale: true })}
     ${busy ? resumeHTML() : weeklyCardHTML()}
     ${busy ? '' : deloadHTML()}

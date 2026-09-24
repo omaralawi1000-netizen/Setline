@@ -365,8 +365,13 @@ const R = (re, s) => re.exec(s);
 export function parse(text, ctx = {}) {
   const batch = parseBatch(text, ctx);
   if (batch) return batch;
+  const said = String(text || '').trim();
+  text = shortBy(text);
   const r = parseOne(text, ctx);
+  r.heard = said;
   if (r.type === 'Unknown') {
+    const named = relOnExercise(text, ctx, r); // "I did one more rep on tricep pushdowns today"
+    if (named) return named;
     const g = gist(text, ctx, r); // "I'm on C bar row" names the exercise better than word matching
     if (g?.exerciseId) return g;
     return slots(text, ctx, r) || g || r;
@@ -380,6 +385,40 @@ export function parse(text, ctx = {}) {
     }
   }
   return r;
+}
+
+// "I needed one more rep" / "missed one rep" / "manglede en gentagelse": one short of the plan.
+const shortBy = text => String(text || '')
+  .replace(/\b(?:i )?(?:needed|was|came up|fell)(?: just)? (one|1|two|2) (?:more )?reps?(?: short)?\b/gi, '$1 rep less')
+  .replace(/\bmissed(?: by)? (one|1|two|2)(?: reps?)?\b/gi, '$1 rep less')
+  .replace(/\b(?:jeg )?manglede (en|én|1|to|2) (?:gentagelser?|reps?)\b/gi, '$1 gentagelse mindre');
+
+// A change told about a named lift: "one more rep on pushdowns", "I did 2 kg more on the leg press
+// today", "på triceps pushdown tog jeg en gentagelse mere". The lift is found, the rest is read as if
+// that lift were the current one.
+const REL_WORD = /\b(more|less|fewer|extra|again|same|planned|mere|mindre|færre|igen|samme|planlagt)\b/;
+function relOnExercise(text, ctx, unknown) {
+  const s = wordsToNumbers(clean(String(text || '')), unknown.lang);
+  const rel = REL_WORD.test(s);
+  const tail = /\s+(?:today|tonight|this time|this week|again|i dag|idag|denne gang)$/;
+  const tries = [];
+  const m = /^(.*?)\s+(?:on|for|at|with|during|in|doing|på|til|ved|i|med)\s+(?:the |my |those |de |mine |min )?(.+)$/.exec(s.replace(tail, ''));
+  if (m) tries.push([m[2], m[1]]);
+  const lead = /^(?:on|for|with|på|til|ved|i)\s+(?:the |my )?(.+)$/.exec(s.replace(tail, ''));
+  const words = (lead ? lead[1] : s.replace(tail, '')).split(' ');
+  for (let n = 4; n >= 1; n--) if (words.length > n) tries.push([words.slice(0, n).join(' '), words.slice(n).join(' ').replace(/^(?:i |jeg )?(?=\S)/, m => m)]);
+  for (const [phrase, rest] of tries) {
+    const ph = phrase.replace(tail, '').trim();
+    const hit = [matchExercise(ph, ctx), matchExercise(ph.replace(/s\b/g, ''), ctx)].filter(h => h?.exerciseId).sort((x, y) => y.score - x.score)[0]; // "triceps pushdowns"
+    if (!hit || hit.score < 50 || !rest.trim()) continue;
+    const sub = { ...ctx, current: { exerciseId: hit.exerciseId, lastSet: null, planned: null } };
+    const n = /^(?:i |jeg )?(?:did|got|hit|made|managed|tog|lavede|fik|klarede) (\d+)$/.exec(rest.trim());
+    const r = n ? { type: 'LogRel', reps: Number(n[1]) } : parseOne(rest.trim(), sub);
+    if (!['LogRel', 'AdjustLast', 'RepeatLast', 'LogSet'].includes(r.type) || (!rel && r.type !== 'LogRel' && r.type !== 'LogSet')) continue;
+    const type = r.type === 'AdjustLast' ? 'LogRel' : r.type;
+    return { ...r, type, exerciseId: r.exerciseId || hit.exerciseId, lang: unknown.lang, heard: unknown.heard };
+  }
+  return null;
 }
 
 // A whole session in one go: "bench 3x8 at 80, then rows 3x10 at 60, then lateral raises 3 by 15 with 10".
