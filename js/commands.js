@@ -67,12 +67,19 @@ export function resolve(intent, snap, t, lang) {
   const lastDone = ex => { const i = ex ? W.lastDoneIndex(ex) : -1; return i === -1 ? null : { i, set: ex.sets[i] }; };
 
   // one or more sets on an exercise (adds the exercise if it isn't in the workout)
+  // No exercise named and none on screen: ask which, with the ones you do most, instead of failing
+  const whichExercise = () => {
+    const ids = Object.keys(snap.usage || {}).sort((a, b) => snap.usage[b] - snap.usage[a]).filter(id => snap.catalog?.get(id)).slice(0, 4);
+    const choices = ids.map(id => ({ label: name(id), intent: { ...intent, exerciseId: id } }));
+    choices.push({ label: t('voice.pickOther'), intent: { type: 'PickExercise', then: intent } });
+    return cmd('ask', { title: t('voice.whichExercise'), sub: t('voice.heard', { text: heard }), choices, say: say(t('voice.whichExercise')) });
+  };
   const logCommand = (kg, reps, count, exerciseId, subText) => {
     const check = W.validateSet(kg, reps);
     if (!check.ok) return err(check.error === 'kg' ? 'invalid.kg' : 'invalid.reps', null, { title: t(check.error === 'kg' ? 'invalid.kg' : 'invalid.reps', { max: kgTxt(W.LIMITS.kgMax), unit: u }) });
     const idx = exerciseId ? w.exercises.findIndex(e => e.exerciseId === exerciseId) : w.current;
     const exId = exerciseId || cur()?.exerciseId;
-    if (!exId) return err('voice.noExercise');
+    if (!exId) return whichExercise();
     const ex = idx >= 0 ? w.exercises[idx] : { sets: [] };
     const n = W.nextSetNumber(ex);
     count = Math.max(1, Math.min(10, count || 1));
@@ -101,7 +108,7 @@ export function resolve(intent, snap, t, lang) {
       if (!check.ok) return err('voice.didntCatch', null, { title: t(check.error === 'kg' ? 'invalid.kg' : 'invalid.reps', { max: kgTxt(W.LIMITS.kgMax), unit: u }) });
     }
     const exId = exerciseId || cur()?.exerciseId;
-    if (!exId) return err('voice.noExercise');
+    if (!exId) return whichExercise();
     const idx = exerciseId ? w.exercises.findIndex(e => e.exerciseId === exerciseId) : w.current;
     const n = W.nextSetNumber(idx >= 0 ? w.exercises[idx] : { sets: [] });
     const heavy = sets.some(s => W.validateSet(s.kg, s.reps).confirm.length);

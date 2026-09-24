@@ -266,3 +266,9 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] Reorder: Today's cards and the Food tab's sections move up and down in Customize (and still switch on/off); a running workout always leads Today
 - [x] Weight steps (Settings → Workout): the −/+ step for barbells, dumbbells and machines (0.5–5 kg); the progression suggestions use the same steps
 - [x] Real maintenance: after 14+ days of food and 6+ weigh-ins, Daily targets shows the maintenance your own intake and scale imply (intake minus the weight trend × 7700 kcal/kg) and offers it, adjusted for your goal, as the calorie target
+
+## 1.18.0: say a set in any order; never "add an exercise first"
+
+- [x] Word order doesn't matter: the sets, the weight, the reps and the exercise are found wherever they are ("tricep pushdowns with two sets and 50 kilograms for eight reps", "two sets of tricep pushdowns at 50 kilos for 8", "I did 8 reps of tricep pushdown at 50 kilograms, 2 sets", "rope pushdown 25 kg 12 reps 3 sets"); it also fills an exercise or a set count a stricter reading dropped
+- [x] No exercise named and none on screen: "Which exercise was that?" with your most-trained lifts as one tap, or Pick another (the list), then the set is logged; never a dead end
+- [x] Empty workout: your lifts as one-tap starts (with their figures) and an example of what to say

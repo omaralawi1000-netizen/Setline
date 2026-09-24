@@ -364,7 +364,67 @@ const R = (re, s) => re.exec(s);
 // did 9 reps") parse as one command when they can; otherwise the gist is pulled out of them.
 export function parse(text, ctx = {}) {
   const r = parseOne(text, ctx);
-  return r.type === 'Unknown' ? gist(text, ctx, r) || r : r;
+  if (r.type === 'Unknown') {
+    const g = gist(text, ctx, r); // "I'm on C bar row" names the exercise better than word matching
+    if (g?.exerciseId) return g;
+    return slots(text, ctx, r) || g || r;
+  }
+  // a set that lost its exercise or its count to word order: fill in what the slots found
+  if (r.type === 'LogSet') {
+    const f = slots(text, ctx, r);
+    if (f && f.kg === r.kg && f.reps === r.reps) {
+      if (!r.exerciseId && f.exerciseId) r.exerciseId = f.exerciseId;
+      if ((r.count || 1) === 1 && f.count > 1) r.count = f.count;
+    }
+  }
+  return r;
+}
+
+// Word order doesn't matter: "tricep pushdowns with two sets and 50 kilograms for eight reps",
+// "two sets of tricep pushdowns at 50 kilos for 8", "rope pushdown 25 kg 12 reps 3 sets".
+// Finds the sets, the weight, the reps and the exercise wherever they are.
+const FILLER = new Set(('i did just my the a an of with and at for on then on the some reps rep sets set kilos kilo kg kgs kilograms pounds lbs each ' +
+  'jeg lavede tog med og på af til sæt gentagelser kilo hver').split(' '));
+function slots(text, ctx, base) {
+  let s = verbsToLifts(wordsToNumbers(clean(String(text || '')), base.lang));
+  const tok = s.split(' ');
+  const used = new Array(tok.length).fill(false);
+  let kg = null, reps = null, count = null;
+  const at = (test, fn) => { for (let i = 0; i < tok.length; i++) if (!used[i] && test(i)) { fn(i); return true; } return false; };
+  const num = i => /^\d+(\.\d+)?$/.test(tok[i] || '');
+  // N sets (of M)
+  at(i => num(i) && /^(sets?|sæt|rounds?)$/.test(tok[i + 1] || ''), i => {
+    count = Number(tok[i]); used[i] = used[i + 1] = true;
+    if (['of', 'af', 'med', 'x'].includes(tok[i + 2]) && num(i + 3) && !KG.has(tok[i + 4]) && !LB.has(tok[i + 4])) { reps = Number(tok[i + 3]); used[i + 2] = used[i + 3] = true; }
+  });
+  // N kg / lb
+  at(i => num(i) && (KG.has(tok[i + 1]) || LB.has(tok[i + 1])), i => {
+    kg = LB.has(tok[i + 1]) || (ctx.unit === 'lb' && !KG.has(tok[i + 1])) ? round(lbToKg(Number(tok[i])), 4) : Number(tok[i]); used[i] = used[i + 1] = true;
+  });
+  // N reps
+  if (reps == null) at(i => num(i) && REPS.has(tok[i + 1] || ''), i => { reps = Number(tok[i]); used[i] = used[i + 1] = true; });
+  // "for 8", "x 8"
+  if (reps == null) at(i => ['for', 'x', 'gange'].includes(tok[i]) && num(i + 1) && !KG.has(tok[i + 2]), i => { reps = Number(tok[i + 1]); used[i] = used[i + 1] = true; });
+  // a bare number left over: the weight if we have reps, the reps if we have the weight
+  const bare = tok.map((x, i) => (!used[i] && num(i) ? i : -1)).filter(i => i >= 0);
+  if (bare.length === 1 && kg == null && reps != null) { kg = Number(tok[bare[0]]); used[bare[0]] = true; }
+  else if (bare.length === 1 && reps == null && kg != null) { reps = Number(tok[bare[0]]); used[bare[0]] = true; }
+  if (reps == null || !Number.isInteger(reps) || reps < 1 || reps > 100) return null;
+  // the exercise: the best-matching run of the words that are left
+  const words = tok.map((x, i) => (used[i] || FILLER.has(x) || EDGE_FILLER.has(x) || /^\d/.test(x) ? null : x));
+  let best = null;
+  for (let len = 4; len >= 1; len--) {
+    for (let i = 0; i + len <= words.length; i++) {
+      const run = words.slice(i, i + len);
+      if (run.some(x => !x)) continue;
+      const hit = matchExercise(run.join(' '), ctx);
+      if (hit?.exerciseId && hit.score >= (len >= 2 ? 35 : 50) && (!best || hit.score + len * 4 > best.v)) best = { id: hit.exerciseId, v: hit.score + len * 4 };
+    }
+  }
+  const exerciseId = best?.id || null;
+  const bw = exerciseId && ctx.catalog?.get(exerciseId)?.equipment === 'bodyweight';
+  if (kg == null && !bw) return null;
+  return { type: 'LogSet', kg: kg ?? 0, reps, count: Math.max(1, Math.min(10, count || 1)), ...(exerciseId ? { exerciseId } : {}), lang: base.lang, heard: base.heard, slots: true };
 }
 
 const KG_RE = /(\d+(?:\.\d+)?)\s*(kg|kgs|kilo|kilos|kilogram|kilograms|kilo s|kiloer|pounds?|lbs?)\b/;

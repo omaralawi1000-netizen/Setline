@@ -70,7 +70,9 @@ export function renderWorkout(root) {
         <div class="emptyglyph">${I.workout}</div>
         <h2>${t('workout.emptyTitle')}</h2><p>${t('workout.emptySub')}</p>
         <button class="log" data-act="add-exercise">${I.plus}<span>${t('workout.addExercise')}</span></button>
-      </div>`;
+      </div>
+      ${quickAddHTML()}
+      ${getKey('groq') ? `<p class="sayhint wsay">${I.mic}<span>${esc(t('workout.emptySay'))}</span></p>` : ''}`;
     return;
   }
 
@@ -542,6 +544,15 @@ function overviewSheet() {
   }, { label: t('workout.exercises') });
 }
 
+// Your most-trained lifts as one-tap starts for an empty workout.
+function quickAddHTML() {
+  const { t, lang } = state;
+  const ids = Object.keys(state.usage || {}).sort((a, b) => state.usage[b] - state.usage[a]).filter(id => state.catalog.get(id)).slice(0, 8);
+  if (!ids.length) return '';
+  return `<div class="section"><span class="label">${t('workout.yourLifts')}</span></div>
+    <div class="qlifts">${ids.map((id, i) => `<button class="qlift solid" data-act="quick-exercise" data-id="${esc(id)}" style="--i:${i}">${figureHTML(state.catalog.get(id), { cls: 'qfig' })}<span>${esc(state.catalog.name(id, lang))}</span></button>`).join('')}</div>`;
+}
+
 function addExerciseFlow() {
   openPicker({
     onPick: id => {
@@ -641,6 +652,10 @@ export function initWorkout(root, actions) {
     },
     overview: () => overviewSheet(),
     'add-exercise': () => addExerciseFlow(),
+    'quick-exercise': el => {
+      try { update(w => W.addExercise(w, el.dataset.id), { undo: 'add', reason: 'add' }); haptic('success'); }
+      catch { toast({ title: esc(state.t('toast.limit')), error: true }); }
+    },
     finish: () => finishSheet()
   });
 

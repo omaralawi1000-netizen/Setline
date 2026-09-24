@@ -271,3 +271,15 @@ test('past-tense lifts and "sets of <weight>"', () => {
   assert.equal(p('deadlifted 180 kilos for 3 reps').exerciseId, 'deadlift');
   assert.equal(p('rowing 20 minutes').type === 'LogSet', false, 'rowing stays cardio');
 });
+
+test('word order does not matter for a set', () => {
+  const catalog = createCatalog();
+  const p = t => parse(t, { catalog, lang: 'en', routines: [], active: { exercises: [], current: 0 } });
+  for (const t of ['Tricep pushdowns with two sets and 50 kilograms for eight reps.', 'Two sets of tricep pushdowns at 50 kilos for 8 reps',
+    'I did triceps pushdowns 50 kilos 8 reps two sets', 'I did 8 reps of tricep pushdown at 50 kilograms, 2 sets']) {
+    const r = p(t);
+    assert.deepEqual([r.type, r.exerciseId, r.count, r.kg, r.reps], ['LogSet', 'triceps-pushdown', 2, 50, 8], t);
+  }
+  const r = p('rope pushdown 25 kg 12 reps 3 sets');
+  assert.deepEqual([r.count, r.kg, r.reps], [3, 25, 12]);
+});
