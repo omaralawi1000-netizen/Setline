@@ -9,6 +9,9 @@ import { haptic } from '../haptics.js';
 import { esc, $ } from './dom.js';
 import { I } from './icons.js';
 import { toast } from './toast.js';
+import { burst } from './fx.js';
+import { openPlates } from './plates.js';
+import { warmupRamp } from '../warmup.js';
 import { getKey } from '../keys.js';
 import { openSheet, closeTop } from './sheet.js';
 import { openPicker } from './picker.js';
@@ -42,7 +45,7 @@ export function renderWorkout(root) {
   if (!w && state.activeCardio) { ui.restVisible = false; return renderLiveCardio(root); }
   if (!w) {
     ui.restVisible = false;
-    root.innerHTML = `<header class="bar"><span class="bt">${t('tab.workout')}</span></header>
+    root.innerHTML = `<div class="tabtop"></div>
       <h1 class="greet tabh">${t('workout.noneTitle')}</h1><p class="sub">${t('workout.noneSub')}</p>${startCardsHTML()}`;
     return;
   }
@@ -100,6 +103,10 @@ export function renderWorkout(root) {
       </div>
       <div class="ghost">${ghost}</div>
       ${suggestionHTML(ex)}
+      <div class="tools">
+        <button class="tool" data-act="plates">${I.plates}<span>${t('plates.title')}</span></button>
+        ${!ex.sets.some(s => s.done) && !ex.sets.some(s => s.type === 'warmup') && v.kg > 20 && info?.equipment !== 'bodyweight' ? `<button class="tool" data-act="warmup">${I.flame}<span>${t('warmup.add')}</span></button>` : ''}
+      </div>
       ${logButton(ex)}
     </div>
 
@@ -170,7 +177,12 @@ function setsHTML(w, ex) {
   const { t } = state;
   const prs = livePRSets(state.prs, w);
   return ex.sets.map((s, k) => {
-    const n = k + 1;
+    const warm = s.type === 'warmup';
+    const n = W.setNumberAt(ex, k);
+    if (warm) {
+      return `<li class="sw" data-set="${s.id}"><span class="del" aria-hidden="true">${I.trash}${t('common.delete')}</span>
+        <button class="set warm ${s.done ? 'done' : 'planned'}" data-act="warmup-done" data-id="${s.id}" aria-label="${t('warmup.row')}"><span class="idx">W</span><span class="val"><b>${weight(s.kg, unit(), state.lang)}</b> ${u()} × <b>${s.reps}</b></span>${s.done ? `<span class="ck soft">${I.check}</span>` : `<span class="later">${t('warmup.tap')}</span>`}</button></li>`;
+    }
     const val = s.done || s.kg != null
       ? `<b>${weight(s.kg, unit(), state.lang)}</b> ${u()} × <b>${s.reps}</b>`
       : t('workout.repsOnly', { reps: s.reps });
@@ -365,6 +377,12 @@ function doLog(kg, reps) {
   ui.flash = true;
   haptic('success');
   const pr = livePRSets(state.prs, state.active).has(set.id);
+  // the new row lands, then sparks fly from its check (warm for a record)
+  requestAnimationFrame(() => {
+    const ck = document.querySelector(`#sets [data-id="${set.id}"] .ck`);
+    burst(ck, { warm: pr, count: pr ? 18 : 10, spread: pr ? 74 : 48 });
+    if (pr) document.querySelector(`#sets [data-id="${set.id}"]`)?.classList.add('prflash');
+  });
   toast({
     title: `${pr ? `<span class="tag sm">${t('workout.pr')}</span> ` : ''}${esc(exName(ex.exerciseId))} <span class="v">${esc(setText(kg, reps))}</span>`,
     sub: t('toast.logged', { n }),
@@ -560,6 +578,19 @@ export function initWorkout(root, actions) {
     'rest-skip': () => { update(w => W.skipRest(w)); haptic('tap'); },
     'edit-set': el => { if (ui.suppressClick) return; editSetSheet(el.dataset.id); },
     noop: () => {},
+    plates: () => { const w = state.active; if (w) openPlates(readInputs(root).kg ?? values(w).kg); },
+    warmup: () => {
+      const w = state.active;
+      const kg = values(w).kg;
+      update(cur => W.addWarmups(cur, cur.current, warmupRamp(kg)), { undo: 'warmup' });
+      haptic('success');
+      toast({ title: esc(state.t('warmup.added')), action: state.t('common.undo'), onAction: () => undo() });
+    },
+    'warmup-done': el => {
+      if (ui.suppressClick) return;
+      update(w => W.completeWarmup(w, w.current, el.dataset.id), { reason: 'warmup' });
+      haptic('tap');
+    },
     overview: () => overviewSheet(),
     'add-exercise': () => addExerciseFlow(),
     finish: () => finishSheet()

@@ -226,6 +226,22 @@ export async function undoProtein(grams, date = dateKey()) {
   emit('body');
 }
 
+// ---- backup ----
+// Replace everything with a validated backup in one transaction (keys and the active workout stay).
+export async function importBackup(d) {
+  await db.tx(['workouts', 'cardio', 'routines', 'exercises', 'prs', 'bodyweight', 'nutrition', 'chat'], 'readwrite', s => {
+    for (const k of ['workouts', 'cardio', 'routines', 'exercises', 'prs', 'bodyweight', 'nutrition', 'chat']) {
+      s[k].clear();
+      for (const x of d[k]) s[k].put(x);
+    }
+  });
+  state.settings = sanitize({ ...d.settings, ttsModel: state.settings.ttsModel, ttsLite: state.settings.ttsLite, cmdModel: state.settings.cmdModel, coachModel: state.settings.coachModel, cmdAlt: state.settings.cmdAlt, coachAlt: state.settings.coachAlt });
+  saveSettings(state.settings);
+  applyLang();
+  await init();
+  emit('reset');
+}
+
 // ---- routines ----
 export async function saveRoutine(r) {
   await db.put('routines', r);

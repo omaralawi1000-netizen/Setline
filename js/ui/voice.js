@@ -9,7 +9,7 @@ import { parse } from '../parser.js';
 import { resolve, AUTO_MS } from '../commands.js';
 import { translator } from '../i18n.js';
 import { getKey } from '../keys.js';
-import { sttModelId, ttsModelId } from '../settings.js';
+import { sttModelId, ttsModelId, ttsAlt } from '../settings.js';
 import { firstPlannedIndex, lastDoneIndex, restRemaining } from '../workout.js';
 import { unlockAudio } from '../audio.js';
 import { haptic } from '../haptics.js';
@@ -21,6 +21,7 @@ import { isQuestion, isPlanRequest } from '../coach.js';
 import { startCardioSession, finishSheet as cardioFinishSheet } from './cardio.js';
 import { dateKey } from '../body.js';
 import { planFor } from './routine.js';
+import { orbPulse } from './fx.js';
 import { ask as askCoach, ensureModels } from './coach.js';
 import { cmdModels } from '../settings.js';
 
@@ -66,7 +67,7 @@ const snapshot = () => ({
 function speak(text, lang) {
   if (!text || state.settings.spoken === 'off') return;
   tts.speak(text, {
-    key: getKey('google'), model: ttsModelId(state.settings), voice: state.settings.voice, lang,
+    key: getKey('google'), model: ttsModelId(state.settings), alt: ttsAlt(state.settings), voice: state.settings.voice, lang,
     canSpeak: () => !mic.isRecording()
   });
 }
@@ -514,6 +515,7 @@ async function commitNow() {
 async function execute(run, cmd) {
   if (!run) return true;
   haptic('success');
+  orbPulse();
   if (run.op === 'update') {
     const before = state.active;
     let next;

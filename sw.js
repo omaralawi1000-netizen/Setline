@@ -1,6 +1,6 @@
 // Service worker: precached app shell, runtime cache for Google Fonts.
 // Bump VERSION on every release (keep js/version.js in sync).
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 const CACHE = 'setline-' + VERSION;
 const FONTS = 'setline-fonts';
 const SHELL = [
@@ -13,6 +13,7 @@ const SHELL = [
   'js/ai.js',
   'js/app.js',
   'js/audio.js',
+  'js/backup.js',
   'js/body.js',
   'js/cardio.js',
   'js/coach.js',
@@ -28,6 +29,7 @@ const SHELL = [
   'js/format.js',
   'js/haptics.js',
   'js/i18n.js',
+  'js/plates.js',
   'js/pr.js',
   'js/progression.js',
   'js/routines.js',
@@ -36,17 +38,22 @@ const SHELL = [
   'js/units.js',
   'js/version.js',
   'js/wakelock.js',
+  'js/warmup.js',
   'js/workout.js',
   'js/ui/body.js',
   'js/ui/cardio.js',
+  'js/ui/charts.js',
   'js/ui/coach.js',
   'js/ui/dom.js',
+  'js/ui/fx.js',
   'js/ui/icons.js',
   'js/ui/sheet.js',
   'js/ui/toast.js',
   'js/ui/today.js',
   'js/ui/workout.js',
   'js/ui/picker.js',
+  'js/ui/plates.js',
+  'js/ui/progress.js',
   'js/ui/routine.js',
   'js/ui/history.js',
   'js/ui/settings.js',
@@ -69,6 +76,16 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('message', e => {
   if (e.data === 'skipWaiting') self.skipWaiting();
+});
+
+// Tapping a rest alert brings the app back.
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (all[0]) return all[0].focus();
+    return self.clients.openWindow('./');
+  })());
 });
 
 self.addEventListener('fetch', e => {

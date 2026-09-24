@@ -8,6 +8,8 @@ const TIMEOUT = 6000;
 const RATE = 24000;
 
 let current = null;   // {source} | {utter}
+// What spoke last and why, for Settings: {engine: 'gemini'|'device', error: code|null}
+export const lastSpeech = { engine: null, error: null };
 let seq = 0;
 let listeners = new Set();
 export const onSpeaking = fn => (listeners.add(fn), () => listeners.delete(fn));
@@ -24,14 +26,16 @@ export function stop() {
 
 import { rankModels } from './ai.js';
 
-// Pick the newest Flash-Lite TTS model, else the newest Flash TTS model.
-export function pickTtsModel(models, preferred) {
+// Pick a TTS model. natural: newest Flash TTS (sounds best), fast: newest Flash-Lite TTS.
+// Each falls back to the other family, then to anything with "tts".
+export function pickTtsModel(models, preferred, quality = 'fast') {
   const ids = models
     .filter(x => typeof x === 'string' || !x.supportedGenerationMethods || x.supportedGenerationMethods.includes('generateContent'))
     .map(x => String(x.name || x).replace(/^models\//, ''))
     .filter(id => /tts/.test(id));
   const best = list => rankModels(list)[0] || null;
-  const pick = best(ids.filter(id => /flash-lite/.test(id))) || best(ids.filter(id => /flash/.test(id))) || best(ids);
+  const lite = best(ids.filter(id => /flash-lite/.test(id))), flash = best(ids.filter(id => /flash/.test(id) && !/lite/.test(id)));
+  const pick = (quality === 'natural' ? flash || lite : lite || flash) || best(ids);
   // the configured default only wins if nothing newer is listed
   if (preferred && ids.includes(preferred) && rankModels([preferred, pick])[0] === preferred) return preferred;
   return pick;
@@ -60,7 +64,7 @@ async function synth(text, { key, model, voice }) {
         generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } }
       })
     });
-    if (!res.ok) throw new Error('tts ' + res.status);
+    if (!res.ok) throw Object.assign(new Error('tts ' + res.status), { status: res.status });
     const data = await res.json();
     const part = data?.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.data)?.inlineData;
     if (!part) throw new Error('tts empty');
@@ -112,10 +116,13 @@ function fallback(text, lang, mine) {
   if (!ss || mine !== seq) return;
   const u = new SpeechSynthesisUtterance(text);
   const want = lang === 'da' ? 'da' : 'en';
-  const v = ss.getVoices().find(v => v.lang?.toLowerCase().startsWith(want));
+  // network and "natural" voices sound far better than the default local ones
+  const voices = ss.getVoices().filter(v => v.lang?.toLowerCase().startsWith(want));
+  const score = v => (/natural|neural|online|premium|enhanced/i.test(v.name) ? 4 : 0) + (/google/i.test(v.name) ? 2 : 0) + (v.localService ? 0 : 1);
+  const v = voices.sort((a, b) => score(b) - score(a))[0];
   if (v) u.voice = v;
   u.lang = lang === 'da' ? 'da-DK' : 'en-GB';
-  u.rate = 1.05;
+  u.rate = 1;
   u.onend = u.onerror = () => { if (current?.utter === u) { current = null; emit(false); } };
   current = { utter: u };
   emit(true);
@@ -133,16 +140,25 @@ export async function speak(text, opts) {
       let buf = await db.get('ttsCache', cacheKey).catch(() => null);
       if (buf && !buf.pcm) buf = null;
       if (!buf) {
-        buf = await synth(text, opts);
+        // chosen model, then its runner-up
+        const models = [...new Set([opts.model, ...(opts.alt || [])].filter(Boolean))];
+        let last;
+        for (const model of models) {
+          try { buf = await synth(text, { ...opts, model }); break; } catch (e) { last = e; if (e.status === 400 || e.status === 403) break; }
+        }
+        if (!buf) throw last;
         db.put('ttsCache', buf, cacheKey).catch(() => {});
       }
       if (mine !== seq || !opts.canSpeak()) return;
+      lastSpeech.engine = 'gemini'; lastSpeech.error = null;
       await playPcm(buf, mine);
       return;
     } catch (e) {
-      console.warn('tts fallback', e?.message);
+      lastSpeech.error = e?.status ? String(e.status) : e?.name === 'AbortError' ? 'timeout' : 'failed';
+      console.warn('tts fallback', lastSpeech.error);
     }
-  }
+  } else lastSpeech.error = 'nokey';
+  lastSpeech.engine = 'device';
   if (mine !== seq || !opts.canSpeak()) return;
   fallback(text, opts.lang, mine);
 }

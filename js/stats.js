@@ -119,3 +119,42 @@ export function weekReview(history, cardio, now = Date.now()) {
     prs: lw.reduce((a, w) => a + (w.prs?.length || 0), 0)
   };
 }
+
+// ---------- progress series ----------
+
+// Weekly totals, oldest first: [{t, volume, sessions, cardioMin}]
+export function weeklySeries(history, cardio, weeks = 12, now = Date.now()) {
+  const start = weekStart(now);
+  const out = [];
+  for (let i = weeks - 1; i >= 0; i--) {
+    const from = weekStart(start - i * 7 * DAY + DAY), to = from + 7 * DAY;
+    const ws = history.filter(w => w.startedAt >= from && w.startedAt < to);
+    const cs = cardio.filter(c => c.startedAt >= from && c.startedAt < to);
+    out.push({ t: from, volume: Math.round(ws.reduce((a, w) => a + volume(w), 0)), sessions: ws.length + cs.length, cardioMin: Math.round(cs.reduce((a, c) => a + c.durationSec / 60, 0)) });
+  }
+  return out;
+}
+
+// Every PR any workout set, newest first: [{t, workoutId, pr}]
+export function prTimeline(history) {
+  const out = [];
+  for (const w of history) for (const pr of w.prs || []) out.push({ t: w.startedAt, workoutId: w.id, pr });
+  return out.sort((a, b) => b.t - a.t);
+}
+
+// Exercises by how often they're trained, with best e1RM and a short series: [{id, sessions, best, series}]
+export function liftSummaries(history) {
+  const map = new Map();
+  for (const w of history) for (const ex of w.exercises) {
+    let best = 0, top = null;
+    for (const s of ex.sets) if (counts(s)) { const v = e1rm(s.kg, s.reps); if (v > best) { best = v; top = s; } }
+    if (!best) continue;
+    if (!map.has(ex.exerciseId)) map.set(ex.exerciseId, []);
+    map.get(ex.exerciseId).push({ t: w.startedAt, v: best, kg: top.kg, reps: top.reps });
+  }
+  return [...map].map(([id, list]) => {
+    const series = list.sort((a, b) => a.t - b.t);
+    const best = series.reduce((m, p) => (p.v > m.v ? p : m), series[0]);
+    return { id, sessions: series.length, best, series, first: series[0].v, last: series[series.length - 1].v };
+  }).sort((a, b) => b.sessions - a.sessions || b.best.v - a.best.v);
+}

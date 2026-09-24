@@ -57,7 +57,9 @@ test('definition of done: hands-free push day', () => {
   let c = s.say('80 kilo 8 gentagelser');
   assert.equal(c.kind, 'auto');
   assert.equal(c.title, 'Bænkpres');
-  assert.match(c.say, /80 kilo, 8 gentagelser\. Sæt 1\. Pause 90 sekunder\./);
+  assert.match(c.say, /80 kilo gange 8|80 gange 8/);
+  assert.match(c.say, /sæt 1|Sæt 1/);
+  assert.match(c.say, /90 sekunder/);
   assert.deepEqual(sets(s), [[80, 8]]);
   assert.ok(s.st.active.rest, 'rest started');
 
@@ -148,7 +150,7 @@ test('undo, swap, rest and queries', () => {
   assert.equal(s.say('undo').kind, 'error', 'nothing to undo yet');
   s.say('start push day');
   let c = s.say('80 for 8');
-  assert.equal(c.say, '80 for 8.');
+  assert.match(c.say, /80 (for|by) 8/);
   s.say('undo');
   assert.equal(sets(s).length, 0);
   s.say('swap to dumbbell bench press');

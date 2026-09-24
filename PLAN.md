@@ -9,8 +9,8 @@ Source: SPEC.md section 7. Work one phase at a time; stop after each and wait fo
 | 1. Foundation and touch workout loop (no AI) | Done |
 | 2. Voice | Done (1.2.1 fixes after phone test) |
 | 3. AI brain and Coach | Done (1.3.1 model fixes after phone test) |
-| 4. Routines and plans | Done, awaiting phone test |
-| 5. Progress and extras | Partly pulled forward (see below) |
+| 4. Routines and plans | Done |
+| 5. Progress and extras | Done, awaiting phone test |
 
 ## Phase 1: Foundation and touch workout loop (no AI)
 
@@ -107,8 +107,17 @@ Added on request (not in the original spec), 1.4.0:
 
 ## Phase 5: Progress and extras
 
-SVG progress charts, plate calculator, backup export/import, polish pass. (Bodyweight log and Today cards were pulled forward.)
+- [x] Progress screen: weekly strength volume and cardio minutes (4 weeks / 12 weeks / 1 year), bodyweight line, lifts with e1RM change, records timeline
+- [x] Exercise page: e1RM curve, best set, heaviest, sessions, next-time suggestion, session list (from Progress, History detail)
+- [x] Plate calculator (bar 20/15/10/0, plates 25/20/15/10/5/2.5/1.25 per side), drawn on a bar
+- [x] Backup export/import (JSON, never keys, validated as a whole before anything is written)
+- [x] Today cards, bodyweight log (pulled forward in 1.2 / 1.4)
+- [x] Polish pass: count-ups, greeting reveal, chart draw-in, spark bursts on logged sets (warm for records), finish celebration, orb pulse on voice commits
 
-## Notes
+Extras in 1.5.0:
+- [x] Warm-up ramp (bar, 50%, 70%, 85%) as a tick-off checklist that logging skips and records ignore
+- [x] Rest alerts: a notification when rest ends with the screen off (opt-in)
+- [x] Voice: friendlier default voice (Achird) with a described list, Flash TTS preferred ("Natural"), runner-up model retry, varied natural replies, Settings shows which engine spoke and why
+- [x] Removed the scroll-aware top bar (felt in the way on the phone)
 
-- Release version lives in `sw.js` (`VERSION`) and `js/version.js`; a test keeps them in sync. Bump both on every release.
+Known: some phones' "dark theme for websites" still re-colours the app even with `color-scheme: dark only`; the fix is in the browser setting.

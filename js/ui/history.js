@@ -6,6 +6,7 @@ import { esc } from './dom.js';
 import { I } from './icons.js';
 import { workoutTitle } from './today.js';
 import { cardioName, paceText } from '../cardio.js';
+import { toDisplay } from '../units.js';
 import { cardioIcon } from './cardio.js';
 
 const u = () => state.t(`unit.${state.settings.unit}`);
@@ -53,8 +54,8 @@ export function renderHistory(root) {
       + (earlier.length ? `<p class="group">${t('history.earlier')}</p><ul class="hlist">${earlier.map(item).join('')}</ul>` : '')
       + (!all.length ? `<p class="none">${t('history.empty')}</p>` : '');
   }
-  root.innerHTML = `<header class="bar"><span class="bt">${t('history.title')}</span></header>
-    <h1 class="h1 tabh">${t('history.title')}</h1>${seg}${body}`;
+  root.innerHTML = `<div class="tabtop"></div>
+    <div class="hhead"><h1 class="h1 tabh">${t('history.title')}</h1><button class="iconbtn" data-progress aria-label="${t('progress.title')}">${I.chart}</button></div>${seg}${body}`;
 }
 
 function prLabel(p) {
@@ -88,11 +89,11 @@ export function renderDetail(root, id) {
     <p class="detail-date">${esc(dayLong(w.startedAt, lang))} · ${esc(time(w.startedAt, lang))}</p>
     <div class="summary glass">
       <div><b>${minutes(elapsedSec(w))}</b><span>${t('history.duration')}</span></div>
-      <div><b>${total(volume(w), state.settings.unit, lang)}</b><span>${t('history.volume')}, ${u()}</span></div>
-      <div><b>${doneSetCount(w)}</b><span>${t('history.setsLabel')}</span></div>
+      <div><b data-count="${Math.round(toDisplay(volume(w), state.settings.unit))}">${total(volume(w), state.settings.unit, lang)}</b><span>${t('history.volume')}, ${u()}</span></div>
+      <div><b data-count="${doneSetCount(w)}">${doneSetCount(w)}</b><span>${t('history.setsLabel')}</span></div>
     </div>
     ${prs ? `<div class="prs solid"><span class="tag">${t('history.newPrs')}</span><ul>${prs}</ul></div>` : ''}
-    ${w.exercises.map(ex => `<div class="exblock solid"><h3>${esc(state.catalog.name(ex.exerciseId, lang))}</h3><ol>
+    ${w.exercises.map(ex => `<div class="exblock solid"><h3><button data-ex="${esc(ex.exerciseId)}">${esc(state.catalog.name(ex.exerciseId, lang))} <span class="chev">›</span></button></h3><ol>
       ${ex.sets.map((s, k) => `<li><span class="idx">${k + 1}</span><span class="val"><b>${weight(s.kg, state.settings.unit, lang)}</b> ${u()} × <b>${s.reps}</b></span>${prSets.has(s.id) ? `<span class="tag sm">${t('workout.pr')}</span>` : '<span></span>'}</li>`).join('')}
     </ol></div>`).join('')}`;
 }

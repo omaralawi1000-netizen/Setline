@@ -1,10 +1,11 @@
 // Coach tab: chat thread, composer, streamed answers, spoken when complete.
 import * as store from '../store.js';
 import { state } from '../store.js';
-import { streamChat, listModelsText, AiError, withFallback, aiPlan } from '../ai.js';
+import { streamChat, AiError, withFallback, aiPlan, pickTextModels } from '../ai.js';
+import { listModels, pickTtsModel } from '../tts.js';
 import { buildContext, chatContents, systemPrompt, formatAnswer, speakable, isPlanRequest, PLAN_SCHEMA, planSystem, validatePlan, planToRoutines } from '../coach.js';
 import { getKey } from '../keys.js';
-import { coachModels, ttsModelId } from '../settings.js';
+import { coachModels, ttsModelId, ttsAlt } from '../settings.js';
 import * as tts from '../tts.js';
 import { isRecording } from '../voice.js';
 import { haptic } from '../haptics.js';
@@ -54,7 +55,7 @@ export function renderCoach(root) {
   } else {
     body = `<ol class="thread" id="thread">${chat.map(bubble).join('')}</ol>`;
   }
-  root.innerHTML = `<header class="bar"><span class="bt">${t('coach.title')}</span></header>
+  root.innerHTML = `<div class="tabtop"></div>
     <header class="coachhead"><div><h1 class="h1">${t('coach.title')}</h1><p class="sub">${t('coach.sub')}</p></div>
       ${chat.length ? `<button class="iconbtn" data-coach="clear" aria-label="${t('coach.clear')}">${I.trash}</button>` : ''}</header>
     ${body}`;
@@ -70,13 +71,23 @@ function scrollDown(root, smooth = true) {
 }
 
 // Pick coach/command models once, from the key's model list.
-export async function ensureModels() {
+// Pick coach, command and voice models once from the key's model list (and again after an update adds fields).
+let picking = null;
+export function ensureModels() {
   const s = state.settings;
-  if (s.coachOverride || (s.coachModel && s.coachAlt)) return;
-  try {
-    const r = await listModelsText(getKey('google'));
-    if (r) store.setSettings(r);
-  } catch { /* fall back to defaults */ }
+  if (!getKey('google') || ((s.coachOverride || (s.coachModel && s.coachAlt)) && (s.ttsOverride || s.ttsLite))) return Promise.resolve();
+  picking ||= (async () => {
+    try {
+      const r = await listModels(getKey('google'));
+      if (r.status !== 'ok') return;
+      const text = pickTextModels(r.models);
+      store.setSettings({
+        cmdModel: text.command || '', coachModel: text.coach || '', cmdAlt: text.commandAlt || '', coachAlt: text.coachAlt || '',
+        ttsModel: pickTtsModel(r.models, null, 'natural') || '', ttsLite: pickTtsModel(r.models, null, 'fast') || ''
+      });
+    } catch { /* fall back to defaults */ } finally { picking = null; }
+  })();
+  return picking;
 }
 
 // Ask the coach. Used by the composer, the example chips, and voice questions.
@@ -114,7 +125,7 @@ export async function ask(question, { root = $('#s-coach') } = {}) {
     store.updateChat(reply.id, { text, streaming: false }, { persist: true });
     haptic('tap');
     if (text && state.settings.spoken !== 'off') {
-      tts.speak(speakable(text), { key, model: ttsModelId(state.settings), voice: state.settings.voice, lang, canSpeak: () => !isRecording() });
+      tts.speak(speakable(text), { key, model: ttsModelId(state.settings), alt: ttsAlt(state.settings), voice: state.settings.voice, lang, canSpeak: () => !isRecording() });
     }
   } catch (e) {
     const code = e instanceof AiError ? e.code : 'failed';
@@ -140,7 +151,7 @@ async function buildPlan(question, reply, { key, lang, ctl, root }) {
     else {
       store.updateChat(reply.id, { streaming: false, text: plan.summary || plan.name, plan }, { persist: true });
       haptic('success');
-      if (plan.summary && state.settings.spoken !== 'off') tts.speak(speakable(plan.summary), { key, model: ttsModelId(state.settings), voice: state.settings.voice, lang, canSpeak: () => !isRecording() });
+      if (plan.summary && state.settings.spoken !== 'off') tts.speak(speakable(plan.summary), { key, model: ttsModelId(state.settings), alt: ttsAlt(state.settings), voice: state.settings.voice, lang, canSpeak: () => !isRecording() });
     }
   } catch (e) {
     const code = e instanceof AiError ? e.code : 'failed';

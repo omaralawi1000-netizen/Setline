@@ -4,6 +4,7 @@ import { esc } from './dom.js';
 import { I } from './icons.js';
 import { routineName, estimateMinutes, nextRoutine } from '../routines.js';
 import { greetingKey, clock, total, weight, num } from '../format.js';
+import { toDisplay } from '../units.js';
 import { doneSetCount, elapsedSec } from '../workout.js';
 import { getKey } from '../keys.js';
 import { thisWeek, lastSessionSummary, latestPR, sparkline, weekStreak, weekReview, weekStart } from '../stats.js';
@@ -94,13 +95,13 @@ function weekCardsHTML() {
   const days = [...wk.days];
   for (const c of cardioWeek) days[Math.min(6, Math.floor((c.startedAt - weekStart(Date.now())) / DAY))] = true;
   const letters = t('today.days').split(' ');
-  const week = `<div class="mini solid" role="img" aria-label="${esc(t('today.weekAria', { n: done, goal }))}"><span class="label">${t('today.thisWeek')}</span>
+  const week = `<div class="mini solid" role="img" aria-label="${esc(t('today.weekAria', { n: done, goal }))}"><span class="label">${t('today.workouts')}</span>
       <div class="week"><div class="ring"><svg viewBox="0 0 60 60" aria-hidden="true"><circle class="bg" cx="30" cy="30" r="25"/><circle class="fg" cx="30" cy="30" r="25" style="stroke-dashoffset:${C}" data-to="${C * (1 - Math.min(1, done / goal))}"/></svg><b>${done}/${goal}</b></div></div>
       <div class="days" aria-hidden="true">${days.map((on, i) => `<i class="${on ? 'on' : ''}${i === wk.today ? ' now' : ''}" title="${letters[i]}"></i>`).join('')}</div>
     </div>`;
   const cm = cardioMinutes(state.cardio, weekStart(Date.now()), weekStart(Date.now()) + 7 * DAY);
   const cardio = `<div class="mini solid"><span class="label">${t('label.cardio')}</span>
-      <span class="vol"><b>${cm.minutes}<small> / ${settings.cardioGoal} min</small></b>
+      <span class="vol"><b><i class="n" data-count="${cm.minutes}">${cm.minutes}</i><small> / ${settings.cardioGoal} min</small></b>
       <span class="cbar"><i style="transform:scaleX(${Math.min(1, cm.minutes / settings.cardioGoal)})"></i></span>
       <span>${cm.minutes ? esc(t('cardio.zone2', { min: cm.zone2 })) : t('cardio.none')}</span></span></div>`;
   let html = `<div class="grid2">${week}${cardio}</div>`;
@@ -109,7 +110,7 @@ function weekCardsHTML() {
   const lastCardio = state.cardio[0];
   const cards = [];
   if (last) cards.push(`<button class="mini solid" data-act="detail" data-id="${esc(last.workout.id)}"><span class="label">${t('today.lastSession')}</span><strong>${esc(workoutTitle(last.workout))}</strong>
-      <span class="vol"><b>${total(last.volume, unit, lang)}</b><span>${esc(t('today.lastSessionSub', { volume: '', unit: u, min: last.minutes }).trim())}</span></span></button>`);
+      <span class="vol"><b data-count="${Math.round(toDisplay(last.volume, unit))}">${total(last.volume, unit, lang)}</b><span>${esc(t('today.lastSessionSub', { volume: '', unit: u, min: last.minutes }).trim())}</span></span></button>`);
   if (lastCardio) {
     const pace = paceText(lastCardio, lang);
     cards.push(`<button class="mini solid" data-act="detail" data-kind="cardio" data-id="${esc(lastCardio.id)}"><span class="label">${esc(cardioName(lastCardio.type, lang))}</span><strong>${lastCardio.distanceKm ? esc(num(lastCardio.distanceKm, lang, 2)) + ' km' : esc(t('min', { n: Math.round(lastCardio.durationSec / 60) }))}</strong>
@@ -163,8 +164,8 @@ function reviewHTML() {
       <div class="rhead"><span class="label">${t('review.title')}</span>${r.prs ? `<span class="tag sm">${t('review.prs', { n: r.prs })}</span>` : ''}</div>
       <div class="rstats">
         <div><b>${r.workouts + r.cardioSessions}</b><span>${esc(t('review.workouts', { n: r.workouts + r.cardioSessions }).replace(/^\d+\s*/, ''))}</span></div>
-        <div><b>${total(r.volume, settings.unit, lang)}</b><span>${t('review.volume')}, ${t(`unit.${settings.unit}`)}${r.volumeChange != null ? ` · ${sign(r.volumeChange)}${Math.abs(r.volumeChange)}%` : ''}</span></div>
-        <div><b>${r.cardioMin}</b><span>${t('min', { n: '' }).trim()} ${t('label.cardio').toLowerCase()}${r.cardioChange != null ? ` · ${sign(r.cardioChange)}${Math.abs(r.cardioChange)}%` : ''}</span></div>
+        <div><b data-count="${Math.round(toDisplay(r.volume, settings.unit))}">${total(r.volume, settings.unit, lang)}</b><span>${t('review.volume')}, ${t(`unit.${settings.unit}`)}${r.volumeChange != null ? ` · ${sign(r.volumeChange)}${Math.abs(r.volumeChange)}%` : ''}</span></div>
+        <div><b data-count="${r.cardioMin}">${r.cardioMin}</b><span>${t('min', { n: '' }).trim()} ${t('label.cardio').toLowerCase()}${r.cardioChange != null ? ` · ${sign(r.cardioChange)}${Math.abs(r.cardioChange)}%` : ''}</span></div>
       </div>
       ${getKey('google') ? `<button class="btn2 soft" data-review="ask">${I.chat}<span>${t('review.ask')}</span></button>` : ''}
     </div>`;
@@ -183,15 +184,15 @@ export function renderToday(root) {
   const { t } = state;
   const hour = new Date().getHours();
   const busy = state.active || state.activeCardio;
-  root.innerHTML = `<header class="bar"><span class="bt">Setline</span></header>
-    <header class="brand">
+  root.innerHTML = `<header class="brand">
       <div><strong>Setline</strong><span>${t('app.tagline')}</span></div>
       <button class="iconbtn" data-act="open-settings" aria-label="${t('settings.title')}">${I.settings}</button>
     </header>
-    <h1 class="greet">${t(greetingKey(hour))}</h1>
+    <h1 class="greet">${t(greetingKey(hour)).split(' ').map((w, i) => `<span class="gw" style="--i:${i}">${esc(w)}</span>`).join(' ')}</h1>
     <p class="sub${!busy && weekStreak(state.history, state.cardio, state.settings.weeklyGoal).streak ? ' streak' : ''}">${esc(subline())}</p>
     ${busy ? resumeHTML() : upNextHTML()}
     ${busy ? '' : cardioRowHTML()}
+    <div class="section"><span class="label">${t('today.thisWeek')}</span><button class="textbtn" data-progress>${t('progress.link')} →</button></div>
     ${weekCardsHTML()}
     ${bodyHTML()}
     ${reviewHTML()}

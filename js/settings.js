@@ -12,9 +12,12 @@ export const DEFAULTS = Object.freeze({
   voiceLang: 'auto',   // auto | da | en (speech-to-text)
   micMode: 'hold',     // hold | tap
   spoken: 'minimal',   // off | minimal | full
-  voice: 'Kore',       // Gemini prebuilt voice
+  voice: 'Achird',     // Gemini prebuilt voice
+  voiceV: 2,           // bumped when the default voice changes
+  ttsQuality: 'natural', // natural (Flash TTS) | fast (Flash-Lite TTS)
   stt: 'fast',         // fast | accurate
-  ttsModel: '',        // picked from the model list on key test
+  ttsModel: '',        // Flash TTS, picked from the model list on key test
+  ttsLite: '',         // Flash-Lite TTS
   ttsOverride: '',     // manual model id
   weeklyGoal: 3,       // workouts per week, Today ring
   cmdModel: '',        // Flash-Lite text model for command fallback (picked on key test)
@@ -26,10 +29,13 @@ export const DEFAULTS = Object.freeze({
   cardioGoal: 150,     // minutes per week
   proteinPerKg: 1.8,
   readiness: true,
-  suggestions: true
+  suggestions: true,
+  restAlerts: false
 });
 
-export const VOICES = ['Kore', 'Puck', 'Aoede', 'Charon', 'Leda', 'Orus', 'Zephyr', 'Fenrir'];
+// Gemini prebuilt voices and how they sound.
+export const VOICES = ['Achird', 'Sulafat', 'Callirrhoe', 'Puck', 'Aoede', 'Despina', 'Zubenelgenubi', 'Leda', 'Kore', 'Charon'];
+export const VOICE_FEEL = { Achird: 'friendly', Sulafat: 'warm', Callirrhoe: 'easy-going', Puck: 'upbeat', Aoede: 'breezy', Despina: 'smooth', Zubenelgenubi: 'casual', Leda: 'youthful', Kore: 'firm', Charon: 'informative' };
 export const DEFAULT_TTS_MODEL = 'gemini-3.8-flash-lite-tts';
 const MODEL_ID = /^[a-z0-9][a-z0-9.\-]{2,80}$/;
 
@@ -46,12 +52,15 @@ export function sanitize(input) {
   if (Number.isFinite(input.proteinPerKg)) s.proteinPerKg = Math.min(2.6, Math.max(1.2, Math.round(input.proteinPerKg * 10) / 10));
   if (typeof input.readiness === 'boolean') s.readiness = input.readiness;
   if (typeof input.suggestions === 'boolean') s.suggestions = input.suggestions;
+  if (typeof input.restAlerts === 'boolean') s.restAlerts = input.restAlerts;
   if (['auto', 'da', 'en'].includes(input.voiceLang)) s.voiceLang = input.voiceLang;
   if (['hold', 'tap'].includes(input.micMode)) s.micMode = input.micMode;
   if (['off', 'minimal', 'full'].includes(input.spoken)) s.spoken = input.spoken;
-  if (VOICES.includes(input.voice)) s.voice = input.voice;
+  // the old default (Kore, firm) moves to the new friendlier default once
+  if (VOICES.includes(input.voice) && (input.voiceV === 2 || input.voice !== 'Kore')) s.voice = input.voice;
+  if (['natural', 'fast'].includes(input.ttsQuality)) s.ttsQuality = input.ttsQuality;
   if (['fast', 'accurate'].includes(input.stt)) s.stt = input.stt;
-  for (const k of ['ttsModel', 'ttsOverride', 'cmdModel', 'coachModel', 'cmdOverride', 'coachOverride', 'cmdAlt', 'coachAlt']) if (typeof input[k] === 'string' && (input[k] === '' || MODEL_ID.test(input[k].trim()))) s[k] = input[k].trim();
+  for (const k of ['ttsModel', 'ttsLite', 'ttsOverride', 'cmdModel', 'coachModel', 'cmdOverride', 'coachOverride', 'cmdAlt', 'coachAlt']) if (typeof input[k] === 'string' && (input[k] === '' || MODEL_ID.test(input[k].trim()))) s[k] = input[k].trim();
   return s;
 }
 
@@ -60,7 +69,9 @@ export const coachModelId = s => s.coachOverride || s.coachModel || 'gemini-flas
 // the order to try: chosen, runner-up, rolling alias
 export const cmdModels = s => [cmdModelId(s), s.cmdOverride ? '' : s.cmdAlt, 'gemini-flash-lite-latest'];
 export const coachModels = s => [coachModelId(s), s.coachOverride ? '' : s.coachAlt, 'gemini-flash-latest'];
-export const ttsModelId = s => s.ttsOverride || s.ttsModel || DEFAULT_TTS_MODEL;
+export const ttsModelId = s => s.ttsOverride || (s.ttsQuality === 'fast' ? s.ttsLite || s.ttsModel : s.ttsModel || s.ttsLite) || DEFAULT_TTS_MODEL;
+// runner-up voice model: the other family
+export const ttsAlt = s => (s.ttsOverride ? [] : [s.ttsQuality === 'fast' ? s.ttsModel : s.ttsLite, DEFAULT_TTS_MODEL].filter(Boolean));
 export const sttModelId = s => (s.stt === 'accurate' ? 'whisper-large-v3' : 'whisper-large-v3-turbo');
 
 export function loadSettings(storage = globalThis.localStorage) {

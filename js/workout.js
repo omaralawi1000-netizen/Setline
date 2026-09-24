@@ -46,7 +46,8 @@ export function validateSet(kg, reps) {
 }
 
 export const doneSets = ex => ex.sets.filter(s => s.done);
-export const firstPlannedIndex = ex => ex.sets.findIndex(s => !s.done);
+// Planned working sets; warm-ups are a separate checklist and never receive a logged set.
+export const firstPlannedIndex = ex => ex.sets.findIndex(s => !s.done && s.type !== 'warmup');
 export const lastDoneIndex = ex => {
   for (let i = ex.sets.length - 1; i >= 0; i--) if (ex.sets[i].done) return i;
   return -1;
@@ -55,7 +56,29 @@ export const lastDoneIndex = ex => {
 // Number (1-based) of the set the next log will fill.
 export function nextSetNumber(ex) {
   const i = firstPlannedIndex(ex);
-  return i === -1 ? ex.sets.length + 1 : i + 1;
+  const work = ex.sets.filter(s => s.type !== 'warmup');
+  return i === -1 ? work.length + 1 : ex.sets.slice(0, i).filter(s => s.type !== 'warmup').length + 1;
+}
+
+// Working-set number for display (warm-ups show as "W").
+export const setNumberAt = (ex, k) => ex.sets.slice(0, k + 1).filter(s => s.type !== 'warmup').length;
+
+// Put a warm-up ramp in front of an exercise's working sets (once).
+export function addWarmups(w, exIndex, ramp) {
+  const ex = w.exercises[exIndex];
+  if (!ex || !ramp.length || ex.sets.some(s => s.type === 'warmup')) return w;
+  const next = clone(w);
+  next.exercises[exIndex].sets = [...ramp.map(s => makeSet({ kg: s.kg, reps: s.reps, type: 'warmup' })), ...next.exercises[exIndex].sets];
+  return next;
+}
+
+export function completeWarmup(w, exIndex, setId, now = Date.now()) {
+  const next = clone(w);
+  const s = next.exercises[exIndex]?.sets.find(x => x.id === setId && x.type === 'warmup');
+  if (!s) return w;
+  s.done = !s.done;
+  s.completedAt = s.done ? now : null;
+  return next;
 }
 
 // Log a set: fills the first planned set of the exercise, otherwise appends. Starts rest.

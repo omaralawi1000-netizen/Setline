@@ -1,7 +1,7 @@
 // Entry point: navigation, dock, clock, service worker updates.
 import * as store from './store.js';
 import { state } from './store.js';
-import { elapsedSec } from './workout.js';
+import { elapsedSec, nextSetNumber } from './workout.js';
 import { clock } from './format.js';
 import { setHapticsGate, haptic } from './haptics.js';
 import { keepAwake } from './wakelock.js';
@@ -14,15 +14,17 @@ import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav } from
 import { renderHistory, renderDetail } from './ui/history.js';
 import { renderSettings, initSettings } from './ui/settings.js';
 import { initVoice, orbHTML, voiceHandlePop, closeVoice, isVoiceOpen } from './ui/voice.js';
-import { renderCoach, initCoach, ask as askCoach } from './ui/coach.js';
+import { renderCoach, initCoach, ask as askCoach, ensureModels } from './ui/coach.js';
 import { initCardio, setCardioNav, tickCardio, renderCardioDetail } from './ui/cardio.js';
 import { initBody } from './ui/body.js';
 import { initRoutine, setRoutineNav, renderRoutine, editRoutine, programsSheet, startRoutine } from './ui/routine.js';
 import { setHistoryFilter } from './ui/history.js';
+import { renderProgress, renderExercise, setRange } from './ui/progress.js';
+import { countAll, burst } from './ui/fx.js';
 import { cardioElapsed, cardioName } from './cardio.js';
 
 const TABS = ['today', 'workout', 'coach', 'history'];
-const SUB = ['detail', 'settings', 'routine'];
+const SUB = ['detail', 'settings', 'routine', 'progress', 'exercise'];
 const view = { screen: 'today', detailId: null, detailKind: 'workout', parent: 'history' };
 const actions = {};
 const app = $('#app');
@@ -39,6 +41,8 @@ function renderScreen(name = view.screen) {
   else if (name === 'coach') renderCoach(root);
   else if (name === 'detail') (view.detailKind === 'cardio' ? renderCardioDetail : renderDetail)(root, view.detailId);
   else if (name === 'routine') renderRoutine(root);
+  else if (name === 'progress') renderProgress(root);
+  else if (name === 'exercise') renderExercise(root, view.exerciseId);
   else if (name === 'settings') renderSettings(root);
 }
 
@@ -88,10 +92,14 @@ function renderAll() {
   renderScreen();
   renderDock();
   renderMini();
+  // numbers count up the first time a screen is shown, not on every change
+  const root = $('#s-' + view.screen);
+  if (root && root._counted === false) { root._counted = true; countAll(root, state.lang); }
+  else root?.querySelectorAll('[data-count]').forEach(el => { el.textContent = new Intl.NumberFormat(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: Number(el.dataset.dp || 0), minimumFractionDigits: Number(el.dataset.dp || 0) }).format(Number(el.dataset.count)); });
 }
 
 // Direction for the transition: tabs by position, sub screens push in from the right.
-const ORDER = { today: 0, workout: 1, coach: 2, history: 3, detail: 4, settings: 4, routine: 4 };
+const ORDER = { today: 0, workout: 1, coach: 2, history: 3, detail: 4, settings: 4, routine: 4, progress: 4, exercise: 5 };
 function show(name, { back = false } = {}) {
   const prev = view.screen;
   view.screen = name;
@@ -105,6 +113,7 @@ function show(name, { back = false } = {}) {
       void s.offsetWidth;
       s.classList.remove('instant');
       s.classList.add('on', 'enter');
+      s._counted = false;
       clearTimeout(s._enter);
       s._enter = setTimeout(() => s.classList.remove('enter'), 800);
     } else if (!on && was) {
@@ -143,6 +152,18 @@ function showDetail(id, { fromFinish = false, kind = 'workout' } = {}) {
     view.screen = 'history';
   }
   pushSub('detail', { detailId: id, detailKind: kind });
+  if (fromFinish) setTimeout(celebrate, 380);
+}
+
+// Finishing is a moment: sparks from the summary, warm ones for every record.
+function celebrate() {
+  const root = $('#s-detail');
+  const hero = root.querySelector('.summary');
+  if (!hero) return;
+  hero.classList.add('celebrate');
+  burst(hero, { count: 22, spread: 120 });
+  const prs = [...root.querySelectorAll('.prs li, .prs .tag')];
+  prs.slice(0, 4).forEach((el, i) => setTimeout(() => burst(el, { warm: true, count: 12, spread: 60 }), 350 + i * 160));
 }
 
 addEventListener('popstate', e => {
@@ -150,6 +171,7 @@ addEventListener('popstate', e => {
   if (voiceHandlePop()) return;
   const s = e.state || { screen: 'today' };
   if (s.detailId) { view.detailId = s.detailId; view.detailKind = s.detailKind || 'workout'; }
+  if (s.exerciseId) view.exerciseId = s.exerciseId;
   const next = TABS.includes(s.screen) || SUB.includes(s.screen) ? s.screen : 'today';
   show(next, { back: SUB.includes(view.screen) && !SUB.includes(next) });
 });
@@ -190,6 +212,11 @@ app.addEventListener('click', e => {
     else if (r.dataset.routine === 'programs') programsSheet();
     return;
   }
+  const ex = e.target.closest('[data-ex]');
+  if (ex) { haptic('tap'); pushSub('exercise', { exerciseId: ex.dataset.ex }); return; }
+  if (e.target.closest('[data-progress]')) { haptic('tap'); pushSub('progress'); return; }
+  const pr = e.target.closest('[data-prange]');
+  if (pr) { setRange(Number(pr.dataset.prange)); haptic('tap'); renderScreen('progress'); countAll($('#s-progress'), state.lang); return; }
   const f = e.target.closest('[data-hfilter]');
   if (f) { setHistoryFilter(f.dataset.hfilter); haptic('tap'); renderScreen('history'); return; }
   if (e.target.closest('[data-review=ask]')) { go('coach'); askCoach(state.t('review.prompt')); }
@@ -202,8 +229,29 @@ app.addEventListener('click', e => {
   if (fn) fn(el, e);
 });
 
+// Rest alerts: when rest ends while the screen is off, a notification with the next set.
+let restTimer = 0, restFor = 0;
+function scheduleRestAlert() {
+  const r = state.active?.rest;
+  if (!state.settings.restAlerts || !r || r.endsAt <= Date.now()) { clearTimeout(restTimer); restFor = 0; return; }
+  if (restFor === r.endsAt) return;
+  clearTimeout(restTimer);
+  restFor = r.endsAt;
+  restTimer = setTimeout(async () => {
+    restFor = 0;
+    if (document.visibilityState === 'visible' || Notification.permission !== 'granted') return;
+    const w = state.active, ex = w?.exercises[w.current];
+    const reg = await navigator.serviceWorker?.ready;
+    reg?.showNotification(state.t('workout.restDone'), {
+      body: ex ? `${state.catalog.name(ex.exerciseId, state.lang)} · ${state.t('workout.setNext', { n: nextSetNumber(ex) })}` : '',
+      tag: 'setline-rest', renotify: true, icon: 'icons/icon-192.png', vibrate: [120, 80, 120]
+    });
+  }, r.endsAt - Date.now());
+}
+
 store.subscribe(reason => {
   keepAwake(!!state.active || !!state.activeCardio);
+  scheduleRestAlert();
   if (reason === 'draft') return syncNums($('#s-workout'));
   if (reason === 'chat' && view.screen !== 'coach') return;
   if (reason === 'reset' && isVoiceOpen()) closeVoice();
@@ -287,6 +335,7 @@ async function boot() {
   show(start);
   startClock();
   initSW();
+  ensureModels();
 }
 
 boot();
@@ -294,10 +343,6 @@ boot();
 addEventListener('pageshow', e => { if (e.persisted) renderAll(); });
 addEventListener('resize', () => renderDock());
 
-// Large titles hand over to a small, blurred bar once you scroll.
-for (const s of document.querySelectorAll('.screen')) {
-  s.addEventListener('scroll', () => s.classList.toggle('scrolled', s.scrollTop > 36), { passive: true });
-}
 
 // Android keeps the layout size when the keyboard opens; lift the composer above it and hide the dock.
 if (globalThis.visualViewport) {
