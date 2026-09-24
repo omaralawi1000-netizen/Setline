@@ -328,6 +328,14 @@ export async function saveRoutines(list) {
   state.routines = [...state.routines.filter(r => !ids.has(r.id)), ...list];
   emit('routines');
 }
+// Swap the whole routine list (a new plan replacing the old one, or undoing that). Returns the old list.
+export async function replaceRoutines(list) {
+  const old = state.routines;
+  await db.tx('routines', 'readwrite', s => { for (const r of old) s.routines.delete(r.id); for (const r of list) s.routines.put(r); });
+  state.routines = [...list];
+  emit('routines');
+  return old;
+}
 export async function deleteRoutine(id) {
   await db.del('routines', id);
   state.routines = state.routines.filter(r => r.id !== id);

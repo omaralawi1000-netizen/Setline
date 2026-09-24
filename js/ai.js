@@ -352,7 +352,7 @@ export async function aiPlan({ key, model, system, prompt, schema, signal }) {
   const { res, done } = await post(`models/${encodeURIComponent(model)}:generateContent`, key, {
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.4, responseMimeType: 'application/json', responseSchema: schema, maxOutputTokens: 2500 }
+    generationConfig: { temperature: 0.4, responseMimeType: 'application/json', responseSchema: schema, maxOutputTokens: 8192 }
   }, { timeout: 25000, signal });
   try {
     const data = await res.json();

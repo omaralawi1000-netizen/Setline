@@ -678,6 +678,9 @@ button.mini:active,button.pr:active{transform:scale(.98)}
 .pday li{display:flex;justify-content:space-between;gap:10px;font-size:14px;color:var(--muted)}
 .pday .psr{font-weight:800;color:var(--ink);white-space:nowrap}
 .pcard .log{margin-top:14px}
+.pacts{display:flex;gap:8px;align-items:stretch}
+.pacts .log{flex:1;margin-top:14px}
+.pacts .btn2{margin-top:14px;flex:0 0 auto}
 .psaved{display:flex;align-items:center;gap:6px;margin-top:12px;color:var(--accent);font-weight:800}
 .psaved svg{width:16px;height:16px}
 
@@ -1048,7 +1051,7 @@ p.ckwarn{margin:6px 0 0}
 .mfield em{font-style:normal;font-size:12px;color:var(--dim);font-weight:700}
 .row2.one{grid-template-columns:1fr}
 .row2.one .log{margin:0}
-.pday{margin-top:14px}
+.phday{margin-top:14px}
 .pdate{display:block;font-size:12.5px;font-weight:800;color:var(--muted);margin-bottom:8px}
 .pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .pthumb{position:relative;aspect-ratio:3/4;border-radius:16px;overflow:hidden;background:rgba(255,255,255,.04);animation:rise .45s var(--ease) both;animation-delay:calc(var(--i) * 50ms)}
@@ -1134,26 +1137,26 @@ p.ckwarn{margin:6px 0 0}
 .glasspill{height:48px;padding:0 18px;border-radius:999px;display:inline-flex;align-items:center;gap:8px;background:rgba(20,22,30,.5);-webkit-backdrop-filter:blur(20px) saturate(160%);backdrop-filter:blur(20px) saturate(160%);border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.18);font-weight:800;font-size:14px;color:var(--ink)}
 .glasspill .i{width:19px;height:19px}
 .pwrap{flex:1;display:flex;flex-direction:column;justify-content:flex-end;padding:calc(var(--safe-top) + 40px) 14px calc(var(--safe-bottom) + 16px);background:radial-gradient(120% 70% at 50% 0%,rgba(122,103,242,.28),transparent 60%),#07080D;overflow-y:auto}
-.pcard{padding:18px;border-radius:30px;display:grid;gap:14px}
-.pcard.in{animation:cardup .6s cubic-bezier(.2,1.2,.3,1)}
+.fcard{padding:18px;border-radius:30px;display:grid;gap:14px}
+.fcard.in{animation:cardup .6s cubic-bezier(.2,1.2,.3,1)}
 @keyframes cardup{from{opacity:0;transform:translateY(40px) scale(.97)}}
-.pcard h2{margin:0}
-.phead{display:flex;align-items:center;gap:14px}
-.phead img,.picon{width:64px;height:64px;flex:none;border-radius:18px;object-fit:contain;background:#fff;box-shadow:0 10px 24px -10px rgba(0,0,0,.8)}
+.fcard h2{margin:0}
+.fhead{display:flex;align-items:center;gap:14px}
+.fhead img,.picon{width:64px;height:64px;flex:none;border-radius:18px;object-fit:contain;background:#fff;box-shadow:0 10px 24px -10px rgba(0,0,0,.8)}
 .picon{display:grid;place-items:center;background:rgba(255,255,255,.06);color:var(--accent)}
-.phead div{display:grid;gap:3px;min-width:0}
-.phead strong{font-size:19px;line-height:1.2;letter-spacing:-.01em}
-.phead span{font-size:12.5px;color:var(--muted);font-weight:650}
-.pcard .mnums{margin-top:0}
+.fhead div{display:grid;gap:3px;min-width:0}
+.fhead strong{font-size:19px;line-height:1.2;letter-spacing:-.01em}
+.fhead span{font-size:12.5px;color:var(--muted);font-weight:650}
+.fcard .mnums{margin-top:0}
 .mnum b.tick{animation:tickUp .3s var(--ease)}
 .amounts{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .amounts .chip[aria-pressed=true]{background:rgba(198,187,250,.2);border-color:rgba(198,187,250,.5);color:var(--ink)}
 .gram{display:inline-flex;align-items:center;gap:4px;height:34px;padding:0 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid var(--line)}
 .gram input{width:52px;background:none;border:0;outline:none;color:var(--ink);font-weight:800;font-size:14px}
 .gram span{font-size:12px;color:var(--dim);font-weight:800}
-.pcard .log{margin-top:0}
-.pcard .linkbtn{justify-self:center}
-.pcard.loading{min-height:230px;align-content:start}
+.fcard .log{margin-top:0}
+.fcard .linkbtn{justify-self:center}
+.fcard.loading{min-height:230px;align-content:start}
 .sk{border-radius:14px;background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.12),rgba(255,255,255,.05));background-size:200% 100%;animation:shimmer 1.2s linear infinite}
 .sk.a{height:64px;width:64px;border-radius:18px}.sk.b{height:22px;width:70%}.sk.c{height:72px}
 @keyframes shimmer{from{background-position:200% 0}to{background-position:-200% 0}}

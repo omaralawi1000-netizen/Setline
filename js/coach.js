@@ -24,6 +24,7 @@ export function systemPrompt(lang) {
     'For pain or injury, give general guidance only and suggest seeing a physiotherapist or doctor.',
     'Use the PROFILE (age, goal, experience, days, equipment, injuries) to tailor every answer. "Planned" sets are what the plan says for the workout in progress.',
     'You can see the data but cannot change it yourself: when something should be logged or changed, say exactly what to tap or say.',
+    'The user is already talking to you in the Coach. Never tell them to go to the Coach tab. When they want a training plan, the app builds it from their request automatically; if a request reaches you anyway, say you will build it when they ask for it, e.g. "make me a 5-day plan".',
     APP_GUIDE
   ].join(' ');
 }
@@ -37,7 +38,7 @@ export const APP_GUIDE = [
   'Headphones button on the workout screen: hands-free mode listens for sets and speaks rest cues.',
   'Workout screen: steppers and Log set, rest timer (+15/-15 teaches that exercise its rest), warm-up ramp, plate calculator, swipe a set left to delete, tap a set to edit, auto-advance after the last planned set, Finish.',
   'Today: one-tap morning check-in (how you feel, sleep, sore spots → readiness), Up next routine, cardio start and "again" chip, week ring and cardio minutes, muscles this week, deload suggestion after 6 steady weeks, bodyweight, protein ring, Snap a meal (photo or text → protein and calories), barcode scanner for packaged food, one-tap favourite meals.',
-  'Coach tab (you): questions, and plans: "make me a 4-day upper/lower plan" gives a plan card with Save as routines.',
+  'Plans: asking for one in plain words here ("I need a 5-day plan", "make my plan 4 days") builds a plan card right away, with Replace my routines or Add.',
   'History: every workout and cardio session, "Do this again". Progress: volume, cardio, bodyweight, sleep, muscles, lifts with e1RM curves and records. Body & photos: measurements, progress photos (on the phone only), before/after compare.',
   'Settings: profile (edit answers), voice and replies, API keys, Google Drive backup, export/import, units, rest default, auto-advance.'
 ].join(' ');
@@ -208,7 +209,16 @@ export const speakable = text => String(text || '').replace(/\*\*?|__|#+\s/g, ''
 const PLAN_WORDS = /\b(plan|program|programme|split|routine|routines|schedule|rutine|rutiner|træningsplan|program)\b/i;
 const MAKE_WORDS = /\b(make|build|create|design|give me|write|set up|lav|byg|opret|giv mig|skriv|sammensæt)\b/i;
 const SPLIT_WORDS = /(\b\d\s?-?\s?(day|days|dages|dag)\b|upper\s?\/?\s?lower|push\s?\/?\s?pull|\bppl\b|full[\s-]?body|hele kroppen|overkrop|(times|days|x) (a|per) week|dage om ugen|gange om ugen)/i;
-export const isPlanRequest = text => MAKE_WORDS.test(text) && (PLAN_WORDS.test(text) || SPLIT_WORDS.test(text));
+const WANT_WORDS = /\b(need|want|would like|i'?d like|can you|could you|new|another|different|better|change|update|redo|rewrite|adjust|jeg vil have|jeg vil gerne have|jeg har brug for|kan du|ny|nyt|anden|andet|ændr|opdater)\b/i;
+const NUM_DAYS = /\b(one|two|three|four|five|six|seven|en|to|tre|fire|fem|seks|syv|\d)[\s-]?(day|days|dages|dags|dag)\b/i;
+export const isPlanRequest = text => (MAKE_WORDS.test(text) || WANT_WORDS.test(text) || NUM_DAYS.test(text)) && (PLAN_WORDS.test(text) || SPLIT_WORDS.test(text) || NUM_DAYS.test(text) && /\b(plan|program|split|week|uge|ugen)\b/i.test(text));
+
+// The plan schema with the exercise names fixed to the catalog: the model can't invent a name we can't use.
+export function planSchema(catalog) {
+  const sch = structuredClone(PLAN_SCHEMA);
+  sch.properties.days.items.properties.exercises.items.properties.exercise.enum = [...new Set(catalog.all.map(e => e.en))];
+  return sch;
+}
 
 export const PLAN_SCHEMA = {
   type: 'OBJECT',
@@ -238,27 +248,31 @@ export function planSystem(lang, catalog) {
     'Use only exercises from this catalog, spelled exactly as listed:',
     catalog.all.map(e => `${e.en} (${e.equipment})`).join(', ') + '.',
     'Respect the requested days per week, session length (about 3.5 minutes per set including rest), focus and available equipment.',
-    'Each day 3 to 8 exercises, 2 to 5 sets, 5 to 20 reps. Base it on the training data when given.'
+    'Each day 3 to 9 exercises, 2 to 5 sets, 5 to 20 reps. Base it on the training data and the PROFILE when given: goal, experience, injuries (avoid exercises that load them), equipment and notes.',
+    'For fat loss keep the heavy compound lifts and mention cardio in the summary. Name days clearly (e.g. "Push", "Legs A").'
   ].join(' ');
 }
 
 // Strictly check the model's plan against the catalog and limits. Returns null if unusable.
 export function validatePlan(raw, catalog) {
-  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.days) || !raw.days.length || raw.days.length > 7) return null;
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.days) || !raw.days.length) return null;
+  const one = n => catalog.findExact(n) || (catalog.rank?.(n)?.[0]?.s >= 50 ? catalog.rank(n)[0].e : null);
+  const find = n => one(n) || one(n.replace(/s\b/gi, '')) || null; // "Lat pulldowns" → "Lat pulldown"
   const days = [];
-  for (const d of raw.days) {
-    if (!d || !Array.isArray(d.exercises)) return null;
+  for (const d of raw.days.slice(0, 7)) {
+    if (!d || !Array.isArray(d.exercises)) continue;
     const exercises = [];
     for (const x of d.exercises.slice(0, 12)) {
-      const e = catalog.findExact(String(x?.exercise || ''));
-      const sets = Number.isInteger(x?.sets) ? Math.max(1, Math.min(8, x.sets)) : null;
-      const reps = Number.isInteger(x?.reps) ? Math.max(1, Math.min(50, x.reps)) : null;
-      if (!e || !sets || !reps) continue; // drop what we can't use rather than guess
+      const name = String(x?.exercise || '').trim();
+      const e = name ? find(name) : null;
+      if (!e || exercises.some(y => y.exerciseId === e.id)) continue;
+      const sets = Math.max(1, Math.min(6, Math.round(Number(x?.sets) || 3)));
+      const reps = Math.max(1, Math.min(30, Math.round(Number(x?.reps) || 10)));
       exercises.push({ exerciseId: e.id, sets, reps });
     }
-    if (!exercises.length) return null;
-    days.push({ name: String(d.name || '').trim().slice(0, 30) || `Day ${days.length + 1}`, exercises });
+    if (exercises.length) days.push({ name: String(d.name || '').trim().slice(0, 30) || `Day ${days.length + 1}`, exercises: exercises.slice(0, 10) });
   }
+  if (!days.length) return null; // a day we can't use is skipped; only an empty plan fails
   return {
     name: String(raw.name || '').trim().slice(0, 30) || 'Plan',
     perWeek: Number.isInteger(raw.perWeek) ? Math.max(1, Math.min(7, raw.perWeek)) : days.length,
@@ -267,7 +281,6 @@ export function validatePlan(raw, catalog) {
   };
 }
 
-// Plan → routine records.
 export function planToRoutines(plan, now = Date.now()) {
   return plan.days.map((d, i) => ({
     id: 'r-' + globalThis.crypto.randomUUID(),

@@ -3,7 +3,7 @@ import * as store from '../store.js';
 import { state } from '../store.js';
 import { streamChat, AiError, withFallback, aiPlan, pickTextModels, nextQuotaReset } from '../ai.js';
 import { listModels, pickTtsModel } from '../tts.js';
-import { buildContext, chatContents, systemPrompt, formatAnswer, speakable, isPlanRequest, PLAN_SCHEMA, planSystem, validatePlan, planToRoutines } from '../coach.js';
+import { buildContext, chatContents, systemPrompt, formatAnswer, speakable, isPlanRequest, PLAN_SCHEMA, planSchema, planSystem, validatePlan, planToRoutines } from '../coach.js';
 import { getKey } from '../keys.js';
 import { coachModels, ttsModelId, ttsAlt } from '../settings.js';
 import * as tts from '../tts.js';
@@ -12,6 +12,7 @@ import { haptic } from '../haptics.js';
 import { $, esc } from './dom.js';
 import { I } from './icons.js';
 import { openSheet, closeTop } from './sheet.js';
+import { toast } from './toast.js';
 
 let nav = { openSettings: () => {} };
 let inflight = null; // {ctl, id}
@@ -39,7 +40,9 @@ function planCard(m) {
   return `<div class="pcard"><div class="phead"><strong>${esc(p.name)}</strong><span class="tag sm soft">${t('plan.days', { n: p.days.length })}</span></div>
     ${p.summary ? `<p>${esc(p.summary)}</p>` : ''}
     ${p.days.map(d => `<div class="pday"><b>${esc(d.name)}</b><ul>${d.exercises.map(e => `<li><span>${esc(state.catalog.name(e.exerciseId, lang))}</span><span class="psr">${e.sets} × ${e.reps}</span></li>`).join('')}</ul></div>`).join('')}
-    ${m.saved ? `<p class="psaved">${I.check}${t('plan.saved')}</p>` : `<button class="log" data-coach="saveplan" data-id="${m.id}">${I.plus}<span>${t('plan.save')}</span></button>`}</div>`;
+    ${m.saved ? `<p class="psaved">${I.check}${t(m.saved === 'replace' ? 'plan.replaced' : 'plan.saved')}</p>`
+      : `<div class="pacts"><button class="log" data-coach="saveplan" data-mode="replace" data-id="${m.id}">${I.check}<span>${t('plan.replace')}</span></button>
+        <button class="btn2 solid" data-coach="saveplan" data-mode="add" data-id="${m.id}">${I.plus}<span>${t('plan.add')}</span></button></div>`}</div>`;
 }
 
 export function renderCoach(root) {
@@ -151,11 +154,13 @@ async function buildPlan(question, reply, { key, lang, ctl, root }) {
   const { t } = state;
   const context = buildContext(coachSnap());
   try {
-    const raw = await withFallback(coachModels(state.settings), model => aiPlan({
-      key, model, system: planSystem(lang, state.catalog), schema: PLAN_SCHEMA, signal: ctl.signal,
-      prompt: `Training data:\n${context}\n\nRequest: ${question}`
-    }));
-    const plan = validatePlan(raw, state.catalog);
+    const prompt = `Training data:\n${context}\n\nRequest: ${question}`;
+    const once = schema => withFallback(coachModels(state.settings), model => aiPlan({ key, model, system: planSystem(lang, state.catalog), schema, signal: ctl.signal, prompt }));
+    let plan = null;
+    // first with the exercise names locked to the catalog; if the model rejects that schema or the
+    // plan comes back unusable, one more try with the plain schema
+    try { plan = validatePlan(await once(planSchema(state.catalog)), state.catalog); } catch (e) { if (!(e instanceof AiError) || !['invalid', 'failed', 'empty'].includes(e.code)) throw e; }
+    if (!plan) plan = validatePlan(await once(PLAN_SCHEMA), state.catalog);
     if (!plan) store.updateChat(reply.id, { streaming: false, text: t('plan.invalid') }, { persist: true });
     else {
       store.updateChat(reply.id, { streaming: false, text: plan.summary || plan.name, plan }, { persist: true });
@@ -172,13 +177,29 @@ async function buildPlan(question, reply, { key, lang, ctl, root }) {
   }
 }
 
-async function savePlan(id) {
+async function savePlan(id, mode = 'replace') {
+  const { t } = state;
   const m = state.chat.find(x => x.id === id);
   if (!m?.plan || m.saved) return;
-  await store.saveRoutines(planToRoutines(m.plan));
-  if (m.plan.perWeek && state.settings.weeklyGoal !== m.plan.perWeek) store.setSettings({ weeklyGoal: m.plan.perWeek });
-  store.updateChat(id, { saved: true }, { persist: true });
+  const fresh = planToRoutines(m.plan);
+  const oldGoal = state.settings.weeklyGoal;
+  let undo;
+  if (mode === 'replace') {
+    const old = await store.replaceRoutines(fresh);
+    undo = () => store.replaceRoutines(old);
+  } else {
+    await store.saveRoutines(fresh);
+    undo = async () => { for (const r of fresh) await store.deleteRoutine(r.id); };
+  }
+  if (m.plan.perWeek && oldGoal !== m.plan.perWeek) store.setSettings({ weeklyGoal: m.plan.perWeek });
+  store.updateChat(id, { saved: mode }, { persist: true });
   haptic('success');
+  toast({ title: esc(t(mode === 'replace' ? 'plan.replaced' : 'plan.saved')), sub: m.plan.name, action: t('common.undo'), ms: 6000, onAction: async () => {
+    await undo();
+    store.setSettings({ weeklyGoal: oldGoal });
+    store.updateChat(id, { saved: false }, { persist: true });
+    haptic('tap');
+  } });
 }
 
 function syncButton() {
@@ -205,7 +226,7 @@ export function initCoach(n) {
     if (!b) return;
     const k = b.dataset.coach;
     if (k === 'ask' || k === 'retry') { haptic('tap'); ask(b.dataset.q, { root }); }
-    else if (k === 'saveplan') { b.disabled = true; savePlan(b.dataset.id); }
+    else if (k === 'saveplan') { b.closest('.pacts')?.querySelectorAll('button').forEach(x => { x.disabled = true; }); savePlan(b.dataset.id, b.dataset.mode); }
     else if (k === 'settings') nav.openSettings();
     else if (k === 'clear') {
       const { t } = state;

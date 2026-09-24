@@ -112,7 +112,7 @@ export function openScanner() {
     // ---------- lookup and product ----------
     async function find(code) {
       s.code = code;
-      render(`<div class="pwrap"><div class="pcard glass loading"><div class="sk a"></div><div class="sk b"></div><div class="sk c"></div><p class="scode">${esc(code)}</p></div></div>`);
+      render(`<div class="pwrap"><div class="fcard glass loading"><div class="sk a"></div><div class="sk b"></div><div class="sk c"></div><p class="scode">${esc(code)}</p></div></div>`);
       const known = (await products()).find(p => p.code === code);
       if (known) return show(known);
       const r = await lookup(code, state.lang);
@@ -131,8 +131,8 @@ export function openScanner() {
       const p = s.product, n = forAmount(p, s.grams);
       const choices = amountChoices(p);
       const label = c => (c.kind === 'serving' ? t('scan.serving', { g: c.g }) : c.kind === 'pack' ? t('scan.pack', { g: c.g }) : '100 g');
-      const html = `<div class="pwrap"><div class="pcard glass${first ? ' in' : ''}">
-        <div class="phead">${p.image ? `<img src="${esc(p.image)}" alt="">` : `<span class="picon">${BARCODE}</span>`}
+      const html = `<div class="pwrap"><div class="fcard glass${first ? ' in' : ''}">
+        <div class="fhead">${p.image ? `<img src="${esc(p.image)}" alt="">` : `<span class="picon">${BARCODE}</span>`}
           <div><strong>${esc(p.name || t('scan.unnamed'))}</strong><span>${esc([p.brand, t('scan.per100', { p: p.per100.protein, k: p.per100.kcal })].filter(Boolean).join(' · '))}</span></div></div>
         <div class="mnums">
           <div class="mnum hot"><b>${n.protein}</b><span>${t('meal.protein')}</span></div>
@@ -147,7 +147,7 @@ export function openScanner() {
       </div></div>`;
       if (first) return render(html);
       // update numbers and chips in place
-      const card = box.querySelector('.pcard');
+      const card = box.querySelector('.fcard');
       const nums = card.querySelectorAll('.mnum b');
       [n.protein, n.kcal, n.carbs, n.fat].forEach((v, i) => { if (nums[i].textContent !== String(v)) { nums[i].textContent = v; nums[i].classList.remove('tick'); void nums[i].offsetWidth; nums[i].classList.add('tick'); } });
       for (const c of card.querySelectorAll('[data-g]')) c.setAttribute('aria-pressed', String(Number(c.dataset.g) === s.grams));
@@ -156,14 +156,14 @@ export function openScanner() {
 
     function missing(status) {
       const msg = status === 'missing' ? t('scan.missing') : status === 'offline' ? t('coach.offline') : t('scan.failed');
-      render(`<div class="pwrap"><div class="pcard glass in"><div class="empty"><div class="emptyglyph">${BARCODE}</div><h2>${esc(msg)}</h2><p>${t('scan.missingSub')}</p></div>
+      render(`<div class="pwrap"><div class="fcard glass in"><div class="empty"><div class="emptyglyph">${BARCODE}</div><h2>${esc(msg)}</h2><p>${t('scan.missingSub')}</p></div>
         <button class="log" data-s="label">${I.camera}<span>${t('scan.label')}</span></button>
         <button class="linkbtn muted" data-s="again">${t('scan.again')}</button></div></div>`);
     }
 
     function manual(note = '') {
       stop();
-      render(`<div class="pwrap"><div class="pcard glass in"><h2>${t('scan.type')}</h2>${note ? `<p class="lead">${esc(note)}</p>` : ''}
+      render(`<div class="pwrap"><div class="fcard glass in"><h2>${t('scan.type')}</h2>${note ? `<p class="lead">${esc(note)}</p>` : ''}
         <form class="mdesc solid" data-s="code"><input name="code" inputmode="numeric" autocomplete="off" placeholder="5701234567899" aria-label="${esc(t('scan.type'))}"><button class="send" aria-label="${esc(t('voice.send'))}">${I.fwd}</button></form>
         <p class="err" id="codeerr"></p>
         <button class="btn2 solid" data-s="label">${I.camera}<span>${t('scan.label')}</span></button></div></div>`);
@@ -172,7 +172,7 @@ export function openScanner() {
     async function readLabel(file) {
       const key = getKey('google');
       if (!key) { toast({ title: esc(t('meal.noKey')), error: true }); return; }
-      render(`<div class="pwrap"><div class="pcard glass loading"><div class="sk a"></div><div class="sk b"></div><div class="sk c"></div><p class="scode">${t('scan.reading')}</p></div></div>`);
+      render(`<div class="pwrap"><div class="fcard glass loading"><div class="sk a"></div><div class="sk b"></div><div class="sk c"></div><p class="scode">${t('scan.reading')}</p></div></div>`);
       try {
         const img = await prepImage(file);
         const raw = await withFallback(coachModels(state.settings), model => aiMeal({ key, model, image: { mime: img.mime, data: img.data }, prompt: labelPrompt(state.lang), schema: LABEL_SCHEMA }), { rounds: 2 });

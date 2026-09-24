@@ -139,12 +139,20 @@ test('plan requests are recognised and validated against the catalog', () => {
   assert.ok(isPlanRequest('make me a 4-day upper/lower, 60 minutes, focus chest, dumbbells only'));
   assert.ok(isPlanRequest('lav en træningsplan med 3 dage'));
   assert.ok(!isPlanRequest("how's my bench progressing?"));
+  assert.ok(isPlanRequest('I need a five-day plan.'));
+  assert.ok(isPlanRequest('Make me a 6-day training plan for hypertrophy'));
+  assert.ok(isPlanRequest('jeg vil gerne have et nyt program'));
+  assert.ok(!isPlanRequest('what should I eat today?'));
   const p = validatePlan({ name: 'UL', perWeek: 4, summary: 'x', days: [
     { name: 'Upper A', exercises: [{ exercise: 'Dumbbell bench press', sets: 4, reps: 10 }, { exercise: 'Laser curls', sets: 3, reps: 10 }, { exercise: 'Dumbbell row', sets: 99, reps: 10 }] },
     { name: 'Lower A', exercises: [{ exercise: 'Goblet squat', sets: 3, reps: 12 }] }] }, catalog);
   assert.equal(p.days.length, 2);
   assert.deepEqual(p.days[0].exercises.map(e => e.exerciseId), ['dumbbell-bench-press', 'dumbbell-row'], 'unknown exercise dropped');
-  assert.equal(p.days[0].exercises[1].sets, 8, 'sets clamped');
+  assert.equal(p.days[0].exercises[1].sets, 6, 'sets clamped');
+  const q = validatePlan({ name: 'PPL', days: [{ name: 'Empty', exercises: [{ exercise: 'Nope', sets: 3, reps: 3 }] },
+    { name: 'Pull', exercises: [{ exercise: 'Lat pulldowns', sets: 3, reps: 10 }, { exercise: 'Barbell Bench Press', sets: 3, reps: 8 }] }] }, catalog);
+  assert.equal(q.days.length, 1, 'a day with nothing usable is skipped');
+  assert.deepEqual(q.days[0].exercises.map(e => e.exerciseId), ['lat-pulldown', 'bench-press'], 'close names are matched');
   assert.equal(validatePlan({ days: [{ name: 'x', exercises: [{ exercise: 'Nope', sets: 3, reps: 3 }] }] }, catalog), null);
   const rs = planToRoutines(p, 1);
   assert.equal(rs.length, 2);
@@ -212,4 +220,12 @@ test('withFallback: a model out of quota is skipped for the next; a short per-mi
   assert.equal(r2, 'ok');
   assert.deepEqual(waits, [3000]);
   await assert.rejects(withFallback(['y'], async () => { throw new AiError('quota', 429); }), e => e.code === 'quota' || e.code === 'busy');
+});
+
+import { planSchema, PLAN_SCHEMA } from '../js/coach.js';
+test('the plan schema locks exercise names to the catalog', () => {
+  const s = planSchema(catalog);
+  const en = s.properties.days.items.properties.exercises.items.properties.exercise.enum;
+  assert.ok(en.includes('Bench press') || en.some(n => /bench/i.test(n)));
+  assert.equal(PLAN_SCHEMA.properties.days.items.properties.exercises.items.properties.exercise.enum, undefined, 'the base schema is untouched');
 });

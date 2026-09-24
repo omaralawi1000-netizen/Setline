@@ -47,7 +47,7 @@ export function renderBody(root) {
 
     <div class="section"><span class="label">${t('bodyx.photos')}</span>${days.length > 1 || state.photos.length > 1 ? `<button class="textbtn" data-bx="compare">${t('bodyx.compare')}</button>` : ''}</div>
     <div class="row2 one"><button class="log" data-bx="add">${I.camera}<span>${t('bodyx.add')}</span></button></div>
-    ${days.length ? days.map(d => `<div class="pday"><span class="pdate">${esc(day(Date.parse(d.date), lang))}</span>
+    ${days.length ? days.map(d => `<div class="phday"><span class="pdate">${esc(day(Date.parse(d.date), lang))}</span>
       <div class="pgrid">${d.photos.map((p, i) => `<button class="pthumb" data-bx="view" data-id="${esc(p.id)}" style="--i:${i}"><img src="${esc(p.thumb)}" alt="" loading="lazy"><span>${t('pose.' + p.pose)}</span></button>`).join('')}</div></div>`).join('')
       : `<div class="empty solid"><div class="emptyglyph">${I.camera}</div><h2>${t('bodyx.noPhotos')}</h2><p>${t('bodyx.noPhotosSub')}</p></div>`}
     <p class="snote center">${t('bodyx.private')}</p>`;
