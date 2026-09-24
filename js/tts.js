@@ -12,7 +12,9 @@ let lastClip = null;  // the last reply as received, for Settings → save audio
 // The last reply exactly as Gemini sent it (a WAV file), so a bad ending can be shared and checked.
 export function lastClipWav() {
   if (!lastClip) return null;
-  const pcm = new Uint8Array(lastClip.pcm), n = pcm.length - (pcm.length % 2);
+  const raw = new Uint8Array(lastClip.pcm);
+  if (raw.length > 12 && String.fromCharCode(...raw.subarray(0, 4)) === 'RIFF') return { blob: new Blob([raw], { type: 'audio/wav' }), text: lastClip.text };
+  const pcm = raw, n = pcm.length - (pcm.length % 2);
   const buf = new ArrayBuffer(44 + n), v = new DataView(buf);
   const str = (o, x) => { for (let i = 0; i < x.length; i++) v.setUint8(o + i, x.charCodeAt(i)); };
   str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVE'); str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
@@ -89,28 +91,60 @@ async function synth(text, { key, model, voice }) {
   } finally { clearTimeout(timer); }
 }
 
-// The audio can come back split over several parts; playing only the first cut replies off mid-word.
+// The audio can come back split over several parts, and each part may be a whole WAV file:
+// a header, the samples, then metadata (the SynthID watermark note). Only the samples are sound;
+// playing the metadata as audio was the loud burst at the end of replies.
 export function audioFrom(data) {
   const parts = (data?.candidates?.[0]?.content?.parts || []).map(p => p.inlineData).filter(d => d?.data);
   if (!parts.length) throw new Error('tts empty');
-  const chunks = parts.map(d => { const bin = atob(d.data); const b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return b; });
+  let rate = null;
+  const chunks = parts.map(d => {
+    const bin = atob(d.data);
+    const b = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
+    const a = pcmBytes(b, Number(/rate=(\d+)/.exec(d.mimeType || '')?.[1]) || RATE);
+    rate ??= a.rate;
+    return a.bytes;
+  });
   const bytes = new Uint8Array(chunks.reduce((a, c) => a + c.length, 0));
   let o = 0;
   for (const c of chunks) { bytes.set(c, o); o += c.length; }
-  const rate = Number(/rate=(\d+)/.exec(parts[0].mimeType || '')?.[1]) || RATE;
-  return { pcm: bytes.buffer, rate };
+  return { pcm: bytes.buffer, rate: rate || RATE };
 }
 
-// 16-bit PCM → float, skipping a WAV header if one is present. Cleaned up for playback.
+// Just the 16-bit mono samples out of raw PCM or a WAV container (any chunks before or after "data").
+export function pcmBytes(u8, fallbackRate = RATE) {
+  const tag = (o, n = 4) => String.fromCharCode(...u8.subarray(o, o + n));
+  if (u8.length < 12 || tag(0) !== 'RIFF' || tag(8) !== 'WAVE') return { bytes: u8.subarray(0, u8.length - (u8.length % 2)), rate: fallbackRate };
+  const v = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  let off = 12, rate = fallbackRate, ch = 1, bits = 16;
+  while (off + 8 <= u8.length) {
+    const id = tag(off), size = v.getUint32(off + 4, true), body = off + 8;
+    if (id === 'fmt ' && body + 16 <= u8.length) { ch = v.getUint16(body + 2, true) || 1; rate = v.getUint32(body + 4, true) || fallbackRate; bits = v.getUint16(body + 14, true); }
+    else if (id === 'data') {
+      const len = Math.min(size === 0xFFFFFFFF || size === 0 ? u8.length - body : size, u8.length - body);
+      let d = u8.subarray(body, body + len - (len % 2));
+      if (bits !== 16) return { bytes: new Uint8Array(0), rate };
+      if (ch > 1) { // keep the first channel
+        const n = Math.floor(d.length / (2 * ch)), mono = new Uint8Array(n * 2);
+        for (let i = 0; i < n; i++) { mono[i * 2] = d[i * 2 * ch]; mono[i * 2 + 1] = d[i * 2 * ch + 1]; }
+        d = mono;
+      }
+      return { bytes: d, rate };
+    }
+    off = body + size + (size & 1);
+  }
+  return { bytes: new Uint8Array(0), rate }; // a WAV without samples: say nothing rather than noise
+}
+
+// 16-bit PCM (or a WAV) → float, cleaned up for playback.
 export function pcmToFloat(buf, rate = RATE, text = '') {
-  const u8 = new Uint8Array(buf);
-  const wav = u8.length > 44 && u8[0] === 0x52 && u8[1] === 0x49 && u8[2] === 0x46 && u8[3] === 0x46; // "RIFF"
-  const start = wav ? 44 : 0;
-  const n = Math.floor((u8.length - start) / 2);
-  const view = new DataView(buf, start, n * 2);
+  const a = pcmBytes(new Uint8Array(buf), rate);
+  const n = a.bytes.length >> 1;
+  const view = new DataView(a.bytes.buffer, a.bytes.byteOffset, n * 2);
   const out = new Float32Array(n);
   for (let i = 0; i < n; i++) out[i] = view.getInt16(i * 2, true) / 32768;
-  return cleanSpeech(out, rate, text);
+  return cleanSpeech(out, a.rate, text);
 }
 
 // The model sometimes ends a clip with a stray thump or burst of noise after the last word.
@@ -184,8 +218,9 @@ function playPcm({ pcm, rate }, mine, text = '') {
   const ac = audioContext();
   if (!ac) throw new Error('no audio');
   lastClip = { pcm, rate: rate || RATE, text };
+  const realRate = pcmBytes(new Uint8Array(pcm), rate || RATE).rate;
   const samples = pcmToFloat(pcm, rate || RATE, text);
-  const audio = ac.createBuffer(1, Math.max(1, samples.length), rate || RATE);
+  const audio = ac.createBuffer(1, Math.max(1, samples.length), realRate);
   audio.getChannelData(0).set(samples);
   return new Promise(res => {
     if (mine !== seq) return res();
@@ -232,7 +267,7 @@ export async function speak(text, opts) {
   if (!text) return;
   stop();
   const mine = ++seq;
-  const cacheKey = `v3|${opts.model}|${opts.voice}|${text}`;
+  const cacheKey = `v4|${opts.model}|${opts.voice}|${text}`;
   if (opts.key) {
     try {
       let buf = await db.get('ttsCache', cacheKey).catch(() => null);

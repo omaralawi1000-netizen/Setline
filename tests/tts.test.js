@@ -36,8 +36,7 @@ test('ends on silence with no DC offset', () => {
 test('pcm bytes and a WAV header decode', () => {
   const pcm = new Int16Array(Array.from({ length: 4800 }, (_, i) => Math.round(8000 * Math.sin(2 * Math.PI * 440 * i / R))));
   assert.equal(pcmToFloat(pcm.buffer, R).length > 4000, true);
-  const wav = new Uint8Array(44 + pcm.byteLength);
-  wav.set([0x52, 0x49, 0x46, 0x46]); wav.set(new Uint8Array(pcm.buffer), 44);
+  const wav = geminiWav([...pcm].map(v => v / 32768));
   assert.ok(Math.abs(pcmToFloat(wav.buffer, R).length - pcmToFloat(pcm.buffer, R).length) < 2);
   assert.equal(cleanSpeech(new Float32Array(0)).length, 0);
 });
@@ -87,4 +86,49 @@ test('a long real reply with pauses is left whole', () => {
 test('the reply as received can be saved as a WAV', async () => {
   const { lastClipWav } = await import('../js/tts.js');
   assert.equal(lastClipWav(), null);
+});
+
+// a WAV like Gemini's newer voices send: header, samples, then a metadata chunk (the SynthID note)
+function geminiWav(samples, rate = 24000, meta = 'This audio has an imperceptible SynthID watermark. digitalSourceType trainedAlgorithmicMedia') {
+  const data = new Int16Array(samples.map(v => Math.round(v * 32767)));
+  const metaBytes = new TextEncoder().encode(meta + (meta.length % 2 ? ' ' : ''));
+  const size = 12 + 24 + 8 + data.byteLength + 8 + metaBytes.length;
+  const b = new Uint8Array(size), v = new DataView(b.buffer);
+  const put = (o, s) => { for (let i = 0; i < s.length; i++) b[o + i] = s.charCodeAt(i); };
+  put(0, 'RIFF'); v.setUint32(4, size - 8, true); put(8, 'WAVE');
+  put(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  put(36, 'data'); v.setUint32(40, data.byteLength, true); b.set(new Uint8Array(data.buffer), 44);
+  const m = 44 + data.byteLength; put(m, 'LIST'); v.setUint32(m + 4, metaBytes.length, true); b.set(metaBytes, m + 8);
+  return b;
+}
+
+test('a WAV with metadata after the samples: only the samples are played (no burst at the end)', async () => {
+  const { pcmBytes, pcmToFloat, audioFrom } = await import('../js/tts.js');
+  const w = geminiWav([...voice(600)]);
+  const a = pcmBytes(w);
+  assert.equal(a.rate, 24000);
+  assert.equal(a.bytes.length, Math.round(R * 0.6) * 2);
+  const f = pcmToFloat(w.buffer.slice(0), 24000);
+  let tail = 0;
+  for (let i = f.length - 240; i < f.length; i++) tail = Math.max(tail, Math.abs(f[i]));
+  assert.ok(tail < 0.01, `ends quietly, got ${tail}`);
+  // two WAV parts join as audio, not header + metadata noise in the middle
+  const b64 = Buffer.from(w).toString('base64');
+  const r = audioFrom({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/wav', data: b64 } }, { inlineData: { mimeType: 'audio/wav', data: b64 } }] } }] });
+  assert.equal(r.pcm.byteLength, a.bytes.length * 2);
+  // raw PCM still works, with the rate from the mime type
+  const raw = new Uint8Array(new Int16Array(4800).buffer);
+  assert.equal(pcmBytes(raw, 16000).rate, 16000);
+  assert.equal(pcmBytes(raw).bytes.length, 9600);
+  assert.equal(audioFrom({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data: Buffer.from(raw).toString('base64') } }] } }] }).pcm.byteLength, 9600);
+});
+
+test('a data chunk with a placeholder size uses what is there; other sample formats say nothing', async () => {
+  const { pcmBytes } = await import('../js/tts.js');
+  const w = geminiWav([...voice(100)], 24000, 'x');
+  new DataView(w.buffer).setUint32(40, 0xFFFFFFFF, true);
+  assert.ok(pcmBytes(w).bytes.length > 0);
+  const w8 = geminiWav([...voice(100)]);
+  new DataView(w8.buffer).setUint16(34, 8, true);
+  assert.equal(pcmBytes(w8).bytes.length, 0);
 });
