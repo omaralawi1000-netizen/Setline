@@ -311,6 +311,12 @@ export function resolve(intent, snap, t, lang) {
       if (!validBodyweight(intent.kg)) return err('voice.bwInvalid');
       return cmd('auto', { title: t('body.weight'), value: `${kgTxt(intent.kg)} ${u}`, sub: t('voice.heard', { text: heard }), say: say(t('say.bw', { kg: kgTxt(intent.kg), unit: sayUnit })), run: { op: 'bodyweight', kg: intent.kg } });
     }
+    case 'SetGoal': {
+      if (!intent.exerciseId) return err('voice.noExercise');
+      const date = new Intl.DateTimeFormat(lang === 'da' ? 'da-DK' : 'en-GB', { day: 'numeric', month: 'long' }).format(intent.deadline);
+      const value = `${name(intent.exerciseId)} ${kgTxt(intent.kg)} ${u}${intent.reps > 1 ? ` × ${intent.reps}` : ''}`;
+      return cmd('confirm', { title: t('goal.newTitle'), value, sub: t('goal.by', { date }), say: say(t('goal.say', { what: `${sayName(intent.exerciseId)} ${kgTxt(intent.kg)} ${sayUnit}`, date })), run: { op: 'goal', goal: { exerciseId: intent.exerciseId, kg: intent.kg, reps: intent.reps, deadline: intent.deadline } } });
+    }
     case 'CheckIn': {
       const date = dateKey(snap.now);
       const prev = (snap.daily || []).find(d => d.date === date) || null;

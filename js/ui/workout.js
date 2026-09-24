@@ -20,6 +20,7 @@ import { renderLiveCardio } from './cardio.js';
 import { suggest } from '../progression.js';
 import { usualMinutes, timeStatus } from '../insights.js';
 import { handsFreeOn, hfPillHTML, toggleHandsFree } from './handsfree.js';
+import { goalAimHTML } from './goals.js';
 
 const C = 157.08; // ring circumference, r=25
 const REST_LINGER = 4000; // keep the card up after rest ends
@@ -106,6 +107,7 @@ export function renderWorkout(root) {
       </div>
       <div class="ghost">${ghost}</div>
       ${suggestionHTML(ex)}
+      ${goalAimHTML(ex.exerciseId)}
       <div class="tools">
         <button class="tool" data-act="plates">${I.plates}<span>${t('plates.title')}</span></button>
         ${!ex.sets.some(s => s.done) && !ex.sets.some(s => s.type === 'warmup') && v.kg > 20 && info?.equipment !== 'bodyweight' ? `<button class="tool" data-act="warmup">${I.flame}<span>${t('warmup.add')}</span></button>` : ''}

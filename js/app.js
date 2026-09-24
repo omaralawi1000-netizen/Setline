@@ -29,6 +29,7 @@ import { renderBody, initBodyScreen } from './ui/bodyscreen.js';
 import { openScanner } from './ui/scan.js';
 import { openMealSheet } from './ui/meal.js';
 import { maybeOnboard, setOnboardNav } from './ui/onboard.js';
+import { initGoals } from './ui/goals.js';
 import { cardioElapsed, cardioName } from './cardio.js';
 import { weekStart } from './stats.js';
 import { nextRoutine } from './routines.js';
@@ -216,6 +217,7 @@ Object.assign(actions, {
 initPress(document);
 initHandsFree();
 initBodyScreen($('#s-body'));
+initGoals();
 setOnboardNav({ go: name => go(name), ask: q => askCoach(q) });
 initWorkout($('#s-workout'), actions);
 initSettings(actions, $('#s-settings'));

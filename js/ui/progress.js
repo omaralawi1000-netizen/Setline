@@ -106,6 +106,7 @@ export function renderExercise(root, id) {
       <div><b>${b.weight ? esc(kg(b.weight.kg)) : '–'}</b><span>${t('pr.weight')}, ${u()}</span></div>
       <div><b>${lift.sessions}</b><span>${t('progress.sessionsLabel')}</span></div>
     </div>` : `<div class="empty solid"><h2>${t('progress.noLift')}</h2></div>`}
+    ${e ? `<button class="btn2 solid goalbtn" data-goal="${(state.settings.goals || []).find(g => g.exerciseId === id) ? 'open' : 'new'}" data-ex="${esc(id)}" data-id="${esc((state.settings.goals || []).find(g => g.exerciseId === id)?.id || '')}">${I.flame}<span>${(state.settings.goals || []).some(g => g.exerciseId === id) ? state.t('goal.view') : state.t('goal.set')}</span></button>` : ''}
     ${sg ? `<div class="card solid sugcard"><span class="label">${t('progress.next')}</span><strong>${esc(`${kg(sg.kg)} ${u()} × ${sg.reps}`)}</strong><span>${esc(t('suggest.' + sg.reason, { from: `${kg(sg.from.kg)} ${u()} × ${sg.from.reps}` }))}</span></div>` : ''}
     ${sessions.length ? `<div class="section"><span class="label">${t('progress.historyLabel')}</span></div>
     <ul class="sesslist">${sessions.map(s => `<li class="solid"><span class="d">${esc(day(s.t, lang))}</span><span class="v">${esc(groupSets(s.sets))}</span></li>`).join('')}</ul>` : ''}`;

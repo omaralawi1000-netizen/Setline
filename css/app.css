@@ -1301,3 +1301,31 @@ p.ckwarn{margin:6px 0 0}
 .profrow .l strong{font-size:17px;font-weight:800}
 .profrow .l > span{font-size:13px;color:var(--muted);font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .profrow .go{color:var(--dim)}
+
+/* ---------- 1.9: goals ---------- */
+.gcard{margin-top:10px;width:100%;display:grid;gap:10px;padding:16px;border-radius:24px;text-align:left;animation:rise .45s var(--ease) both;animation-delay:calc(var(--i) * 60ms)}
+.ghead{display:flex;align-items:flex-start;gap:10px}
+.ghead .l{flex:1;min-width:0;display:grid;gap:2px}
+.ghead strong{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.ghead .l > span{font-size:12.5px;color:var(--muted);font-weight:650}
+.gstate{flex:none;height:26px;line-height:26px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:800;background:rgba(255,255,255,.08);color:var(--muted)}
+.gcard.ahead .gstate,.gstate.ahead,.gcard.done .gstate,.gstate.done{background:rgba(111,227,165,.14);color:#8FEBBB}
+.gcard.on-track .gstate,.gstate.on-track{background:rgba(198,187,250,.16);color:var(--accent)}
+.gcard.behind .gstate,.gstate.behind,.gcard.missed .gstate{background:rgba(255,217,168,.14);color:var(--warm)}
+.gbar{position:relative;height:10px;border-radius:5px;background:rgba(255,255,255,.07);overflow:visible}
+.gbar .fill{position:absolute;inset:0;border-radius:5px;background:linear-gradient(90deg,#7A67F2,#C6BBFA);transform-origin:left;animation:mgrow 1s var(--ease) both .15s}
+.gcard.done .gbar .fill,.gcard.ahead .gbar .fill{background:linear-gradient(90deg,#7A67F2,#8FEBBB)}
+.gbar .gnow{position:absolute;top:-4px;width:2px;height:18px;margin-left:-1px;border-radius:1px;background:rgba(255,255,255,.7);box-shadow:0 0 8px rgba(255,255,255,.5)}
+.gfoot{display:flex;justify-content:space-between;gap:10px;font-size:13px;font-weight:650;color:var(--muted)}
+.gfoot b{color:var(--ink);font-weight:800;white-space:nowrap}
+.gpace{font-size:12px;color:var(--dim);font-weight:650}
+.gaim{margin-top:10px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:750;color:var(--warm)}
+.gaim .i{width:16px;height:16px;flex:none}
+.goalbtn{margin-top:12px;width:100%}
+.goalbtn .i{color:var(--warm)}
+.gchart{width:100%;height:150px;margin:8px 0 4px}
+.gchart .gt{stroke:rgba(255,217,168,.6);stroke-width:1.5;stroke-dasharray:4 5}
+.gchart .gl{fill:none;stroke:#C6BBFA;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.gchart .gp{stroke:#C6BBFA;stroke-width:2;stroke-dasharray:3 6;opacity:.7}
+.gchart circle{fill:#C6BBFA}
+.gchart text{fill:var(--warm);font-size:11px;font-weight:800}

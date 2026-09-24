@@ -15,6 +15,7 @@ import { muscleBalance, deloadStatus } from '../insights.js';
 import { driveNudgeHTML } from './drive.js';
 import { checkinHTML } from './checkin.js';
 import { scanIcon } from './scan.js';
+import { goalCardsHTML } from './goals.js';
 import { favRowHTML } from './meal.js';
 
 const MIC = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.6 11.5a6.4 6.4 0 0 0 12.8 0M12 18v3"/></svg>';
@@ -241,6 +242,7 @@ export function renderToday(root) {
     ${busy ? '' : checkinHTML()}
     ${busy ? '' : deloadHTML()}
     ${busy ? resumeHTML() : upNextHTML()}
+    ${goalCardsHTML()}
     ${busy ? '' : cardioRowHTML()}
     <div class="section"><span class="label">${t('today.thisWeek')}</span><button class="textbtn" data-progress>${t('progress.link')} →</button></div>
     ${weekCardsHTML()}

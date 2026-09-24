@@ -18,6 +18,7 @@ import { I } from './icons.js';
 import { hideToast } from './toast.js';
 import { aiCommand, withFallback } from '../ai.js';
 import { openMealSheet } from './meal.js';
+import { addGoal } from './goals.js';
 import { isQuestion, isPlanRequest } from '../coach.js';
 import { startCardioSession, finishSheet as cardioFinishSheet } from './cardio.js';
 import { dateKey } from '../body.js';
@@ -56,7 +57,7 @@ function parseCtx() {
   const li = ex ? lastDoneIndex(ex) : -1;
   const pi = ex ? firstPlannedIndex(ex) : -1;
   return {
-    lang: state.settings.voiceLang, unit: state.settings.unit, catalog: state.catalog, usage: state.usage,
+    lang: state.settings.voiceLang, unit: state.settings.unit, catalog: state.catalog, usage: state.usage, now: Date.now(),
     routines: state.routines, workoutExerciseIds: w ? w.exercises.map(e => e.exerciseId) : [],
     current: ex ? { exerciseId: ex.exerciseId, lastSet: li >= 0 ? ex.sets[li] : null, planned: pi >= 0 ? ex.sets[pi] : null, shown: shownValues(ex) } : null,
     restRunning: !!(w && restRemaining(w.rest) > 0)
@@ -689,6 +690,7 @@ async function execute(run, cmd) {
     return true;
   }
   if (run.op === 'protein') { await store.logProtein(run.grams); card.undoOp = { op: 'protein', grams: run.grams }; return true; }
+  if (run.op === 'goal') { addGoal(run.goal); return true; }
   if (run.op === 'checkin') { const r = await store.saveCheckin(run.patch); card.undoOp = { op: 'checkin', prev: r.prev }; return true; }
   if (run.op === 'meal') { dismissCard(); if (v.open) await closeVoice(); openMealSheet({ text: run.text }); return false; }
   if (run.op === 'discard') {

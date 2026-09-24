@@ -6,12 +6,13 @@
 //   workoutExerciseIds: [...], routines: [{id, name, names}], restRunning: bool
 // }
 // Intent shapes are shared with the AI fallback (phase 3).
+import { parseGoalDate } from './goals.js';
 import { parseCheckin } from './checkin.js';
 import { normalize } from './catalog.js';
 import { lbToKg, round } from './units.js';
 import { CARDIO_TYPES } from './cardio.js';
 
-export const INTENTS = ['LogSet', 'LogSets', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'CheckIn', 'LogRel', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
+export const INTENTS = ['LogSet', 'LogSets', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'CheckIn', 'LogRel', 'SetGoal', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
   'AddExercise', 'SwapExercise', 'StartRoutine', 'StartEmpty', 'Finish', 'Discard', 'StartRest', 'AdjustRest', 'SkipRest',
   'Query', 'Cancel', 'Help', 'Ask', 'Unknown'];
 
@@ -460,6 +461,24 @@ export function parse(text, ctx = {}) {
 
   // --- morning check-in: "slept 6 hours, legs are sore", "sov 7 timer", "energy 3" ---
   { const ci = parseCheckin(s); if (ci) return out('CheckIn', ci); }
+
+  // --- a goal: "goal 100 kg bench by december", "i want to squat 140 by christmas", "mål 100 kilo bænkpres til jul" ---
+  if ((m = R(/^(?:(?:set |new |make )?(?:a |my |the )?goal(?: of| to| is)?|my goal is(?: to)?|i want to|i wanna|mål(?:et er)?|mit mål er(?: at)?|jeg vil(?: gerne)?)(?: hit| lift| do| have| reach| nå| løfte| tage| kunne)? (.+?) (?:by|before|til|inden|før|in|om) (.+)$/, s))) {
+    const deadline = parseGoalDate(m[2], ctx.now ?? Date.now());
+    const wm = /(\d+(?:\.\d+)?) ?(kg|kilo|kilos|lb|lbs|pounds|pund)?(?: (?:for|x|gange) (\d+)(?: reps?| gentagelser?)?)?/.exec(m[1]);
+    if (deadline && wm) {
+      const kg = (wm[2] && /^(lb|lbs|pounds|pund)$/.test(wm[2])) || (!wm[2] && ctx.unit === 'lb') ? round(lbToKg(Number(wm[1])), 4) : Number(wm[1]);
+      let phrase = (m[1].slice(0, wm.index) + ' ' + m[1].slice(wm.index + wm[0].length)).trim();
+      const rm = wm[3] ? null : /(?:^| )(?:for|x|gange) (\d+)(?: reps?| gentagelser?)?(?= |$)/.exec(phrase); // "bench press for 5"
+      const reps = wm[3] ? Number(wm[3]) : rm ? Number(rm[1]) : 1;
+      if (rm) phrase = phrase.replace(rm[0], ' ');
+      phrase = trimFiller(phrase.split(' ').filter(Boolean)).join(' ');
+      const hit = phrase ? exercise(phrase) : null;
+      const exerciseId = hit?.exerciseId || (!phrase ? ctx.current?.exerciseId : null);
+      if (exerciseId) return out('SetGoal', { exerciseId, kg, reps, deadline });
+      if (hit?.choices) return out('Ask', { reason: 'exercise', choices: hit.choices, then: { type: 'SetGoal', kg, reps, deadline } });
+    }
+  }
 
   // --- bodyweight and protein ---
   if ((m = R(/^(?:i )?(?:weigh|weighed|weight|my weight is|my weight|bodyweight|body weight|jeg vejer|vejer|vægt|min vægt er|kropsvægt)(?: is| er| i dag| today)? (\d+(?:\.\d+)?) ?(kg|kilo|kilos|lb|lbs|pounds|pund)?$/, s))) {
