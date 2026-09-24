@@ -2,7 +2,8 @@
 import { LIMITS } from './workout.js';
 import { sanitizeProfile } from './profile.js';
 import { sanitizeGoals } from './goals.js';
-import { sanitizeTargets } from './nutrition.js';
+import { sanitizeTargets, sanitizeQuick } from './nutrition.js';
+import { sanitizeSteps } from './progression.js';
 
 export const SETTINGS_KEY = 'setline.settings';
 
@@ -45,12 +46,21 @@ export const DEFAULTS = Object.freeze({
   accent: 'violet',    // colour theme
   fullscreen: false,   // hide the phone's status bar (edge to edge)
   foodHide: [],        // Food tab parts turned off (Customize)
+  foodOrder: [],       // Food tab sections, in your order
+  todayOrder: [],      // Today cards, in your order
+  quickAdd: null,      // {kind: 'protein'|'kcal', values: [a, b, c]}
+  kgSteps: null,       // {barbell, dumbbell, machine}: the − / + step in kg
   foodTargets: null,   // {kcal, protein, carbs, fat, water} set by hand; null = worked out from the profile
   todayHide: ['balance', 'routines'] // Today sections tucked away (Customize)
 });
 
 export const ACCENTS = ['violet', 'ocean', 'jade', 'ember', 'rose'];
 export const FOOD_PARTS = ['calories', 'carbs', 'fat', 'water', 'favourites', 'quickProtein', 'week'];
+export const FOOD_ORDER = ['favourites', 'quickProtein', 'water', 'meals', 'week'];
+export const TODAY_ORDER = ['checkin', 'upnext', 'goals', 'cardio', 'week', 'balance', 'body', 'review', 'routines'];
+const order = (list, all) => { const seen = [...new Set((Array.isArray(list) ? list : []).filter(x => all.includes(x)))]; return [...seen, ...all.filter(x => !seen.includes(x))]; };
+export const foodOrderOf = s => order(s.foodOrder, FOOD_ORDER);
+export const todayOrderOf = s => order(s.todayOrder, TODAY_ORDER);
 export const TODAY_PARTS = ['checkin', 'goals', 'cardio', 'week', 'balance', 'body', 'review', 'routines'];
 
 // Gemini prebuilt voices and how they sound.
@@ -80,6 +90,10 @@ export function sanitize(input) {
   if (ACCENTS.includes(input.accent)) s.accent = input.accent;
   if (typeof input.fullscreen === 'boolean') s.fullscreen = input.fullscreen;
   s.foodTargets = sanitizeTargets(input.foodTargets);
+  if (Array.isArray(input.foodOrder)) s.foodOrder = order(input.foodOrder, FOOD_ORDER);
+  if (Array.isArray(input.todayOrder)) s.todayOrder = order(input.todayOrder, TODAY_ORDER);
+  if (input.quickAdd) s.quickAdd = sanitizeQuick(input.quickAdd);
+  s.kgSteps = sanitizeSteps(input.kgSteps);
   if (Array.isArray(input.foodHide)) s.foodHide = [...new Set(input.foodHide.filter(x => FOOD_PARTS.includes(x)))];
   if (Array.isArray(input.todayHide)) s.todayHide = [...new Set(input.todayHide.filter(x => TODAY_PARTS.includes(x)))];
   if (Array.isArray(input.favMeals)) s.favMeals = input.favMeals.filter(x => typeof x === 'string' && x.length <= 60).slice(0, 30);

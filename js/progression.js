@@ -8,8 +8,23 @@ import { counts } from './workout.js';
 
 const LOWER = new Set(['quads', 'hamstrings', 'glutes']);
 
+// Your own steps per kind of kit (Settings → Workout), or null for the defaults below.
+export const STEP_GROUPS = ['barbell', 'dumbbell', 'machine'];
+export const STEP_CHOICES = [0.5, 1, 1.25, 2, 2.5, 5];
+export const stepGroup = equipment => (['dumbbell', 'kettlebell'].includes(equipment) ? 'dumbbell' : ['machine', 'cable'].includes(equipment) ? 'machine' : 'barbell');
+let custom = null;
+export const userStep = ex => (ex && custom?.[stepGroup(ex.equipment)]) || null; // the stepper: yours, else 2.5
+export const configureSteps = steps => { custom = steps && typeof steps === 'object' ? steps : null; };
+export function sanitizeSteps(s) {
+  if (!s || typeof s !== 'object') return null;
+  const out = {};
+  for (const g of STEP_GROUPS) if (STEP_CHOICES.includes(s[g])) out[g] = s[g];
+  return Object.keys(out).length ? out : null;
+}
+
 // Weight step for an exercise: big lower-body lifts move faster, dumbbells in 2 kg jumps.
 export function stepFor(ex) {
+  if (ex && custom?.[stepGroup(ex.equipment)]) return custom[stepGroup(ex.equipment)];
   if (!ex) return 2.5;
   if (ex.equipment === 'dumbbell' || ex.equipment === 'kettlebell') return 2;
   if (LOWER.has(ex.muscles?.[0]) && ['barbell', 'trapbar', 'machine', 'smith'].includes(ex.equipment)) return 5;

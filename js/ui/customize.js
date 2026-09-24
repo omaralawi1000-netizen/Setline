@@ -1,7 +1,9 @@
 // Customize: the colour theme and which cards Today shows. Changes apply live behind the sheet.
 import * as store from '../store.js';
 import { state } from '../store.js';
-import { ACCENTS, TODAY_PARTS, FOOD_PARTS } from '../settings.js';
+import { ACCENTS, TODAY_PARTS, FOOD_PARTS, foodOrderOf, todayOrderOf } from '../settings.js';
+import { sanitizeQuick, QUICK_DEFAULTS } from '../nutrition.js';
+import { I } from './icons.js';
 import { haptic } from '../haptics.js';
 import { openSheet, closeTop } from './sheet.js';
 
@@ -12,14 +14,21 @@ export function openCustomize() {
       const s = state.settings, hide = new Set(s.todayHide || []);
       el.innerHTML = `<div class="sbody"><h2>${t('cust.title')}</h2><p class="lead">${t('cust.lead')}</p>
         <div class="field"><label>${t('cust.colour')}</label><div class="swatches">${ACCENTS.map(a => `<button class="swatch" data-accent="${a}" data-cu="accent" aria-pressed="${a === s.accent}" aria-label="${t('accent.' + a)}"><i></i><span>${t('accent.' + a)}</span></button>`).join('')}</div></div>
-        <div class="field"><label>${t('cust.cards')}</label><div class="slist solid">${TODAY_PARTS.map(k => `<div class="srow"><span class="l"><strong>${t('cust.part.' + k)}</strong></span>
-          <button class="toggle" role="switch" aria-checked="${!hide.has(k)}" aria-label="${t('cust.part.' + k)}" data-cu="part" data-k="${k}"></button></div>`).join('')}</div></div></div>`;
+        <div class="field"><label>${t('cust.cards')}</label><div class="slist solid">${todayOrderOf(s).map((k, i, ord) => `<div class="srow ord"><span class="l"><strong>${t('cust.part.' + k)}</strong></span>
+          <span class="ordbtns"><button class="iconbtn sm" data-cu="move" data-k="${k}" data-d="-1" aria-label="${t('cust.up')}" ${i === 0 ? 'disabled' : ''}>${I.up}</button><button class="iconbtn sm dn" data-cu="move" data-k="${k}" data-d="1" aria-label="${t('cust.down')}" ${i === ord.length - 1 ? 'disabled' : ''}>${I.up}</button></span>
+          ${TODAY_PARTS.includes(k) ? `<button class="toggle" role="switch" aria-checked="${!hide.has(k)}" aria-label="${t('cust.part.' + k)}" data-cu="part" data-k="${k}"></button>` : '<span class="togph"></span>'}</div>`).join('')}</div></div></div>`;
     };
     paint();
     el.addEventListener('click', e => {
       const b = e.target.closest('[data-cu]');
-      if (!b) return;
+      if (!b || b.disabled) return;
       haptic('tap');
+      if (b.dataset.cu === 'move') {
+        const ord = todayOrderOf(state.settings), i = ord.indexOf(b.dataset.k), j = i + Number(b.dataset.d);
+        [ord[i], ord[j]] = [ord[j], ord[i]];
+        store.setSettings({ todayOrder: ord });
+        return paint();
+      }
       if (b.dataset.cu === 'accent') {
         store.setSettings({ accent: b.dataset.accent });
         el.querySelectorAll('.swatch').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
@@ -34,24 +43,49 @@ export function openCustomize() {
   }, { label: t('cust.title') });
 }
 
-// Food tab: what to track. Calories off → the ring follows protein.
+// Food tab: what to track and in which order. Calories off → the ring follows protein.
+const QSTEP = { protein: 5, kcal: 50 };
 export function openFoodCustomize({ targets = null } = {}) {
   const { t } = state;
   openSheet(el => {
-    const hide = () => new Set(state.settings.foodHide || []);
-    el.innerHTML = `<div class="sbody"><h2>${t('cust.foodTitle')}</h2><p class="lead">${t('cust.foodLead')}</p>
-      <div class="slist solid">${FOOD_PARTS.map(k => `<div class="srow"><span class="l"><strong>${t('cust.food.' + k)}</strong>${k === 'calories' ? `<small>${t('cust.food.caloriesSub')}</small>` : ''}</span>
-        <button class="toggle" role="switch" aria-checked="${!hide().has(k)}" aria-label="${t('cust.food.' + k)}" data-cf="${k}"></button></div>`).join('')}</div>
-      ${targets ? `<button class="btn2 solid wide" data-cf-targets>${t('food.targets')}</button>` : ''}</div>`;
+    const paint = () => {
+      const st = state.settings, hide = new Set(st.foodHide || []), q = sanitizeQuick(st.quickAdd), ord = foodOrderOf(st);
+      const hideable = k => FOOD_PARTS.includes(k);
+      el.innerHTML = `<div class="sbody"><h2>${t('cust.foodTitle')}</h2><p class="lead">${t('cust.foodLead')}</p>
+        <div class="field"><label>${t('cust.track')}</label><div class="slist solid">${['calories', 'carbs', 'fat'].map(k => `<div class="srow"><span class="l"><strong>${t('cust.food.' + k)}</strong>${k === 'calories' ? `<small>${t('cust.food.caloriesSub')}</small>` : ''}</span>
+          <button class="toggle" role="switch" aria-checked="${!hide.has(k)}" aria-label="${t('cust.food.' + k)}" data-cf="${k}"></button></div>`).join('')}</div></div>
+        <div class="field"><label>${t('cust.sections')}</label><div class="slist solid">${ord.map((k, i) => `<div class="srow ord"><span class="l"><strong>${t('cust.food.' + k)}</strong></span>
+          <span class="ordbtns"><button class="iconbtn sm" data-mv="${k}" data-d="-1" aria-label="${t('cust.up')}" ${i === 0 ? 'disabled' : ''}>${I.up}</button><button class="iconbtn sm dn" data-mv="${k}" data-d="1" aria-label="${t('cust.down')}" ${i === ord.length - 1 ? 'disabled' : ''}>${I.up}</button></span>
+          ${hideable(k) ? `<button class="toggle" role="switch" aria-checked="${!hide.has(k)}" aria-label="${t('cust.food.' + k)}" data-cf="${k}"></button>` : '<span class="togph"></span>'}</div>`).join('')}</div></div>
+        <div class="field"><label>${t('cust.quick')}</label>
+          <div class="seg" role="group">${['kcal', 'protein'].map(k => `<button data-qk="${k}" aria-pressed="${q.kind === k}">${t('cust.quick.' + k)}</button>`).join('')}</div>
+          <div class="qvals">${q.values.map((v, i) => `<div class="stepper"><button class="step" data-qv="${i}" data-d="-1">−</button><b>${v}${q.kind === 'kcal' ? '' : ' g'}</b><button class="step" data-qv="${i}" data-d="1">+</button></div>`).join('')}</div></div>
+        ${targets ? `<button class="btn2 solid wide" data-cf-targets>${t('food.targets')}</button>` : ''}</div>`;
+    };
+    paint();
     el.addEventListener('click', async e => {
       if (e.target.closest('[data-cf-targets]')) { haptic('tap'); await closeTop(); targets?.(); return; }
-      const b = e.target.closest('[data-cf]');
-      if (!b) return;
+      const st = state.settings;
+      const b = e.target.closest('[data-cf],[data-mv],[data-qk],[data-qv]');
+      if (!b || b.disabled) return;
       haptic('tap');
-      const h = hide(), k = b.dataset.cf;
-      if (h.has(k)) h.delete(k); else h.add(k);
-      store.setSettings({ foodHide: [...h] });
-      b.setAttribute('aria-checked', String(!h.has(k)));
+      if (b.dataset.cf) {
+        const h = new Set(st.foodHide || []), k = b.dataset.cf;
+        if (h.has(k)) h.delete(k); else h.add(k);
+        store.setSettings({ foodHide: [...h] });
+      } else if (b.dataset.mv) {
+        const ord = foodOrderOf(st), i = ord.indexOf(b.dataset.mv), j = i + Number(b.dataset.d);
+        [ord[i], ord[j]] = [ord[j], ord[i]];
+        store.setSettings({ foodOrder: ord });
+      } else if (b.dataset.qk) {
+        store.setSettings({ quickAdd: { kind: b.dataset.qk, values: QUICK_DEFAULTS[b.dataset.qk] } });
+      } else {
+        const q = sanitizeQuick(st.quickAdd), i = Number(b.dataset.qv);
+        const values = [...q.values];
+        values[i] = Math.max(q.kind === 'kcal' ? 10 : 1, values[i] + Number(b.dataset.d) * QSTEP[q.kind]);
+        store.setSettings({ quickAdd: { kind: q.kind, values } });
+      }
+      paint();
     });
   }, { label: t('cust.foodTitle') });
 }

@@ -1,5 +1,6 @@
 // Entry point: navigation, dock, clock, service worker updates.
 import * as store from './store.js';
+import { configureSteps } from './progression.js';
 import { state } from './store.js';
 import { elapsedSec, nextSetNumber } from './workout.js';
 import { clock } from './format.js';
@@ -110,6 +111,7 @@ function renderMini() {
 function renderAll() {
   document.documentElement.lang = state.lang;
   document.documentElement.dataset.motion = state.settings.motion;
+  configureSteps(state.settings.kgSteps);
   if (document.documentElement.dataset.accent !== state.settings.accent) { document.documentElement.dataset.accent = state.settings.accent; refreshChrome(); }
   renderScreen();
   animateFigures($('#s-' + view.screen));

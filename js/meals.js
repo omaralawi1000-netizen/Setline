@@ -85,6 +85,24 @@ export function addMeal(entries, date, meal, now = Date.now(), id = uid()) {
   return { entries: [...entries.filter(e => e.date !== date), next], meal: m };
 }
 
+// Change a logged meal (the estimate was off); the day's totals move by the difference.
+export function editMeal(entries, date, id, patch) {
+  const cur = entries.find(e => e.date === date);
+  const m = cur?.meals?.find(x => x.id === id);
+  if (!m) return entries;
+  const next = {
+    ...m,
+    ...(typeof patch.name === 'string' && patch.name.trim() ? { name: patch.name.trim().slice(0, MEAL_LIMITS.name) } : {}),
+    protein: Math.round(clamp(patch.protein ?? m.protein, MEAL_LIMITS.protein)), kcal: Math.round(clamp(patch.kcal ?? m.kcal, MEAL_LIMITS.kcal)),
+    carbs: Math.round(clamp(patch.carbs ?? m.carbs, MEAL_LIMITS.carbs)), fat: Math.round(clamp(patch.fat ?? m.fat, MEAL_LIMITS.fat))
+  };
+  const day = {
+    ...cur, protein: Math.max(0, Math.min(1000, (cur.protein || 0) - m.protein + next.protein)),
+    kcal: Math.max(0, Math.min(20000, (cur.kcal || 0) - m.kcal + next.kcal)), meals: cur.meals.map(x => (x.id === id ? next : x))
+  };
+  return [...entries.filter(e => e.date !== date), day];
+}
+
 export function removeMeal(entries, date, id) {
   const cur = entries.find(e => e.date === date);
   const m = cur?.meals?.find(x => x.id === id);

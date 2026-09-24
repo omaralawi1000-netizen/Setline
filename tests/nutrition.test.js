@@ -48,3 +48,32 @@ test('day totals count meals and quick protein; water and slots', () => {
   const sp = N.energySplit({ protein: 100, carbs: 100, fat: 0 });
   assert.equal(sp.protein, 0.5);
 });
+
+test('quick add can be calories or protein, with your own amounts', () => {
+  assert.deepEqual(N.sanitizeQuick(null), { kind: 'protein', values: [20, 30, 40] });
+  assert.deepEqual(N.sanitizeQuick({ kind: 'kcal' }), { kind: 'kcal', values: [100, 200, 300] });
+  assert.deepEqual(N.sanitizeQuick({ kind: 'kcal', values: [150, 250, 500] }).values, [150, 250, 500]);
+  assert.deepEqual(N.sanitizeQuick({ kind: 'protein', values: [20, 999, 40] }).values, [20, 30, 40], 'a bad amount falls back');
+});
+
+test('maintenance from 3 weeks of eating and weighing', () => {
+  const nutrition = [], bodyweight = [];
+  const day = i => { const d = new Date(2026, 8, 3 + i); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  for (let i = 0; i < 21; i++) {
+    nutrition.push({ date: day(i), protein: 150, kcal: 3000, meals: [] });
+    if (i % 3 === 0) bodyweight.push({ date: day(i), kg: 90 + i * (0.25 / 7) }); // +0.25 kg a week
+  }
+  const m = N.adaptiveMaintenance(nutrition, bodyweight, day(20));
+  assert.ok(m, 'enough data');
+  assert.ok(Math.abs(m.maintenance - 2725) < 40, `eating 3000 and gaining 0.25 kg/week → ~2725 (got ${m.maintenance})`);
+  assert.equal(m.kgPerWeek, 0.25);
+  assert.equal(N.adaptiveMaintenance(nutrition.slice(0, 5), bodyweight, day(20)), null, 'not enough days');
+  assert.equal(N.goalCalories(2725, 'muscle'), 3000);
+});
+
+import { editMeal } from '../js/meals.js';
+test('editing a meal moves the day by the difference', () => {
+  const es = [{ date: '2026-09-24', protein: 70, kcal: 900, meals: [{ id: 'a', t: 1, name: 'Plate', protein: 50, kcal: 700, carbs: 60, fat: 20 }] }];
+  const out = editMeal(es, '2026-09-24', 'a', { protein: 40, kcal: 550, name: 'Smaller plate' });
+  assert.deepEqual([out[0].protein, out[0].kcal, out[0].meals[0].name, out[0].meals[0].carbs], [60, 750, 'Smaller plate', 60]);
+});

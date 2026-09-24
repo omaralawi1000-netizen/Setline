@@ -1691,3 +1691,23 @@ html[data-motion=off] #s-food *{animation:none!important}
 .edge.et::before{opacity:1;background:linear-gradient(#000,rgba(0,0,0,.7) 30%,rgba(0,0,0,0))}
 .app.under-top .edge.et::before{opacity:1}
 .sbody .btn2.wide{width:100%;margin-top:12px}
+/* reorder rows in Customize */
+.srow.ord{flex-wrap:nowrap}
+.srow.ord .l{flex:1 1 auto}
+.ordbtns{display:flex;gap:2px;margin-left:auto}
+.ordbtns .iconbtn.sm{background:rgba(255,255,255,.05)}
+.ordbtns .dn svg{transform:rotate(180deg)}
+.togph{width:52px;flex:none}
+.srow.ord > .toggle{margin-left:6px}
+.qvals{margin-top:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.qvals .stepper{justify-content:space-between;padding:4px;border-radius:16px;background:var(--card);border:1px solid var(--card-line)}
+.qvals .stepper b{font-size:15px}
+.fsheet .fedit{margin-top:14px;flex-direction:row}
+.freal{margin-top:14px;padding:14px 16px;border-radius:20px;display:flex;flex-direction:column;gap:6px}
+.freal strong{font-size:15.5px;font-weight:800}
+.freal span{font-size:13px;color:var(--muted);font-weight:600;line-height:1.4}
+.freal .btn2{margin-top:6px;align-self:flex-start}
+.qvals{gap:6px}
+.qvals .stepper{min-width:0;gap:2px;padding:3px}
+.qvals .step{width:30px;height:30px;border-radius:10px;font-size:17px}
+.qvals .stepper b{flex:1;min-width:0;text-align:center;font-size:14px}

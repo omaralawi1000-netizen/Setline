@@ -17,7 +17,10 @@ import { openSheet, closeTop } from './sheet.js';
 import { openPicker } from './picker.js';
 import { startCardsHTML, workoutTitle } from './today.js';
 import { renderLiveCardio } from './cardio.js';
-import { suggest } from '../progression.js';
+import { suggest, userStep } from '../progression.js';
+
+// the − / + step for the exercise in front of you (Settings → Workout → Weight steps)
+const curStep = () => { const w = state.active; const ex = w?.exercises[w.current]; return userStep(ex && state.catalog.get(ex.exerciseId)); };
 import { usualMinutes, timeStatus } from '../insights.js';
 import { handsFreeOn, hfPillHTML, toggleHandsFree } from './handsfree.js';
 import { goalAimHTML } from './goals.js';
@@ -331,7 +334,7 @@ function setDraft(kg, reps) {
 
 function stepKg(dir) {
   const v = values();
-  const kg = Math.min(W.LIMITS.kgMax, stepWeight(v.kg, dir, unit()));
+  const kg = Math.min(W.LIMITS.kgMax, stepWeight(v.kg, dir, unit(), curStep()));
   haptic('tap');
   if (kg !== v.kg) ui.tick = { field: 'kg', dir };
   setDraft(kg, v.reps);
@@ -464,8 +467,8 @@ function editSetSheet(setId) {
     const readReps = () => { const n = parseNumber(repsIn.value); if (n != null) reps = n; };
     kgIn.onchange = () => { readKg(); paint(); };
     repsIn.onchange = () => { readReps(); paint(); };
-    el.querySelector('[data-k="kg-"]').onclick = () => { readKg(); kg = stepWeight(kg, -1, unit()); haptic('tap'); paint(); };
-    el.querySelector('[data-k="kg+"]').onclick = () => { readKg(); kg = Math.min(W.LIMITS.kgMax, stepWeight(kg, 1, unit())); haptic('tap'); paint(); };
+    el.querySelector('[data-k="kg-"]').onclick = () => { readKg(); kg = stepWeight(kg, -1, unit(), curStep()); haptic('tap'); paint(); };
+    el.querySelector('[data-k="kg+"]').onclick = () => { readKg(); kg = Math.min(W.LIMITS.kgMax, stepWeight(kg, 1, unit(), curStep())); haptic('tap'); paint(); };
     el.querySelector('[data-k="reps-"]').onclick = () => { readReps(); reps = Math.max(1, reps - 1); haptic('tap'); paint(); };
     el.querySelector('[data-k="reps+"]').onclick = () => { readReps(); reps = Math.min(W.LIMITS.repsMax, reps + 1); haptic('tap'); paint(); };
     el.querySelector('[data-k=save]').onclick = () => {

@@ -92,3 +92,36 @@ export function energySplit({ protein, carbs, fat }) {
   const p = protein * 4, c = carbs * 4, f = fat * 9, tot = p + c + f;
   return tot ? { protein: p / tot, carbs: c / tot, fat: f / tot } : { protein: 0, carbs: 0, fat: 0 };
 }
+
+// ---------- quick add ----------
+export const QUICK_KINDS = ['protein', 'kcal'];
+export const QUICK_DEFAULTS = { protein: [20, 30, 40], kcal: [100, 200, 300] };
+export function sanitizeQuick(q) {
+  const kind = QUICK_KINDS.includes(q?.kind) ? q.kind : 'protein';
+  const [lo, hi] = kind === 'kcal' ? [10, 2000] : [1, 150];
+  const vals = Array.isArray(q?.values) ? q.values.map(Number).filter(v => Number.isFinite(v) && v >= lo && v <= hi).map(Math.round).slice(0, 3) : [];
+  return { kind, values: vals.length === 3 ? vals : QUICK_DEFAULTS[kind] };
+}
+
+// ---------- the real maintenance, from what you ate and what the scale did ----------
+// Needs 14+ days with food logged and 6+ weigh-ins spread over them. 1 kg of body weight ≈ 7700 kcal.
+export function adaptiveMaintenance(nutrition, bodyweight, today, days = 21) {
+  const week = weekOf(nutrition, today, days).filter(d => d.kcal >= 800); // ignore days barely logged
+  if (week.length < 14) return null;
+  const from = week[0].date;
+  const bw = bodyweight.filter(b => b.date >= from && b.date <= today).sort((a, b) => a.date.localeCompare(b.date));
+  if (bw.length < 6) return null;
+  const t0 = Date.parse(bw[0].date), xs = bw.map(b => (Date.parse(b.date) - t0) / 86_400_000), ys = bw.map(b => b.kg);
+  const mx = xs.reduce((a, b) => a + b, 0) / xs.length, my = ys.reduce((a, b) => a + b, 0) / ys.length;
+  let num = 0, den = 0;
+  for (let i = 0; i < xs.length; i++) { num += (xs[i] - mx) * (ys[i] - my); den += (xs[i] - mx) ** 2; }
+  if (!den || xs[xs.length - 1] < 10) return null;
+  const kgPerDay = num / den;
+  const intake = week.reduce((a, d) => a + d.kcal, 0) / week.length;
+  const maintenance = Math.round((intake - kgPerDay * 7700) / 10) * 10;
+  if (maintenance < 1200 || maintenance > 6000) return null;
+  return { maintenance, intake: Math.round(intake), kgPerWeek: Math.round(kgPerDay * 7 * 100) / 100, days: week.length };
+}
+
+// The goal's calories from a known maintenance (same adjustment as the formula).
+export const goalCalories = (maintenance, goal) => Math.round(maintenance * ({ fatloss: 0.8, muscle: 1.1, strength: 1.05 }[goal] ?? 1) / 10) * 10;

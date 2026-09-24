@@ -24,9 +24,9 @@ export function fromDisplay(value, unit) {
 export const weightStep = unit => (unit === 'lb' ? 5 : 2.5);
 
 // Step the weight in display units so the shown number stays clean.
-export function stepWeight(kg, dir, unit) {
+export function stepWeight(kg, dir, unit, kgStep = null) {
   const shown = toDisplay(kg ?? 0, unit);
-  const step = weightStep(unit);
+  const step = unit === 'kg' && kgStep ? kgStep : weightStep(unit);
   let next = dir > 0 ? Math.floor(shown / step + 1e-9) * step + step : Math.ceil(shown / step - 1e-9) * step - step;
   next = Math.max(0, round(next, 2));
   return fromDisplay(next, unit);

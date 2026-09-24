@@ -10,7 +10,7 @@ import { applyWorkout } from './pr.js';
 import { clearKeys } from './keys.js';
 import { startCardio, pauseCardio, resumeCardio, finishCardio, cardioRecords } from './cardio.js';
 import { upsertBodyweight, addProtein, dateKey } from './body.js';
-import { addMeal, removeMeal } from './meals.js';
+import { editMeal, addMeal, removeMeal } from './meals.js';
 import { mergeCheckin } from './checkin.js';
 import { upsertMeasures } from './measures.js';
 import { easyDay } from './progression.js';
@@ -292,6 +292,12 @@ export async function logMeal(meal, date = dateKey()) {
   await db.put('nutrition', state.nutrition.find(x => x.date === date));
   emit('body');
   return r.meal;
+}
+export async function updateMeal(id, patch, date = dateKey()) {
+  state.nutrition = editMeal(state.nutrition, date, id, patch);
+  const e = state.nutrition.find(x => x.date === date);
+  if (e) await db.put('nutrition', e);
+  emit('body');
 }
 export async function logWater(ml, date = dateKey()) {
   state.nutrition = addWater(state.nutrition, date, ml);

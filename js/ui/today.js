@@ -1,5 +1,6 @@
 // Today: the hub. Streak, what's next, cardio, the week, body, last week's review, routines.
 import { state } from '../store.js';
+import { todayOrderOf } from '../settings.js';
 import { foodTargets } from './food.js';
 import { dayTotals } from '../nutrition.js';
 import { esc } from './dom.js';
@@ -231,6 +232,18 @@ export function renderToday(root) {
   const hour = new Date().getHours();
   const busy = state.active || state.activeCardio;
   const hide = new Set(state.settings.todayHide || []), on = k => !hide.has(k);
+  // the cards, in your order (Today → Customize); a running workout always leads
+  const part = {
+    checkin: () => (busy || !on('checkin') ? '' : checkinHTML()),
+    upnext: () => (busy ? '' : upNextHTML({ more: !on('routines') })),
+    goals: () => (on('goals') ? goalCardsHTML() : ''),
+    cardio: () => (busy || !on('cardio') ? '' : cardioRowHTML()),
+    week: () => (on('week') ? `<div class="section"><span class="label">${t('today.thisWeek')}</span><button class="textbtn" data-progress>${t('progress.link')} →</button></div>${weekCardsHTML()}` : ''),
+    balance: () => (on('balance') ? balanceHTML() : ''),
+    body: () => (on('body') ? bodyHTML() : ''),
+    review: () => (on('review') ? reviewHTML() : ''),
+    routines: () => (busy || !on('routines') ? '' : routinesHTML())
+  };
   root.innerHTML = `<header class="brand">
       <div><strong>Setline</strong><span>${t('app.tagline')}</span></div>
       <button class="iconbtn" data-act="open-settings" aria-label="${t('settings.title')}">${I.settings}</button>
@@ -238,17 +251,9 @@ export function renderToday(root) {
     <h1 class="greet">${greeting(t(greetingKey(hour))).split(' ').map((w, i) => `<span class="gw" style="--i:${i}">${esc(w)}</span>`).join(' ')}</h1>
     <p class="sub${!busy && weekStreak(state.history, state.cardio, state.settings.weeklyGoal).streak ? ' streak' : ''}">${esc(subline())}</p>
     ${busy ? '' : driveNudgeHTML({ stale: true })}
-    ${busy || !on('checkin') ? '' : checkinHTML()}
+    ${busy ? resumeHTML() : ''}
     ${busy ? '' : deloadHTML()}
-    ${busy ? resumeHTML() : upNextHTML({ more: !on('routines') })}
-    ${on('goals') ? goalCardsHTML() : ''}
-    ${busy || !on('cardio') ? '' : cardioRowHTML()}
-    ${on('week') ? `<div class="section"><span class="label">${t('today.thisWeek')}</span><button class="textbtn" data-progress>${t('progress.link')} →</button></div>
-    ${weekCardsHTML()}` : ''}
-    ${on('balance') ? balanceHTML() : ''}
-    ${on('body') ? bodyHTML() : ''}
-    ${on('review') ? reviewHTML() : ''}
-    ${busy || !on('routines') ? '' : routinesHTML()}
+    ${todayOrderOf(state.settings).map(k => part[k]()).join('')}
     <button class="custom" data-act="customize">${I.settings}<span>${t('cust.open')}</span></button>`;
   nameParts(root);
   const fg = root.querySelector('.week .fg');

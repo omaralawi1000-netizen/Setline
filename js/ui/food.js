@@ -4,7 +4,9 @@
 import * as store from '../store.js';
 import { state } from '../store.js';
 import { dateKey, bodyTrend } from '../body.js';
-import { autoTargets, targetsFor, dayTotals, bySlot, weekOf, SLOTS, GLASS_ML, slotOf, TARGET_LIMITS } from '../nutrition.js';
+import { autoTargets, targetsFor, dayTotals, bySlot, weekOf, SLOTS, GLASS_ML, slotOf, TARGET_LIMITS, sanitizeQuick, adaptiveMaintenance, goalCalories } from '../nutrition.js';
+import { foodOrderOf } from '../settings.js';
+import { addProteinQuick } from './body.js';
 import { haptic } from '../haptics.js';
 import { esc } from './dom.js';
 import { I } from './icons.js';
@@ -78,6 +80,27 @@ export function renderFood(root) {
   const ringWas = cal ? was.kcal / tg.kcal : was.protein / tg.protein, ringNow = cal ? tot.kcal / tg.kcal : tot.protein / tg.protein;
   const ringLeft = cal ? left : tg.protein - tot.protein, ringOver = ringLeft < 0;
 
+  // the sections under the ring, in your order (Food → Customize)
+  const qa = sanitizeQuick(state.settings.quickAdd);
+  const part = {
+    favourites: () => (on('favourites') && isToday ? favRowHTML(10) : ''),
+    quickProtein: () => (on('quickProtein') && isToday ? `<div class="fqp"><span>${t(qa.kind === 'kcal' ? 'food.quickKcal' : 'food.quickProtein')}</span>${qa.values.map(v => `<button class="chip" data-f="quick" data-kind="${qa.kind}" data-v="${v}">+${v}${qa.kind === 'kcal' ? '' : ' g'}</button>`).join('')}</div>` : ''),
+    water: () => (on('water') ? `    <div class="section"><span class="label">${t('food.water')}</span><span class="fwl">${(tot.water / 1000).toLocaleString(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: 2 })} / ${(tg.water / 1000).toLocaleString(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: 1 })} L</span></div>
+    <div class="fwater" style="--n:${Math.min(12, glasses)}">${Array.from({ length: glasses }, (_, i) => `<button class="glass-w${i < full ? ' on' : ''}" data-f="water" data-n="${i + 1}" aria-label="${esc(t('food.glasses', { n: i + 1 }))}" style="--i:${i}"><i></i></button>`).join('')}</div>` : ''),
+    meals: () => (anyMeals ? SLOTS.filter(s => slots[s].length).map(s => {
+      const k = slots[s].reduce((a, m) => a + m.kcal, 0);
+      return `<div class="section fslot"><span class="label">${t('food.slot.' + s)}</span><span class="fsk">${nf().format(k)} kcal</span></div>
+        <ul class="flist solid">${slots[s].map(m => mealRowHTML(m, seen && !seen.has(m.id), idx++)).join('')}</ul>`;
+    }).join('') : `<div class="fempty"><span class="fei">${I.meal}</span><strong>${t(isToday ? 'food.emptyToday' : 'food.emptyDay')}</strong><small>${t('food.emptySub')}</small></div>`) + (tot.quickProtein > 0 ? `<p class="fquick">${esc(t('food.quick', { g: tot.quickProtein }))}</p>` : ''),
+    week: () => (on('week') ? `    <div class="section"><span class="label">${t('food.week')}</span><span class="fwl">${esc(t('food.avg', { k: nf().format(Math.round(week.filter(d => d.kcal).reduce((a, d) => a + d.kcal, 0) / Math.max(1, week.filter(d => d.kcal).length))) }))}</span></div>
+    <div class="fweek solid">
+      <i class="ftarget" style="bottom:${(tg.kcal / maxK * 100).toFixed(1)}%"></i>
+      ${week.map((d, i) => `<button class="fwd${d.date === date ? ' on' : ''}" data-f="goto" data-date="${d.date}" style="--i:${i}">
+        <i class="fwb${d.kcal > tg.kcal * 1.08 ? ' hi' : ''}" style="--h:${(d.kcal / maxK).toFixed(3)}"></i>
+        ${d.protein ? `<i class="fwp" style="--p:${Math.min(1, d.protein / tg.protein).toFixed(3)}"></i>` : ''}
+        <span>${esc(new Intl.DateTimeFormat(state.lang === 'da' ? 'da-DK' : 'en-GB', { weekday: 'narrow' }).format(new Date(d.date + 'T12:00')))}</span></button>`).join('')}
+    </div>` : '')
+  };
   root.innerHTML = `<div class="tabtop"></div>
     <div class="fdayrow"><h1 class="h1 tabh">${t('food.title')}</h1>
       <div class="fday"><button class="iconbtn sm" data-f="day" data-d="-1" aria-label="${t('food.prevDay')}">${I.back}</button><span>${esc(dayLabel(date))}</span>
@@ -98,27 +121,8 @@ export function renderFood(root) {
       <button class="ftile" data-f="snap" style="--i:1">${I.camera}<span>${t('food.snap')}</span></button>
       <button class="ftile" data-f="say" style="--i:2">${I.mic}<span>${t('food.say')}</span></button>
       <button class="ftile" data-f="type" style="--i:3">${I.pen}<span>${t('food.type')}</span></button>
-    </div>
-    ${on('favourites') ? favRowHTML(10) : ''}
-    ${on('quickProtein') ? `<div class="fqp"><span>${t('food.quickProtein')}</span>${[20, 30, 40].map(g => `<button class="chip" data-body="protein" data-g="${g}">+${g} g</button>`).join('')}</div>` : ''}` : `<button class="btn2 solid fback" data-f="today">${t('food.backToday')}</button>`}
-
-    ${on('water') ? `    <div class="section"><span class="label">${t('food.water')}</span><span class="fwl">${(tot.water / 1000).toLocaleString(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: 2 })} / ${(tg.water / 1000).toLocaleString(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: 1 })} L</span></div>
-    <div class="fwater" style="--n:${Math.min(12, glasses)}">${Array.from({ length: glasses }, (_, i) => `<button class="glass-w${i < full ? ' on' : ''}" data-f="water" data-n="${i + 1}" aria-label="${esc(t('food.glasses', { n: i + 1 }))}" style="--i:${i}"><i></i></button>`).join('')}</div>` : ''}
-    ${anyMeals ? SLOTS.filter(s => slots[s].length).map(s => {
-      const k = slots[s].reduce((a, m) => a + m.kcal, 0);
-      return `<div class="section fslot"><span class="label">${t('food.slot.' + s)}</span><span class="fsk">${nf().format(k)} kcal</span></div>
-        <ul class="flist solid">${slots[s].map(m => mealRowHTML(m, seen && !seen.has(m.id), idx++)).join('')}</ul>`;
-    }).join('') : `<div class="fempty"><span class="fei">${I.meal}</span><strong>${t(isToday ? 'food.emptyToday' : 'food.emptyDay')}</strong><small>${t('food.emptySub')}</small></div>`}
-    ${tot.quickProtein > 0 ? `<p class="fquick">${esc(t('food.quick', { g: tot.quickProtein }))}</p>` : ''}
-
-    ${on('week') ? `    <div class="section"><span class="label">${t('food.week')}</span><span class="fwl">${esc(t('food.avg', { k: nf().format(Math.round(week.filter(d => d.kcal).reduce((a, d) => a + d.kcal, 0) / Math.max(1, week.filter(d => d.kcal).length))) }))}</span></div>
-    <div class="fweek solid">
-      <i class="ftarget" style="bottom:${(tg.kcal / maxK * 100).toFixed(1)}%"></i>
-      ${week.map((d, i) => `<button class="fwd${d.date === date ? ' on' : ''}" data-f="goto" data-date="${d.date}" style="--i:${i}">
-        <i class="fwb${d.kcal > tg.kcal * 1.08 ? ' hi' : ''}" style="--h:${(d.kcal / maxK).toFixed(3)}"></i>
-        ${d.protein ? `<i class="fwp" style="--p:${Math.min(1, d.protein / tg.protein).toFixed(3)}"></i>` : ''}
-        <span>${esc(new Intl.DateTimeFormat(state.lang === 'da' ? 'da-DK' : 'en-GB', { weekday: 'narrow' }).format(new Date(d.date + 'T12:00')))}</span></button>`).join('')}
-    </div>` : ''}
+    </div>` : `<button class="btn2 solid fback" data-f="today">${t('food.backToday')}</button>`}
+    ${foodOrderOf(state.settings).map(k => part[k]()).join('')}
     <p class="fnote">${t(state.settings.foodTargets ? 'food.targetsCustom' : 'food.targetsAuto')}</p>
     <button class="custom" data-f="custom">${I.settings}<span>${t('cust.open')}</span></button>`;
 
@@ -161,6 +165,7 @@ function mealSheet(id) {
         <h2>${esc(m.name)}</h2>
         <div class="fbig"><div><b>${nf().format(m.kcal)}</b><span>kcal</span></div><div class="p"><b>${m.protein}</b><span>${t('food.protein')}</span></div><div class="c"><b>${m.carbs || 0}</b><span>${t('food.carbs')}</span></div><div class="f"><b>${m.fat || 0}</b><span>${t('food.fat')}</span></div></div>
         <div class="field"><label>${t('food.meal')}</label><div class="opts">${SLOTS.map(s => `<button class="chip" data-fs="slot" data-v="${s}" aria-pressed="${s === slot}">${t('food.slot.' + s)}</button>`).join('')}</div></div>
+        <button class="btn2 solid wide fedit" data-fs="edit">${I.pen}<span>${t('food.edit')}</span></button>
         <div class="acts row3">
           <button class="btn2 solid" data-fs="again">${I.plus}<span>${t('food.again')}</span></button>
           <button class="btn2 solid${starred ? ' on' : ''}" data-fs="star">${I.flame}<span>${t(starred ? 'food.starred' : 'food.star')}</span></button>
@@ -174,6 +179,7 @@ function mealSheet(id) {
       const k = b.dataset.fs;
       haptic('tap');
       if (k === 'slot') { await store.moveMeal(id, b.dataset.v, date); paint(); return; }
+      if (k === 'edit') { await closeTop(); editSheet(id, date); return; }
       if (k === 'star') { toggleStar(m.name); await closeTop(); return; }
       if (k === 'again') {
         await closeTop();
@@ -187,6 +193,46 @@ function mealSheet(id) {
 }
 
 // the row folds away, then the meal goes (with undo)
+// Fix an estimate: the numbers one by one, or the whole portion at once.
+function editSheet(id, date) {
+  const { t } = state;
+  const m = state.nutrition.find(e => e.date === date)?.meals?.find(x => x.id === id);
+  if (!m) return;
+  const base = { kcal: m.kcal, protein: m.protein, carbs: m.carbs || 0, fat: m.fat || 0 };
+  const f = { ...base, name: m.name, portion: 1 };
+  const STEP = { kcal: 10, protein: 1, carbs: 1, fat: 1 };
+  openSheet(el => {
+    const paint = () => {
+      el.innerHTML = `<div class="sbody"><h2>${t('food.edit')}</h2>
+        <div class="field"><label>${t('food.name')}</label><input class="rname" data-fe="name" value="${esc(f.name)}" maxlength="60" autocomplete="off"></div>
+        <div class="field"><label>${t('food.portion')}</label><div class="opts">${[0.5, 0.75, 1, 1.25, 1.5, 2].map(p => `<button class="chip" data-fe="portion" data-v="${p}" aria-pressed="${p === f.portion}">${p === 1 ? t('food.asLogged') : `× ${String(p).replace('.', state.lang === 'da' ? ',' : '.')}`}</button>`).join('')}</div></div>
+        <div class="slist solid">${Object.keys(STEP).map(k => `<div class="srow"><span class="l"><strong>${t(k === 'kcal' ? 'food.t.kcal' : 'food.' + k)}</strong></span>
+          <div class="stepper"><button class="step" data-fe="step" data-k="${k}" data-d="-1">−</button><b>${nf().format(f[k])}${k === 'kcal' ? '' : ' g'}</b><button class="step" data-fe="step" data-k="${k}" data-d="1">+</button></div></div>`).join('')}</div>
+        <div class="acts"><button class="log" data-fe="save">${I.check}<span>${t('food.saveEdit')}</span></button></div></div>`;
+    };
+    paint();
+    el.addEventListener('input', e => { if (e.target.dataset.fe === 'name') f.name = e.target.value; });
+    el.addEventListener('click', async e => {
+      const b = e.target.closest('[data-fe]');
+      if (!b || b.dataset.fe === 'name') return;
+      haptic('tap');
+      if (b.dataset.fe === 'portion') {
+        f.portion = Number(b.dataset.v);
+        for (const k of Object.keys(STEP)) f[k] = Math.round(base[k] * f.portion);
+      } else if (b.dataset.fe === 'step') {
+        const k = b.dataset.k, hold = k === 'kcal' ? 10 : 1;
+        f[k] = Math.max(0, f[k] + Number(b.dataset.d) * (e.detail > 1 ? hold * 5 : STEP[k]));
+      } else if (b.dataset.fe === 'save') {
+        await store.updateMeal(id, { name: f.name, kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }, date);
+        await closeTop();
+        haptic('success');
+        return toast({ title: esc(t('food.saved')), sub: `${f.kcal} kcal · ${f.protein} g`, action: t('common.undo'), onAction: () => store.updateMeal(id, { ...base, name: m.name }, date) });
+      }
+      paint();
+    });
+  }, { label: t('food.edit') });
+}
+
 function removeWithFold(id, date, m) {
   const row = document.querySelector(`#s-food [data-meal="${CSS.escape(id)}"]`);
   const done = async () => {
@@ -206,9 +252,16 @@ function targetsSheet() {
   const auto = autoTargets({ profile: state.settings.profile, bodyweightKg: bodyTrend(state.bodyweight)?.latest.kg, proteinPerKg: state.settings.proteinPerKg });
   const f = { ...foodTargets() };
   const STEP = { kcal: 50, protein: 5, carbs: 10, fat: 5, water: 250 };
+  // what your own intake and scale say, once there's enough of both
+  const real = adaptiveMaintenance(state.nutrition, state.bodyweight, dateKey());
+  const realGoal = real ? goalCalories(real.maintenance, state.settings.profile?.goal) : null;
   openSheet(el => {
     const paint = () => {
       el.innerHTML = `<div class="sbody"><h2>${t('food.targets')}</h2><p class="lead">${t('food.targetsLead')}</p>
+        ${real ? `<div class="freal solid"><strong>${esc(t('food.realTitle', { k: nf().format(real.maintenance) }))}</strong>
+          <span>${esc(t('food.realSub', { days: real.days, intake: nf().format(real.intake), sign: real.kgPerWeek > 0 ? '+' : real.kgPerWeek < 0 ? '−' : '±', kg: Math.abs(real.kgPerWeek).toLocaleString(state.lang === 'da' ? 'da-DK' : 'en-GB') }))}</span>
+          <button class="btn2 solid" data-ft="real">${esc(t('food.useReal', { k: nf().format(realGoal) }))}</button></div>`
+        : `<p class="snote">${t('food.realLater')}</p>`}
         <div class="slist solid">${Object.keys(STEP).map(k => `<div class="srow"><span class="l"><strong>${t('food.t.' + k)}</strong><small>${esc(t('food.autoIs', { v: `${nf().format(auto[k])} ${k === 'kcal' ? 'kcal' : k === 'water' ? 'ml' : 'g'}` }))}</small></span>
           <div class="stepper"><button class="step" data-ft="-" data-k="${k}">−</button><b>${nf().format(f[k])}</b><button class="step" data-ft="+" data-k="${k}">+</button></div></div>`).join('')}</div>
         <div class="acts"><button class="log" data-ft="save">${I.check}<span>${t('food.saveTargets')}</span></button>
@@ -225,6 +278,7 @@ function targetsSheet() {
         f[k] = Math.min(hi, Math.max(lo, f[k] + (v === '+' ? 1 : -1) * STEP[k]));
         return paint();
       }
+      if (v === 'real') { f.kcal = realGoal; f.carbs = Math.max(0, Math.round((realGoal - f.protein * 4 - f.fat * 9) / 4 / 5) * 5); return paint(); }
       if (v === 'auto') store.setSettings({ foodTargets: null });
       else store.setSettings({ foodTargets: f });
       await closeTop();
@@ -245,6 +299,13 @@ export function initFood(root) {
     if (k === 'day') { view.date = shiftDate(view.date, Number(b.dataset.d)); slide(root, Number(b.dataset.d)); return renderFood(root); }
     if (k === 'goto') { const d = Number(new Date(b.dataset.date) > new Date(view.date)) || -1; view.date = b.dataset.date; slide(root, d); return renderFood(root); }
     if (k === 'today') { view.date = dateKey(); slide(root, 1); return renderFood(root); }
+    if (k === 'quick') {
+      const v = Number(b.dataset.v);
+      if (b.dataset.kind === 'protein') return addProteinQuick(v);
+      const meal = await store.logMeal({ name: state.t('food.quickName'), kcal: v, protein: 0, carbs: 0, fat: 0, source: 'text' });
+      haptic('success');
+      return toast({ title: `${esc(state.t('food.quickName'))} <span class="v">+${v} kcal</span>`, action: state.t('common.undo'), onAction: () => store.deleteMeal(meal.id), ms: 3000 });
+    }
     if (k === 'targets') return targetsSheet();
     if (k === 'custom') return openFoodCustomize({ targets: targetsSheet });
     if (k === 'meal') return mealSheet(b.dataset.id);
