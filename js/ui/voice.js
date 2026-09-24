@@ -32,6 +32,7 @@ const reduced = () => document.documentElement.dataset.motion === 'off' ||
 
 let nav = { go: () => {}, showDetail: () => {}, openSettings: () => {} };
 const v = {
+  mode: 'full',   // 'mini' = the orb floating above the dock, 'full' = the voice screen
   open: false, phase: 'idle', toggle: false, typing: false,
   press: null, token: 0, closing: null, popWaiting: 0,
   raf: 0, lvl: 0, hist: new Float32Array(64), histAt: 0
@@ -97,7 +98,17 @@ function build() {
     <div class="hints" id="vhints"></div>
     <button class="hold" id="vhold"><span class="glow"></span>${micIcon}<span id="vholdtxt"></span></button>
     <p class="holdnote" id="vnote"></p>`;
+  const mini = document.createElement('div');
+  mini.className = 'ofloat';
+  mini.id = 'ofloat';
+  mini.hidden = true;
+  mini.innerHTML = `<div class="oscrim" data-o="cancel"></div>
+    <div class="obubble"><span class="ostatus" id="ostatus"></span><p class="osay" id="osay"></p></div>
+    <div class="opull" id="opull" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M6 14.5l6-6 6 6"/></svg><span></span></div>
+    <span class="owrap" id="owrap" data-o="orb"><span class="orb lift" id="oorb"><i class="core"><b></b><b></b><b></b></i><i class="spin"></i></span><span class="oglow"></span></span>`;
+  document.getElementById('app').appendChild(mini);
   Object.assign(el, {
+    mini, owrap: mini.querySelector('#owrap'), oorb: mini.querySelector('#oorb'), ostatus: mini.querySelector('#ostatus'), osay: mini.querySelector('#osay'), opull: mini.querySelector('#opull'),
     layer, status: $('#vstatus span'), lang: $('#vlang'), stage: $('#vstage'), halo: $('#vhalo'), ripples: $('#vripples'),
     orbwrap: $('#vorbwrap'), orb: $('#vorb'), wave: $('#vwave'), bars: [...$('#vwave').children], say: $('#vsay'),
     type: $('#vtype'), input: $('#vinput'), hints: $('#vhints'), hold: $('#vhold'), holdtxt: $('#vholdtxt'), note: $('#vnote'),
@@ -133,6 +144,9 @@ function setPhase(phase) {
   el.note.textContent = t(rec && v.toggle ? 'voice.tapNote' : 'voice.holdNote');
   el.hold.disabled = phase === 'thinking';
   el.layer.dataset.toggle = v.toggle ? '1' : '';
+  el.mini.dataset.phase = phase;
+  el.mini.dataset.toggle = v.toggle ? '1' : '';
+  el.ostatus.textContent = t(phase === 'listening' && v.toggle ? 'voice.tapSendMini' : status);
 }
 
 const translateY = node => { const t = getComputedStyle(node).transform; return t && t !== 'none' ? new DOMMatrix(t).m42 : 0; };
@@ -140,8 +154,8 @@ const scaleOf = node => { const t = getComputedStyle(node).transform; return t &
 
 // FLIP the big orb to/from the dock orb. Works from wherever things are right now,
 // so reopening or closing mid-flight (or from the typing layout) doesn't jump.
-function flyOrb(open) {
-  const from = document.querySelector('#dock .orbbtn .orb');
+function flyOrb(open, fromEl = null) {
+  const from = fromEl || document.querySelector('#dock .orbbtn .orb');
   const w = el.orbwrap;
   if (!from || reduced()) { w.style.transform = ''; return; }
   const current = getComputedStyle(w).transform;
@@ -162,10 +176,79 @@ function flyOrb(open) {
   w.style.transform = open ? '' : far;
 }
 
-export function openVoice() {
+// ---------- mini mode: the orb lifts out of the dock ----------
+
+function flyMini(open) {
+  const from = document.querySelector('#dock .orbbtn .orb');
+  const w = el.owrap;
+  if (!from || reduced()) { w.style.transform = ''; return; }
+  const current = getComputedStyle(w).transform;
+  w.style.transition = 'none';
+  w.style.transform = 'none';
+  const b = el.oorb.getBoundingClientRect();
+  const a = from.getBoundingClientRect();
+  const dockShift = open ? 0 : translateY(document.getElementById('dock'));
+  const dx = a.left + a.width / 2 - (b.left + b.width / 2);
+  const dy = a.top + a.height / 2 - dockShift - (b.top + b.height / 2);
+  const far = `translate(${dx}px, ${dy}px) scale(${a.width / b.width})`;
+  w.style.transform = open ? far : (current === 'none' ? '' : current);
+  void w.offsetWidth;
+  w.style.transition = open ? '' : 'transform .5s cubic-bezier(.3,.7,.2,1)';
+  w.style.transform = open ? '' : far;
+}
+
+function pushVoiceEntry() {
+  const push = () => { if (v.open && !history.state?.voice) history.pushState({ ...(history.state || {}), voice: 1 }, ''); };
+  if (v.closing) v.closing.then(push); else push();
+}
+
+export function openMini() {
   hideToast();
   if (v.open) return;
   v.open = true;
+  v.mode = 'mini';
+  el.osay.innerHTML = '';
+  el.owrap.style.translate = '';
+  el.opull.style.opacity = '';
+  el.opull.querySelector('span').textContent = state.t('voice.pullUp');
+  setPhase('idle');
+  document.getElementById('app').classList.add('voice-mini', 'orbaway');
+  el.mini.hidden = false;
+  void el.mini.offsetWidth;
+  el.mini.classList.add('on');
+  flyMini(true);
+  pushVoiceEntry();
+  startLoop();
+}
+
+// Hand the live session over to the full voice screen (recording keeps going).
+function expandFull() {
+  if (!v.open || v.mode !== 'mini') return;
+  haptic('tap');
+  const from = el.oorb;
+  v.mode = 'full';
+  v.typing = false;
+  el.layer.classList.remove('typing');
+  paintStatic();
+  el.say.innerHTML = el.osay.innerHTML;
+  document.getElementById('app').classList.add('voice');
+  el.layer.hidden = false;
+  el.layer.inert = false;
+  el.orbwrap.style.transform = '';
+  void el.layer.offsetWidth;
+  el.layer.classList.add('on');
+  flyOrb(true, from);
+  setPhase(v.phase);
+  el.mini.classList.remove('on');
+  el.mini.classList.add('handoff');
+  setTimeout(() => { el.mini.hidden = true; el.mini.classList.remove('handoff'); document.getElementById('app').classList.remove('voice-mini'); el.owrap.style.translate = ''; }, 260);
+}
+
+export function openVoice() {
+  hideToast();
+  if (v.open) { if (v.mode === 'mini') expandFull(); return; }
+  v.open = true;
+  v.mode = 'full';
   v.typing = false;
   el.layer.classList.remove('typing');
   paintStatic();
@@ -192,6 +275,20 @@ export function closeVoice({ fromPop = false } = {}) {
   v.press = null;
   v.toggle = false;
   mic.cancel();
+  if (v.mode === 'mini') {
+    // the orb sinks back into the dock
+    el.mini.classList.remove('on');
+    el.oorb.style.transform = '';
+    el.owrap.style.translate = '';
+    flyMini(false);
+    const land = () => { if (!v.open) document.getElementById('app').classList.remove('orbaway', 'voice-mini'); };
+    el.owrap.addEventListener('transitionend', land, { once: true });
+    setTimeout(land, reduced() ? 0 : 560);
+    setTimeout(() => { if (!v.open) { el.mini.hidden = true; stopLoop(); el.owrap.style.transform = ''; el.owrap.style.transition = ''; } }, 600);
+    if (fromPop || !history.state?.voice) return v.closing || Promise.resolve();
+    v.closing = new Promise(res => { v.popWaiting++; v.popResolve = res; history.back(); }).then(() => { v.closing = null; });
+    return v.closing;
+  }
   el.input.blur();
   el.layer.classList.remove('on');
   el.layer.inert = true;
@@ -232,6 +329,11 @@ function startLoop() {
     v.hist[v.histAt = (v.histAt + 1) % v.hist.length] = v.lvl;
     if (reduced()) return;
     const l = v.lvl;
+    if (v.mode === 'mini') {
+      el.oorb.style.transform = `scale(${1 + l * 0.2})`;
+      el.owrap.style.setProperty('--l', l.toFixed(3));
+      return;
+    }
     el.orb.style.transform = `scale(${1 + l * 0.12})`;
     el.halo.style.opacity = String(listening ? 0.35 + l * 0.65 : v.phase === 'thinking' ? 0.5 : 0.22);
     el.halo.style.transform = `scale(${1 + l * 0.3})`;
@@ -335,7 +437,7 @@ function cancelRec() {
 
 function showWords(text) {
   const words = text.split(/\s+/).filter(Boolean);
-  el.say.innerHTML = words.map((w, i) => `<span class="w" style="animation-delay:${Math.min(i, 14) * 38}ms">${esc(w)}</span>`).join(' ');
+  (v.mode === 'mini' ? el.osay : el.say).innerHTML = words.map((w, i) => `<span class="w" style="animation-delay:${Math.min(i, 14) * 38}ms">${esc(w)}</span>`).join(' ');
 }
 
 export function handleText(text, { typed = false } = {}) {
@@ -372,7 +474,8 @@ async function aiFallback(text, parsed, { typed }) {
   const lang = langFor(parsed);
   const t = tFor(lang);
   if (v.open) setPhase('thinking');
-  showCard({ kind: 'wait', icon: 'info', title: t('voice.thinkingAi'), sub: t('voice.heard', { text }), lang, intent: parsed });
+  if (v.open && v.mode === 'mini') el.ostatus.textContent = t('voice.thinkingAi');
+  else showCard({ kind: 'wait', icon: 'info', title: t('voice.thinkingAi'), sub: t('voice.heard', { text }), lang, intent: parsed });
   let intent;
   try {
     await ensureModels();
@@ -409,6 +512,12 @@ function present(intent, { typed = false } = {}) {
     return;
   }
   speak(cmd.say, lang);
+  if (v.open && v.mode === 'mini') {
+    setPhase(cmd.kind === 'error' ? 'error' : 'result');
+    setTimeout(() => { if (v.open && v.mode === 'mini') closeVoice(); }, 420);
+    setTimeout(() => showCard(cmd), 180);
+    return;
+  }
   showCard(cmd);
   if (v.open) {
     setPhase(cmd.kind === 'error' ? 'error' : 'result');
@@ -423,6 +532,7 @@ function showError(titleKey, subKey, opts = {}) {
   if (v.open) setPhase('error');
   haptic('error');
   const sub = (subKey ? t(subKey) : '') + (opts.code ? ` (${opts.code})` : '');
+  if (v.open && v.mode === 'mini') setTimeout(() => { if (v.open && v.mode === 'mini') closeVoice(); }, 250);
   showCard({ kind: 'error', icon: 'alert', title: t(titleKey), sub, retry: !!opts.retry, settings: !!opts.settings, type: !!opts.type, local: true });
 }
 
@@ -600,11 +710,11 @@ function onCardClick(e) {
     dismissCard({ keepPending: false });
     return present({ ...ch.intent, heard: cmd.intent?.heard || '', lang: cmd.lang });
   }
-  if (k === 'retry') { dismissCard({ keepPending: false }); if (!v.open) openVoice(); v.toggle = true; return startRec(); }
+  if (k === 'retry') { dismissCard({ keepPending: false }); if (!v.open) openMini(); v.toggle = true; return startRec(); }
   if (k === 'edit') {
     const heard = cmd?.intent?.heard || '';
     dismissCard({ keepPending: false });
-    if (!v.open) openVoice();
+    openVoice();
     return startTyping(heard);
   }
   if (k === 'settings') { dismissCard({ keepPending: false }); closeVoice().then(() => nav.openSettings()); }
@@ -688,21 +798,56 @@ export function initVoice(n) {
     unlockAudio();
     try { orb.setPointerCapture(e.pointerId); } catch {}
     haptic('tap');
-    openVoice();
-    if (state.settings.micMode === 'tap') { v.toggle = true; v.press = null; startRec(); return; }
-    v.press = { t: performance.now(), orb: true };
+    openMini();
+    if (state.settings.micMode === 'tap') { v.toggle = true; v.press = { t: performance.now(), orb: true, y: e.clientY, tapMode: true }; startRec(); return; }
+    v.press = { t: performance.now(), orb: true, y: e.clientY };
     startRec();
+  });
+  // while holding: drag the orb up to open the full voice screen
+  document.getElementById('dock').addEventListener('pointermove', e => {
+    const p = v.press;
+    if (!p?.orb || !v.open || v.mode !== 'mini') return;
+    const dy = Math.min(0, e.clientY - p.y);
+    const pull = Math.max(dy, -140);
+    el.owrap.style.translate = `0 ${(pull * 0.6).toFixed(1)}px`;
+    el.opull.style.opacity = String(Math.min(1, -dy / 90));
+    if (dy < -120) { p.expanded = true; expandFull(); }
   });
   const orbUp = e => {
     if (!e.target.closest?.('.orbbtn') || !v.press?.orb) return;
-    const dt = performance.now() - v.press.t;
+    const p = v.press;
+    const dt = performance.now() - p.t;
     v.press = null;
-    if (dt >= HOLD_MS) finishRec();
-    else cancelRec(); // a tap just opens the voice screen
+    if (v.mode === 'mini') { el.owrap.style.translate = ''; el.opull.style.opacity = ''; }
+    if (p.tapMode) return; // tap mode keeps listening until the orb is tapped again
+    if (dt >= HOLD_MS || p.expanded) return finishRec();
+    // a quick tap: keep listening hands-free; tap the floating orb to send
+    v.toggle = true;
+    if (v.phase === 'listening' || v.phase === 'opening') setPhase(v.phase);
   };
   document.getElementById('dock').addEventListener('pointerup', orbUp);
   document.getElementById('dock').addEventListener('pointercancel', () => { if (v.press?.orb) { v.press = null; cancelRec(); } });
   document.getElementById('dock').addEventListener('contextmenu', e => { if (e.target.closest('.orbbtn')) e.preventDefault(); });
+
+  // floating orb: tap to send (or to listen again), tap outside to cancel
+  el.mini.addEventListener('click', e => {
+    const o = e.target.closest('[data-o]')?.dataset.o;
+    if (o === 'cancel') { haptic('tap'); cancelRec(); closeVoice(); }
+    else if (o === 'orb') {
+      haptic('tap');
+      if (mic.isRecording() || v.phase === 'opening') finishRec();
+      else if (v.phase !== 'thinking') { v.toggle = true; startRec(); }
+    }
+  });
+  let drag = null;
+  el.owrap.addEventListener('pointerdown', e => { drag = { y: e.clientY }; });
+  el.owrap.addEventListener('pointermove', e => {
+    if (!drag || v.mode !== 'mini') return;
+    const dy = Math.min(0, e.clientY - drag.y);
+    el.owrap.style.translate = `0 ${(Math.max(dy, -140) * 0.6).toFixed(1)}px`;
+    if (dy < -110) { drag = null; expandFull(); }
+  });
+  el.owrap.addEventListener('pointerup', () => { drag = null; el.owrap.style.translate = ''; });
 
   tts.onSpeaking(on => document.getElementById('app').classList.toggle('speaking', on));
   store.subscribe(reason => { if (reason === 'settings' && v.open) paintStatic(); });
