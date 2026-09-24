@@ -1406,25 +1406,30 @@ html{transition:background-color .4s}
 .ofloat[data-pause=check] .orb.lift{opacity:.82;transition:opacity .3s}
 .ofloat[data-pause=wait] .ostatus{color:var(--warm);background:rgba(255,217,168,.1)}
 
-/* the dock minimizes to a small pill (current tab + orb) while you scroll down, like iOS */
-.dock{--c-today:1fr;--c-workout:1fr;--c-coach:1fr;--c-history:1fr;grid-template-columns:var(--c-today) var(--c-workout) 88px var(--c-coach) var(--c-history);
-  transition:opacity .35s var(--ease),transform .6s cubic-bezier(.3,1.35,.5,1),left .55s cubic-bezier(.3,1.15,.4,1),right .55s cubic-bezier(.3,1.15,.4,1),
-  grid-template-columns .55s cubic-bezier(.3,1.15,.4,1),height .5s cubic-bezier(.3,1.2,.4,1),bottom .5s cubic-bezier(.3,1.2,.4,1)}
-.tab{min-width:0;overflow:hidden;transition:color .3s,transform .3s var(--ease),opacity .3s}
-.tab span{transition:opacity .25s,transform .4s var(--ease)}
-.app.compact:not(.is-sub):not(.voice):not(.kb) .dock{left:calc(50% - 82px);right:calc(50% - 82px);height:60px;bottom:calc(var(--dock-bottom) - 4px);
-  grid-template-columns:var(--c-today) var(--c-workout) 76px var(--c-coach) var(--c-history)}
+/* the dock minimizes to a small pill (current tab + orb) while you scroll down, like iOS.
+   One easing for everything so the parts move as one piece; no overshoot on layout. */
+.dock{--dk:cubic-bezier(.32,.72,0,1);--c-today:1fr;--c-workout:1fr;--c-coach:1fr;--c-history:1fr;
+  grid-template-columns:var(--c-today) var(--c-workout) 88px var(--c-coach) var(--c-history);
+  transition:opacity .35s var(--ease),transform .5s var(--dk),left .5s var(--dk),right .5s var(--dk),grid-template-columns .5s var(--dk),height .5s var(--dk),bottom .5s var(--dk),padding .5s var(--dk)}
+.tab{min-width:0;overflow:hidden;transition:color .3s,transform .3s var(--ease),opacity .22s,height .5s var(--dk),background .3s}
+.tab span{transition:opacity .18s,transform .4s var(--dk)}
+.orbbtn{transition:transform .5s var(--dk),margin .5s var(--dk)}
+.orbbtn::before{transition:opacity .3s}
+.app.compact:not(.is-sub):not(.voice):not(.kb) .dock{left:calc(50% - 66px);right:calc(50% - 66px);height:64px;padding:0 6px;
+  grid-template-columns:var(--c-today) var(--c-workout) 64px var(--c-coach) var(--c-history)}
 .app.compact .dock:not([data-on=today]){--c-today:0fr}
 .app.compact .dock:not([data-on=workout]){--c-workout:0fr}
 .app.compact .dock:not([data-on=coach]){--c-coach:0fr}
 .app.compact .dock:not([data-on=history]){--c-history:0fr}
 .app.compact .dock .tab:not(.on){opacity:0;pointer-events:none}
-.app.compact .dock .tab span{opacity:0;transform:translateY(4px)}
-.app.compact .dock .tab{height:48px}
+.app.compact .dock .tab span{opacity:0;transform:translateY(6px)}
+.app.compact .dock .tab{height:52px;border-radius:26px}
+.app.compact .dock .tab.on svg{transform:translateY(7px)}
+.tab svg{transition:color .3s,transform .5s var(--dk)}
 .app.compact .dock .ind{opacity:0!important}
 .app.compact .dock .tab.on{background:rgba(var(--a-rgb),.14)}
-.app.compact .dock .orbbtn{transform:scale(.8);margin-top:-14px}
-.orbbtn{transition:transform .5s cubic-bezier(.3,1.35,.5,1),margin .5s cubic-bezier(.3,1.2,.4,1)}
+.app.compact .dock .orbbtn{transform:scale(.72);margin-top:0}
+.app.compact .dock .orbbtn::before{opacity:0}
 
 /* onboarding: the getting-to-know-you chat */
 .ivmount{display:block;margin-top:14px}

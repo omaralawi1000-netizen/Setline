@@ -1,5 +1,7 @@
 // The phone's own bars: the status bar takes the colour of the app's top edge (darker under a sheet
 // or the voice layer), and soft blurred edges fade in at the top and bottom once content scrolls under them.
+import * as store from '../store.js';
+
 export const DIM = '#121220';
 const edge = () => getComputedStyle(document.documentElement).getPropertyValue('--edge').trim() || '#24233F';
 let repaint = () => {};
@@ -47,6 +49,19 @@ export function initChrome() {
   }, true);
   // the indicator is placed from the laid-out tabs: place it again once the dock has opened
   dock?.addEventListener('transitionend', e => { if (e.target === dock && e.propertyName === 'grid-template-columns' && !app.classList.contains('compact')) app.dispatchEvent(new Event('dockopen')); });
+  // Full screen (Settings): the browser only allows it from a tap, so ask on the next one, and
+  // again after coming back to the app (Android leaves full screen when the app is left).
+  const wantFull = () => {
+    const s = store.state.settings;
+    return s.fullscreen && !document.fullscreenElement && document.fullscreenEnabled;
+  };
+  const goFull = () => { if (wantFull()) document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }).catch(() => {}); };
+  document.addEventListener('pointerup', goFull, { capture: true, passive: true });
+  store.subscribe(r => {
+    if (r !== 'settings') return;
+    if (!store.state.settings.fullscreen && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else goFull(); // switched on: still inside the tap
+  });
   repaint = paint;
   paint();
 }

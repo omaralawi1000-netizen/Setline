@@ -5,7 +5,7 @@ import * as mic from '../voice.js';
 import { transcribe } from '../stt.js';
 import { createEndpointer, looksUnfinished } from '../endpoint.js';
 
-export function listenSmart({ stt, onLevel = () => {}, onState = () => {}, pauseMs = 1300, waitMs = 6000, maxMs = 90_000 } = {}) {
+export function listenSmart({ stt, onLevel = () => {}, onState = () => {}, pauseMs = 900, waitMs = 3500, maxMs = 90_000 } = {}) {
   const ep = createEndpointer({ pauseMs });
   let resolve, reject, over = false, raf = 0, last = 0, spec = null, waiting = false;
   const done = new Promise((res, rej) => { resolve = res; reject = rej; });

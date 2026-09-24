@@ -28,8 +28,8 @@ import { ask as askCoach, ensureModels } from './coach.js';
 import { cmdModels } from '../settings.js';
 import { createEndpointer, looksUnfinished } from '../endpoint.js';
 
-const endpoint = createEndpointer();
-const WAIT_MS = 6000; // sounded unfinished: still send after this much quiet
+const endpoint = createEndpointer({ pauseMs: 850 });
+const WAIT_MS = 3000; // sounded unfinished: still send after this much quiet
 
 const HOLD_MS = 280;          // shorter press = tap
 const BARS = 27;

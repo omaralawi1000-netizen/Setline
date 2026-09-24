@@ -42,6 +42,7 @@ export const DEFAULTS = Object.freeze({
   profileAsked: 0,     // when the onboarding was shown (so it's asked once)
   goals: [],           // lift goals (goals.js)
   accent: 'violet',    // colour theme
+  fullscreen: false,   // hide the phone's status bar (edge to edge)
   todayHide: ['balance', 'routines'] // Today sections tucked away (Customize)
 });
 
@@ -73,6 +74,7 @@ export function sanitize(input) {
   if (Array.isArray(input.goals)) s.goals = sanitizeGoals(input.goals);
   if (Number.isFinite(input.profileAsked)) s.profileAsked = input.profileAsked;
   if (ACCENTS.includes(input.accent)) s.accent = input.accent;
+  if (typeof input.fullscreen === 'boolean') s.fullscreen = input.fullscreen;
   if (Array.isArray(input.todayHide)) s.todayHide = [...new Set(input.todayHide.filter(x => TODAY_PARTS.includes(x)))];
   if (Array.isArray(input.favMeals)) s.favMeals = input.favMeals.filter(x => typeof x === 'string' && x.length <= 60).slice(0, 30);
   for (const k of ['deloadUntil', 'deloadSnoozed']) if (Number.isFinite(input[k]) && input[k] >= 0) s[k] = input[k];

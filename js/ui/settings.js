@@ -119,6 +119,8 @@ export function renderSettings(root) {
     <div class="sgroup"><h2>${t('settings.feel')}</h2><div class="slist solid">
       <div class="srow"><span class="l"><strong>${t('settings.haptics')}</strong><small>${t('settings.hapticsSub')}</small></span>
         <button class="toggle" role="switch" aria-checked="${s.haptics}" aria-label="${t('settings.haptics')}" data-act="toggle-haptics"></button></div>
+      <div class="srow"><span class="l"><strong>${t('settings.fullscreen')}</strong><small>${t('settings.fullscreenSub')}</small></span>
+        <button class="toggle" role="switch" aria-checked="${s.fullscreen}" aria-label="${t('settings.fullscreen')}" data-act="toggle" data-key="fullscreen"></button></div>
       <div class="srow"><span class="l"><strong>${t('settings.motion')}</strong></span>${seg('motion', ['auto', 'on', 'off'], [t('settings.motion.auto'), t('settings.motion.on'), t('settings.motion.off')])}</div>
     </div></div>
 
