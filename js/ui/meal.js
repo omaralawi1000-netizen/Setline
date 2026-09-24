@@ -94,6 +94,16 @@ export function openMealSheet({ text = '' } = {}) {
           <button class="linkbtn muted" data-m="again">${t('meal.again')}</button></div>
       </div>`;
     };
+    // portion changes: numbers tick over in place, nothing re-animates
+    const update = () => {
+      const d = s.draft;
+      const nums = box.querySelectorAll('.mnum b');
+      [d.protein, d.kcal, d.carbs, d.fat].forEach((v, k) => { if (nums[k] && nums[k].textContent !== String(v)) { nums[k].textContent = v; nums[k].classList.remove('tick'); void nums[k].offsetWidth; nums[k].classList.add('tick'); } });
+      for (const c of box.querySelectorAll('[data-p]')) c.setAttribute('aria-pressed', String(Number(c.dataset.p) === s.portion));
+      box.querySelectorAll('.mitems li').forEach((li, k) => { const it = d.items[k]; if (!it) return; li.querySelector('em').textContent = `${it.grams} g`; li.querySelector('b').textContent = `${Math.round(it.protein)} g`; });
+      const save = box.querySelector('[data-m=save] span');
+      if (save) save.textContent = t('meal.save', { g: d.protein });
+    };
     const failed = (code) => {
       const msg = code === 'nokey' ? t('meal.noKey') : code === 'notfood' ? t('meal.notFood') : code === 'offline' || code === 'network' ? t('coach.offline') : code === 'busy' ? t('coach.busy') : code === 'quota' ? t('coach.quota', { time: new Date(nextQuotaReset()).toLocaleTimeString(state.lang === 'da' ? 'da-DK' : 'en-GB', { hour: '2-digit', minute: '2-digit' }) }) : t('meal.failed');
       box.innerHTML = `<div class="sbody meal"><div class="empty"><div class="emptyglyph">${I.meal}</div><h2>${esc(msg)}</h2></div>
@@ -141,7 +151,7 @@ export function openMealSheet({ text = '' } = {}) {
     });
     box.addEventListener('click', async e => {
       const p = e.target.closest('[data-p]');
-      if (p) { s.portion = Number(p.dataset.p); s.draft = scaleMeal(s.base, s.portion); haptic('tap'); return result(); }
+      if (p) { s.portion = Number(p.dataset.p); s.draft = scaleMeal(s.base, s.portion); haptic('tap'); return update(); }
       const fav = e.target.closest('[data-fav]');
       if (fav) { await closeTop(); return logFavourite(fav.dataset.fav); }
       const star = e.target.closest('[data-meal-star]');

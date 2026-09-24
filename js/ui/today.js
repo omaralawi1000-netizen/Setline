@@ -228,6 +228,9 @@ function subline() {
   return t('today.ready');
 }
 
+// "Good morning." → "Good morning, Omar."
+const greeting = g => { const n = state.settings.profile?.name; return n ? g.replace(/[.!]?$/, m => `, ${n}${m || '.'}`) : g; };
+
 export function renderToday(root) {
   const { t } = state;
   const hour = new Date().getHours();
@@ -236,7 +239,7 @@ export function renderToday(root) {
       <div><strong>Setline</strong><span>${t('app.tagline')}</span></div>
       <button class="iconbtn" data-act="open-settings" aria-label="${t('settings.title')}">${I.settings}</button>
     </header>
-    <h1 class="greet">${t(greetingKey(hour)).split(' ').map((w, i) => `<span class="gw" style="--i:${i}">${esc(w)}</span>`).join(' ')}</h1>
+    <h1 class="greet">${greeting(t(greetingKey(hour))).split(' ').map((w, i) => `<span class="gw" style="--i:${i}">${esc(w)}</span>`).join(' ')}</h1>
     <p class="sub${!busy && weekStreak(state.history, state.cardio, state.settings.weeklyGoal).streak ? ' streak' : ''}">${esc(subline())}</p>
     ${busy ? '' : driveNudgeHTML({ stale: true })}
     ${busy ? '' : checkinHTML()}

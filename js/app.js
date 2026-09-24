@@ -118,6 +118,8 @@ const ORDER = { today: 0, workout: 1, coach: 2, history: 3, detail: 4, settings:
 function show(name, { back = false } = {}) {
   const prev = view.screen;
   view.screen = name;
+  const amb = document.querySelector('.ambient');
+  if (amb) amb.dataset.s = TABS.includes(name) ? name : 'sub';
   const dir = prev === name ? 0 : (back ? -1 : Math.sign((ORDER[name] ?? 0) - (ORDER[prev] ?? 0)) || 1);
   for (const s of document.querySelectorAll('.screen')) {
     const on = s.dataset.screen === name;

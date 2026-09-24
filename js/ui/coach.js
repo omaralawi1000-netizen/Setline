@@ -15,6 +15,7 @@ import { openSheet, closeTop } from './sheet.js';
 
 let nav = { openSettings: () => {} };
 let inflight = null; // {ctl, id}
+const shown = new Set(); // chat message ids already rendered
 
 const errorText = (code, t) => ({
   offline: t('coach.offline'), network: t('coach.offline'), badkey: t('coach.badKey'), busy: t('coach.busy'), quota: t('coach.quota', { time: new Date(nextQuotaReset()).toLocaleTimeString(state.lang === 'da' ? 'da-DK' : 'en-GB', { hour: '2-digit', minute: '2-digit' }) }), empty: t('coach.empty'), timeout: t('coach.timeout'), nomodel: t('coach.noModel'), nokey: t('coach.noKey')
@@ -54,7 +55,8 @@ export function renderCoach(root) {
       <h2>${t('coach.empty')}</h2><p>${t('coach.emptySub')}</p>
       <div class="exq">${['coach.ex1', 'coach.ex2', 'coach.ex3'].map(k => `<button class="chip" data-coach="ask" data-q="${esc(t(k))}">${esc(t(k))}</button>`).join('')}</div></div>`;
   } else {
-    body = `<ol class="thread" id="thread">${chat.map(bubble).join('')}</ol>`;
+    // messages already on screen don't slide in again when the thread re-renders
+    body = `<ol class="thread" id="thread">${chat.map(m => { const h = bubble(m); const seen = shown.has(m.id); shown.add(m.id); return seen ? h.replace('<li class="msg', '<li class="msg seen') : h; }).join('')}</ol>`;
   }
   root.innerHTML = `<div class="tabtop"></div>
     <header class="coachhead"><div><h1 class="h1">${t('coach.title')}</h1><p class="sub">${t('coach.sub')}</p></div>

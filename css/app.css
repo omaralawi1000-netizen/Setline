@@ -462,7 +462,7 @@ button.mini:active,button.pr:active{transform:scale(.98)}
 .pr polyline{stroke-dasharray:400;stroke-dashoffset:0}
 .screen.enter .pr polyline{animation:draw 1.2s var(--ease) both .15s}
 .screen.enter .pr path{animation:fadein .9s ease both .35s}
-.pr .pulse{transform-box:fill-box;transform-origin:center;animation:prpulse 2.4s ease-in-out infinite}
+.pr .pulse{transform-box:fill-box;transform-origin:center;animation:prpulse 2.4s ease-in-out 4}
 @keyframes draw{from{stroke-dashoffset:400}}
 @keyframes fadein{from{opacity:0}}
 @keyframes prpulse{50%{transform:scale(1.5);opacity:.05}}
@@ -698,7 +698,7 @@ button{-webkit-appearance:none;appearance:none}
 /* greeting words rise in on arrival */
 .greet .gw{display:inline-block}
 .screen.enter .greet .gw{animation:wordup .7s var(--ease) both;animation-delay:calc(var(--i) * 70ms + 60ms)}
-@keyframes wordup{from{opacity:0;transform:translateY(14px);filter:blur(6px)}}
+@keyframes wordup{from{opacity:0;transform:translateY(14px)}}
 
 /* particle bursts */
 .fx-burst{position:absolute;z-index:35;width:0;height:0;pointer-events:none}
@@ -740,7 +740,7 @@ button{-webkit-appearance:none;appearance:none}
 .chart .dot{fill:#D9D0FF;transform-box:fill-box;transform-origin:center}
 .screen.enter .chart .dot{animation:dotpop .5s var(--ease) both;animation-delay:calc(var(--i) * 40ms + .5s)}
 @keyframes dotpop{from{transform:scale(0)}}
-.chart .halo{opacity:.25;transform-box:fill-box;transform-origin:center;animation:prpulse 2.4s ease-in-out infinite}
+.chart .halo{opacity:.25;transform-box:fill-box;transform-origin:center;animation:prpulse 2.4s ease-in-out 4}
 
 /* lifts and records */
 .hhead{display:flex;align-items:flex-end;justify-content:space-between}
@@ -1136,7 +1136,7 @@ p.ckwarn{margin:6px 0 0}
 .pwrap{flex:1;display:flex;flex-direction:column;justify-content:flex-end;padding:calc(var(--safe-top) + 40px) 14px calc(var(--safe-bottom) + 16px);background:radial-gradient(120% 70% at 50% 0%,rgba(122,103,242,.28),transparent 60%),#07080D;overflow-y:auto}
 .pcard{padding:18px;border-radius:30px;display:grid;gap:14px}
 .pcard.in{animation:cardup .6s cubic-bezier(.2,1.2,.3,1)}
-@keyframes cardup{from{opacity:0;transform:translateY(40px) scale(.97);filter:blur(8px)}}
+@keyframes cardup{from{opacity:0;transform:translateY(40px) scale(.97)}}
 .pcard h2{margin:0}
 .phead{display:flex;align-items:center;gap:14px}
 .phead img,.picon{width:64px;height:64px;flex:none;border-radius:18px;object-fit:contain;background:#fff;box-shadow:0 10px 24px -10px rgba(0,0,0,.8)}
@@ -1219,21 +1219,19 @@ p.ckwarn{margin:6px 0 0}
 
 /* content softly blurs as it slides under the dock */
 .app::before{content:"";position:absolute;z-index:6;left:0;right:0;bottom:0;height:calc(var(--dock-bottom) + var(--dock-h) + 34px);pointer-events:none;
-  background:linear-gradient(to top,rgba(13,15,21,.55),rgba(13,15,21,0));
-  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
-  -webkit-mask-image:linear-gradient(to top,#000 45%,transparent);mask-image:linear-gradient(to top,#000 45%,transparent)}
+  background:linear-gradient(to top,rgba(13,15,21,.82),rgba(13,15,21,.45) 45%,rgba(13,15,21,0))}
 .app.voice::before,.app.is-sub::before{opacity:0}
 
 /* big titles melt away as you scroll */
 @supports (animation-timeline:scroll()){
   .greet,.h1{animation:headmelt linear both;animation-timeline:scroll(nearest block);animation-range:0 140px}
-  @keyframes headmelt{to{opacity:0;transform:translateY(-14px) scale(.97);filter:blur(6px)}}
+  @keyframes headmelt{to{opacity:0;transform:translateY(-14px) scale(.97)}}
 }
 
 /* sheets: the page behind dims and blurs a little */
 .scrim{-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 .sheet .sin{animation:sheetin .5s var(--ease) both}
-@keyframes sheetin{from{opacity:0;transform:translateY(14px);filter:blur(6px)}}
+@keyframes sheetin{from{opacity:0;transform:translateY(14px)}}
 
 /* ---------- 1.9: onboarding ---------- */
 .sheet.obsheet{top:0;max-height:none;height:100%;border-radius:0;padding:calc(var(--safe-top) + 6px) 22px calc(var(--safe-bottom) + 20px);--gl-fill:rgba(12,14,20,.86)}
@@ -1329,3 +1327,26 @@ p.ckwarn{margin:6px 0 0}
 .gchart .gp{stroke:#C6BBFA;stroke-width:2;stroke-dasharray:3 6;opacity:.7}
 .gchart circle{fill:#C6BBFA}
 .gchart text{fill:var(--warm);font-size:11px;font-weight:800}
+
+/* =====================================================================
+   1.9: smoothness. Nothing re-blurs or re-animates unless something changed.
+   ===================================================================== */
+/* cards inside scrolling screens: the glass look without a live blur (it re-blurred every scroll frame) */
+.screen .glass{-webkit-backdrop-filter:none;backdrop-filter:none;--gl-fill:rgba(27,30,42,.8)}
+/* the background holds still; it swirls slowly only when you change tabs */
+.ambient i{animation:none!important;transition:transform 2.8s cubic-bezier(.22,1,.36,1)}
+.ambient[data-s=workout] i:nth-child(1){transform:translate(90px,40px) scale(1.12)}
+.ambient[data-s=workout] i:nth-child(2){transform:translate(-40px,-120px) scale(1.05)}
+.ambient[data-s=coach] i:nth-child(1){transform:translate(160px,120px) scale(.95)}
+.ambient[data-s=coach] i:nth-child(2){transform:translate(-120px,60px) scale(1.12)}
+.ambient[data-s=history] i:nth-child(1){transform:translate(40px,260px) scale(1.08)}
+.ambient[data-s=history] i:nth-child(3){transform:translate(120px,-140px) scale(1.2)}
+.ambient[data-s=today] i:nth-child(4){transform:rotate(0deg)}
+.ambient[data-s=workout] i:nth-child(4){transform:rotate(70deg)}
+.ambient[data-s=coach] i:nth-child(4){transform:rotate(150deg)}
+.ambient[data-s=history] i:nth-child(4){transform:rotate(230deg)}
+.ambient[data-s=sub] i:nth-child(4){transform:rotate(-40deg) scale(1.1)}
+/* entrance animations play when a screen appears, not on every update */
+.screen:not(.enter) :is(.gcard,.favchip,.msite,.pthumb,.ckq,.ckdone:not(.arrive),.hfpill,.mrow i b,.gbar .fill,.ckbars i,.mealrow,.dlcard,.dnudge){animation:none}
+.msg.seen{animation:none}
+.glass .label{color:#A99DE8}
