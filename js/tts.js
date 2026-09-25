@@ -86,7 +86,10 @@ async function synth(text, { key, model, voice }) {
         generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } }
       })
     });
-    if (!res.ok) throw Object.assign(new Error('tts ' + res.status), { status: res.status });
+    if (!res.ok) {
+      const body = res.status === 429 ? await res.text().catch(() => '') : '';
+      throw Object.assign(new Error('tts ' + res.status), { status: res.status, daily: /PerDay/i.test(body) });
+    }
     return audioFrom(await res.json());
   } finally { clearTimeout(timer); }
 }
@@ -314,12 +317,17 @@ async function fallback(text, lang, mine) {
 export function splitSpeech(text) {
   const t = String(text || '').trim();
   const m = /^(.{12,}?[.!?…])\s+(?=\S)/.exec(t);
-  if (!m || t.length < 70 || t.length - m[0].length < 12) return [t];
+  if (!m || t.length < 320 || t.length - m[0].length < 12) return [t]; // one request for a normal reply (the free quota is a few a minute)
   return [m[1], t.slice(m[0].length)];
 }
 
-async function clip(text, opts) {
-  const cacheKey = `v4|${opts.model}|${opts.voice}|${text}`;
+const pending = new Map();
+function clip(text, opts) {
+  const k = `v4|${opts.model}|${opts.voice}|${text}`;
+  if (!pending.has(k)) pending.set(k, clipNow(text, opts, k).finally(() => pending.delete(k)));
+  return pending.get(k);
+}
+async function clipNow(text, opts, cacheKey) {
   let buf = await db.get('ttsCache', cacheKey).catch(() => null);
   if (buf && !buf.pcm) buf = null;
   if (buf) return buf;
@@ -338,7 +346,12 @@ async function clip(text, opts) {
 // for an hour, so no reply waits on a request that is going to fail.
 const QUOTA_KEY = 'setline.ttsQuotaUntil';
 const quotaUntil = () => { try { return Number(localStorage.getItem(QUOTA_KEY)) || 0; } catch { return 0; } };
-const quotaHit = () => { try { localStorage.setItem(QUOTA_KEY, String(Date.now() + 3_600_000)); } catch {} };
+// A per-minute limit is waited out for a minute; the daily one until Google resets it (midnight Pacific ≈ 08:00 UTC).
+function quotaHit(daily) {
+  const now = Date.now(), reset = new Date(now); reset.setUTCHours(8, 0, 0, 0);
+  if (reset.getTime() <= now) reset.setUTCDate(reset.getUTCDate() + 1);
+  try { localStorage.setItem(QUOTA_KEY, String(daily ? reset.getTime() : now + 60_000)); } catch {}
+}
 
 export async function speak(text, opts) {
   if (!text) return;
@@ -362,8 +375,8 @@ export async function speak(text, opts) {
       }
       return;
     } catch (e) {
-      lastSpeech.error = e?.status === 429 ? 'quota' : e?.status ? String(e.status) : e?.name === 'AbortError' ? 'timeout' : 'failed';
-      if (e?.status === 429) quotaHit();
+      lastSpeech.error = e?.status === 429 ? (e.daily ? 'quota' : 'busy') : e?.status ? String(e.status) : e?.name === 'AbortError' ? 'timeout' : 'failed';
+      if (e?.status === 429) quotaHit(!!e.daily);
       console.warn('tts fallback', lastSpeech.error);
     }
     text = parts.slice(played).join(' ');

@@ -56,7 +56,7 @@ function speechStatus() {
   if (!lastSpeech.engine) return getKey('google') ? t('speech.unknown') : t('speech.noKey');
   if (lastSpeech.engine === 'gemini') return t('speech.gemini');
   if (!lastSpeech.error) return t('speech.instant');
-  const why = lastSpeech.error === 'nokey' ? t('speech.why.nokey') : lastSpeech.error === 'quota' ? t('speech.why.quota') : t('speech.why.error', { code: lastSpeech.error });
+  const why = lastSpeech.error === 'nokey' ? t('speech.why.nokey') : lastSpeech.error === 'quota' ? t('speech.why.quota') : lastSpeech.error === 'busy' ? t('speech.why.busy') : t('speech.why.error', { code: lastSpeech.error });
   return t('speech.device', { why });
 }
 

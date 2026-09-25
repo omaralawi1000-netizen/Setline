@@ -53,8 +53,9 @@ test('voice settings sanitize and model ids', () => {
   assert.equal(s.ttsOverride, '');
   assert.equal(sttModelId(s), 'whisper-large-v3');
   assert.equal(sttModelId(sanitize({})), 'whisper-large-v3-turbo');
-  assert.equal(ttsModelId(sanitize({})), 'device', 'default: the phone speaks at once');
-  assert.equal(ttsModelId(sanitize({ ttsQuality: 'natural', ttsV: 1 })), DEFAULT_TTS_MODEL);
+  assert.equal(ttsModelId(sanitize({})), DEFAULT_TTS_MODEL, 'default: the natural Gemini voice');
+  assert.equal(ttsModelId(sanitize({ ttsQuality: 'instant', ttsV: 1 })), DEFAULT_TTS_MODEL, 'the old automatic switch to the phone voice is undone');
+  assert.equal(ttsModelId(sanitize({ ttsQuality: 'instant', ttsV: 2 })), 'device', 'a choice made now is kept');
   assert.equal(ttsModelId(sanitize({ ttsModel: 'gemini-x-tts', ttsOverride: 'gemini-y-tts' })), 'gemini-y-tts');
   assert.equal(sanitize({ voice: 'Nobody' }).voice, 'Achird');
   assert.equal(sanitize({ voice: 'Kore' }).voice, 'Achird', 'old default migrates once');

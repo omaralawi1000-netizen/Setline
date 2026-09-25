@@ -439,3 +439,10 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Sheets, like iOS: the page behind shrinks back with rounded corners and dims as a sheet rises (iOS curve); swiping the sheet down, the page follows your finger back to full size; let go and it settles back, flick or pull past a third and it closes
 - [x] Android back-swipe from the left edge: Chrome draws its own animation there, so the app no longer plays a second, generic one on top (it now matches the right-edge back)
 - [x] The shrunk bar's lens sits exactly on its tab
+
+## 1.34.0: the Gemini voice back, faster, no automatic mic
+
+- [x] Why replies used the robot voice: the default was still "Instant" (the phone's voice) from 1.22; every reply was split into two Gemini requests (the free voice quota is only a few requests a minute), and any "limit reached" answer switched to the phone voice for a whole hour. Now: Gemini is the default again (your old automatic switch is undone once), one request per normal reply, a per-minute limit is waited out for a minute, only the daily limit waits for Google's overnight reset, and Settings says which one it was
+- [x] Faster: the voice is requested the moment the answer is in, instead of after the words finished appearing on screen (that was the 3–5 s)
+- [x] Talking to the Coach: after the answer is spoken it rests; the mic only opens when you tap the orb
+- [x] Bug sweep: every button on every screen tapped (111) with no errors; the shrunk bar's lens fix from 1.33 confirmed

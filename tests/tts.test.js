@@ -137,7 +137,9 @@ import { splitSpeech } from '../js/tts.js';
 test('long replies start with their first sentence', () => {
   assert.deepEqual(splitSpeech('Logged.'), ['Logged.']);
   assert.deepEqual(splitSpeech('Bench press, 80 kilos for 8.'), ['Bench press, 80 kilos for 8.']);
-  const [a, b] = splitSpeech('Nice work today, Omar. Your bench is up two kilos this month, so next week try 82.5 for 6.');
+  const short = 'Nice work today, Omar. Your bench is up two kilos this month, so next week try 82.5 for 6.';
+  assert.deepEqual(splitSpeech(short), [short], 'a normal reply is one request (the free quota is a few a minute)');
+  const [a, b] = splitSpeech('Nice work today, Omar. ' + 'Your bench is up two kilos this month, so next week try 82.5 for 6 and keep the rest short. '.repeat(4));
   assert.equal(a, 'Nice work today, Omar.');
   assert.match(b, /^Your bench/);
   assert.equal(splitSpeech('Ok. ' + 'x'.repeat(80)).length, 1, 'a tiny first sentence is not worth its own request');
