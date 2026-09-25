@@ -405,3 +405,8 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] Closing the Coach is a soft crossfade: the conversation sinks toward the orb, the light fades as it draws in a little, the page comes forward through it and the orb pops back; no sweeping ring, no dark moment
 - [x] Sheets: their contents cascade up as the sheet rises
 - [x] The tab you pick pops
+
+## 1.30.1: never dim
+
+- [x] Page and tab changes: the new page is at 92 % brightness or more from its first frame (it started at 20–50 %, which the recording showed as a dim flash); only a short glide says which way you went
+- [x] Coach: the conversation rises in with the light instead of after it, so there is no empty dark moment; the bloom is quicker

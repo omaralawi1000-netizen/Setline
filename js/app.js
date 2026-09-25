@@ -195,7 +195,7 @@ function coachMorph(open, under) {
       { transform: `scale(${k0})`, opacity: 0 },
       { opacity: 1, offset: 0.12 },
       { transform: `scale(${k1})`, opacity: 1 }
-    ], { duration: 620, easing: 'cubic-bezier(.3,.72,.08,1)' });
+    ], { duration: 520, easing: 'cubic-bezier(.25,.75,.1,1)' }); // quick: the Coach is on screen as it lands
     dockOrb?.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.35)', opacity: 0 }], { duration: 240, easing: 'ease-out', fill: 'forwards' });
     // depth: the page sinks back and dims as the light comes over it
     const sink = under && under !== $('#s-coach') ? under.animate([{ scale: 1, opacity: 1 }, { scale: 0.93, opacity: 0.35 }], { duration: 520, easing: 'cubic-bezier(.3,.7,.1,1)', fill: 'forwards' }) : null;

@@ -2292,3 +2292,21 @@ html[data-cards=outline] .screen :is(.solid,.glass){background:transparent;borde
 /* the tab you pick pops */
 .dock .tab.on svg.ti{animation:tabpop .5s cubic-bezier(.3,1.6,.5,1)}
 @keyframes tabpop{0%{scale:.78}55%{scale:1.14}100%{scale:1}}
+
+/* ======================= 1.30.1: never dim =======================
+   The new page is at (nearly) full brightness from its first frame; only a short glide from the
+   side you moved towards says where you went. A page that starts faint reads as a dim flash. */
+@keyframes m-glide{from{opacity:.82;transform:translate(calc(var(--off-x, 0px) * .9),10px)}}
+@keyframes m-glide-soft{from{opacity:.92;transform:translate(calc(var(--off-x, 0px) * .5),4px)}}
+.screen.enter > *{animation-duration:.42s}
+/* the Coach: the conversation is there as the light arrives, not after it */
+.app.coach-in #s-coach > *{animation:coachin .38s cubic-bezier(.2,.8,.2,1) both;animation-delay:.14s}
+.app.coach-in #s-coach > *:nth-child(2){animation-delay:.17s}
+.app.coach-in #s-coach > *:nth-child(n+3){animation-delay:.2s}
+@keyframes coachin{from{opacity:0;transform:translateY(14px) scale(.985)}}
+.app.coaching:not(.is-sub):not(.voice) .composer{transition:opacity .3s var(--e-out) .12s,transform .4s var(--e-out) .12s,box-shadow .4s}
+.app.coach-in .composer .corb .orb{animation-delay:.2s}
+.app.coach-in #s-coach > *{animation-duration:.34s;animation-delay:.05s}
+.app.coach-in #s-coach > *:nth-child(2){animation-delay:.08s}
+.app.coach-in #s-coach > *:nth-child(n+3){animation-delay:.11s}
+.app.coaching:not(.is-sub):not(.voice) .composer{transition-delay:.06s}
