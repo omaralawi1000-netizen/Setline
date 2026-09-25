@@ -1,5 +1,6 @@
 // Bottom sheets. Each open sheet owns a history entry so Android back closes it.
 import { $ } from './dom.js';
+import { cssSpring, reducedMotion } from '../motion-tokens.js';
 
 const stack = [];
 const waiting = [];   // resolvers for history.back() calls we triggered
@@ -9,10 +10,13 @@ export const sheetOpen = () => stack.length > 0;
 // iOS-style depth: while a sheet is up, the page behind (and the bar) sits a little smaller and lower,
 // with rounded corners, as if lifted off the background. p = 1 is fully back, 0 is normal.
 const DEPTH = [{ sel: '.screen.on', s: 0.93, y: 12 }, { sel: '#dock', s: 0.95, y: 8 }, { sel: '#minibar', s: 0.95, y: 8 }];
-const IOS = 'cubic-bezier(.32,.72,0,1)';
+// the page settles back on the default spring (css/motion.css has the same curve)
+const PANEL = cssSpring('default');
 let depthEls = [];
-function depth(p, ms = 0, ease = IOS) {
+function depth(p, ms = 0, ease = PANEL.easing) {
   const app = $('#app');
+  const settle = ms > 0; // a real move (not a finger), even when reduced motion makes it instant
+  if (ms && reducedMotion()) ms = 0; // reduced motion: the page just is where it goes
   if (p > 0 && !depthEls.length) depthEls = DEPTH.map(d => ({ ...d, el: app.querySelector(d.sel) })).filter(d => d.el);
   // on their own layers while a sheet is up, so following a finger only moves them (no redraw)
   if (p > 0) depthEls.forEach(d => { d.el.style.willChange = 'scale, translate'; if (d.sel === '.screen.on') d.el.style.borderRadius = '22px'; }); // a scroller clips to its own corners
@@ -30,12 +34,12 @@ function depth(p, ms = 0, ease = IOS) {
     const a = d.anim = el.animate([from, to], { duration: ms, easing: ease, fill: 'forwards' });
     a.id = 'depth';
   }
-  if (p === 0 && ms) {
+  if (p === 0 && settle) {
     const els = depthEls; depthEls = [];
     setTimeout(() => els.forEach(d => {
       if (depthEls.some(x => x.el === d.el)) return; // a new sheet took it back already
       d.el.getAnimations().filter(a => a.id === 'depth').forEach(a => a.cancel());
-      d.el.style.borderRadius = ''; d.el.style.willChange = '';
+      d.el.style.borderRadius = ''; d.el.style.willChange = ''; d.el.style.scale = ''; d.el.style.translate = '';
     }), ms + 20);
   }
 }
@@ -78,7 +82,7 @@ export function openSheet(render, { onClose = null, label = '' } = {}) {
   scrim.addEventListener('click', () => closeTop());
   dragToClose(el, scrim, entry);
   app.classList.add('sheeting');
-  if (stack.length === 1) requestAnimationFrame(() => requestAnimationFrame(() => depth(1, 520)));
+  if (stack.length === 1) requestAnimationFrame(() => requestAnimationFrame(() => depth(1, PANEL.duration)));
   requestAnimationFrame(() => requestAnimationFrame(() => { scrim.classList.add('show'); el.classList.add('show', 'opening'); }));
   setTimeout(() => el.classList.remove('opening'), 900); // its contents cascade in once, on the way up
   // the glass blur switches on once the sheet has stopped moving (a moving blur flickers on Android)
@@ -111,7 +115,7 @@ function dragToClose(el, scrim, entry) {
     d = null;
     el.classList.remove('dragging');
     const close = dy > el.offsetHeight / 3 || (v > 0.45 && dy > 24);
-    if (!close && stack.length === 1) depth(1, 420); // let go: the page settles back behind
+    if (!close && stack.length === 1) depth(1, PANEL.duration); // let go: the page settles back behind
     el.classList.add(close ? 'flung' : 'snap'); // a flick leaves at the finger's speed; a let-go springs back
     setTimeout(() => el.classList.remove('flung', 'snap'), 450);
     el.style.transform = '';
