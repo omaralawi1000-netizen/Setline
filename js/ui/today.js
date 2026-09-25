@@ -173,7 +173,7 @@ function weekCardsHTML() {
     const sub = p.pr.kind === 'weight' ? (p.deltaKg ? t('today.prUp', { name, kg: kgTxt(p.deltaKg) }) : t('today.prFirst', { name }))
       : p.pr.kind === 'e1rm' ? t('today.prE1rm', { name, v: kgTxt(p.pr.value) }) : t('today.prReps', { name, reps: p.pr.reps, kg: kgTxt(p.pr.kg) });
     const sp = sparkline(p.series);
-    const chart = sp ? `<svg viewBox="0 0 120 56" aria-hidden="true"><path d="${sp.area}" fill="url(#sf)"/><polyline points="${sp.line}" fill="none" stroke="url(#sp)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${sp.last.x}" cy="${sp.last.y}" r="4.5" fill="#FFD9A8"/><circle class="pulse" cx="${sp.last.x}" cy="${sp.last.y}" r="9" fill="#FFD9A8" opacity=".18"/></svg>` : '';
+    const chart = sp ? `<span class="spark"><svg viewBox="0 0 120 56" aria-hidden="true"><path d="${sp.area}" fill="url(#sf)"/><polyline points="${sp.line}" fill="none" stroke="url(#sp)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${sp.last.x}" cy="${sp.last.y}" r="4.5" fill="#FFD9A8"/></svg>${pulseAt(sp.last)}</span>` : '';
     html += `<button class="pr solid" data-act="detail" data-id="${esc(p.workout.id)}"><span class="l"><span class="tag">${t('today.newPr')}</span><strong>${esc(headline)}</strong><span class="p">${esc(sub)}</span></span>${chart}</button>`;
   }
   return html;
@@ -366,4 +366,12 @@ function nameParts(root) {
     const n = seen[key] = (seen[key] || 0) + 1;
     el.style.viewTransitionName = `t-${key}${n > 1 ? '-' + n : ''}`.replace(/[^a-zA-Z0-9_-]/g, '_');
   }
+}
+
+// The record's soft pulse is an HTML dot over the sparkline's last point, not an SVG circle: a
+// scaling SVG circle can't stay on the compositor, so it re-laid out the chart every frame.
+// The svg is 112×56 showing a 120×56 viewBox, so it's scaled by 112/120 and centred vertically.
+function pulseAt({ x, y }) {
+  const k = 112 / 120, top = (56 - 56 * k) / 2 + y * k;
+  return `<i class="pulse" aria-hidden="true" style="left:${(x / 120 * 100).toFixed(2)}%;top:${(top / 56 * 100).toFixed(2)}%"></i>`;
 }

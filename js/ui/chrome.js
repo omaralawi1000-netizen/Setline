@@ -12,7 +12,7 @@ export function edgeColor() {
   const k = root.dataset.glow === 'off' || !glow ? 0 : root.dataset.glow === 'soft' ? 0.07 : 0.14;
   const c = bg.map((v, i) => Math.round(v + ((glow?.[i] ?? v) - v) * k));
   const out = '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
-  root.style.setProperty('--edge', out);
+  if (root.style.getPropertyValue('--edge') !== out) root.style.setProperty('--edge', out); // same value again still restyles the page
   return out;
 }
 const edge = () => edgeColor();

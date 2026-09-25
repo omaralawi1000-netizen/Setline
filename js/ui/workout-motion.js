@@ -1,6 +1,8 @@
 // Motion for the active workout screen: button presses, the set list (rows entering, moving,
-// leaving, logged and undone) and the set-saved confirmation. View only: it reads the DOM that
-// renderWorkout() wrote and never touches workout data. Every animation uses js/motion-tokens.js.
+// leaving and undone) and the set-saved toast. A logged row's own landing is CSS (.set.fresh in
+// app.css, on the same expressive spring from css/motion.css), because it has to survive the
+// screen redrawing mid-animation. View only: reads the DOM that renderWorkout() wrote, never the
+// workout data. Every animation uses js/motion-tokens.js.
 import { animate, stagger } from '../vendor/motion.js';
 import { presets, reducedMotion } from '../motion-tokens.js';
 
@@ -69,14 +71,6 @@ const rise = (el, i, n) => {
   return animate(el, { opacity: [0, 1], translate: ['0 10px', '0 0'] }, { ...base, delay, opacity: { ...fade, delay } });
 };
 
-// the set-saved confirmation on the row: its check springs in
-const confirmRow = li => {
-  const ck = li.querySelector('.ck');
-  if (ck) animate(ck, { scale: [0.4, 1], opacity: [0, 1] }, { ...expressive, opacity: fade });
-  const row = li.querySelector('.set');
-  if (row) animate(row, { scale: [0.97, 1] }, expressive);
-};
-
 // a row that's gone stays where it was as a copy and fades away while the others close the gap
 // (in a layer above the screen, so another render of the screen can't cut it short; the layer is
 // added to the app once, so the app's own child watchers aren't woken for every row)
@@ -127,16 +121,13 @@ function diffSets(root, prev) {
     if (!old) continue;
     const dy = old.r.top - li.getBoundingClientRect().top;
     if (Math.abs(dy) > 0.5) animate(li, { translate: [`0 ${dy}px`, '0 0'] }, base);
-    if (done && !old.done) confirmRow(li); // logged into a planned row
-    else if (!done && old.done) { // undone: the row settles back to planned
+    if (!done && old.done) { // undone: the row settles back to planned
       const row = li.querySelector('.set');
       if (row) animate(row, { opacity: [0.4, 1], scale: [0.97, 1] }, { ...base, opacity: fade });
     }
   }
-  added.forEach((li, i) => {
-    rise(li, i, added.length);
-    if (li.querySelector('.set.done')) confirmRow(li); // logged as a new row
-  });
+  const fresh = added.filter(li => !li.querySelector('.set.fresh')); // a just-logged row lands by itself
+  fresh.forEach((li, i) => rise(li, i, fresh.length));
   const now = new Set(rows.map(li => li.dataset.set));
   for (const [id, old] of prev.rows) if (!now.has(id) && !old.gone) leave(old); // swiped rows already left
 }
@@ -149,9 +140,4 @@ export function springToast() {
   el.style.transition = 'none'; // the spring replaces the CSS entrance
   const clear = () => { for (const p of ['transition', 'transform', 'opacity']) el.style.removeProperty(p); };
   animate(el, { transform: ['translateY(18px) scale(.96)', 'none'], opacity: [0, 1] }, { ...expressive, opacity: fade }).finished.then(clear, clear);
-}
-
-// the Log button answers the tap it just got
-export function springLog(btn) {
-  if (btn && !reducedMotion()) animate(btn, { scale: [0.96, 1] }, expressive);
 }

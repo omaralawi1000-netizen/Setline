@@ -13,6 +13,14 @@ export const fade = { duration: 0.2, ease: 'easeOut' };                       //
 export const presets = { tap, fast, default: standard, expressive, fade };
 export default standard;
 
+// A spring preset as a CSS/Web Animations easing: { duration (ms), easing: 'linear(…)' }, for the
+// places that animate without Motion (CSS rules via css/motion.css, element.animate()).
+export function cssSpring(name) {
+  const p = presets[name];
+  const [dur, ...easing] = String(spring(p.visualDuration, p.bounce)).split(' ');
+  return { duration: parseFloat(dur), easing: easing.join(' ') };
+}
+
 // No movement when the phone asks for reduced motion, or Settings → Motion is off.
 export function reducedMotion() {
   const m = document.documentElement.dataset.motion;

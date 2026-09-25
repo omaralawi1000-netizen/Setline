@@ -26,7 +26,8 @@ import { usualMinutes, timeStatus } from '../insights.js';
 import { handsFreeOn, hfPillHTML, toggleHandsFree, announceWarmup } from './handsfree.js';
 import { goalAimHTML } from './goals.js';
 import { figureHTML } from './figure.js';
-import { initWorkoutMotion, markLive, rememberSets, animateSets, springToast, springLog } from './workout-motion.js';
+import { initWorkoutMotion, markLive, rememberSets, animateSets, springToast } from './workout-motion.js';
+import { reducedMotion } from '../motion-tokens.js';
 
 const C = 157.08; // ring circumference, r=25
 const REST_LINGER = 4000; // keep the card up after rest ends
@@ -146,7 +147,7 @@ export function renderWorkout(root) {
   const moved = ui.seenWorkout === w.id && ui.lastCurrent !== -1 && ui.lastCurrent !== i;
   root.classList.remove('slide-l', 'slide-r');
   if (moved) { void root.offsetWidth; root.classList.add(i > ui.lastCurrent ? 'slide-r' : 'slide-l'); }
-  if (ui.flash) { ui.flash = false; springLog(root.querySelector('.log')); }
+  if (ui.flash) { ui.flash = false; root.querySelector('.log')?.classList.add('flash'); }
   animateSets(root);
   ui.lastCurrent = i;
   ui.seenWorkout = w.id;
@@ -292,6 +293,11 @@ function restHTML(w, now) {
 function driveRing(root, w = state.active, now = Date.now()) {
   const fg = root.querySelector('#rest:not(.over) #fg');
   if (!fg || !w?.rest || now >= w.rest.endsAt) return;
+  if (reducedMotion()) { // no gliding: the clock steps it once a second
+    fg.getAnimations().forEach(a => a.cancel());
+    fg.style.strokeDashoffset = C * (1 - W.restProgress(w.rest, now));
+    return;
+  }
   if (fg._ends === w.rest.endsAt && fg.getAnimations().length) return;
   fg.getAnimations().forEach(a => a.cancel());
   fg._ends = w.rest.endsAt;
