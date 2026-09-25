@@ -601,6 +601,16 @@ function initSW() {
     location.reload();
   });
   navigator.serviceWorker.register('sw.js').then(reg => {
+    // An update that's ready goes in by itself where it can't interrupt anything: straight away
+    // while the app is starting, or the moment you leave it (the reload happens out of sight).
+    const apply = async () => {
+      if (!reg.waiting || !navigator.serviceWorker.controller || asked) return;
+      asked = true;
+      await store.flush();
+      reg.waiting.postMessage('skipWaiting');
+    };
+    if (performance.now() < 8000) apply();
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') apply(); });
     const offer = () => {
       if (!reg.waiting || !navigator.serviceWorker.controller) return;
       const el = $('#update');
@@ -612,7 +622,10 @@ function initSW() {
     offer();
     reg.addEventListener('updatefound', () => {
       const sw = reg.installing;
-      sw?.addEventListener('statechange', () => { if (sw.state === 'installed') offer(); });
+      sw?.addEventListener('statechange', () => {
+        if (sw.state !== 'installed') return;
+        if (performance.now() < 8000) apply(); else offer(); // found while starting: just take it
+      });
     });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
   }).catch(() => {});

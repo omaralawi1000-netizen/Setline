@@ -388,3 +388,7 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] One thinking animation: the separate "Reading your log…" bubble is gone (kept for screen readers); the aurora behind the conversation is bigger and brighter and the message-box orb breathes in it
 - [x] Coach replies: each word arrives out of a soft blur, lit in the accent, and settles into the text colour
 - [x] Talk mode: stray letters and fragments ("L", "Jd") are never sent; it keeps listening and rests after three
+
+## 1.28.2: updates install by themselves
+
+- [x] A ready update no longer waits for a tap on the small Update pill: it goes in while the app is starting, or silently the moment you leave the app (the reload happens out of sight, after saving). The pill only shows for an update that arrives mid-use
