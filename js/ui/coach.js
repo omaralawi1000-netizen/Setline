@@ -79,7 +79,6 @@ export function renderCoach(root) {
     body = `<ol class="thread" id="thread">${chat.map(m => { const h = bubble(m); const seen = shown.has(m.id); shown.add(m.id); return seen ? h.replace('<li class="msg', '<li class="msg seen') : h; }).join('')}</ol>`;
   }
   root.innerHTML = `<div class="tabtop"></div>
-    <button class="iconbtn cclose" data-coach="close" aria-label="${t('common.close')}">${I.back.replace('d="M14.5 6 8.5 12l6 6"', 'd="M6 9.5l6 6 6-6"')}</button>
     <header class="coachhead"><div><h1 class="h1">${t('coach.title')}</h1><p class="sub">${t('coach.sub')}</p></div>
       ${chat.length ? `<button class="iconbtn" data-coach="clear" aria-label="${t('coach.clear')}">${I.trash}</button>` : ''}</header>
     ${body}`;
@@ -376,7 +375,6 @@ export function initCoach(n) {
     if (k === 'ask' || k === 'retry') { haptic('tap'); ask(b.dataset.q, { root }); }
     else if (k === 'saveplan') { b.closest('.pacts')?.querySelectorAll('button').forEach(x => { x.disabled = true; }); savePlan(b.dataset.id, b.dataset.mode); }
     else if (k === 'settings') nav.openSettings();
-    else if (k === 'close') { haptic('tap'); nav.closeCoach?.(); }
     else if (k === 'clear') {
       const { t } = state;
       openSheet(el => {

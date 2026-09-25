@@ -416,3 +416,18 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] The recording showed the screen dark for about a second after closing the Coach: the light was one disc scaled to about five times the screen, which the phone has to draw thousands of pixels wide. Now two screen-sized layers: a burst of light that grows out of the orb and fades, and the Coach's own background fading in under it. Open ≈ 0.8 s, close ≈ 0.7 s, both slower and softer; the page sinks back as the light comes and comes forward as it gathers back into the orb, which takes it in last
 - [x] Keyboard: the page now shrinks above the keyboard (viewport interactive-widget=resizes-content) instead of Android sliding the whole view up while the app also lifted the message box; the chat keeps its latest message in view as the keyboard comes and goes
 - [x] The orb moves slowly and softly: longer swirls, a slower thinking breath and aurora
+
+## 1.32.0: back to the 1.23 design, with everything since
+
+Your feedback over the last day says the look and motion started going downhill at 1.24 ("we're beginning to degrade the app", then "transitions have degraded", then flashes). So the design, navigation and motion are back to 1.23.1: the liquid-glass bar with the orb in the middle (tap to talk, hold for the full voice screen), the Coach as a tab with the orb flying into its message box, blur-in replies with the thinking glow, stable tab switches, the old sheets and pop-ups. Kept from 1.24–1.31 (all engine, or small additions in the 1.23 style):
+- [x] Foods said together are separate rows under one meal line (voice, Coach box, photos), Undo removes the group
+- [x] Speech-to-text drops the subtitle ghosts and non-speech; Norwegian/Swedish guesses are redone as Danish; stray letters never sent in talk mode
+- [x] Coach answers what you said, doesn't repeat itself, asks when a message looks misheard
+- [x] Reply voice: Gemini's daily limit falls back to the phone voice for an hour without waiting; clearer status line
+- [x] Quiet colours (Violet, Slate, Sage, Sand, Clay, Graphite) and the trimmed Customize
+- [x] Sheets: swipe down from anywhere
+- [x] Updates install by themselves
+- [x] Keyboard: the page shrinks above it, the chat keeps its latest message in view (no jump)
+- [x] Top-edge glass blur actually blurs (a view-transition name had cut it off); no live blur behind chat bubbles
+- [x] Progress with no data: one calm card; Today doesn't count up again after the Coach
+- Left out on purpose: the You tab (Progress, History and Body are on Train again, Settings on Today), the orb-as-Coach bloom, the 1.24+ bar and motion experiments

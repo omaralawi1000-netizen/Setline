@@ -7,7 +7,6 @@ export const TAB_ICONS = {
   today: tab('<path class="fl" d="M3.6 10.4 12 3.7l8.4 6.7v8.4a1.7 1.7 0 0 1-1.7 1.7H5.3a1.7 1.7 0 0 1-1.7-1.7z"/><path d="M9.6 20.5v-4.6a2.4 2.4 0 0 1 4.8 0v4.6"/>'),
   workout: tab('<rect class="fl" x="5" y="6.3" width="3.2" height="11.4" rx="1.3"/><rect class="fl" x="15.8" y="6.3" width="3.2" height="11.4" rx="1.3"/><rect x="2.3" y="9" width="2.7" height="6" rx="1.1"/><rect x="19" y="9" width="2.7" height="6" rx="1.1"/><path d="M8.2 12h7.6"/>'),
   food: tab('<path class="fl" d="M3.5 11.3h17a8.5 8.2 0 0 1-17 0z"/><path d="M8.5 20.2h7"/><path d="M9.3 8.3c0-1.3 1.2-1.6 1.2-3.1M13.5 8.3c0-1.3 1.2-1.6 1.2-3.1"/>'),
-  you: tab('<circle class="fl" cx="12" cy="8.3" r="3.9"/><path class="fl" d="M4.6 19.6c.9-3.6 3.9-5.6 7.4-5.6s6.5 2 7.4 5.6c.1.5-.3.9-.8.9H5.4c-.5 0-.9-.4-.8-.9z"/>'),
   coach: tab('<path class="fl" d="M20.3 11.4c0 4.1-3.7 7.4-8.3 7.4-1.2 0-2.4-.2-3.4-.6l-4.5 1.5 1.3-3.6a7 7 0 0 1-1.7-4.7C3.7 7.3 7.4 4 12 4s8.3 3.3 8.3 7.4z"/><path class="sp" d="M12 7.8l.95 2.55 2.55.95-2.55.95L12 14.8l-.95-2.55-2.55-.95 2.55-.95z"/>')
 };
 
