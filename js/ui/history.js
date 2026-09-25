@@ -92,6 +92,11 @@ function highlightsHTML(w) {
     <p class="hlnote">${esc(t('hl.note'))}</p></div>`;
 }
 
+// Just finished: the workout's page opens as a moment (a check that draws itself, then the numbers
+// and records arrive one by one). Timed from the finish, so redraws continue it rather than replay it.
+let finished = null;
+export function markFinished(id) { finished = { id, at: Date.now() }; }
+
 export function renderDetail(root, id) {
   const { t, lang } = state;
   const w = state.history.find(x => x.id === id);
@@ -101,15 +106,19 @@ export function renderDetail(root, id) {
     return;
   }
   const prSets = new Map((w.prs || []).map(p => [p.setId, true]));
-  const prs = (w.prs || []).map(p => {
+  const prs = (w.prs || []).map((p, i) => {
     const [label, val] = prLabel(p);
-    return `<li><span><b>${esc(state.catalog.name(p.exerciseId, lang))}</b><br>${esc(label)}</span><span class="v">${esc(val)}</span></li>`;
+    return `<li style="--i:${i}"><span><b>${esc(state.catalog.name(p.exerciseId, lang))}</b><br>${esc(label)}</span><span class="v">${esc(val)}</span></li>`;
   }).join('');
+  const fin = finished?.id === w.id;
+  root.classList.toggle('finished', fin);
+  if (fin) root.style.setProperty('--t', `-${Date.now() - finished.at}ms`); else root.style.removeProperty('--t');
   root.innerHTML = `<header class="top">
       <button class="iconbtn" data-act="back" aria-label="${t('common.back')}">${I.back}</button>
       <div class="ttl"><strong>${esc(workoutTitle(w))}</strong><span>${esc(day(w.startedAt, lang))}</span></div>
       <span class="spacer"></span>
     </header>
+    ${fin ? `<div class="donehero" aria-hidden="true"><svg class="dring" viewBox="0 0 96 96"><circle class="bg" cx="48" cy="48" r="42"/><circle class="fg" cx="48" cy="48" r="42"/><path class="ck" d="M31 49.5l11 11 23-25"/></svg><span class="dlabel">${t('finish.done')}</span></div>` : ''}
     <h1 class="h1">${esc(workoutTitle(w))}</h1>
     <p class="detail-date">${esc(dayLong(w.startedAt, lang))} · ${esc(time(w.startedAt, lang))}</p>
     <div class="summary glass">
@@ -124,5 +133,6 @@ export function renderDetail(root, id) {
     </ol></div>`).join('')}
     ${dateKey(w.startedAt) === dateKey() ? driveNudgeHTML() : ''}
     ${w.exercises.length ? `<button class="log again" data-act="repeat-workout" data-id="${esc(w.id)}">${I.play}<span>${t('history.again')}</span></button>
-    <p class="hint">${t('history.againSub')}</p>` : ''}`;
+    <p class="hint">${t('history.againSub')}</p>
+    ${(!w.routineId || !state.routines.some(r => r.id === w.routineId)) && !state.routines.some(r => r.fromWorkout === w.id) ? `<button class="btn2 solid wide saveas" data-act="save-routine" data-id="${esc(w.id)}">${I.plus}<span>${t('history.saveRoutine')}</span></button>` : ''}` : ''}`;
 }

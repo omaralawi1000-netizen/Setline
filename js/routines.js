@@ -128,12 +128,39 @@ export function routineDay(r) {
 export const withoutDay = name => String(name || '').replace(/^\s*(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mandag|tirsdag|onsdag|torsdag|fredag|lørdag|søndag)\s*[:.,–—-]?\s*/i, '') || name;
 const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
 
-// The routine to do next: today's (by weekday) if it isn't done yet, else the one done least
-// recently (never done first, in list order).
+// The routine to do next. When routines have weekdays, it's the week that decides: today's if you
+// haven't trained yet today, otherwise the next day that has one (a rest day shows tomorrow's, not
+// whichever was done longest ago). Without weekdays: the one done least recently (never done first).
 export function nextRoutine(routines, history, now = Date.now()) {
   if (!routines.length) return null;
-  const today = routines.find(r => routineDay(r) === new Date(now).getDay());
-  if (today && !history.some(w => sameDay(w.startedAt, now))) return today;
+  const dated = routines.filter(r => routineDay(r) != null);
+  if (dated.length) {
+    const d0 = new Date(now).getDay();
+    const trained = history.some(w => sameDay(w.startedAt, now));
+    for (let k = trained ? 1 : 0; k <= 7; k++) {
+      const r = dated.find(x => routineDay(x) === (d0 + k) % 7);
+      if (r) return r;
+    }
+  }
   const last = id => Math.max(0, ...history.filter(w => w.routineId === id).map(w => w.startedAt));
   return [...routines].sort((a, b) => last(a.id) - last(b.id) || (a.createdAt || 0) - (b.createdAt || 0))[0];
+}
+
+// When a routine is next on: 0 today, 1 tomorrow, … (null for a routine without a weekday).
+export function daysUntil(r, history, now = Date.now()) {
+  const d = routineDay(r);
+  if (d == null) return null;
+  const d0 = new Date(now).getDay(), trained = history.some(w => sameDay(w.startedAt, now));
+  const k = (d - d0 + 7) % 7;
+  return k === 0 && trained ? 7 : k;
+}
+
+// A finished workout as a routine: its lifts in order, each with the sets you actually did
+// (warm-ups left out), ready to edit and save.
+export function routineFromWorkout(w, name = '', now = Date.now()) {
+  const exercises = (w.exercises || []).map(e => {
+    const sets = e.sets.filter(x => x.done && x.type !== 'warmup').slice(0, LIMITS.sets).map(x => ({ reps: Math.max(1, Math.round(x.reps)), kg: x.kg ?? null }));
+    return sets.length ? { exerciseId: e.exerciseId, sets } : null;
+  }).filter(Boolean).slice(0, LIMITS.exercises);
+  return { id: uid(), name: String(name).slice(0, LIMITS.name), exercises, createdAt: now, fromWorkout: w.id };
 }

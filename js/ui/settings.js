@@ -18,7 +18,7 @@ import { num } from '../format.js';
 import { getKey, setKey, mask } from '../keys.js';
 import { VOICES, VOICE_FEEL, DEFAULT_TTS_MODEL, ttsModelId, ttsAlt } from '../settings.js';
 import { testGroqKey } from '../stt.js';
-import { listModels, pickTtsModel, speak, lastSpeech, onSpeaking, lastClipWav } from '../tts.js';
+import { listModels, pickTtsModel, speak, lastSpeech, onSpeaking, lastClipWav, clearVoiceRest } from '../tts.js';
 import { unlockAudio } from '../audio.js';
 import { pickTextModels, FALLBACK_MODELS } from '../ai.js';
 
@@ -56,7 +56,7 @@ function speechStatus() {
   if (!lastSpeech.engine) return getKey('google') ? t('speech.unknown') : t('speech.noKey');
   if (lastSpeech.engine === 'gemini') return t('speech.gemini');
   if (!lastSpeech.error) return t('speech.instant');
-  const why = lastSpeech.error === 'nokey' ? t('speech.why.nokey') : lastSpeech.error === 'quota' ? t('speech.why.quota') : t('speech.why.error', { code: lastSpeech.error });
+  const why = lastSpeech.error === 'nokey' ? t('speech.why.nokey') : lastSpeech.error === 'quota' ? t('speech.why.quota') : lastSpeech.error === 'busy' ? t('speech.why.busy') : t('speech.why.error', { code: lastSpeech.error });
   return t('speech.device', { why });
 }
 
@@ -230,6 +230,7 @@ async function testKey(name, root) {
   const input = root.querySelector(`[data-key-input="${name}"]`);
   if (input?.value.trim()) { setKey(name, input.value); input.value = ''; }
   const key = getKey(name);
+  if (name === 'google') clearVoiceRest();
   if (!key) return;
   keyStatus[name] = 'testing';
   renderSettings(root);
@@ -270,9 +271,14 @@ export function initSettings(actions, root) {
     'edit-profile': () => openOnboarding({ edit: true }),
     'test-key': el => testKey(el.dataset.k, root),
     'clear-key': el => { setKey(el.dataset.k, ''); delete keyStatus[el.dataset.k]; haptic('tap'); renderSettings(root); },
-    'preview-voice': () => {
+    'preview-voice': async () => {
       unlockAudio();
-      speak(state.t('settings.previewText'), { key: getKey('google'), model: ttsModelId(state.settings), alt: ttsAlt(state.settings), voice: state.settings.voice, lang: state.lang, canSpeak: () => true });
+      clearVoiceRest(); // a test always asks Gemini, whatever happened before
+      await speak(state.t('settings.previewText'), { key: getKey('google'), model: ttsModelId(state.settings), alt: ttsAlt(state.settings), voice: state.settings.voice, lang: state.lang, canSpeak: () => true });
+      // say exactly what happened, so a failing voice can be fixed
+      const ok = lastSpeech.engine === 'gemini';
+      toast({ title: esc(ok ? state.t('speech.testOk') : speechStatus()), sub: esc(ok ? ttsModelId(state.settings) : lastSpeech.error ? `${ttsModelId(state.settings)} · ${lastSpeech.error}` : ''), error: !ok, ms: 6000 });
+      renderSettings(root);
     },
     set: el => { setSettings({ [el.dataset.key]: el.dataset.v }); haptic('tap'); },
     'kg-steps': () => { haptic('tap'); stepsSheet(); },

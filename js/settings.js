@@ -19,8 +19,8 @@ export const DEFAULTS = Object.freeze({
   spoken: 'minimal',   // off | minimal | full
   voice: 'Achird',     // Gemini prebuilt voice
   voiceV: 2,           // bumped when the default voice changes
-  ttsQuality: 'instant', // instant (the phone's own voice, no wait) | natural (Flash TTS) | fast (Flash-Lite TTS)
-  ttsV: 1,             // bumped when the default voice engine changes
+  ttsQuality: 'natural', // natural (Gemini Flash TTS) | fast (Flash-Lite TTS) | instant (the phone's own voice)
+  ttsV: 2,             // bumped when the default voice engine changes
   stt: 'fast',         // fast | accurate
   ttsModel: '',        // Flash TTS, picked from the model list on key test
   ttsLite: '',         // Flash-Lite TTS
@@ -175,7 +175,8 @@ export function sanitize(input) {
   // the old default (Kore, firm) moves to the new friendlier default once
   if (VOICES.includes(input.voice) && (input.voiceV === 2 || input.voice !== 'Kore')) s.voice = input.voice;
   // 1.22: replies speak at once with the phone's voice unless you pick Natural again after that
-  if (['instant', 'natural', 'fast'].includes(input.ttsQuality) && input.ttsV === 1) s.ttsQuality = input.ttsQuality;
+  // 1.34: the Gemini voice is the default again; a choice made after that is kept
+  if (['instant', 'natural', 'fast'].includes(input.ttsQuality) && input.ttsV === 2) s.ttsQuality = input.ttsQuality;
   if (['fast', 'accurate'].includes(input.stt)) s.stt = input.stt;
   for (const k of ['ttsModel', 'ttsLite', 'ttsOverride', 'cmdModel', 'coachModel', 'cmdOverride', 'coachOverride', 'cmdAlt', 'coachAlt', 'coachPro']) if (typeof input[k] === 'string' && (input[k] === '' || MODEL_ID.test(input[k].trim()))) s[k] = input[k].trim();
   return s;

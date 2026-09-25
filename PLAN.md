@@ -440,6 +440,30 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Android back-swipe from the left edge: Chrome draws its own animation there, so the app no longer plays a second, generic one on top (it now matches the right-edge back)
 - [x] The shrunk bar's lens sits exactly on its tab
 
+## 1.34.0: the Gemini voice back, faster, no automatic mic
+
+- [x] Why replies used the robot voice: the default was still "Instant" (the phone's voice) from 1.22; every reply was split into two Gemini requests (the free voice quota is only a few requests a minute), and any "limit reached" answer switched to the phone voice for a whole hour. Now: Gemini is the default again (your old automatic switch is undone once), one request per normal reply, a per-minute limit is waited out for a minute, only the daily limit waits for Google's overnight reset, and Settings says which one it was
+- [x] Faster: the voice is requested the moment the answer is in, instead of after the words finished appearing on screen (that was the 3–5 s)
+- [x] Talking to the Coach: after the answer is spoken it rests; the mic only opens when you tap the orb
+- [x] Bug sweep: every button on every screen tapped (111) with no errors; the shrunk bar's lens fix from 1.33 confirmed
+
+## 1.35.0: the workout, polished
+
+- [x] Found and fixed: the "set landed" animation never played (logging redraws the screen twice and the second redraw wiped it). Every workout moment is now timed from when it happened, so redraws continue it instead of losing or restarting it
+- [x] Logging a set: the row drops into place with a spring, a ring of light fades off it, the check pops and draws itself, the numbers rise in; the log button gives a firm press and its set number ticks over; a firm log haptic
+- [x] Records: warm light on the row, the PR tag springs in, a "New record" chip slides in and out, a drum-roll haptic
+- [x] Rest: the card drops in with a spring; the ring drains in one smooth continuous motion (was a jump every second); the last 3 seconds breathe with a soft glow (no filters); when rest is over the ring fills back up, a check draws in the middle and the card glows once
+- [x] Finishing: the workout's page opens with a ring that draws around and a check that draws inside it, "Workout complete", then the title, numbers, highlights and each record arrive one after another, with sparks from the check and warm ones from each record
+
+## 1.36.0: set by number, save a workout as a routine, your own program, the week decides Up next, voice, no dark flashes
+
+- [x] Voice: "set one is done, but I only did nine reps instead of ten", "set 2 done", "first set done at 82.5", "sæt 3 er færdigt men kun ni gentagelser": that set of the current lift, with its planned numbers and what you said; an already-done set is corrected; "3 sets…" and "set my calories…" are left alone. ("set 2 done 9 reps" used to log 2 kg)
+- [x] Finished workout → "Save as a routine": opens the routine editor filled with what you did (name it, pick its day, adjust, save); the button goes once saved
+- [x] Add a program → "Your own program": paste or type it any way; the Coach reads it into routines with their weekdays, to add or replace yours
+- [x] Up next follows the week: today's routine if you haven't trained, else the next day that has one (a rest day now shows tomorrow's, not the one done longest ago); the card says when ("Up next · Tomorrow")
+- [x] Reply voice after turning on billing: an earlier "daily limit" made the app wait for Google's overnight reset; now limits only pause it for 30 s (per minute) or 10 min (daily), the old rest is dropped, a missing voice model is looked up again, and Settings → Voice → test says exactly what happened (model and error)
+- [x] Bug sweep: measured frame by frame, every tab or page change dipped 10–15 % darker for a moment (the old screen faded before the new one's cards showed): gone; Coach open/close and sheets measured clean; 111 buttons tapped without errors
+
 ## 1.33.1: design tooling
 
 - [x] `css/motion.css`: motion tokens (4 durations, out / in-out / spring curves, press scale), button press, root View Transition, reduced-motion fallback; loaded before all other CSS and precached

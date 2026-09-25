@@ -196,7 +196,37 @@ export function resolve(intent, snap, t, lang) {
     });
   };
 
+  // "set 2 done, only 9 reps": that set of the current lift. Planned → logged with its planned numbers
+  // (and what was said); already done → corrected; one past the end → a new set.
+  const setNoCommand = intent => {
+    const ex = cur(), ti = w.current;
+    if (!ex) return err('voice.noExercise');
+    const work = ex.sets.map((x, k) => ({ x, k })).filter(o => o.x.type !== 'warmup');
+    const tgtSet = work[intent.n - 1]?.x;
+    const bw = snap.catalog.get(ex.exerciseId)?.equipment === 'bodyweight';
+    const base = W.suggestNext(ex, W.lastSession(snap.history || [], ex.exerciseId), bw ? 0 : 20);
+    if (tgtSet?.done) {
+      const kg = intent.kg ?? tgtSet.kg, reps = intent.reps ?? tgtSet.reps;
+      const check = W.validateSet(kg, reps);
+      if (!check.ok) return err('voice.didntCatch');
+      return cmd(check.confirm.length ? 'confirm' : 'auto', {
+        title: name(ex.exerciseId), value: setTxt(kg, reps), sub: t('voice.was', { n: intent.n, old: setTxt(tgtSet.kg, tgtSet.reps) }),
+        say: say(t('say.edit', { n: intent.n, kg: kgTxt(kg), unit: sayUnit, reps })),
+        run: { op: 'update', fn: cw => W.editSet(cw, ti, tgtSet.id, { kg, reps }), nav: 'workout' }
+      });
+    }
+    if (!tgtSet && intent.n > work.length + 1) return err('voice.didntCatch');
+    const kg = intent.kg ?? tgtSet?.kg ?? base.kg, reps = intent.reps ?? tgtSet?.reps ?? base.reps;
+    const plan = tgtSet && tgtSet.kg != null ? setTxt(tgtSet.kg, tgtSet.reps) : null;
+    const changed = plan && (kg !== tgtSet.kg || reps !== tgtSet.reps);
+    return logCommand(kg, reps, 1, null, plan ? (changed ? t('voice.vsPlan', { change: setTxt(kg, reps), plan }) : t('voice.asPlanned', { plan })) : undefined);
+  };
+
   switch (intent.type) {
+    case 'LogSetNo': {
+      const need = needWorkout(); if (need) return need;
+      return setNoCommand(intent);
+    }
     case 'LogSet': {
       const need = needWorkout(); if (need) return need;
       // "20 for 10" while that warm-up is next: it's the warm-up, not a working set

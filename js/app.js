@@ -13,14 +13,14 @@ import { handlePop } from './ui/sheet.js';
 import { renderToday, currentStall } from './ui/today.js';
 import { applyPlateauFix } from './plateau.js';
 import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav, autoWarmup, restBell } from './ui/workout.js';
-import { renderHistory, renderDetail } from './ui/history.js';
+import { markFinished, renderHistory, renderDetail } from './ui/history.js';
 import { renderSettings, initSettings } from './ui/settings.js';
 import { initVoice, orbHTML, voiceHandlePop, closeVoice, isVoiceOpen, openVoice } from './ui/voice.js';
 import { renderYou } from './ui/you.js';
 import { renderCoach, initCoach, ask as askCoach, ensureModels, weeklyCheckin, markWeeklySeen, sessionDebrief, markDebriefSeen } from './ui/coach.js';
 import { initCardio, setCardioNav, tickCardio, renderCardioDetail, syncGps, startCardioSession, pickTypeSheet } from './ui/cardio.js';
 import { initBody } from './ui/body.js';
-import { initRoutine, setRoutineNav, renderRoutine, editRoutine, programsSheet, startRoutine } from './ui/routine.js';
+import { initRoutine, setRoutineNav, renderRoutine, editRoutine, editRoutineFrom, programsSheet, startRoutine } from './ui/routine.js';
 import { setHistoryFilter } from './ui/history.js';
 import { renderProgress, renderExercise, setRange } from './ui/progress.js';
 import { countAll, burst } from './ui/fx.js';
@@ -39,7 +39,7 @@ import { maybeOnboard, setOnboardNav } from './ui/onboard.js';
 import { initGoals } from './ui/goals.js';
 import { cardioElapsed, cardioName } from './cardio.js';
 import { weekStart } from './stats.js';
-import { nextRoutine } from './routines.js';
+import { nextRoutine, routineFromWorkout } from './routines.js';
 import { repeatTemplate } from './insights.js';
 import { animateFigures } from './ui/figure.js';
 
@@ -274,19 +274,22 @@ function showDetail(id, { fromFinish = false, kind = 'workout' } = {}) {
     history.replaceState({ screen: 'today' }, '');
     view.screen = 'today';
   }
+  if (fromFinish && kind === 'workout') markFinished(id);
   pushSub('detail', { detailId: id, detailKind: kind });
-  if (fromFinish) setTimeout(celebrate, 380);
+  if (fromFinish) setTimeout(celebrate, kind === 'workout' ? 820 : 380); // as the check finishes drawing
 }
 
 // Finishing is a moment: sparks from the summary, warm ones for every record.
 function celebrate() {
   const root = $('#s-detail');
-  const hero = root.querySelector('.summary');
+  const ring = root.querySelector('.donehero .dring');
+  const hero = ring || root.querySelector('.summary');
   if (!hero) return;
-  hero.classList.add('celebrate');
-  burst(hero, { count: 22, spread: 120 });
-  const prs = [...root.querySelectorAll('.prs li, .prs .tag')];
-  prs.slice(0, 4).forEach((el, i) => setTimeout(() => burst(el, { warm: true, count: 12, spread: 60 }), 350 + i * 160));
+  if (!ring) hero.classList.add('celebrate');
+  burst(hero, { count: 26, spread: ring ? 110 : 120 });
+  const prs = [...root.querySelectorAll('.prs li')];
+  if (prs.length) haptic('pr');
+  prs.slice(0, 4).forEach((el, i) => setTimeout(() => burst(el, { warm: true, count: 12, spread: 60 }), 520 + i * 140));
 }
 
 addEventListener('popstate', e => {
@@ -308,6 +311,12 @@ Object.assign(actions, {
   customize: () => openCustomize(),
   detail: el => pushSub('detail', { detailId: el.dataset.id, detailKind: el.dataset.kind || 'workout' }),
   'start-routine': el => startRoutine(el.dataset.id),
+  'save-routine': el => {
+    const w = state.history.find(x => x.id === el.dataset.id);
+    if (!w) return;
+    haptic('tap');
+    editRoutineFrom(routineFromWorkout(w, w.name || '')); // an empty workout has no name yet: you give it one
+  },
   'repeat-workout': el => {
     const w = state.history.find(x => x.id === el.dataset.id);
     if (!w) return;

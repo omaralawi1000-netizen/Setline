@@ -31,7 +31,12 @@ import { initWorkoutMotion, markLive, rememberSets, animateSets, springToast, sp
 const C = 157.08; // ring circumference, r=25
 const REST_LINGER = 4000; // keep the card up after rest ends
 
-const ui = { restVisible: false, buzzed: 0, suppressClick: false, seenWorkout: null, seenDone: new Set(), lastCurrent: -1, tick: null, flash: false };
+const ui = { restVisible: false, buzzed: 0, suppressClick: false, seenWorkout: null, seenDone: new Set(), lastCurrent: -1, tick: null, flash: false, fresh: new Map() };
+// A set's landing is timed from when it was logged, not from when the row was drawn: the screen can
+// redraw several times in that second (logging redraws it twice), and each redraw picks the
+// animation up where it is instead of restarting or losing it.
+const FRESH_MS = 1800;
+const since = at => `--t:-${Math.max(0, Date.now() - at)}ms`;
 let nav = { go: () => {}, showDetail: () => {} };
 export const setWorkoutNav = n => { nav = n; };
 
@@ -136,6 +141,7 @@ export function renderWorkout(root) {
       <button class="btn2 solid" data-act="add-exercise">${I.plus}<span>${t('workout.addExercise')}</span></button>
     </div>`;
   fitNums(root);
+  driveRing(root, w);
   // slide the exercise in when it changed (touch or voice)
   const moved = ui.seenWorkout === w.id && ui.lastCurrent !== -1 && ui.lastCurrent !== i;
   root.classList.remove('slide-l', 'slide-r');
@@ -222,6 +228,9 @@ function fitNums(root) {
 function setsHTML(w, ex) {
   const { t } = state;
   const prs = livePRSets(state.prs, w);
+  const now = Date.now();
+  for (const s of ex.sets) if (s.done && ui.seenWorkout === w.id && !ui.seenDone.has(s.id) && !ui.fresh.has(s.id)) ui.fresh.set(s.id, now);
+  for (const [id, at] of ui.fresh) if (now - at > FRESH_MS) ui.fresh.delete(id);
   return ex.sets.map((s, k) => {
     const warm = s.type === 'warmup';
     const n = W.setNumberAt(ex, k);
@@ -233,11 +242,11 @@ function setsHTML(w, ex) {
       ? `<b>${weight(s.kg, unit(), state.lang)}</b> ${u()} × <b>${s.reps}</b>`
       : t('workout.repsOnly', { reps: s.reps });
     const end = s.done
-      ? `<span class="end">${prs.has(s.id) ? `<span class="tag sm">${t('workout.pr')}</span>` : ''}<span class="ck">${I.check}</span></span>`
+      ? `<span class="end">${prs.has(s.id) ? `<span class="tag sm">${t('workout.pr')}</span>` : ''}<span class="ck">${I.check}</span></span>${prs.has(s.id) && ui.fresh.has(s.id) ? `<span class="prfloat" aria-hidden="true">${t('workout.newPr')}</span>` : ''}`
       : `<span class="later">${t('workout.planned')}</span>`;
     const cls = s.done ? 'done' : 'planned';
     return `<li class="sw" data-set="${s.id}"><span class="del" aria-hidden="true">${I.trash}${t('common.delete')}</span>
-      <button class="set ${cls}${s.done && ui.seenWorkout === w.id && !ui.seenDone.has(s.id) ? ' fresh' : ''}" data-act="${s.done ? 'edit-set' : 'noop'}" data-id="${s.id}" aria-label="${t('workout.editSet', { n })}"><span class="idx">${n}</span><span class="val">${val}</span>${end}</button></li>`;
+      <button class="set ${cls}${ui.fresh.has(s.id) ? ` fresh${prs.has(s.id) ? ' prfresh' : ''}` : ''}"${ui.fresh.has(s.id) ? ` style="${since(ui.fresh.get(s.id))}"` : ''} data-act="${s.done ? 'edit-set' : 'noop'}" data-id="${s.id}" aria-label="${t('workout.editSet', { n })}"><span class="idx">${n}</span><span class="val">${val}</span>${end}</button></li>`;
   }).join('');
 }
 
@@ -269,11 +278,26 @@ function restHTML(w, now) {
   // the entrance plays once per rest, not on every re-render
   const fresh = ui.restAnimated !== w.rest.startedAt;
   ui.restAnimated = w.rest.startedAt;
-  return `<div class="rest solid${fresh ? ' in' : ''}" id="rest">
-    <div class="ring${running && left <= 3 ? ' hot' : ''}" id="ring"><svg viewBox="0 0 60 60"><circle class="bg" cx="30" cy="30" r="25"/><circle class="fg" id="fg" cx="30" cy="30" r="25" style="stroke-dashoffset:${off}"/></svg><b id="rtime">${mss(left)}</b></div>
+  // rest over: the ring fills back up and a check appears, once (timed from the end of the rest)
+  const bloom = running ? '' : ' bloom';
+  return `<div class="rest solid${fresh ? ' in' : ''}${running ? '' : ' over'}" id="rest"${running ? '' : ` style="${since(w.rest.endsAt)}"`}>
+    <div class="ring${running && left <= 3 ? ' hot' : ''}${bloom}" id="ring"><svg viewBox="0 0 60 60"><circle class="bg" cx="30" cy="30" r="25"/><circle class="fg" id="fg" cx="30" cy="30" r="25" style="stroke-dashoffset:${running ? off : 0}"/></svg><b id="rtime">${running ? mss(left) : I.check}</b></div>
     <div class="rtxt"><strong id="rtitle">${t(running ? 'workout.rest' : 'workout.restDone')}</strong><span>${esc(running ? restNext(w) : t('workout.goTime'))}</span></div>
     <div class="chips" id="rchips"${running ? '' : ' hidden'}><button class="chip" data-act="rest-" aria-label="−15 s">−15</button><button class="chip" data-act="rest+" aria-label="+15 s">+15</button><button class="chip" data-act="rest-skip">${t('workout.skip')}</button></div>
   </div>`;
+}
+
+// The ring drains in one smooth, continuous motion to the end of the rest (not a jump a second);
+// it's started again only when the end moves (+15 / −15) or the card is redrawn.
+function driveRing(root, w = state.active, now = Date.now()) {
+  const fg = root.querySelector('#rest:not(.over) #fg');
+  if (!fg || !w?.rest || now >= w.rest.endsAt) return;
+  if (fg._ends === w.rest.endsAt && fg.getAnimations().length) return;
+  fg.getAnimations().forEach(a => a.cancel());
+  fg._ends = w.rest.endsAt;
+  const from = C * (1 - W.restProgress(w.rest, now));
+  fg.style.strokeDashoffset = from;
+  fg.animate([{ strokeDashoffset: from }, { strokeDashoffset: C }], { duration: w.rest.endsAt - now, easing: 'linear', fill: 'forwards' });
 }
 
 // Called by the app clock. Updates the ring in place; swaps the card when its state changes.
@@ -300,12 +324,13 @@ export function tickWorkout(root, now) {
       ui.restVisible = false;
     } else {
       slot.innerHTML = restHTML(w, now);
+      driveRing(slot, w, now);
     }
     return;
   }
   if (st !== 'running') return;
   const left = W.restRemaining(w.rest, now);
-  $('#fg', slot).style.strokeDashoffset = C * (1 - W.restProgress(w.rest, now));
+  driveRing(slot, w, now);
   $('#rtime', slot).textContent = mss(left);
   $('#ring', slot).classList.toggle('hot', left <= 3);
 }
@@ -425,8 +450,9 @@ function doLog(kg, reps) {
   }
   ui.buzzed = 0;
   ui.flash = true;
-  haptic('success');
+  if (!ui.fresh.has(set.id)) ui.fresh.set(set.id, Date.now());
   const pr = livePRSets(state.prs, state.active).has(set.id);
+  haptic(pr ? 'pr' : 'log');
   // the new row lands, then sparks fly from its check (warm for a record)
   requestAnimationFrame(() => {
     const ck = document.querySelector(`#sets [data-id="${set.id}"] .ck`);

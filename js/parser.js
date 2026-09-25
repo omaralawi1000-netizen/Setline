@@ -13,7 +13,7 @@ import { lbToKg, round } from './units.js';
 import { CARDIO_TYPES } from './cardio.js';
 import { parseMealLocal } from './fooddb.js';
 
-export const INTENTS = ['LogSet', 'LogSets', 'LogBatch', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'LogWater', 'SetTarget', 'CheckIn', 'LogRel', 'SetGoal', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
+export const INTENTS = ['LogSet', 'LogSetNo', 'LogSets', 'LogBatch', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'LogWater', 'SetTarget', 'CheckIn', 'LogRel', 'SetGoal', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
   'AddWarmup', 'WarmupDone', 'AddExercise', 'SwapExercise', 'StartRoutine', 'StartEmpty', 'Finish', 'Discard', 'StartRest', 'AdjustRest', 'SkipRest',
   'Query', 'Cancel', 'Help', 'Ask', 'Unknown'];
 
@@ -778,6 +778,29 @@ function parseOne(text, ctx = {}) {
   if (swap && !/\d/.test(swap[1])) { const r = withExercise('SwapExercise', swap[1]); if (r) return r; }
   if ((m = R(/^(add|tilføj|also|and also|now|next up|next is|nu|lets do|let s do|go to|gå til|hop til)( exercise| øvelse| øvelsen| an exercise| en øvelse| some| er)? (.+)$/, s))) {
     if (!/\d/.test(m[3])) { const r = withExercise('AddExercise', m[3]); if (r) return r; }
+  }
+
+  // --- a set by its number: "set one is done", "set 2 done, only 9 reps instead of 10", "first set done at 82.5",
+  // "sæt 1 er færdigt, men kun 9 gentagelser". Logs that set of the current lift (or corrects it if it's done). ---
+  {
+    const ORD = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, '1st': 1, '2nd': 2, '3rd': 3, '4th': 4, '5th': 5, '6th': 6,
+      første: 1, anden: 2, andet: 2, tredje: 3, fjerde: 4, femte: 5, sjette: 6 };
+    const m = /(?<!\d )\b(?:set|sæt|sættet)(?: (?:number|no|nr|nummer))? (\d{1,2})\b(?! ?(?:kg|kilo|kilos|lbs?|pounds?|x|×|for|sets?|sæt|reps?|gentagelser))/.exec(s)
+      || /\b(first|second|third|fourth|fifth|sixth|1st|2nd|3rd|4th|5th|6th|første|anden|andet|tredje|fjerde|femte|sjette) (?:set|sæt)\b/.exec(s);
+    if (m) {
+      const n = /^\d+$/.test(m[1]) ? Number(m[1]) : ORD[m[1]];
+      let rest = ` ${s.slice(0, m.index)} ${s.slice(m.index + m[0].length)} `.replace(/\s+/g, ' ');
+      const said = /\b(?:done|finished|complete|completed|over|did|hit|got|made|færdig|færdigt|færdige|klaret|klar|lavet|taget|gennemført|lavede|tog|fik|klarede)\b/.test(rest);
+      rest = rest.replace(/\b(?:instead of|rather than|not|i stedet for|frem for|ikke) \d+(?:\.\d+)?(?: ?(?:reps?|gentagelser))?/g, ' ');
+      const kgM = /(\d+(?:\.\d+)?) ?(kg|kilo|kilos|kilogram|lbs?|pounds?|pund)\b/.exec(rest) || /\b(?:at|with|på|med) (\d+(?:\.\d+)?)\b(?! ?(?:reps?|gentagelser|gange))/.exec(rest);
+      if (kgM) rest = rest.replace(kgM[0], ' ');
+      const repsM = /(\d+) ?(?:reps?|repetitions?|gentagelser|gange)\b/.exec(rest) || /\b(?:only|just|kun|bare) (?:did |got |lavede |tog |fik )?(\d+)\b/.exec(rest) || (said ? /\b(\d+)\b/.exec(rest) : null);
+      if (n >= 1 && n <= 12 && (said || repsM || kgM)) {
+        const lb = kgM ? /^(lbs?|pounds?|pund)$/.test(kgM[2] || '') || (!kgM[2] && ctx.unit === 'lb') : false;
+        const kg = kgM ? (lb ? Math.round(Number(kgM[1]) * 0.45359237 * 10000) / 10000 : Number(kgM[1])) : null;
+        return out('LogSetNo', { n, ...(repsM ? { reps: Number(repsM[1]) } : {}), ...(kg != null ? { kg } : {}) });
+      }
+    }
   }
 
   // --- a set you just did, told naturally: "i got 9 reps this time", "did 2 kg more", "as planned" ---

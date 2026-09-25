@@ -151,6 +151,7 @@ function scrollDown(root, smooth = true) {
 // Pick coach/command models once, from the key's model list.
 // Pick coach, command and voice models once from the key's model list (and again after an update adds fields).
 let picking = null;
+tts.whenModelMissing(() => store.setSettings({ ttsModel: '', ttsLite: '' })); // listed again next time
 export function ensureModels() {
   const s = state.settings;
   if (!getKey('google') || ((s.coachOverride || (s.coachModel && s.coachAlt && s.proChecked)) && (s.ttsOverride || s.ttsLite))) return Promise.resolve();
@@ -213,18 +214,19 @@ export async function ask(question, { root = $('#s-coach'), voice = false } = {}
       key, model, system: systemPrompt(lang), contents: chatContents(history, context, question), signal: ctl.signal,
       onText: full => { clearTimeout(slow); store.updateChat(reply.id, { text: full }, { quiet: true }); typer.set(full); }
     }), { rounds: 3, wait: 2500, alsoRetry: ['timeout'] }).finally(() => clearTimeout(slow)); // busy servers get a patient second and third go
+    // the voice starts as soon as the answer is in, while the words are still appearing on screen
+    const { text: said, facts: all } = splitMemories(text);
+    const talk = said && (voice || state.settings.spoken !== 'off')
+      ? tts.speak(speakable(said), { key, model: ttsModelId(state.settings), alt: ttsAlt(state.settings), voice: state.settings.voice, lang, canSpeak: () => !isRecording() })
+      : null;
     await typer.drain();
     // "REMEMBER: …" lines become memories and leave the reply
-    const { text: said, facts: all } = splitMemories(text);
     const before = state.settings.memories || [], mem = addMemories(before, all);
     const facts = mem.slice(before.length).map(m => m.text); // only what's new
     if (facts.length) store.setSettings({ memories: mem });
     store.updateChat(reply.id, { text: said, streaming: false, ...(facts.length ? { remembered: facts } : {}) }, { persist: true });
     haptic('tap');
-    if (said && (voice || state.settings.spoken !== 'off')) {
-      const talk = tts.speak(speakable(said), { key, model: ttsModelId(state.settings), alt: ttsAlt(state.settings), voice: state.settings.voice, lang, canSpeak: () => !isRecording() });
-      if (voice) await talk;
-    }
+    if (talk && voice) await talk;
   } catch (e) {
     const code = e instanceof AiError ? e.code : 'failed';
     if (code === 'aborted') store.updateChat(reply.id, { streaming: false }, { persist: true });
@@ -341,9 +343,9 @@ export function initCoach(n) {
     setTalk('thinking');
     await ask(text, { root, voice: true });
     if (!talk.on) return;
-    setTalk('speaking');
-    for (let t0 = Date.now(); talk.on && tts.isSpeaking() && Date.now() - t0 < 90_000;) await new Promise(r => setTimeout(r, 150));
-    if (talk.on) setTimeout(listenTurn, 300);
+    // the answer is spoken, then it rests: tap the orb to talk again (it never opens the mic by itself)
+    talk.on = false;
+    setTalk(null);
   };
   orbBtn.addEventListener('click', () => {
     if (talk.on) { haptic('tap'); if (talk.l && composer.dataset.talk !== 'thinking') talk.l.stop(); else stopTalk(); return; }
@@ -354,7 +356,7 @@ export function initCoach(n) {
     talk.on = true;
     talk.misses = 0;
     const typed = input.value.trim();
-    if (typed) { input.value = ''; talk.on = true; setTalk('thinking'); ask(typed, { root, voice: true }).then(() => talk.on && setTimeout(listenTurn, 300)); return; }
+    if (typed) { input.value = ''; setTalk('thinking'); ask(typed, { root, voice: true }).then(() => { talk.on = false; setTalk(null); }); return; }
     listenTurn();
   });
   document.getElementById('app').addEventListener('screenchange', () => { if (talk.on && !document.getElementById('app').classList.contains('coaching')) stopTalk(); });
