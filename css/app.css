@@ -2154,3 +2154,13 @@ html[data-cards=outline] .screen :is(.solid,.glass){background:transparent;borde
 .app:not(.under-top) .screen.on .top:has(~ .h1) .ttl{opacity:0;transform:translateY(4px)}
 /* idle work: the hidden message box's orb rests, and the bar's orb holds still while a screen or sheet moves */
 .app:not(.coaching) .composer .orb *,.app.moving .dock .orb *,.app.sheeting .orb *{animation-play-state:paused}
+
+/* ======================= 1.27.1: the Coach opens and closes cleanly =======================
+   Solid, with its own copy of the background glow, so nothing shows through the circle */
+#s-coach{background:radial-gradient(520px 420px at 50% -70px,color-mix(in srgb,var(--amb1) 34%,transparent),transparent 72%),linear-gradient(180deg,transparent 45%,rgba(7,8,12,.5)),var(--bg)}
+/* the bar's orb keeps its size while the Coach is open (the flying copy stands in for it) */
+.app.coaching .dock.v2 .orbbtn{transform:none}
+/* coming back from the Coach the bar settles without a bounce, before the orb lands on it */
+.app.uncoaching .dock.v2{transition:opacity .28s var(--e-out),transform .36s var(--e-out)}
+/* …and the message box fades where it is instead of jumping up to its old place above the bar */
+.app.uncoaching .composer{bottom:calc(var(--dock-bottom) + 6px)}

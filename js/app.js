@@ -166,45 +166,71 @@ function heroNav(el, fn) {
   fn();
 }
 
-function revealCoach(open, prevEl = null) {
+// The Coach opens as a circle growing out of the orb, over the tab you were on, and closes back
+// into it. The Coach screen is solid and the tab underneath doesn't move while the circle covers
+// or uncovers it, so there is only ever one page to look at.
+const stillMotion = () => document.documentElement.dataset.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches;
+// where an element sits in the layout, ignoring transforms (the bar sliding away or shrinking),
+// i.e. where it will be once everything has settled
+const layoutBox = el => {
+  let x = 0, y = 0;
+  for (let n = el; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }
+  return { x: x + el.offsetWidth / 2, y: y + el.offsetHeight / 2, s: el.offsetWidth };
+};
+// where it is on screen right now
+const screenBox = el => { const r = el.getBoundingClientRect(), a = app.getBoundingClientRect(); return { x: r.left + r.width / 2 - a.left, y: r.top + r.height / 2 - a.top, s: r.width }; };
+const pinStyles = { transition: 'none', opacity: '1', visibility: 'visible', transform: 'none' };
+const unpin = el => Object.assign(el.style, { transition: '', opacity: '', visibility: '', transform: '', zIndex: '' });
+let coachFx = null; // how to tidy up the open or close in progress
+function settleCoachFx() { const c = coachFx; coachFx = null; c?.(); }
+
+function revealCoach(open, under) {
   const s = $('#s-coach'), orb = $('#dock .orbbtn');
-  if (!s || !orb || document.documentElement.dataset.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const r = orb.getBoundingClientRect(), a = app.getBoundingClientRect();
-  const x = r.left + r.width / 2 - a.left, y = r.top + r.height / 2 - a.top;
-  const small = `circle(${r.width / 2}px at ${x}px ${y}px)`, big = `circle(${Math.hypot(Math.max(x, a.width - x), y) + 40}px at ${x}px ${y}px)`;
-  s.getAnimations().forEach(x => x.cancel());
+  settleCoachFx();
+  if (!s || !orb || stillMotion()) return;
+  const c = open ? screenBox(orb) : layoutBox(orb); // opens from the orb as it is; closes to where it will be
+  const a = app.getBoundingClientRect();
+  const small = `circle(${c.s / 2}px at ${c.x}px ${c.y}px)`, big = `circle(${Math.hypot(Math.max(c.x, a.width - c.x), Math.max(c.y, a.height - c.y)) + 20}px at ${c.x}px ${c.y}px)`;
   if (open) {
-    // the tab you were on stays put under the circle until it has covered the screen
-    if (prevEl && prevEl !== s) {
-      prevEl.style.transition = 'opacity .15s ease .45s, transform .3s ease .45s, visibility 0s .6s';
-      setTimeout(() => { prevEl.style.transition = ''; }, 700);
-    }
-    s.animate([{ clipPath: small }, { clipPath: big }], { duration: 520, easing: 'cubic-bezier(.3,.9,.2,1)' });
+    if (under && under !== s) Object.assign(under.style, pinStyles); // the tab stays exactly as it was
+    s.style.transition = 'none';
+    const anim = s.animate([{ clipPath: small }, { clipPath: big }], { duration: 480, easing: 'cubic-bezier(.3,.8,.2,1)', fill: 'both' });
+    anim.onfinish = settleCoachFx;
+    coachFx = () => {
+      anim.cancel();
+      s.style.transition = '';
+      if (!under || under === s) return;
+      if (under.classList.contains('on')) return unpin(under); // closed again before it finished
+      Object.assign(under.style, { visibility: 'hidden', opacity: '0' }); // covered: gone at once, no fade
+      void under.offsetWidth; // settle that first, or releasing the styles below would fade it out
+      setTimeout(() => { if (!under.classList.contains('on')) unpin(under); }, 50);
+    };
   } else {
-    // keep it on top and visible while it closes into the orb
-    Object.assign(s.style, { opacity: '1', visibility: 'visible', transition: 'none', zIndex: '4' });
-    // no fade on the way: a see-through Coach over the page reads as two screens at once
-    const anim = s.animate([{ clipPath: big }, { clipPath: small }], { duration: 400, easing: 'cubic-bezier(.4,0,.2,1)' });
-    anim.onfinish = anim.oncancel = () => Object.assign(s.style, { opacity: '', visibility: '', transition: '', zIndex: '' });
+    Object.assign(s.style, pinStyles, { zIndex: '4' }); // on top and solid while it shrinks into the orb
+    const anim = s.animate([{ clipPath: big }, { clipPath: small }], { duration: 400, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'both' });
+    anim.onfinish = settleCoachFx;
+    coachFx = () => {
+      if (s.classList.contains('on')) { anim.cancel(); return unpin(s); } // opened again meanwhile
+      Object.assign(s.style, { visibility: 'hidden', opacity: '0' }); // hidden before the clip lets go,
+      void s.offsetWidth; // (and settled, so letting go of the styles can't start a fade)
+      anim.cancel(); // so the whole Coach never flashes up at the end
+      setTimeout(() => { if (!s.classList.contains('on')) unpin(s); }, 50);
+    };
   }
   haptic(open ? 'open' : 'tick');
 }
 
-// On the Coach tab the orb leaves the dock and settles into the message box (and goes back when you
-// leave): a copy flies between the two places while the real ones wait out of sight.
-function flyOrb(toCoach) {
-  if (document.documentElement.dataset.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+// The orb leaves the bar and settles into the message box (and goes back when the Coach closes):
+// a copy flies from where the orb is now to where the other one will be, while the real ones wait
+// out of sight.
+// takeOff() is read before the Coach classes change (the message box moves when they do);
+// flyOrb() runs after, when the landing spot is known.
+const takeOff = toCoach => { const el = $(toCoach ? '#dock .orbbtn .orb' : '#composer .corb .orb'); return el && screenBox(el); };
+function flyOrb(toCoach, from) {
+  if (stillMotion() || !from) return;
   const dockOrb = $('#dock .orbbtn .orb'), boxOrb = $('#composer .corb .orb');
   if (!dockOrb || !boxOrb) return;
-  // where each orb sits in the layout, ignoring the dock and message box sliding in or out,
-  // so the copy lands exactly where the real one ends up
-  const at = el => {
-    let x = 0, y = 0;
-    for (let n = el; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }
-    return { x: x + el.offsetWidth / 2, y: y + el.offsetHeight / 2, s: el.offsetWidth };
-  };
-  const home = at(dockOrb), box = at(boxOrb);
-  const [from, to] = toCoach ? [home, box] : [box, home];
+  const to = toCoach ? layoutBox(boxOrb) : layoutBox(dockOrb);
   $('.orbfly')?.remove();
   const fly = dockOrb.cloneNode(true);
   fly.className = 'orb orbfly'; // a component of its own, not a state
@@ -215,14 +241,14 @@ function flyOrb(toCoach) {
   app.classList.add('orbflying');
   const a = fly.animate([
     { transform: `translate(${dx}px, ${dy}px) scale(${k})` },
-    { transform: `translate(${dx * 0.4}px, ${dy * 0.5 - 18}px) scale(${(k + 1) / 2})`, offset: 0.5 },
+    { transform: `translate(${dx * 0.4}px, ${dy * 0.5 - 14}px) scale(${(k + 1) / 2})`, offset: 0.5 },
     { transform: 'none' }
-  ], { duration: 480, easing: 'cubic-bezier(.32,.72,0,1)', fill: 'forwards' });
+  ], { duration: 460, easing: 'cubic-bezier(.32,.72,0,1)', fill: 'forwards' });
   let done = false;
   const land = () => {
     if (done) return; done = true;
-    app.classList.remove('orbflying'); // the real orb fades in where the copy landed…
-    fly.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180, easing: 'ease-out' }).onfinish = () => fly.remove(); // …as the copy fades out
+    app.classList.remove('orbflying'); // the real orb shows where the copy landed…
+    fly.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: 'ease-out' }).onfinish = () => fly.remove(); // …as the copy fades out
   };
   a.onfinish = land;
   a.oncancel = () => { done = true; fly.remove(); app.classList.remove('orbflying'); };
@@ -233,13 +259,23 @@ const ORDER = { today: 0, workout: 1, food: 2, you: 3, coach: 4, history: 4, det
 function show(name, { back = false } = {}) {
   const prev = view.screen;
   view.screen = name;
+  // the Coach opening over a tab or closing back to one: the circle does the moving, so the two
+  // screens involved appear and disappear at once instead of sliding
+  const coachSwap = prev !== name && (prev === 'coach' || name === 'coach') && TABS.includes(prev) && TABS.includes(name);
   const amb = document.querySelector('.ambient');
-  if (amb) amb.dataset.s = TABS.includes(name) ? name : 'sub';
+  if (amb && name !== 'coach') amb.dataset.s = TABS.includes(name) ? name : 'sub'; // the Coach is solid: the glow stays put under it
   const dir = prev === name ? 0 : (back ? -1 : Math.sign((ORDER[name] ?? 0) - (ORDER[prev] ?? 0)) || 1);
   for (const s of document.querySelectorAll('.screen')) {
     const on = s.dataset.screen === name;
     const was = s.classList.contains('on');
-    if (on && !was) {
+    if (on && !was && coachSwap) {
+      s.classList.add('instant');
+      s.style.setProperty('--off-x', '0px');
+      s.classList.add('on');
+      void s.offsetWidth;
+      s.classList.remove('instant');
+      s._counted = prev === 'coach'; // back from the Coach: the page was there all along, no count-up
+    } else if (on && !was) {
       s.classList.add('instant');
       s.style.setProperty('--off-x', `${dir * 28}px`);
       void s.offsetWidth;
@@ -258,10 +294,16 @@ function show(name, { back = false } = {}) {
   clearTimeout(app._moving);
   app._moving = setTimeout(() => app.classList.remove('moving'), 600);
   app.classList.toggle('is-sub', SUB.includes(name));
-  const wasCoach = app.classList.contains('coaching');
-  if (wasCoach !== (name === 'coach')) revealCoach(name === 'coach', $('#s-' + prev));
+  const orbFrom = coachSwap ? takeOff(name === 'coach') : null;
+  if (coachSwap) revealCoach(name === 'coach', $('#s-' + (name === 'coach' ? prev : name)));
+  else if (prev === 'coach' || name === 'coach') settleCoachFx();
+  if (coachSwap && name !== 'coach') { // the bar comes back without a bounce, so the orb lands on it exactly
+    app.classList.add('uncoaching');
+    clearTimeout(app._uncoach);
+    app._uncoach = setTimeout(() => app.classList.remove('uncoaching'), 700);
+  }
   app.classList.toggle('coaching', name === 'coach');
-  if (wasCoach !== (name === 'coach')) flyOrb(name === 'coach');
+  if (coachSwap) flyOrb(name === 'coach', orbFrom);
   if (name === 'coach') { markWeeklySeen(); markDebriefSeen(); }
   requestAnimationFrame(() => app.dispatchEvent(new Event('screenchange')));
   renderAll();

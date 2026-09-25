@@ -366,3 +366,11 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] One motion system (tokens.css: 4 speeds, 3 curves): tabs and pages hand over cleanly (the old one is gone before the new one arrives, a small slide in the direction you went, cards rise in); every pop-up is the same sheet (long ease up, quicker down; new content in the same sheet fades in); voice cards and toasts share one rise; presses one squeeze. Removed: the card-grows-into-page effect (it ghosted over its neighbours), the sheet's second animation, the pop-in bounce, the fade on Coach close
 - [x] Less work while moving: the background glow and orbs pause during screen and sheet moves; the hidden message-box orb no longer animates
 - [x] Calmer screens: Progress with no data is one card with "Start your first workout"; sub pages show their title once (the small header title appears only after scrolling); Train no longer repeats the Progress / History / Body tiles that live on You
+
+## 1.27.1: the Coach opens and closes cleanly
+
+- [x] The Coach screen is solid (its own copy of the background glow), so the page under the circle never shows through it: no two pages on top of each other while it opens or closes
+- [x] The tab under the Coach stays perfectly still while the circle covers or uncovers it (it used to slide, fade and replay its card animation underneath)
+- [x] No flash at the end of closing: the Coach is hidden before the circle lets go (the clean-up ran in the same frame as the animation's end, so the whole Coach faded out over Today)
+- [x] Orb flight: takes off from where the orb really is (also when the bar is shrunk), lands where the other one will settle; the message box no longer jumps up 76 px as it fades; the bar comes back without a bounce, so the orb lands on it exactly; the bar's orb no longer shrinks to 20 % while hidden
+- [x] Fast back-and-forth: each open or close tidies up the previous one first; the background glow no longer drifts when the Coach opens
