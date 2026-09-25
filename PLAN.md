@@ -374,3 +374,10 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] No flash at the end of closing: the Coach is hidden before the circle lets go (the clean-up ran in the same frame as the animation's end, so the whole Coach faded out over Today)
 - [x] Orb flight: takes off from where the orb really is (also when the bar is shrunk), lands where the other one will settle; the message box no longer jumps up 76 px as it fades; the bar comes back without a bounce, so the orb lands on it exactly; the bar's orb no longer shrinks to 20 % while hidden
 - [x] Fast back-and-forth: each open or close tidies up the previous one first; the background glow no longer drifts when the Coach opens
+
+## 1.28.0: the orb becomes the Coach, a thinking aurora, glass, sheets you can swipe away
+
+- [x] Coach opens by the orb's light blooming out of it until it fills the screen (a bright rim sweeps across) and stays as the Coach's background, glowing up from where the orb was; the conversation and message box rise into it and the message-box orb pops in. Closing pulls the light back into the orb, which condenses back in the bar. One soft element that only scales and fades: no circle cut-out and no flying copy of the orb (both could flicker or pop on Android)
+- [x] Thinking: a slowly turning aurora rises from the bottom behind the conversation; the orb swirls fast, a comet of light circles it and a halo breathes (rotation and opacity only)
+- [x] Glass: three soft pools of the theme colour behind everything, cards are tinted glass with a light top edge, more blur on the bar and message box
+- [x] Sheets: swipe down from anywhere once the content is at its top (1:1 with the finger, flick or a third of the way closes, otherwise springs back); no more Android stretch pulling the content away from the sheet (it looked like two sheets); the glass blur switches on only once the sheet has stopped moving

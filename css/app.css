@@ -2157,10 +2157,92 @@ html[data-cards=outline] .screen :is(.solid,.glass){background:transparent;borde
 
 /* ======================= 1.27.1: the Coach opens and closes cleanly =======================
    Solid, with its own copy of the background glow, so nothing shows through the circle */
-#s-coach{background:radial-gradient(520px 420px at 50% -70px,color-mix(in srgb,var(--amb1) 34%,transparent),transparent 72%),linear-gradient(180deg,transparent 45%,rgba(7,8,12,.5)),var(--bg)}
 /* the bar's orb keeps its size while the Coach is open (the flying copy stands in for it) */
 .app.coaching .dock.v2 .orbbtn{transform:none}
 /* coming back from the Coach the bar settles without a bounce, before the orb lands on it */
 .app.uncoaching .dock.v2{transition:opacity .28s var(--e-out),transform .36s var(--e-out)}
 /* …and the message box fades where it is instead of jumping up to its old place above the bar */
 .app.uncoaching .composer{bottom:calc(var(--dock-bottom) + 6px)}
+
+/* ======================= 1.28: the orb becomes the Coach =======================
+   .aura sits between the tabs and the Coach. Its .bloom is the orb's light: a soft disc that is
+   solid in the middle and feathers out, scaled from orb size to past the screen corners (JS), and
+   left there as the Coach's background, glowing up from where the orb was. .glow is the thinking
+   light. Only transform and opacity ever change. */
+.aura{--ax:50%;--ay:calc(100% - var(--dock-bottom) - 50px);--k1:5;position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden;visibility:hidden}
+.app.coaching .aura,.aura.run{visibility:visible}
+.aura .bloom{position:absolute;left:var(--ax);top:var(--ay);width:600px;height:600px;margin:-300px 0 0 -300px;border-radius:50%;will-change:transform,opacity;transform:scale(var(--k1));
+  background:radial-gradient(closest-side,
+    color-mix(in srgb,var(--accent) 60%,var(--bg)) 0%,
+    color-mix(in srgb,var(--violet) 46%,var(--bg)) 5%,
+    color-mix(in srgb,var(--violet) 20%,var(--bg)) 13%,
+    color-mix(in srgb,var(--blue) 8%,var(--bg)) 22%,
+    var(--bg) 32%, var(--bg) 58%,
+    color-mix(in srgb,var(--violet) 26%,var(--bg)) 68%,
+    color-mix(in srgb,var(--accent) 34%,transparent) 76%,
+    color-mix(in srgb,var(--violet) 18%,transparent) 84%, transparent 96%)}
+.aura:not(.run) .bloom{transition:none}
+.app:not(.coaching) .aura:not(.run) .bloom{opacity:0}
+/* the conversation rises into the light */
+.app.coach-in #s-coach > *{animation:m-rise .5s var(--e-out) both;animation-delay:.2s}
+.app.coach-in #s-coach > *:nth-child(2){animation-delay:.25s}
+.app.coach-in #s-coach > *:nth-child(n+3){animation-delay:.3s}
+.app.coaching:not(.is-sub):not(.voice) .composer{transition:opacity .4s var(--e-out) .22s,transform .5s var(--e-out) .22s,box-shadow .4s}
+.app.coach-in .composer .corb .orb{animation:orbin .55s var(--e-spring) .3s both}
+@keyframes orbin{from{transform:scale(.3);opacity:0}}
+.composer{transition:opacity .16s var(--e-in),transform .3s var(--e-out),box-shadow .4s}
+
+/* ---------- 1.28: thinking ----------
+   While the Coach thinks, a slow aurora rises from the bottom behind the conversation (the glass
+   message box and bubbles soften it), and the orb works: its colours swirl fast, a comet of light
+   circles it and a halo breathes. Rotation and opacity only, all on the GPU. */
+.aura .glow{position:absolute;left:50%;bottom:-62vw;width:150vw;max-width:780px;aspect-ratio:1;translate:-50% 0;border-radius:50%;opacity:0;scale:.8;
+  background:conic-gradient(from 0deg,var(--accent),var(--violet),var(--blue),color-mix(in srgb,var(--warm) 60%,var(--violet)),var(--accent));
+  -webkit-mask:radial-gradient(closest-side,#000 0%,rgba(0,0,0,.55) 38%,transparent 72%);mask:radial-gradient(closest-side,#000 0%,rgba(0,0,0,.55) 38%,transparent 72%);
+  transition:opacity .9s var(--e-out),scale 1.4s var(--e-out);animation:auraspin 9s linear infinite paused;will-change:rotate}
+.app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .glow{opacity:.5;scale:1;animation-play-state:running}
+@keyframes auraspin{to{rotate:360deg}}
+
+.orb::before,.orb::after{content:"";position:absolute;border-radius:50%;pointer-events:none;opacity:0;transition:opacity .4s var(--e-out)}
+.orb::before{inset:-45%;z-index:-1;background:radial-gradient(closest-side,rgba(var(--a-rgb),.55),rgba(var(--v-rgb),.25) 55%,transparent)}
+.orb::after{inset:-3px;background:conic-gradient(from 0deg,transparent 0 50%,rgba(var(--a-rgb),.25) 68%,var(--accent-hi) 86%,#fff 90%,transparent 93%);
+  -webkit-mask:radial-gradient(closest-side,transparent calc(100% - 2.5px),#000 calc(100% - 2px));mask:radial-gradient(closest-side,transparent calc(100% - 2.5px),#000 calc(100% - 2px))}
+:is(.think .orb,.composer[data-talk=thinking] .corb .orb,.app:has(#s-coach .msg.ai.is-thinking) .composer .corb .orb)::before{opacity:1;animation:orbhalo 1.6s ease-in-out infinite}
+:is(.think .orb,.composer[data-talk=thinking] .corb .orb,.app:has(#s-coach .msg.ai.is-thinking) .composer .corb .orb)::after{opacity:1;animation:orbcomet 1.1s linear infinite}
+:is(.think .orb,.composer[data-talk=thinking] .corb .orb,.app:has(#s-coach .msg.ai.is-thinking) .composer .corb .orb) .core{animation:orbwork 1.6s ease-in-out infinite}
+:is(.think .orb,.composer[data-talk=thinking] .corb .orb,.app:has(#s-coach .msg.ai.is-thinking) .composer .corb .orb) .core b:nth-child(1){animation-duration:1.9s}
+:is(.think .orb,.composer[data-talk=thinking] .corb .orb,.app:has(#s-coach .msg.ai.is-thinking) .composer .corb .orb) .core b:nth-child(2){animation-duration:2.3s}
+:is(.think .orb,.composer[data-talk=thinking] .corb .orb,.app:has(#s-coach .msg.ai.is-thinking) .composer .corb .orb) .core b:nth-child(3){animation-duration:1.3s}
+@keyframes orbcomet{to{rotate:360deg}}
+@keyframes orbhalo{0%,100%{opacity:.45;scale:.85}50%{opacity:1;scale:1.08}}
+@keyframes orbwork{0%,100%{scale:1}50%{scale:1.07}}
+.orb{isolation:isolate} /* keeps the halo (::before) just behind the orb, inside whatever holds it */
+
+/* ---------- 1.28: sheets ----------
+   One way in, one way out, and a swipe down from anywhere (sheet.js). The glass blur comes on
+   once the sheet has stopped moving and goes off while it moves, so it can't flicker. */
+.sheet.glass{-webkit-backdrop-filter:none;backdrop-filter:none;--gl-fill:rgba(20,23,32,.74)}
+.sheet.glass.settled{-webkit-backdrop-filter:blur(28px) saturate(170%);backdrop-filter:blur(28px) saturate(170%)}
+.sheet.show.snap{transition:transform .42s var(--e-spring)}
+.sheet.flung{transition:transform .26s var(--e-out)!important}
+.sheet .sbody{overscroll-behavior-y:none}
+
+/* ---------- 1.28: glass ----------
+   Glass only reads as glass when there is colour behind it, so the background gets three soft
+   pools of the theme colour (plain gradients, nothing blurred live, still), and cards become
+   tinted glass over them: see-through with a light top edge. Live blur stays on what floats over
+   moving content (the bar, the message box, sheets, the top edge), where it's worth its cost. */
+:root{--card:rgba(28,31,43,.5);--card-line:rgba(255,255,255,.085)}
+.ambient i:nth-child(2),.ambient i:nth-child(3){display:block}
+.ambient i{filter:none}
+.ambient i:nth-child(1){width:560px;height:520px;left:-150px;top:-220px;margin-left:0;opacity:.5;background:radial-gradient(closest-side,var(--amb1),transparent)}
+.ambient i:nth-child(2){width:520px;height:560px;right:-260px;top:34%;opacity:.3;background:radial-gradient(closest-side,var(--amb2),transparent)}
+.ambient i:nth-child(3){width:560px;height:480px;left:-220px;bottom:-200px;opacity:.26;background:radial-gradient(closest-side,var(--violet),transparent)}
+.screen :is(.glass,.solid),.sheet .solid{
+  background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.012) 60%) padding-box,var(--card) padding-box;
+  border:1px solid var(--card-line);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 14px 34px -22px rgba(0,0,0,.7)}
+/* nested cards stay quiet */
+.screen :is(.glass,.solid) :is(.glass,.solid){box-shadow:none;background:rgba(255,255,255,.035)}
+/* the floating layers: a touch more blur and light */
+.dock.v2 .dpill{-webkit-backdrop-filter:blur(30px) saturate(190%);backdrop-filter:blur(30px) saturate(190%)}
+.composer.glass{-webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);--gl-fill:rgba(20,22,32,.5)}

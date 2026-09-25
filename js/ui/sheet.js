@@ -45,41 +45,83 @@ export function openSheet(render, { onClose = null, label = '' } = {}) {
   dragToClose(el, scrim, entry);
   app.classList.add('sheeting');
   requestAnimationFrame(() => requestAnimationFrame(() => { scrim.classList.add('show'); el.classList.add('show'); }));
+  // the glass blur switches on once the sheet has stopped moving (a moving blur flickers on Android)
+  el.addEventListener('transitionend', e => { if (e.target === el && e.propertyName === 'transform' && el.classList.contains('show') && !el.classList.contains('dragging')) el.classList.add('settled'); });
   return api;
 }
 
-// Pull the sheet down by its top edge to close it.
+// Swipe the sheet down to close it, from anywhere on it: once its content is scrolled to the top a
+// downward swipe moves the sheet itself (1:1 with the finger), and it closes on a flick or past a
+// third of the way; otherwise it springs back. A mouse can drag it by the top edge.
+const SKIP_DRAG = 'input, textarea, select, [contenteditable], .nodrag';
+function scrollerIn(el, target) {
+  for (let n = target; n && n !== el; n = n.parentElement) {
+    if (n.scrollHeight > n.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(n).overflowY)) return n;
+  }
+  return null;
+}
 function dragToClose(el, scrim, entry) {
   let d = null;
-  el.addEventListener('pointerdown', e => {
-    if (e.button > 0 || e.target.closest('input,button,select,a,.sbody')) return;
-    if (e.clientY - el.getBoundingClientRect().top > 72) return;
-    d = { y: e.clientY, t: performance.now(), dy: 0, id: e.pointerId };
-    el.setPointerCapture(e.pointerId);
-    el.classList.add('dragging');
-  });
-  el.addEventListener('pointermove', e => {
-    if (!d || e.pointerId !== d.id) return;
-    d.dy = Math.max(0, e.clientY - d.y);
-    el.style.transform = `translateY(${d.dy}px)`;
-    scrim.style.opacity = String(Math.max(0, 1 - d.dy / 400));
-  });
-  const end = () => {
-    if (!d) return;
-    const v = d.dy / Math.max(1, performance.now() - d.t);
-    const close = d.dy > 110 || (v > 0.6 && d.dy > 30);
+  const move = dy => {
+    el.style.transform = `translateY(${dy}px)`;
+    scrim.style.opacity = String(Math.max(0, 1 - dy / (el.offsetHeight * 0.9)));
+  };
+  const finish = () => {
+    if (!d?.on) { d = null; return; }
+    const { dy, v } = d;
     d = null;
     el.classList.remove('dragging');
+    const close = dy > el.offsetHeight / 3 || (v > 0.45 && dy > 24);
+    el.classList.add(close ? 'flung' : 'snap'); // a flick leaves at the finger's speed; a let-go springs back
+    setTimeout(() => el.classList.remove('flung', 'snap'), 450);
     el.style.transform = '';
     scrim.style.opacity = '';
     if (close && stack[stack.length - 1] === entry) closeTop();
+    else if (!close) el.classList.add('settled');
   };
-  el.addEventListener('pointerup', end);
-  el.addEventListener('pointercancel', end);
+  el.addEventListener('touchstart', e => {
+    if (e.touches.length > 1 || e.target.closest(SKIP_DRAG) || stack[stack.length - 1] !== entry) { d = null; return; }
+    const t = e.touches[0];
+    d = { x: t.clientX, y: t.clientY, dy: 0, v: 0, t: performance.now(), on: false, off: false, scroller: scrollerIn(el, e.target) };
+  }, { passive: true });
+  el.addEventListener('touchmove', e => {
+    if (!d || d.off) return;
+    const t = e.touches[0], dx = t.clientX - d.x, dy = t.clientY - d.y;
+    if (!d.on) {
+      // decided on the first movement (after that Android has started scrolling and won't let go):
+      // only a downward, mostly vertical swipe with the content already at its top moves the sheet
+      if (dy <= 0 || Math.abs(dx) > dy || (d.scroller && d.scroller.scrollTop > 0)) { d.off = true; return; }
+      d.on = true; d.y0 = d.y;
+      el.classList.remove('settled');
+      el.classList.add('dragging');
+    }
+    e.preventDefault(); // the swipe is ours now, not the list's
+    const now = performance.now(), ny = Math.max(0, t.clientY - d.y0);
+    d.v = (ny - d.dy) / Math.max(1, now - d.t); d.dy = ny; d.t = now;
+    move(ny);
+  }, { passive: false });
+  el.addEventListener('touchend', finish);
+  el.addEventListener('touchcancel', finish);
+  // mouse: by the top edge
+  el.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'mouse' || e.button > 0 || e.target.closest('input,button,select,a,.sbody')) return;
+    if (e.clientY - el.getBoundingClientRect().top > 72) return;
+    d = { y: e.clientY, y0: e.clientY, t: performance.now(), dy: 0, v: 0, on: true, id: e.pointerId };
+    el.setPointerCapture(e.pointerId);
+    el.classList.remove('settled');
+    el.classList.add('dragging');
+  });
+  el.addEventListener('pointermove', e => {
+    if (!d?.on || e.pointerId !== d.id) return;
+    const now = performance.now(), ny = Math.max(0, e.clientY - d.y0);
+    d.v = (ny - d.dy) / Math.max(1, now - d.t); d.dy = ny; d.t = now;
+    move(ny);
+  });
+  el.addEventListener('pointerup', e => { if (d?.id === e.pointerId) finish(); });
 }
 
 function dismiss(entry) {
-  entry.el.classList.remove('show');
+  entry.el.classList.remove('show', 'settled');
   entry.scrim.classList.remove('show');
   const kill = () => { entry.el.remove(); entry.scrim.remove(); if (!stack.length) $('#app').classList.remove('sheeting'); };
   // only the sheet's own slide counts; a button's transition inside it would cut the slide short
