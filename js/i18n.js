@@ -551,6 +551,7 @@ const en = {
   'workout.planned': 'Planned',
   'workout.repsOnly': p => `${p.reps} reps`,
   'workout.pr': 'PR',
+  'workout.newPr': 'New record',
   'workout.emptyTitle': 'Empty workout',
   'workout.emptySub': 'Add your first exercise to get going.',
   'workout.addExercise': 'Add exercise',
@@ -568,6 +569,7 @@ const en = {
   'today.orSay': p => `Or say “${p.text}”`,
 
   'finish.title': 'Finish workout?',
+  'finish.done': 'Workout complete',
   'finish.summary': p => `${p.time} · ${p.sets} ${p.sets === 1 ? 'set' : 'sets'} · ${p.volume} ${p.unit}`,
   'finish.plannedLeft': p => `${p.n} planned ${p.n === 1 ? 'set' : 'sets'} not done will be dropped.`,
   'finish.confirm': 'Finish workout',
@@ -1711,6 +1713,7 @@ const da = {
   'workout.planned': 'Planlagt',
   'workout.repsOnly': p => `${p.reps} gentagelser`,
   'workout.pr': 'PR',
+  'workout.newPr': 'Ny rekord',
   'workout.emptyTitle': 'Tom træning',
   'workout.emptySub': 'Tilføj din første øvelse for at komme i gang.',
   'workout.addExercise': 'Tilføj øvelse',
@@ -1728,6 +1731,7 @@ const da = {
   'today.orSay': p => `Eller sig “${p.text}”`,
 
   'finish.title': 'Afslut træning?',
+  'finish.done': 'Træning fuldført',
   'finish.summary': p => `${p.time} · ${p.sets} sæt · ${p.volume} ${p.unit}`,
   'finish.plannedLeft': p => `${p.n} planlagte sæt, der ikke er lavet, bliver droppet.`,
   'finish.confirm': 'Afslut træning',

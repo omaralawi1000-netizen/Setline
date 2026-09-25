@@ -13,7 +13,7 @@ import { handlePop } from './ui/sheet.js';
 import { renderToday, currentStall } from './ui/today.js';
 import { applyPlateauFix } from './plateau.js';
 import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav, autoWarmup, restBell } from './ui/workout.js';
-import { renderHistory, renderDetail } from './ui/history.js';
+import { markFinished, renderHistory, renderDetail } from './ui/history.js';
 import { renderSettings, initSettings } from './ui/settings.js';
 import { initVoice, orbHTML, voiceHandlePop, closeVoice, isVoiceOpen, openVoice } from './ui/voice.js';
 import { renderYou } from './ui/you.js';
@@ -274,19 +274,22 @@ function showDetail(id, { fromFinish = false, kind = 'workout' } = {}) {
     history.replaceState({ screen: 'today' }, '');
     view.screen = 'today';
   }
+  if (fromFinish && kind === 'workout') markFinished(id);
   pushSub('detail', { detailId: id, detailKind: kind });
-  if (fromFinish) setTimeout(celebrate, 380);
+  if (fromFinish) setTimeout(celebrate, kind === 'workout' ? 820 : 380); // as the check finishes drawing
 }
 
 // Finishing is a moment: sparks from the summary, warm ones for every record.
 function celebrate() {
   const root = $('#s-detail');
-  const hero = root.querySelector('.summary');
+  const ring = root.querySelector('.donehero .dring');
+  const hero = ring || root.querySelector('.summary');
   if (!hero) return;
-  hero.classList.add('celebrate');
-  burst(hero, { count: 22, spread: 120 });
-  const prs = [...root.querySelectorAll('.prs li, .prs .tag')];
-  prs.slice(0, 4).forEach((el, i) => setTimeout(() => burst(el, { warm: true, count: 12, spread: 60 }), 350 + i * 160));
+  if (!ring) hero.classList.add('celebrate');
+  burst(hero, { count: 26, spread: ring ? 110 : 120 });
+  const prs = [...root.querySelectorAll('.prs li')];
+  if (prs.length) haptic('pr');
+  prs.slice(0, 4).forEach((el, i) => setTimeout(() => burst(el, { warm: true, count: 12, spread: 60 }), 520 + i * 140));
 }
 
 addEventListener('popstate', e => {

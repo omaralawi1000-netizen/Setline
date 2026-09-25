@@ -446,3 +446,11 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Faster: the voice is requested the moment the answer is in, instead of after the words finished appearing on screen (that was the 3–5 s)
 - [x] Talking to the Coach: after the answer is spoken it rests; the mic only opens when you tap the orb
 - [x] Bug sweep: every button on every screen tapped (111) with no errors; the shrunk bar's lens fix from 1.33 confirmed
+
+## 1.35.0: the workout, polished
+
+- [x] Found and fixed: the "set landed" animation never played (logging redraws the screen twice and the second redraw wiped it). Every workout moment is now timed from when it happened, so redraws continue it instead of losing or restarting it
+- [x] Logging a set: the row drops into place with a spring, a ring of light fades off it, the check pops and draws itself, the numbers rise in; the log button gives a firm press and its set number ticks over; a firm log haptic
+- [x] Records: warm light on the row, the PR tag springs in, a "New record" chip slides in and out, a drum-roll haptic
+- [x] Rest: the card drops in with a spring; the ring drains in one smooth continuous motion (was a jump every second); the last 3 seconds breathe with a soft glow (no filters); when rest is over the ring fills back up, a check draws in the middle and the card glows once
+- [x] Finishing: the workout's page opens with a ring that draws around and a check that draws inside it, "Workout complete", then the title, numbers, highlights and each record arrive one after another, with sparks from the check and warm ones from each record

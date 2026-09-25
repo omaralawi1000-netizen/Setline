@@ -2104,3 +2104,81 @@ html[data-dock=icons] .dock .tab span{display:none}
 .sheet.dragging{transition:none}
 .scrim{transition:opacity .45s cubic-bezier(.32,.72,0,1)}
 /* the page's depth itself is animated in sheet.js (scale and position only) */
+
+/* ======================= 1.35: the workout, polished =======================
+   Every moment is timed from when it happened (--t is a negative delay), so a redraw continues it
+   instead of restarting it. Only transform and opacity move. */
+:root{--spring:cubic-bezier(.34,1.45,.55,1);--glide:cubic-bezier(.2,.8,.2,1)}
+
+/* a logged set lands: it drops into place with a little spring, a ring of light fades off it and
+   the check draws itself */
+.set.fresh{animation:setland .62s var(--spring) both;animation-delay:var(--t,0ms)}
+@keyframes setland{0%{opacity:0;transform:translateY(-10px) scale(.94)}100%{opacity:1;transform:none}}
+.set.fresh::after{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;border:1.5px solid rgba(var(--a-rgb),.7);background:rgba(var(--a-rgb),.14);
+  animation:setglow 1.6s var(--glide) both;animation-delay:var(--t,0ms)}
+@keyframes setglow{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.035)}}
+.set.fresh .ck{animation:ckpop .5s var(--spring) both;animation-delay:calc(var(--t,0ms) + .12s)}
+@keyframes ckpop{0%{opacity:0;transform:scale(.3)}100%{opacity:1;transform:none}}
+.set.fresh .ck svg path{stroke-dasharray:22;stroke-dashoffset:22;animation:ckdraw .38s ease-out forwards;animation-delay:calc(var(--t,0ms) + .24s)}
+@keyframes ckdraw{to{stroke-dashoffset:0}}
+.set.fresh .val b{display:inline-block;animation:valin .5s var(--glide) both;animation-delay:calc(var(--t,0ms) + .06s)}
+@keyframes valin{from{opacity:0;transform:translateY(5px)}}
+/* a record: warm light instead, the tag springs in and "New record" floats up off the row */
+.set.prfresh::after{border-color:rgba(255,217,168,.8);background:rgba(255,217,168,.16);animation-duration:2.2s}
+.set.prfresh .tag{animation:ckpop .55s var(--spring) both;animation-delay:calc(var(--t,0ms) + .3s)}
+.set.prflash{animation:none}
+.sw{position:relative}
+.prfloat{position:absolute;right:88px;top:50%;margin-top:-11px;z-index:3;pointer-events:none;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:800;letter-spacing:.02em;
+  color:#2B1E0A;background:linear-gradient(180deg,#FFE7C2,#FFC98A);box-shadow:0 6px 18px -6px rgba(255,190,110,.8);
+  opacity:0;animation:prfloat 1.9s var(--glide) both;animation-delay:calc(var(--t,0ms) + .25s)}
+@keyframes prfloat{0%{opacity:0;transform:translateX(12px) scale(.7)}16%{opacity:1;transform:none}78%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-6px) scale(.96)}}
+/* the log button gives a short, firm press and its set number ticks over */
+.log.flash{animation:logpress .42s var(--spring)}
+@keyframes logpress{0%{transform:scale(.95)}100%{transform:none}}
+.log.flash > span{display:inline-block;animation:tickUp .4s var(--glide)}
+
+/* rest: the card drops in with a spring; the ring drains smoothly (driven from JS) */
+.rest.in{animation:restin2 .55s var(--spring) both}
+@keyframes restin2{from{opacity:0;transform:translateY(-12px) scale(.96)}}
+.ring .fg{transition:none}
+.ring::after{content:"";position:absolute;inset:-8px;border-radius:50%;pointer-events:none;opacity:0;background:radial-gradient(closest-side,rgba(var(--a-rgb),.5),transparent)}
+/* the last three seconds: a soft glow breathes behind the ring (no filters) */
+.ring.hot{animation:hotbeat 1s ease-in-out infinite}
+.ring.hot::after{animation:hotglow 1s ease-in-out infinite}
+@keyframes hotbeat{50%{transform:scale(1.06)}}
+@keyframes hotglow{50%{opacity:1}}
+/* rest over: the ring fills back up in one sweep, a check pops in and the card glows once */
+.ring.bloom .fg{animation:ringfill .7s var(--glide) both;animation-delay:var(--t,0ms)}
+@keyframes ringfill{from{stroke-dashoffset:157.08}to{stroke-dashoffset:0}}
+.ring.bloom b svg{width:22px;height:22px;stroke-width:2.6;color:var(--accent);animation:ckpop .5s var(--spring) both;animation-delay:calc(var(--t,0ms) + .35s)}
+.ring.bloom b svg path{stroke-dasharray:22;stroke-dashoffset:22;animation:ckdraw .35s ease-out forwards;animation-delay:calc(var(--t,0ms) + .45s)}
+.ring.bloom::after{animation:hotglow 1.2s ease-out both;animation-delay:var(--t,0ms)}
+.rest.over{position:relative;isolation:isolate}
+.rest.over::before{content:"";position:absolute;inset:0;border-radius:inherit;z-index:-1;pointer-events:none;box-shadow:0 0 0 1.5px rgba(var(--a-rgb),.55),0 14px 40px -12px rgba(var(--a-rgb),.55);opacity:0;animation:overglow 2.4s ease-out both;animation-delay:var(--t,0ms)}
+@keyframes overglow{15%{opacity:1}100%{opacity:.35}}
+
+/* just finished: a ring draws around, a check draws inside it, "Workout complete" rises, then the
+   title, the numbers, the highlights and every record arrive one after another */
+.donehero{display:flex;flex-direction:column;align-items:center;gap:10px;margin:6px 0 2px}
+.dring{width:96px;height:96px;overflow:visible;filter:drop-shadow(0 10px 24px rgba(var(--v-rgb),.45))}
+.dring circle{fill:none;stroke-width:5}
+.dring .bg{stroke:rgba(255,255,255,.07);fill:rgba(var(--a-rgb),.06)}
+.dring .fg{stroke:var(--accent);stroke-linecap:round;stroke-dasharray:264;stroke-dashoffset:264;transform:rotate(-90deg);transform-origin:48px 48px;
+  animation:dringdraw .7s cubic-bezier(.5,0,.2,1) forwards;animation-delay:calc(var(--t,0ms) + .12s)}
+@keyframes dringdraw{to{stroke-dashoffset:0}}
+.dring .ck{fill:none;stroke:var(--accent-hi);stroke-width:6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:56;stroke-dashoffset:56;
+  animation:ckdraw .34s ease-out forwards;animation-delay:calc(var(--t,0ms) + .66s)}
+.donehero{animation:heropop .8s var(--spring) both;animation-delay:var(--t,0ms)}
+@keyframes heropop{0%{opacity:0;transform:scale(.7)}60%{opacity:1}100%{transform:none}}
+.dlabel{font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);animation:valin .5s var(--glide) both;animation-delay:calc(var(--t,0ms) + .8s)}
+#s-detail.finished > *{animation:finrise .6s var(--glide) both;animation-delay:calc(var(--t,0ms) + var(--d,.9s))}
+#s-detail.finished > .top{animation:none}
+#s-detail.finished > .donehero{animation:heropop .8s var(--spring) both;animation-delay:var(--t,0ms)}
+#s-detail.finished > .h1{--d:.86s}
+#s-detail.finished > .detail-date{--d:.92s}
+#s-detail.finished > .summary{--d:1s}
+#s-detail.finished > :nth-child(n+6){--d:1.12s}
+#s-detail.finished > :nth-child(n+7){--d:1.22s}
+#s-detail.finished > :nth-child(n+8){--d:1.3s}
+@keyframes finrise{from{opacity:0;transform:translateY(16px)}}
+#s-detail.finished .prs li{animation:ckpop .55s var(--spring) both;animation-delay:calc(var(--t,0ms) + 1.25s + var(--i,0) * .14s)}
