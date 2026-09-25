@@ -5,7 +5,7 @@ import { foodTargets } from './food.js';
 import { dayTotals } from '../nutrition.js';
 import { esc } from './dom.js';
 import { I } from './icons.js';
-import { routineName, estimateMinutes, nextRoutine, routineDay, withoutDay } from '../routines.js';
+import { routineName, estimateMinutes, nextRoutine, routineDay, withoutDay, daysUntil } from '../routines.js';
 import { greetingKey, clock, total, weight, num } from '../format.js';
 import { toDisplay } from '../units.js';
 import { doneSetCount, elapsedSec } from '../workout.js';
@@ -44,9 +44,13 @@ function upNextHTML({ more = false } = {}) {
       <div class="setupalt"><button class="textbtn" data-routine="programs">${t('routine.program')}</button><button class="textbtn" data-routine="new">${t('setup.own')}</button></div></div>`;
   }
   const names = r.exercises.map(e => catalog.name(e.exerciseId, lang));
+  // "Up next · Tomorrow", "Up next · Saturday"; the day then leaves the name
+  const k = daysUntil(r, state.history);
+  const when = k == null ? '' : k === 0 ? t('plan.today') : k === 1 ? t('plan.tomorrow') : new Intl.DateTimeFormat(lang === 'da' ? 'da-DK' : 'en-GB', { weekday: 'long' }).format(Date.now() + k * 86_400_000);
+  const label = `${t('label.upNext')}${when ? ` · ${esc(when)}` : ''}`;
   return `<div class="upcoming glass">
-      ${more ? `<div class="uphead"><span class="label">${t('label.upNext')}</span><button class="textbtn" data-act="go" data-to="workout">${t('today.otherRoutines')} →</button></div>` : `<span class="label">${t('label.upNext')}</span>`}
-      <h2>${esc(routineName(r, lang))}</h2>
+      ${more ? `<div class="uphead"><span class="label">${label}</span><button class="textbtn" data-act="go" data-to="workout">${t('today.otherRoutines')} →</button></div>` : `<span class="label">${label}</span>`}
+      <h2>${esc(k == null ? routineName(r, lang) : withoutDay(routineName(r, lang)))}</h2>
       <p>${t('today.exercisesAbout', { n: r.exercises.length, min: estimateMinutes(r) })}</p>
       <p class="exnames">${esc(names.slice(0, 4).join(' · '))}${names.length > 4 ? ` · +${names.length - 4}` : ''}</p>
       <button class="log" data-act="start-routine" data-id="${esc(r.id)}">${I.play}<span>${t('today.start')}</span></button>

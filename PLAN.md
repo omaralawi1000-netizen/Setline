@@ -454,3 +454,12 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Records: warm light on the row, the PR tag springs in, a "New record" chip slides in and out, a drum-roll haptic
 - [x] Rest: the card drops in with a spring; the ring drains in one smooth continuous motion (was a jump every second); the last 3 seconds breathe with a soft glow (no filters); when rest is over the ring fills back up, a check draws in the middle and the card glows once
 - [x] Finishing: the workout's page opens with a ring that draws around and a check that draws inside it, "Workout complete", then the title, numbers, highlights and each record arrive one after another, with sparks from the check and warm ones from each record
+
+## 1.36.0: set by number, save a workout as a routine, your own program, the week decides Up next, voice, no dark flashes
+
+- [x] Voice: "set one is done, but I only did nine reps instead of ten", "set 2 done", "first set done at 82.5", "sæt 3 er færdigt men kun ni gentagelser": that set of the current lift, with its planned numbers and what you said; an already-done set is corrected; "3 sets…" and "set my calories…" are left alone. ("set 2 done 9 reps" used to log 2 kg)
+- [x] Finished workout → "Save as a routine": opens the routine editor filled with what you did (name it, pick its day, adjust, save); the button goes once saved
+- [x] Add a program → "Your own program": paste or type it any way; the Coach reads it into routines with their weekdays, to add or replace yours
+- [x] Up next follows the week: today's routine if you haven't trained, else the next day that has one (a rest day now shows tomorrow's, not the one done longest ago); the card says when ("Up next · Tomorrow")
+- [x] Reply voice after turning on billing: an earlier "daily limit" made the app wait for Google's overnight reset; now limits only pause it for 30 s (per minute) or 10 min (daily), the old rest is dropped, a missing voice model is looked up again, and Settings → Voice → test says exactly what happened (model and error)
+- [x] Bug sweep: measured frame by frame, every tab or page change dipped 10–15 % darker for a moment (the old screen faded before the new one's cards showed): gone; Coach open/close and sheets measured clean; 111 buttons tapped without errors

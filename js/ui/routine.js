@@ -90,9 +90,24 @@ export function programsSheet() {
   const { t, lang } = state;
   openSheet(el => {
     el.insertAdjacentHTML('beforeend', `<div class="shead"><h2>${t('routine.program')}</h2></div>
+      <div class="ownprog solid"><strong>${t('routine.own')}</strong><small>${t('routine.ownSub')}</small>
+        <textarea id="ownprog" rows="5" placeholder="${esc(t('routine.ownPh'))}"></textarea>
+        <button class="log" data-own>${I.plus}<span>${t('routine.ownAdd')}</span></button></div>
+      <p class="plabel">${t('routine.ready')}</p>
       <ul class="plist">${R.PROGRAMS.map(p => `<li><button class="prow" data-p="${p.id}"><span class="l"><strong>${esc(lang === 'da' ? p.da : p.en)}</strong>
         <small>${t('routine.programSub', { n: p.routines.length, w: p.perWeek })} · ${esc(p.routines.map(r => lang === 'da' ? r.da : r.en).join(', '))}</small></span><span class="plus">${I.plus}</span></button></li>`).join('')}</ul>`);
     el.addEventListener('click', async e => {
+      // your own program: the Coach reads it (any format, any language) and shows it as routines to add
+      if (e.target.closest('[data-own]')) {
+        const text = el.querySelector('#ownprog').value.trim();
+        if (text.length < 8) { el.querySelector('#ownprog').focus(); return; }
+        haptic('tap');
+        await closeTop();
+        nav.go('coach');
+        const { ask } = await import('./coach.js');
+        setTimeout(() => ask(`${state.lang === 'da' ? 'Dette er mit program' : 'This is my program'}:\n${text}`), 350);
+        return;
+      }
       const b = e.target.closest('[data-p]');
       if (!b) return;
       const p = R.PROGRAMS.find(x => x.id === b.dataset.p);
@@ -107,6 +122,13 @@ export function programsSheet() {
 }
 
 // ---------- editor ----------
+
+// A finished workout, opened in the editor as a new routine (name it, pick a day, adjust, save).
+export function editRoutineFrom(draft) {
+  ui.isNew = true;
+  ui.draft = draft;
+  nav.openRoutine();
+}
 
 export function editRoutine(id) {
   const r = id && state.routines.find(x => x.id === id);

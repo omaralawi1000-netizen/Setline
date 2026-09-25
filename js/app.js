@@ -20,7 +20,7 @@ import { renderYou } from './ui/you.js';
 import { renderCoach, initCoach, ask as askCoach, ensureModels, weeklyCheckin, markWeeklySeen, sessionDebrief, markDebriefSeen } from './ui/coach.js';
 import { initCardio, setCardioNav, tickCardio, renderCardioDetail, syncGps, startCardioSession, pickTypeSheet } from './ui/cardio.js';
 import { initBody } from './ui/body.js';
-import { initRoutine, setRoutineNav, renderRoutine, editRoutine, programsSheet, startRoutine } from './ui/routine.js';
+import { initRoutine, setRoutineNav, renderRoutine, editRoutine, editRoutineFrom, programsSheet, startRoutine } from './ui/routine.js';
 import { setHistoryFilter } from './ui/history.js';
 import { renderProgress, renderExercise, setRange } from './ui/progress.js';
 import { countAll, burst } from './ui/fx.js';
@@ -39,7 +39,7 @@ import { maybeOnboard, setOnboardNav } from './ui/onboard.js';
 import { initGoals } from './ui/goals.js';
 import { cardioElapsed, cardioName } from './cardio.js';
 import { weekStart } from './stats.js';
-import { nextRoutine } from './routines.js';
+import { nextRoutine, routineFromWorkout } from './routines.js';
 import { repeatTemplate } from './insights.js';
 import { animateFigures } from './ui/figure.js';
 
@@ -311,6 +311,12 @@ Object.assign(actions, {
   customize: () => openCustomize(),
   detail: el => pushSub('detail', { detailId: el.dataset.id, detailKind: el.dataset.kind || 'workout' }),
   'start-routine': el => startRoutine(el.dataset.id),
+  'save-routine': el => {
+    const w = state.history.find(x => x.id === el.dataset.id);
+    if (!w) return;
+    haptic('tap');
+    editRoutineFrom(routineFromWorkout(w, w.name || '')); // an empty workout has no name yet: you give it one
+  },
   'repeat-workout': el => {
     const w = state.history.find(x => x.id === el.dataset.id);
     if (!w) return;

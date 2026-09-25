@@ -344,14 +344,17 @@ async function clipNow(text, opts, cacheKey) {
 
 // Gemini's free voices have a small daily limit. Once it answers 429 the phone's voice takes over
 // for an hour, so no reply waits on a request that is going to fail.
-const QUOTA_KEY = 'setline.ttsQuotaUntil';
+const QUOTA_KEY = 'setline.ttsRest'; // (renamed in 1.36: an old overnight rest is dropped)
 const quotaUntil = () => { try { return Number(localStorage.getItem(QUOTA_KEY)) || 0; } catch { return 0; } };
-// A per-minute limit is waited out for a minute; the daily one until Google resets it (midnight Pacific ≈ 08:00 UTC).
+// Short rests only: a per-minute limit for 30 s, a daily one for 10 minutes, then Gemini is simply asked
+// again (turning on billing lifts the limit at once, and a long rest would hide that).
 function quotaHit(daily) {
-  const now = Date.now(), reset = new Date(now); reset.setUTCHours(8, 0, 0, 0);
-  if (reset.getTime() <= now) reset.setUTCDate(reset.getUTCDate() + 1);
-  try { localStorage.setItem(QUOTA_KEY, String(daily ? reset.getTime() : now + 60_000)); } catch {}
+  try { localStorage.setItem(QUOTA_KEY, String(Date.now() + (daily ? 600_000 : 30_000))); } catch {}
 }
+// A voice model that no longer exists (404): the app picks again from the key's model list.
+let onMissing = () => {};
+export const whenModelMissing = fn => { onMissing = fn; };
+export function clearVoiceRest() { try { localStorage.removeItem(QUOTA_KEY); } catch {} }
 
 export async function speak(text, opts) {
   if (!text) return;
@@ -377,6 +380,7 @@ export async function speak(text, opts) {
     } catch (e) {
       lastSpeech.error = e?.status === 429 ? (e.daily ? 'quota' : 'busy') : e?.status ? String(e.status) : e?.name === 'AbortError' ? 'timeout' : 'failed';
       if (e?.status === 429) quotaHit(!!e.daily);
+      if (e?.status === 404) onMissing();
       console.warn('tts fallback', lastSpeech.error);
     }
     text = parts.slice(played).join(' ');

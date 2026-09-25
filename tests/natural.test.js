@@ -85,3 +85,21 @@ test('"did it" is the planned set, not an exercise; sleep stays a check-in', () 
   assert.equal(parse('i got 5 hours of sleep', ctx).type, 'CheckIn');
   assert.equal(parse('got it', ctx).type === 'LogRel', false, '"got it" is not a set (could be a reply to the app)');
 });
+
+test('a set by its number: "set one is done, but I only did nine reps instead of ten"', () => {
+  const s = session(plan('bench-press', 80, 10, 3));
+  s.say('Set one is done, but I only did nine reps instead of ten.');
+  assert.deepEqual(s.done(), [[80, 9]]);
+  s.say('set 2 done', 120_000);
+  assert.deepEqual(s.done(), [[80, 9], [80, 10]]);
+  s.say('first set was 8 reps', 20_000); // already done: corrected
+  assert.deepEqual(s.done(), [[80, 8], [80, 10]]);
+  s.say('sæt 3 er færdigt men kun ni gentagelser', 120_000);
+  assert.deepEqual(s.done(), [[80, 8], [80, 10], [80, 9]]);
+});
+
+test('"set" as a verb or in "3 sets" is not a set number', () => {
+  const s = session(plan('bench-press', 80, 10, 3));
+  assert.notEqual(s.say('set my calories to 2400').intent.type, 'LogSetNo');
+  assert.notEqual(s.say('3 sets of 8 at 80').intent.type, 'LogSetNo');
+});

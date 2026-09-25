@@ -151,6 +151,7 @@ function scrollDown(root, smooth = true) {
 // Pick coach/command models once, from the key's model list.
 // Pick coach, command and voice models once from the key's model list (and again after an update adds fields).
 let picking = null;
+tts.whenModelMissing(() => store.setSettings({ ttsModel: '', ttsLite: '' })); // listed again next time
 export function ensureModels() {
   const s = state.settings;
   if (!getKey('google') || ((s.coachOverride || (s.coachModel && s.coachAlt && s.proChecked)) && (s.ttsOverride || s.ttsLite))) return Promise.resolve();
