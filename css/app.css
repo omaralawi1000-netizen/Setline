@@ -2221,7 +2221,7 @@ html[data-cards=outline] .screen :is(.solid,.glass){background:transparent;borde
 /* ---------- 1.28: sheets ----------
    One way in, one way out, and a swipe down from anywhere (sheet.js). The glass blur comes on
    once the sheet has stopped moving and goes off while it moves, so it can't flicker. */
-.sheet.glass{-webkit-backdrop-filter:none;backdrop-filter:none;--gl-fill:rgba(20,23,32,.74)}
+.sheet.glass{-webkit-backdrop-filter:none;backdrop-filter:none;--gl-fill:rgba(20,23,32,.9)}
 .sheet.glass.settled{-webkit-backdrop-filter:blur(28px) saturate(170%);backdrop-filter:blur(28px) saturate(170%)}
 .sheet.show.snap{transition:transform .42s var(--e-spring)}
 .sheet.flung{transition:transform .26s var(--e-out)!important}
@@ -2261,3 +2261,14 @@ html[data-cards=outline] .screen :is(.solid,.glass){background:transparent;borde
   0%{opacity:0;filter:blur(8px);color:var(--accent-hi);transform:translateY(.25em)}
   45%{opacity:1;filter:blur(2px);color:color-mix(in srgb,var(--accent-hi) 70%,var(--ink))}
   100%{opacity:1;filter:none;color:inherit;transform:none}}
+
+/* ======================= 1.29: depth and scroll ======================= */
+/* a sheet pushes the page back a little (and it comes forward again as the sheet leaves) */
+.screen.on{transition:opacity var(--m-base) var(--e-out) .1s,transform var(--m-slow) var(--e-out) .1s,visibility 0s 0s,scale .46s cubic-bezier(.22,.9,.24,1),translate .46s cubic-bezier(.22,.9,.24,1)}
+.app.sheeting .screen.on{scale:.94;translate:0 10px}
+/* cards float up into place as they scroll onto the screen (driven by the scroll itself, on the GPU) */
+@supports (animation-timeline: view()) {
+  .screen:not(#s-coach):not(.enter) :is(.solid,.glass,.ytile,.lift,.hitem):not(:is(.solid,.glass) *){
+    animation:cardin linear both;animation-timeline:view();animation-range:entry 0% entry 70%}
+  @keyframes cardin{from{opacity:0;translate:0 26px;scale:.965}}
+}

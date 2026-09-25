@@ -122,8 +122,9 @@ function dragToClose(el, scrim, entry) {
 
 function dismiss(entry) {
   entry.el.classList.remove('show', 'settled');
+  if (!stack.length) $('#app').classList.remove('sheeting'); // the page comes forward as the sheet leaves
   entry.scrim.classList.remove('show');
-  const kill = () => { entry.el.remove(); entry.scrim.remove(); if (!stack.length) $('#app').classList.remove('sheeting'); };
+  const kill = () => { entry.el.remove(); entry.scrim.remove(); };
   // only the sheet's own slide counts; a button's transition inside it would cut the slide short
   const onEnd = e => { if (e.target === entry.el && e.propertyName === 'transform') { entry.el.removeEventListener('transitionend', onEnd); kill(); } };
   entry.el.addEventListener('transitionend', onEnd);

@@ -197,10 +197,13 @@ function coachMorph(open, under) {
       { transform: `scale(${k1})`, opacity: 1 }
     ], { duration: 620, easing: 'cubic-bezier(.3,.72,.08,1)' });
     dockOrb?.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.35)', opacity: 0 }], { duration: 240, easing: 'ease-out', fill: 'forwards' });
+    // depth: the page sinks back and dims as the light comes over it
+    const sink = under && under !== $('#s-coach') ? under.animate([{ scale: 1, opacity: 1 }, { scale: 0.93, opacity: 0.35 }], { duration: 520, easing: 'cubic-bezier(.3,.7,.1,1)', fill: 'forwards' }) : null;
     app.classList.add('coach-in');
     a.onfinish = settleCoachFx;
     coachFx = () => {
       a.cancel();
+      sink?.cancel();
       aura.classList.remove('run');
       dockOrb?.getAnimations().forEach(x => x.cancel());
       setTimeout(() => app.classList.remove('coach-in'), 400);
@@ -225,8 +228,9 @@ function coachMorph(open, under) {
     setTimeout(() => { if (!coach.classList.contains('on')) coach.style.transition = ''; }, 250);
     // the light condenses back into the orb as the bloom arrives
     dockOrb?.animate([{ transform: 'scale(1.35)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 320, delay: 440, easing: 'cubic-bezier(.3,1.3,.5,1)', fill: 'backwards' });
+    const rise = under?.animate([{ scale: 0.93, opacity: 0.35 }, { scale: 1, opacity: 1 }], { duration: 560, delay: 100, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
     a.onfinish = settleCoachFx;
-    coachFx = () => { a.cancel(); aura.classList.remove('run'); };
+    coachFx = () => { a.cancel(); rise?.cancel(); aura.classList.remove('run'); };
   }
 }
 
@@ -270,7 +274,7 @@ function show(name, { back = false } = {}) {
   clearTimeout(app._moving);
   app._moving = setTimeout(() => app.classList.remove('moving'), 600);
   app.classList.toggle('is-sub', SUB.includes(name));
-  if (coachSwap) coachMorph(name === 'coach', $('#s-' + prev));
+  if (coachSwap) coachMorph(name === 'coach', $('#s-' + (name === 'coach' ? prev : name)));
   else if (prev === 'coach' || name === 'coach') settleCoachFx();
   if (coachSwap && name !== 'coach') { // the bar comes back without a bounce, under the returning light
     app.classList.add('uncoaching');

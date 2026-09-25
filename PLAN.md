@@ -392,3 +392,9 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 ## 1.28.2: updates install by themselves
 
 - [x] A ready update no longer waits for a tap on the small Update pill: it goes in while the app is starting, or silently the moment you leave the app (the reload happens out of sight, after saving). The pill only shows for an update that arrives mid-use
+
+## 1.29.0: depth and scroll
+
+- [x] Cards float up into place as they scroll onto the screen (scroll-driven, on the GPU)
+- [x] Sheets push the page back (it shrinks a little and dims) and it comes forward as the sheet leaves; sheets are near-solid while moving, so the page never shows through them mid-slide
+- [x] Coach depth: as the orb's light blooms, the page sinks back and dims; closing, it comes forward again as the light returns to the orb
