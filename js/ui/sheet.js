@@ -6,6 +6,40 @@ const waiting = [];   // resolvers for history.back() calls we triggered
 
 export const sheetOpen = () => stack.length > 0;
 
+// iOS-style depth: while a sheet is up, the page behind (and the bar) sits a little smaller and lower,
+// with rounded corners, as if lifted off the background. p = 1 is fully back, 0 is normal.
+const DEPTH = [{ sel: '.screen.on', s: 0.93, y: 12 }, { sel: '#dock', s: 0.95, y: 8 }, { sel: '#minibar', s: 0.95, y: 8 }];
+const IOS = 'cubic-bezier(.32,.72,0,1)';
+let depthEls = [];
+function depth(p, ms = 0, ease = IOS) {
+  const app = $('#app');
+  if (p > 0 && !depthEls.length) depthEls = DEPTH.map(d => ({ ...d, el: app.querySelector(d.sel) })).filter(d => d.el);
+  // on their own layers while a sheet is up, so following a finger only moves them (no redraw)
+  if (p > 0) depthEls.forEach(d => { d.el.style.willChange = 'scale, translate'; if (d.sel === '.screen.on') d.el.style.borderRadius = '22px'; }); // a scroller clips to its own corners
+  for (const d of depthEls) {
+    const el = d.el;
+    const to = { scale: String(1 - (1 - d.s) * p), translate: `0px ${(d.y * p).toFixed(1)}px` };
+    if (!ms) { // following a finger: cheap, no style reads
+      if (d.anim) { d.anim.cancel(); d.anim = null; }
+      el.style.scale = to.scale; el.style.translate = to.translate; continue;
+    }
+    const cs = getComputedStyle(el);
+    const from = { scale: cs.scale === 'none' ? '1' : cs.scale, translate: cs.translate === 'none' ? '0px 0px' : cs.translate };
+    el.getAnimations().filter(a => a.id === 'depth').forEach(a => a.cancel());
+    el.style.scale = ''; el.style.translate = '';
+    const a = d.anim = el.animate([from, to], { duration: ms, easing: ease, fill: 'forwards' });
+    a.id = 'depth';
+  }
+  if (p === 0 && ms) {
+    const els = depthEls; depthEls = [];
+    setTimeout(() => els.forEach(d => {
+      if (depthEls.some(x => x.el === d.el)) return; // a new sheet took it back already
+      d.el.getAnimations().filter(a => a.id === 'depth').forEach(a => a.cancel());
+      d.el.style.borderRadius = ''; d.el.style.willChange = '';
+    }), ms + 20);
+  }
+}
+
 // render(body, api) fills the sheet. api = {close, replace}.
 import { haptic } from '../haptics.js';
 export function openSheet(render, { onClose = null, label = '' } = {}) {
@@ -44,6 +78,7 @@ export function openSheet(render, { onClose = null, label = '' } = {}) {
   scrim.addEventListener('click', () => closeTop());
   dragToClose(el, scrim, entry);
   app.classList.add('sheeting');
+  if (stack.length === 1) requestAnimationFrame(() => requestAnimationFrame(() => depth(1, 520)));
   requestAnimationFrame(() => requestAnimationFrame(() => { scrim.classList.add('show'); el.classList.add('show', 'opening'); }));
   setTimeout(() => el.classList.remove('opening'), 900); // its contents cascade in once, on the way up
   // the glass blur switches on once the sheet has stopped moving (a moving blur flickers on Android)
@@ -63,9 +98,12 @@ function scrollerIn(el, target) {
 }
 function dragToClose(el, scrim, entry) {
   let d = null;
+  const app = $('#app');
   const move = dy => {
     el.style.transform = `translateY(${dy}px)`;
-    scrim.style.opacity = String(Math.max(0, 1 - dy / (el.offsetHeight * 0.9)));
+    const p = Math.max(0, 1 - dy / el.offsetHeight);
+    scrim.style.opacity = String(p);
+    if (stack.length === 1) depth(p); // the page behind follows the finger back to full size
   };
   const finish = () => {
     if (!d?.on) { d = null; return; }
@@ -73,6 +111,7 @@ function dragToClose(el, scrim, entry) {
     d = null;
     el.classList.remove('dragging');
     const close = dy > el.offsetHeight / 3 || (v > 0.45 && dy > 24);
+    if (!close && stack.length === 1) depth(1, 420); // let go: the page settles back behind
     el.classList.add(close ? 'flung' : 'snap'); // a flick leaves at the finger's speed; a let-go springs back
     setTimeout(() => el.classList.remove('flung', 'snap'), 450);
     el.style.transform = '';
@@ -123,7 +162,7 @@ function dragToClose(el, scrim, entry) {
 
 function dismiss(entry) {
   entry.el.classList.remove('show', 'settled');
-  if (!stack.length) $('#app').classList.remove('sheeting'); // the page comes forward as the sheet leaves
+  if (!stack.length) { $('#app').classList.remove('sheeting'); depth(0, entry.el.classList.contains('flung') ? 280 : 360, 'cubic-bezier(.2,.8,.2,1)'); } // the page comes forward as the sheet leaves
   entry.scrim.classList.remove('show');
   const kill = () => { entry.el.remove(); entry.scrim.remove(); };
   // only the sheet's own slide counts; a button's transition inside it would cut the slide short

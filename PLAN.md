@@ -417,7 +417,30 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] Keyboard: the page now shrinks above the keyboard (viewport interactive-widget=resizes-content) instead of Android sliding the whole view up while the app also lifted the message box; the chat keeps its latest message in view as the keyboard comes and goes
 - [x] The orb moves slowly and softly: longer swirls, a slower thinking breath and aurora
 
-## 1.31.1: design tooling
+## 1.32.0: back to the 1.23 design, with everything since
+
+Your feedback over the last day says the look and motion started going downhill at 1.24 ("we're beginning to degrade the app", then "transitions have degraded", then flashes). So the design, navigation and motion are back to 1.23.1: the liquid-glass bar with the orb in the middle (tap to talk, hold for the full voice screen), the Coach as a tab with the orb flying into its message box, blur-in replies with the thinking glow, stable tab switches, the old sheets and pop-ups. Kept from 1.24–1.31 (all engine, or small additions in the 1.23 style):
+- [x] Foods said together are separate rows under one meal line (voice, Coach box, photos), Undo removes the group
+- [x] Speech-to-text drops the subtitle ghosts and non-speech; Norwegian/Swedish guesses are redone as Danish; stray letters never sent in talk mode
+- [x] Coach answers what you said, doesn't repeat itself, asks when a message looks misheard
+- [x] Reply voice: Gemini's daily limit falls back to the phone voice for an hour without waiting; clearer status line
+- [x] Quiet colours (Violet, Slate, Sage, Sand, Clay, Graphite) and the trimmed Customize
+- [x] Sheets: swipe down from anywhere
+- [x] Updates install by themselves
+- [x] Keyboard: the page shrinks above it, the chat keeps its latest message in view (no jump)
+- [x] Top-edge glass blur actually blurs (a view-transition name had cut it off); no live blur behind chat bubbles
+- [x] Progress with no data: one calm card; Today doesn't count up again after the Coach
+- Left out on purpose: the You tab (Progress, History and Body are on Train again, Settings on Today), the orb-as-Coach bloom, the 1.24+ bar and motion experiments
+
+## 1.33.0: the orb opens the Coach again, iOS-style sheets, Android back-swipe
+
+- [x] Tap the orb in the middle: its light blooms out and becomes the Coach, the conversation rises into it and the bar steps aside; ✓ or Back pulls the light back into the orb. Hold the orb: quick voice command, as before. The 1.31 light (screen-sized layers only, no flash) in the 1.23 design; the fourth tab is You again (Progress, History, Body, What your coach knows, Make it yours, Settings) and Train no longer repeats those tiles
+- [x] Thinking: one slow aurora behind the conversation, the message-box orb breathes in it
+- [x] Sheets, like iOS: the page behind shrinks back with rounded corners and dims as a sheet rises (iOS curve); swiping the sheet down, the page follows your finger back to full size; let go and it settles back, flick or pull past a third and it closes
+- [x] Android back-swipe from the left edge: Chrome draws its own animation there, so the app no longer plays a second, generic one on top (it now matches the right-edge back)
+- [x] The shrunk bar's lens sits exactly on its tab
+
+## 1.33.1: design tooling
 
 - [x] `css/motion.css`: motion tokens (4 durations, out / in-out / spring curves, press scale), button press, root View Transition, reduced-motion fallback; loaded before all other CSS and precached
 - [x] `.claude/skills/frontend-design/SKILL.md` (upstream skill, with the note that Setline's direction is locked)

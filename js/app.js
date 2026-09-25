@@ -7,7 +7,6 @@ import { clock } from './format.js';
 import { setHapticsGate, haptic } from './haptics.js';
 import { keepAwake } from './wakelock.js';
 import { $, esc } from './ui/dom.js';
-import { unlockAudio } from './audio.js';
 import { I, TAB_ICONS } from './ui/icons.js';
 import { toast } from './ui/toast.js';
 import { handlePop } from './ui/sheet.js';
@@ -17,6 +16,7 @@ import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav, autoW
 import { renderHistory, renderDetail } from './ui/history.js';
 import { renderSettings, initSettings } from './ui/settings.js';
 import { initVoice, orbHTML, voiceHandlePop, closeVoice, isVoiceOpen, openVoice } from './ui/voice.js';
+import { renderYou } from './ui/you.js';
 import { renderCoach, initCoach, ask as askCoach, ensureModels, weeklyCheckin, markWeeklySeen, sessionDebrief, markDebriefSeen } from './ui/coach.js';
 import { initCardio, setCardioNav, tickCardio, renderCardioDetail, syncGps, startCardioSession, pickTypeSheet } from './ui/cardio.js';
 import { initBody } from './ui/body.js';
@@ -31,7 +31,6 @@ import { autoBackup } from './ui/drive.js';
 import { initHandsFree } from './ui/handsfree.js';
 import { onCheckinClick } from './ui/checkin.js';
 import { renderBody, initBodyScreen, monthly } from './ui/bodyscreen.js';
-import { renderYou } from './ui/you.js';
 import { dateKey } from './body.js';
 import { renderFood, initFood, openFoodDay } from './ui/food.js';
 import { openScanner } from './ui/scan.js';
@@ -60,6 +59,7 @@ function renderScreen(name = view.screen) {
   else if (name === 'workout') renderWorkout(root);
   else if (name === 'history') renderHistory(root);
   else if (name === 'coach') renderCoach(root);
+  else if (name === 'you') renderYou(root);
   else if (name === 'detail') (view.detailKind === 'cardio' ? renderCardioDetail : renderDetail)(root, view.detailId);
   else if (name === 'routine') renderRoutine(root);
   else if (name === 'progress') renderProgress(root);
@@ -67,7 +67,6 @@ function renderScreen(name = view.screen) {
   else if (name === 'settings') renderSettings(root);
   else if (name === 'body') renderBody(root);
   else if (name === 'food') renderFood(root);
-  else if (name === 'you') renderYou(root);
 }
 
 // Built once; later renders only move the pill and relabel, so the indicator can glide.
@@ -75,12 +74,10 @@ function renderDock() {
   const { t } = state;
   const dock = $('#dock');
   const tab = (name, icon, cls = '') => `<button class="tab${cls}" data-act="go" data-to="${name}">${icon}<span>${t('tab.' + name)}</span></button>`;
-  if (dock.dataset.built !== '4' || dock.dataset.lang !== state.lang) {
-    // a glass pill with the three places, and the orb (the Coach) on its own beside it
-    // the glass pill: two places either side of the orb (the Coach) in the middle, where the thumb is
-    dock.innerHTML = '<div class="dpill"><span class="ind" aria-hidden="true"></span>' + tab('today', TAB_ICONS.today) + tab('workout', TAB_ICONS.workout) + orbHTML() + tab('food', TAB_ICONS.food) + tab('you', TAB_ICONS.you) + '</div>';
-    dock.classList.add('v2');
-    dock.dataset.built = '4';
+  if (dock.dataset.built !== '3' || dock.dataset.lang !== state.lang) {
+    // the orb in the middle is the Coach (tap) and the quick voice command (hold)
+    dock.innerHTML = '<span class="ind" aria-hidden="true"></span>' + tab('today', TAB_ICONS.today) + tab('workout', TAB_ICONS.workout) + orbHTML() + tab('food', TAB_ICONS.food) + tab('you', TAB_ICONS.you);
+    dock.dataset.built = '3';
     dock.dataset.lang = state.lang;
   }
   let on = null;
@@ -98,30 +95,6 @@ function renderDock() {
     ind.style.transform = to;
     requestAnimationFrame(() => ind.classList.add('ready'));
   }
-}
-
-// While the bar squishes or stretches, the lens glides to its tab and tracks it every frame
-// (so it can't lag behind or land where the tab used to be).
-let lensRun = 0;
-function followLens(ms = 700) {
-  const dock = $('#dock'), ind = dock?.querySelector('.ind');
-  if (!ind) return;
-  const m = /translateX\(([-\d.]+)px\)/.exec(ind.style.transform || '');
-  const x0 = m ? Number(m[1]) : null, w0 = ind.offsetWidth;
-  const t0 = performance.now(), mine = ++lensRun;
-  const spring = k => 1 - Math.pow(1 - k, 3) * Math.cos(k * 2.2); // quick, with a little give at the end
-  ind.classList.add('follow');
-  const step = now => {
-    if (mine !== lensRun) return;
-    const on = dock.querySelector('.tab.on');
-    const k = Math.min(1, (now - t0) / ms), e = spring(k);
-    if (on) {
-      const x = x0 == null ? on.offsetLeft : x0 + (on.offsetLeft - x0) * e, w = w0 ? w0 + (on.offsetWidth - w0) * e : on.offsetWidth;
-      ind.style.transform = `translateX(${x.toFixed(1)}px)`; ind.style.width = w.toFixed(1) + 'px';
-    }
-    if (k < 1) requestAnimationFrame(step); else ind.classList.remove('follow');
-  };
-  requestAnimationFrame(step);
 }
 
 function renderMini() {
@@ -144,9 +117,8 @@ function renderAll() {
   document.documentElement.lang = state.lang;
   document.documentElement.dataset.motion = state.settings.motion;
   const glowWas = document.documentElement.dataset.glow;
-  // one look: liquid glass bar, aurora orb, soft cards, motion that only moves and fades (1.26 dropped the choices)
-  Object.assign(document.documentElement.dataset, { text: state.settings.textSize, glow: 'soft', dock: 'labels', fx: 'wow', orbstyle: 'aurora', bar: 'glass', cards: 'soft' });
-  if (glowWas !== 'soft') refreshChrome();
+  Object.assign(document.documentElement.dataset, { text: state.settings.textSize, glow: state.settings.glow, dock: state.settings.dockLabels ? 'labels' : 'icons' });
+  if (glowWas !== state.settings.glow) refreshChrome();
   configureSteps(state.settings.kgSteps);
   if (document.documentElement.dataset.accent !== state.settings.accent) { document.documentElement.dataset.accent = state.settings.accent; refreshChrome(); }
   renderScreen();
@@ -159,17 +131,7 @@ function renderAll() {
   else root?.querySelectorAll('[data-count]').forEach(el => { el.textContent = new Intl.NumberFormat(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: Number(el.dataset.dp || 0), minimumFractionDigits: Number(el.dataset.dp || 0) }).format(Number(el.dataset.count)); });
 }
 
-// A card opening its page: since 1.27 every page opens the same way (it slides in), so this only
-// adds the soft double tap. The card-grows-into-the-page effect ghosted over its neighbours.
-function heroNav(el, fn) {
-  haptic('open');
-  fn();
-}
-
-// The Coach is the orb, grown: tapping it, the orb's light blooms out until it fills the screen and
-// becomes the Coach's background, and the conversation rises into it; closing, the light pulls back
-// into the orb. One soft element that only scales and fades (the phone's GPU does all of it), no
-// cut-outs and no stand-in copies of the orb, so nothing can flash or pop.
+// The Coach is the orb, grown (1.31's light, in this design).
 const stillMotion = () => document.documentElement.dataset.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches;
 let coachFx = null; // tidies up the open or close in progress
 function settleCoachFx() { const c = coachFx; coachFx = null; c?.(); }
@@ -225,45 +187,45 @@ function coachMorph(open, under) {
 
 // Direction for the transition: tabs by position, sub screens push in from the right.
 const ORDER = { today: 0, workout: 1, food: 2, you: 3, coach: 4, history: 4, detail: 5, settings: 4, routine: 4, progress: 5, body: 4, exercise: 6 };
-function show(name, { back = false } = {}) {
+function show(name, { back = false, still = false } = {}) {
   const prev = view.screen;
   view.screen = name;
-  // the Coach opening over a tab or closing back to one: the bloom does the moving, so the two
-  // screens involved appear and disappear in place instead of sliding
+  // the Coach opening over a tab or closing back to one: the light does the moving, so the two
+  // screens involved appear and disappear in place
   const coachSwap = prev !== name && (prev === 'coach' || name === 'coach') && TABS.includes(prev) && TABS.includes(name);
+  // Chrome is already animating this (its own back-swipe from the left edge): don't animate on top
+  if (still) { app.classList.add('uanav'); setTimeout(() => app.classList.remove('uanav'), 60); }
   const amb = document.querySelector('.ambient');
-  if (amb && name !== 'coach') amb.dataset.s = TABS.includes(name) ? name : 'sub'; // the Coach has its own light: the glow stays put under it
+  if (amb && name !== 'coach') amb.dataset.s = TABS.includes(name) ? name : 'sub';
   const dir = prev === name ? 0 : (back ? -1 : Math.sign((ORDER[name] ?? 0) - (ORDER[prev] ?? 0)) || 1);
   for (const s of document.querySelectorAll('.screen')) {
     const on = s.dataset.screen === name;
     const was = s.classList.contains('on');
-    if (on && !was && coachSwap) {
+    if (on && !was && (coachSwap || still)) {
       s.classList.add('instant');
       s.style.setProperty('--off-x', '0px');
       s.classList.add('on');
       void s.offsetWidth;
       s.classList.remove('instant');
-      s._counted = prev === 'coach'; // back from the Coach: the page was there all along, no count-up
+      s._counted = prev === 'coach' || still;
     } else if (on && !was) {
       s.classList.add('instant');
       s.style.setProperty('--off-x', `${dir * 28}px`);
       void s.offsetWidth;
       s.classList.remove('instant');
       s.classList.add('on', 'enter');
-      s._counted = prev === 'coach'; // back from the Coach: the page was there all along, no count-up
+      s._counted = prev === 'coach'; // back from the Coach: no count-up again
       clearTimeout(s._enter);
       s._enter = setTimeout(() => s.classList.remove('enter'), 800);
     } else if (!on && was) {
-      s.style.setProperty('--off-x', coachSwap ? '0px' : `${-dir * 28}px`);
+      s.style.setProperty('--off-x', coachSwap || still ? '0px' : `${-dir * 28}px`);
+      if (still) { s.classList.add('instant'); setTimeout(() => s.classList.remove('instant'), 60); }
       s.classList.remove('on', 'enter');
     }
     s.inert = !on;
   }
-  app.classList.add('moving'); // the background glow holds still while the screens move
-  clearTimeout(app._moving);
-  app._moving = setTimeout(() => app.classList.remove('moving'), 600);
   app.classList.toggle('is-sub', SUB.includes(name));
-  if (coachSwap) coachMorph(name === 'coach', $('#s-' + (name === 'coach' ? prev : name)));
+  if (coachSwap && !still) coachMorph(name === 'coach', $('#s-' + (name === 'coach' ? prev : name)));
   else if (prev === 'coach' || name === 'coach') settleCoachFx();
   if (coachSwap && name !== 'coach') { // the bar comes back without a bounce, under the returning light
     app.classList.add('uncoaching');
@@ -322,7 +284,6 @@ function celebrate() {
   const hero = root.querySelector('.summary');
   if (!hero) return;
   hero.classList.add('celebrate');
-  if (root.querySelector('.prs li, .prs .tag')) setTimeout(() => haptic('pr'), 300);
   burst(hero, { count: 22, spread: 120 });
   const prs = [...root.querySelectorAll('.prs li, .prs .tag')];
   prs.slice(0, 4).forEach((el, i) => setTimeout(() => burst(el, { warm: true, count: 12, spread: 60 }), 350 + i * 160));
@@ -335,17 +296,17 @@ addEventListener('popstate', e => {
   if (s.detailId) { view.detailId = s.detailId; view.detailKind = s.detailKind || 'workout'; }
   if (s.exerciseId) view.exerciseId = s.exerciseId;
   const next = TABS.includes(s.screen) || SUB.includes(s.screen) ? s.screen : 'today';
-  show(next, { back: SUB.includes(view.screen) && !SUB.includes(next) });
+  show(next, { back: SUB.includes(view.screen) && !SUB.includes(next), still: !!e.hasUAVisualTransition });
 });
 
 // ---------- actions ----------
 
 Object.assign(actions, {
-  go: el => { if (el.closest('#dock')) haptic('tick'); go(el.dataset.to); },
+  go: el => { if (el.closest('#dock')) haptic('tap'); go(el.dataset.to); },
   back: () => history.back(),
   'open-settings': () => pushSub('settings'),
   customize: () => openCustomize(),
-  detail: el => heroNav(el, () => pushSub('detail', { detailId: el.dataset.id, detailKind: el.dataset.kind || 'workout' })),
+  detail: el => pushSub('detail', { detailId: el.dataset.id, detailKind: el.dataset.kind || 'workout' }),
   'start-routine': el => startRoutine(el.dataset.id),
   'repeat-workout': el => {
     const w = state.history.find(x => x.id === el.dataset.id);
@@ -393,11 +354,10 @@ app.addEventListener('click', e => {
   }
   const ex = e.target.closest('[data-ex]');
   if (ex) { haptic('tap'); pushSub('exercise', { exerciseId: ex.dataset.ex }); return; }
-  let h;
-  if ((h = e.target.closest('[data-progress]'))) { haptic('tap'); heroNav(h, () => pushSub('progress')); return; }
-  if ((h = e.target.closest('[data-bodyscreen]'))) { haptic('tap'); heroNav(h, () => pushSub('body')); return; }
-  if ((h = e.target.closest('[data-foodscreen]')) && !e.target.closest('[data-body]')) { haptic('tap'); heroNav(h, () => { openFoodDay(); go('food'); }); return; }
-  if ((h = e.target.closest('[data-historyscreen]'))) { haptic('tap'); heroNav(h, () => pushSub('history')); return; }
+  if (e.target.closest('[data-progress]')) { haptic('tap'); pushSub('progress'); return; }
+  if (e.target.closest('[data-bodyscreen]')) { haptic('tap'); pushSub('body'); return; }
+  if (e.target.closest('[data-foodscreen]') && !e.target.closest('[data-body]')) { haptic('tap'); openFoodDay(); go('food'); return; }
+  if (e.target.closest('[data-historyscreen]')) { haptic('tap'); pushSub('history'); return; }
   const pr = e.target.closest('[data-prange]');
   if (pr) { setRange(Number(pr.dataset.prange)); haptic('tap'); renderScreen('progress'); countAll($('#s-progress'), state.lang); return; }
   const f = e.target.closest('[data-hfilter]');
@@ -673,25 +633,6 @@ function shortcut() {
 // "Set up these routines" in the brief: the Coach copies the routine written there
 window.addEventListener('setline:brief-routines', () => { if (SUB.includes(view.screen)) history.back(); setTimeout(() => { go('coach'); askCoach(state.t('brief.routinesAsk')); }, 350); });
 
-// every tap keeps sound and speech ready (Android only allows them after a touch)
-addEventListener('pointerdown', e => { unlockAudio(); ripple(e); }, { capture: true, passive: true });
-
-// Wow motion: a soft light spreads from where you touch the big buttons and tiles.
-function ripple(e) {
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const host = e.target.closest?.('.log, .ftile, .ttile, .frep, .plopt, .upcoming, .rrow .rmain, .cstart');
-  if (!host) return;
-  host.dataset.rip = '';
-  const r = host.getBoundingClientRect(), d = Math.max(r.width, r.height) * 2.2;
-  const s = document.createElement('span');
-  s.className = 'rip';
-  s.style.cssText = `width:${d}px;height:${d}px;left:${e.clientX - r.left - d / 2}px;top:${e.clientY - r.top - d / 2}px`;
-  host.appendChild(s);
-  setTimeout(() => s.remove(), 650);
-}
-
-app.addEventListener('dockshape', () => followLens(620));
-
 boot();
 
 addEventListener('pageshow', e => { if (e.persisted) renderAll(); });
@@ -716,8 +657,8 @@ if (globalThis.visualViewport) {
   chat?.addEventListener('scroll', () => { atEnd = chat.scrollHeight - chat.scrollTop - chat.clientHeight < 90; }, { passive: true });
   const keepEnd = () => { if (chat && atEnd && app.classList.contains('coaching')) chat.scrollTop = chat.scrollHeight; };
   vv.addEventListener('resize', () => { onVV(); keepEnd(); });
-  vv.addEventListener('scroll', onVV);
   addEventListener('resize', keepEnd);
+  vv.addEventListener('scroll', onVV);
 }
 // typing anywhere: the dock steps aside at once (before the keyboard has finished sliding up)
 app.addEventListener('focusin', e => { if (e.target.matches('input:not([type=range]):not([type=checkbox]),textarea')) app.classList.add('inputting'); });
