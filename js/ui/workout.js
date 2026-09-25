@@ -26,6 +26,7 @@ import { usualMinutes, timeStatus } from '../insights.js';
 import { handsFreeOn, hfPillHTML, toggleHandsFree, announceWarmup } from './handsfree.js';
 import { goalAimHTML } from './goals.js';
 import { figureHTML } from './figure.js';
+import { initWorkoutMotion, markLive, rememberSets, animateSets, springToast, springLog } from './workout-motion.js';
 
 const C = 157.08; // ring circumference, r=25
 const REST_LINGER = 4000; // keep the card up after rest ends
@@ -50,6 +51,8 @@ function values(w = state.active) {
 export function renderWorkout(root) {
   const { t } = state;
   const w = state.active;
+  markLive(root, !!w);
+  rememberSets(root);
   if (!w && state.activeCardio) { ui.restVisible = false; return renderLiveCardio(root); }
   if (!w) {
     ui.restVisible = false;
@@ -125,7 +128,7 @@ export function renderWorkout(root) {
 
     <div id="restslot">${restHTML(w, Date.now())}</div>
 
-    <ol class="sets" id="sets">${setsHTML(w, ex)}</ol>
+    <ol class="sets" id="sets" data-ex="${esc(ex.id)}">${setsHTML(w, ex)}</ol>
     ${ex.sets.some(s => s.done) ? `<p class="hint">${t('workout.swipeHint')}</p>` : ''}
 
     <div class="row2">
@@ -137,7 +140,8 @@ export function renderWorkout(root) {
   const moved = ui.seenWorkout === w.id && ui.lastCurrent !== -1 && ui.lastCurrent !== i;
   root.classList.remove('slide-l', 'slide-r');
   if (moved) { void root.offsetWidth; root.classList.add(i > ui.lastCurrent ? 'slide-r' : 'slide-l'); }
-  if (ui.flash) { ui.flash = false; root.querySelector('.log')?.classList.add('flash'); }
+  if (ui.flash) { ui.flash = false; springLog(root.querySelector('.log')); }
+  animateSets(root);
   ui.lastCurrent = i;
   ui.seenWorkout = w.id;
   ui.seenDone = new Set(w.exercises.flatMap(e => e.sets.filter(x => x.done).map(x => x.id)));
@@ -435,6 +439,7 @@ function doLog(kg, reps) {
     action: t('common.undo'),
     onAction: () => { undo(); haptic('tap'); }
   });
+  springToast();
   rerender();
 }
 
@@ -644,6 +649,7 @@ export function autoWarmup() {
 }
 
 export function initWorkout(root, actions) {
+  initWorkoutMotion(root);
   Object.assign(actions, {
     handsfree: () => toggleHandsFree(),
     'kg-': () => stepKg(-1),

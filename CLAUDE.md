@@ -16,7 +16,7 @@ Before any work, read `SPEC.md` (what to build) and `PLAN.md` (where we are). If
 
 ## Design & motion rules (non-negotiable)
 - Design direction in SPEC.md is LOCKED. Improve execution, never replace the direction.
-- All motion values come from css/motion.css tokens. No hardcoded durations or easings anywhere else.
+- All motion values come from css/motion.css tokens (CSS) and js/motion-tokens.js presets (Motion, js/vendor/motion.js). No hardcoded durations or easings anywhere else.
 - Animate ONLY transform and opacity (filter/backdrop-filter sparingly). Never animate width, height, top, left, margin or box-shadow directly.
 - Every animation needs a prefers-reduced-motion fallback.
 - Screen changes use the View Transitions API with a fallback for unsupported browsers.

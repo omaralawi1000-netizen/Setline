@@ -115,6 +115,7 @@ button.chip:active{transform:scale(.93);background:rgba(var(--a-rgb),.16)}
 .set .later{font-size:12.5px;color:var(--dim);font-weight:700}
 .set.fresh{animation:land 1.6s var(--ease)}
 .set.fresh .ck{animation:pop .6s var(--ease)}
+#s-workout.wk-live .set.fresh .ck{animation:none} /* the live workout's check springs in with Motion (workout-motion.js) */
 @keyframes land{0%{background:rgba(var(--a-rgb),.3);border-color:rgba(var(--a-rgb),.55)}40%{background:rgba(var(--a-rgb),.1);border-color:rgba(var(--a-rgb),.12)}100%{background:rgba(255,255,255,.035);border-color:transparent}}
 @keyframes pop{0%{opacity:0;transform:scale(.4)}50%{opacity:1;transform:scale(1.25)}100%{transform:scale(1)}}
 .tag{display:inline-block;height:24px;line-height:24px;padding:0 10px;border-radius:999px;background:rgba(255,217,168,.14);color:var(--warm);font-size:12.5px;font-weight:800;white-space:nowrap}
@@ -405,11 +406,12 @@ html[data-motion=off] *,html[data-motion=off] *::before,html[data-motion=off] *:
 .num.tick-down{animation:tickDown .28s var(--ease)}
 @keyframes tickUp{from{transform:translateY(7px);opacity:.35}}
 @keyframes tickDown{from{transform:translateY(-7px);opacity:.35}}
-.slide-l .exhead,.slide-l .hero .cols,.slide-l .hero .ghost,.slide-l .sets{animation:slideL .45s var(--ease)}
-.slide-r .exhead,.slide-r .hero .cols,.slide-r .hero .ghost,.slide-r .sets{animation:slideR .45s var(--ease)}
+.slide-l .exhead,.slide-l .hero .cols,.slide-l .hero .ghost{animation:slideL .45s var(--ease)}
+.slide-r .exhead,.slide-r .hero .cols,.slide-r .hero .ghost{animation:slideR .45s var(--ease)}
 @keyframes slideL{from{opacity:0;transform:translateX(-22px)}}
 @keyframes slideR{from{opacity:0;transform:translateX(22px)}}
-.log.flash{animation:logflash .5s var(--ease)}
+/* live workout: presses are Motion springs (workout-motion.js), so :active doesn't squish as well */
+#s-workout.wk-live button:active{transform:none}
 @keyframes logflash{30%{transform:scale(.97);box-shadow:0 12px 40px -4px rgba(var(--a-rgb),.9),inset 0 1px 0 rgba(255,255,255,.65)}}
 .sayhint{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;font-size:13px;color:var(--muted);font-weight:600}
 .sayhint svg{width:14px;height:14px}

@@ -450,3 +450,11 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] `npm run motion` (`scripts/motion.mjs`, dev only): every animation on an emulated phone (390×844 @2x, touch, CPU 4×): contact sheet of every painted frame (CDP screencast), rAF smoothness (FPS, p95, frames over 16.7 ms, longest), CDP trace for layout and large paints, and a prefers-reduced-motion pass; `motion/REPORT.md`, previous run kept in `motion/previous/`. First run: 0 of 26 pass (headless has no GPU, so compare runs rather than read absolute FPS)
 - Not yet done (existing code predates the rules): `tokens.css` keeps its own motion tokens (`--m-*`, `--e-*`), `app.css` and the JS animations still hardcode durations and easings, and page changes use CSS classes rather than the View Transitions API
 
+
+## 1.34.0 (branch `redesign`): Motion springs on the active workout screen
+
+- [x] Motion (motion.dev 13.4.4, MIT) vendored as one ES module, `js/vendor/motion.js` (15 KB: `animate` from motion/mini on the Web Animations API, `spring`, `stagger`); no npm dependency in the app
+- [x] `js/motion-tokens.js`: the only presets for Motion animations: tap, fast, default, expressive, fade
+- [x] Active workout only (`js/ui/workout-motion.js`, view code; no logic, data, voice or AI changes): buttons scale to 0.96 on press and spring back (tap); set rows rise in with a 40 ms stagger on arrival and on a new exercise (default); rows that are added rise in, rows that leave fade out in place while the rest glide into the gap, rows that move (rest card, removed warm-ups) glide (default); undone rows settle back (default + fade); the set-saved confirmation (the row's check, the Log button and the toast) uses the expressive spring
+- [x] prefers-reduced-motion and Settings → Motion off: no Motion animations at all
+- Motion lab before → after (CPU 4×, no GPU, so noisy): set-logged longest frame 367 → 83 ms, FPS 19.5 → 22.2; set-saved 22 → 23.4 FPS; set-undone 21.4 → 25.1 FPS; still FAIL overall (baseline layout from the PR pulse on Today, software rendering)

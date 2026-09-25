@@ -1,7 +1,7 @@
 // Motion lab: triggers every animation in the app on an emulated mid-range phone, records every
 // painted frame, measures smoothness and layout/paint work, and writes contact sheets + a report.
 //   npm run motion                  everything
-//   npm run motion -- --only=orb    just the animations whose name contains "orb"
+//   npm run motion -- --only=orb,set just the animations whose name contains "orb" or "set"
 //   npm run motion -- --no-reduced  skip the prefers-reduced-motion pass
 // Dev tool only (Playwright is a devDependency; the app itself has none). Nothing leaves the
 // machine except Google Fonts; speech-to-text is answered locally with a fixed transcript.
@@ -35,7 +35,7 @@ const STAND_IN_KEY = 'motion-stand-in-not-a-key';
 const TRANSCRIPT = 'Bench press 80 kilo 8 reps';
 
 const argv = process.argv.slice(2);
-const ONLY = argv.find(a => a.startsWith('--only='))?.slice(7);
+const ONLY = argv.find(a => a.startsWith('--only='))?.slice(7).split(',').filter(Boolean); // names containing any of these
 const REDUCED = !argv.includes('--no-reduced');
 
 // ---------- local server ----------
@@ -248,6 +248,15 @@ const ANIMATIONS = [
       await p.mouse.move(c.x, c.y - 140, { steps: 4 }); await p.mouse.up();
     },
     min: 600, expect: p => onScreen(p, 'today')
+  },
+  {
+    name: 'workout-button-press', group: 'feedback', setup: p => at.workout(p),
+    trigger: async p => {
+      const c = await center(p, '#s-workout [data-act="reps+"]');
+      await p.mouse.move(c.x, c.y); await p.mouse.down(); await wait(p, 160);
+      await p.mouse.move(c.x, c.y - 140, { steps: 4 }); await p.mouse.up();
+    },
+    min: 600, expect: p => onScreen(p, 'workout')
   },
   {
     name: 'set-logged', group: 'feedback', setup: p => at.workout(p),
@@ -545,7 +554,7 @@ async function rotate() {
 }
 
 async function main() {
-  const list = ANIMATIONS.filter(a => !ONLY || a.name.includes(ONLY));
+  const list = ANIMATIONS.filter(a => !ONLY || ONLY.some(o => a.name.includes(o)));
   if (!list.length) throw new Error('no animation matches ' + ONLY);
   await rotate();
   const prev = await readFile(join(PREV, 'results.json'), 'utf8').then(JSON.parse).catch(() => null);
