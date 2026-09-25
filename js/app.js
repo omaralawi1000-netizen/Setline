@@ -214,23 +214,20 @@ function coachMorph(open, under) {
       setTimeout(() => { if (!under.classList.contains('on')) Object.assign(under.style, { transition: '', opacity: '', visibility: '', transform: '' }); }, 60);
     };
   } else {
-    // the page shows through the light as it thins and pulls back into the orb, so the screen is
-    // never an empty dark moment between the Coach and the tab
+    // a soft crossfade: the conversation sinks toward the orb, the light fades as it draws in a
+    // little, and the page comes forward through it. Nothing sweeps across and nothing goes dark.
     const a = bloom.animate([
       { transform: `scale(${k1})`, opacity: 1 },
-      { transform: `scale(${k1 * 0.55})`, opacity: 0.55, offset: 0.35 },
-      { transform: `scale(${k0 * 1.6})`, opacity: 0.25, offset: 0.8 },
-      { transform: `scale(${k0})`, opacity: 0 }
-    ], { duration: 520, delay: 120, easing: 'cubic-bezier(.3,.1,.2,1)', fill: 'backwards' });
-    // the conversation is gone before the page starts to show, so the two never overlap
-    const coach = $('#s-coach');
-    coach.style.transition = 'opacity .08s linear, visibility 0s .08s';
-    setTimeout(() => { if (!coach.classList.contains('on')) coach.style.transition = ''; }, 250);
-    // the light condenses back into the orb as the bloom arrives
-    dockOrb?.animate([{ transform: 'scale(1.35)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 320, delay: 440, easing: 'cubic-bezier(.3,1.3,.5,1)', fill: 'backwards' });
-    const rise = under?.animate([{ scale: 0.93, opacity: 0.35 }, { scale: 1, opacity: 1 }], { duration: 560, delay: 100, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+      { transform: `scale(${k1 * 0.86})`, opacity: 0 }
+    ], { duration: 440, easing: 'cubic-bezier(.3,.6,.2,1)' });
+    const sinkCoach = $('#s-coach').animate([
+      { opacity: 1, transform: 'none', visibility: 'visible' },
+      { opacity: 0, transform: 'translateY(18px) scale(.97)', visibility: 'visible' }
+    ], { duration: 150, easing: 'cubic-bezier(.4,0,.6,1)' });
+    dockOrb?.animate([{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 380, delay: 160, easing: 'cubic-bezier(.3,1.35,.5,1)', fill: 'backwards' });
+    const rise = under?.animate([{ scale: 0.95, opacity: 0.2 }, { scale: 1, opacity: 1 }], { duration: 480, delay: 90, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
     a.onfinish = settleCoachFx;
-    coachFx = () => { a.cancel(); rise?.cancel(); aura.classList.remove('run'); };
+    coachFx = () => { a.cancel(); rise?.cancel(); sinkCoach.cancel(); aura.classList.remove('run'); };
   }
 }
 

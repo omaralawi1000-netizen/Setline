@@ -398,3 +398,10 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] Cards float up into place as they scroll onto the screen (scroll-driven, on the GPU)
 - [x] Sheets push the page back (it shrinks a little and dims) and it comes forward as the sheet leaves; sheets are near-solid while moving, so the page never shows through them mid-slide
 - [x] Coach depth: as the orb's light blooms, the page sinks back and dims; closing, it comes forward again as the light returns to the orb
+
+## 1.30.0: no dark flashes, a cascade everywhere
+
+- [x] Pages and tabs never fade through black (the recording showed a near-black moment on every change): the old page goes at once, the new one is there at once and its cards glide in one after another from the side you moved towards
+- [x] Closing the Coach is a soft crossfade: the conversation sinks toward the orb, the light fades as it draws in a little, the page comes forward through it and the orb pops back; no sweeping ring, no dark moment
+- [x] Sheets: their contents cascade up as the sheet rises
+- [x] The tab you pick pops

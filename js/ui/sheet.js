@@ -44,7 +44,8 @@ export function openSheet(render, { onClose = null, label = '' } = {}) {
   scrim.addEventListener('click', () => closeTop());
   dragToClose(el, scrim, entry);
   app.classList.add('sheeting');
-  requestAnimationFrame(() => requestAnimationFrame(() => { scrim.classList.add('show'); el.classList.add('show'); }));
+  requestAnimationFrame(() => requestAnimationFrame(() => { scrim.classList.add('show'); el.classList.add('show', 'opening'); }));
+  setTimeout(() => el.classList.remove('opening'), 900); // its contents cascade in once, on the way up
   // the glass blur switches on once the sheet has stopped moving (a moving blur flickers on Android)
   el.addEventListener('transitionend', e => { if (e.target === el && e.propertyName === 'transform' && el.classList.contains('show') && !el.classList.contains('dragging')) el.classList.add('settled'); });
   return api;

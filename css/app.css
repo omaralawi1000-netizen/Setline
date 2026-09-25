@@ -2272,3 +2272,23 @@ html[data-cards=outline] .screen :is(.solid,.glass){background:transparent;borde
     animation:cardin linear both;animation-timeline:view();animation-range:entry 0% entry 70%}
   @keyframes cardin{from{opacity:0;translate:0 26px;scale:.965}}
 }
+
+/* ======================= 1.30: no dark flashes, a cascade everywhere =======================
+   Changing page or tab never fades through black: the old page goes at once and the new one is
+   there at once, its cards gliding in one after another from the side you moved towards. */
+.screen{transition:opacity 0s,transform 0s,visibility 0s}
+.screen.on{transition:opacity 0s,transform 0s,visibility 0s,scale .46s cubic-bezier(.22,.9,.24,1),translate .46s cubic-bezier(.22,.9,.24,1)}
+.screen.enter > *{animation:m-glide .5s cubic-bezier(.2,.8,.2,1) both}
+.screen.enter > *:first-child{animation-name:m-glide-soft}
+@keyframes m-glide{from{opacity:.2;transform:translate(calc(var(--off-x, 0px) * 1.1),18px) scale(.985)}}
+@keyframes m-glide-soft{from{opacity:.5;transform:translate(calc(var(--off-x, 0px) * .6),6px)}}
+/* sheets: their contents cascade up behind the sheet as it rises */
+.sheet.opening :is(.sbody > *,.sin > :not(.sbody):not(.grab)){animation:m-glide .55s cubic-bezier(.2,.8,.2,1) both;--off-x:0px}
+.sheet.opening .sbody > *:nth-child(2){animation-delay:.04s}
+.sheet.opening .sbody > *:nth-child(3){animation-delay:.08s}
+.sheet.opening .sbody > *:nth-child(4){animation-delay:.12s}
+.sheet.opening .sbody > *:nth-child(5){animation-delay:.16s}
+.sheet.opening .sbody > *:nth-child(n+6){animation-delay:.2s}
+/* the tab you pick pops */
+.dock .tab.on svg.ti{animation:tabpop .5s cubic-bezier(.3,1.6,.5,1)}
+@keyframes tabpop{0%{scale:.78}55%{scale:1.14}100%{scale:1}}
