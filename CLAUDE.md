@@ -23,3 +23,4 @@ Before any work, read `SPEC.md` (what to build) and `PLAN.md` (where we are). If
 - Nothing in the UI unless it works. No placeholder buttons.
 - After any UI change: run node scripts/screens.mjs, look at the screenshots, check them against SPEC.md, and fix issues before reporting done.
 - Work one screen at a time. Never refactor working logic just to restyle it.
+- After changing any animation: run npm run motion, look at the contact sheets in motion/sheets/, compare with motion/previous/, and fix every FAIL before reporting done.

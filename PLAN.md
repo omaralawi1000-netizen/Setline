@@ -447,5 +447,6 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] `scripts/screens.mjs` (Playwright, dev only): 12 screenshots at 390×844 into `screenshots/` (git-ignored): onboarding, home, food, you, history, settings, Coach, readiness check, active workout, rest timer, voice listening (lifted orb and full screen)
 - [x] Cloud sessions run `npm install` on start (`.claude/hooks/session-start.sh`); Chromium is pre-installed there
 - [x] CLAUDE.md: design and motion rules
+- [x] `npm run motion` (`scripts/motion.mjs`, dev only): every animation on an emulated phone (390×844 @2x, touch, CPU 4×): contact sheet of every painted frame (CDP screencast), rAF smoothness (FPS, p95, frames over 16.7 ms, longest), CDP trace for layout and large paints, and a prefers-reduced-motion pass; `motion/REPORT.md`, previous run kept in `motion/previous/`. First run: 0 of 26 pass (headless has no GPU, so compare runs rather than read absolute FPS)
 - Not yet done (existing code predates the rules): `tokens.css` keeps its own motion tokens (`--m-*`, `--e-*`), `app.css` and the JS animations still hardcode durations and easings, and page changes use CSS classes rather than the View Transitions API
 
