@@ -416,3 +416,13 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] The recording showed the screen dark for about a second after closing the Coach: the light was one disc scaled to about five times the screen, which the phone has to draw thousands of pixels wide. Now two screen-sized layers: a burst of light that grows out of the orb and fades, and the Coach's own background fading in under it. Open ≈ 0.8 s, close ≈ 0.7 s, both slower and softer; the page sinks back as the light comes and comes forward as it gathers back into the orb, which takes it in last
 - [x] Keyboard: the page now shrinks above the keyboard (viewport interactive-widget=resizes-content) instead of Android sliding the whole view up while the app also lifted the message box; the chat keeps its latest message in view as the keyboard comes and goes
 - [x] The orb moves slowly and softly: longer swirls, a slower thinking breath and aurora
+
+## 1.31.1: design tooling
+
+- [x] `css/motion.css`: motion tokens (4 durations, out / in-out / spring curves, press scale), button press, root View Transition, reduced-motion fallback; loaded before all other CSS and precached
+- [x] `.claude/skills/frontend-design/SKILL.md` (upstream skill, with the note that Setline's direction is locked)
+- [x] `scripts/screens.mjs` (Playwright, dev only): 12 screenshots at 390×844 into `screenshots/` (git-ignored): onboarding, home, food, you, history, settings, Coach, readiness check, active workout, rest timer, voice listening (lifted orb and full screen)
+- [x] Cloud sessions run `npm install` on start (`.claude/hooks/session-start.sh`); Chromium is pre-installed there
+- [x] CLAUDE.md: design and motion rules
+- Not yet done (existing code predates the rules): `tokens.css` keeps its own motion tokens (`--m-*`, `--e-*`), `app.css` and the JS animations still hardcode durations and easings, and page changes use CSS classes rather than the View Transitions API
+
