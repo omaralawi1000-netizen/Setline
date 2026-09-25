@@ -221,6 +221,7 @@ const SHORT_REPLIES = /^(yes|yeah|yep|no|nope|ok|okay|sure|thanks|stop|done|next
 export function isNoise(text) {
   const words = String(text || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').trim().split(/\s+/).filter(Boolean);
   if (!words.length) return true;
+  if (words.every(w => w.length <= 2 && !/\d/.test(w) && !SHORT_REPLIES.test(w))) return true; // "L", "Jd", "a h"
   if (words.length > 1) return false;
   return !SHORT_REPLIES.test(words[0]) && !/\d/.test(words[0]);
 }

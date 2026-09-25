@@ -32,3 +32,13 @@ test('the coach answers what was said and does not repeat itself', () => {
   assert.match(p, /Never repeat a point/);
   assert.match(p, /misheard/);
 });
+
+test('talk mode drops stray letters', async () => {
+  const { isNoise } = await import('../js/coach.js');
+  assert.ok(isNoise('L'));
+  assert.ok(isNoise('Jd.'));
+  assert.ok(isNoise('a h'));
+  assert.ok(!isNoise('ja'));
+  assert.ok(!isNoise('no'));
+  assert.ok(!isNoise('Hvad kan I hjælpe dem i dag?'));
+});

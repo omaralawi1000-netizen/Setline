@@ -333,7 +333,10 @@ export function initCoach(n) {
     orbBtn.style.removeProperty('--lv');
     if (!talk.on) return;
     if (!text) return stopTalk(); // nothing said: the conversation rests
-    if (isNoise(text) && talk.misses < 2) { talk.misses++; return listenTurn(); } // a stray noise: keep listening
+    if (isNoise(text)) { // a stray noise ("L", "Jd"): never sent; keep listening, and rest after a few
+      if (++talk.misses >= 3) return stopTalk();
+      return listenTurn();
+    }
     talk.misses = 0;
     setTalk('thinking');
     await ask(text, { root, voice: true });

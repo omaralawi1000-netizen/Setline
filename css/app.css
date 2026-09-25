@@ -2246,3 +2246,18 @@ html[data-cards=outline] .screen :is(.solid,.glass){background:transparent;borde
 /* the floating layers: a touch more blur and light */
 .dock.v2 .dpill{-webkit-backdrop-filter:blur(30px) saturate(190%);backdrop-filter:blur(30px) saturate(190%)}
 .composer.glass{-webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);--gl-fill:rgba(20,22,32,.5)}
+
+/* ---------- 1.28.1: one thinking animation, words that blur in ----------
+   While the Coach thinks there is just the light: the aurora rising behind the conversation, with
+   the message-box orb breathing in it. The separate "Reading your log…" bubble is gone (it stays in
+   the page for screen readers). */
+.msg.ai.is-thinking{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .glow{opacity:.72}
+.aura .glow{bottom:-70vw;width:170vw;max-width:900px}
+:is(.composer[data-talk=thinking] .corb .orb,.app:has(#s-coach .msg.ai.is-thinking) .composer .corb .orb)::after{opacity:0;animation:none}
+/* each word arrives out of a soft blur, lit in the accent, and settles into the text colour */
+.bub .w{animation:wordblur .6s cubic-bezier(.2,.7,.2,1) both}
+@keyframes wordblur{
+  0%{opacity:0;filter:blur(8px);color:var(--accent-hi);transform:translateY(.25em)}
+  45%{opacity:1;filter:blur(2px);color:color-mix(in srgb,var(--accent-hi) 70%,var(--ink))}
+  100%{opacity:1;filter:none;color:inherit;transform:none}}

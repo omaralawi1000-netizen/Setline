@@ -381,3 +381,10 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] Thinking: a slowly turning aurora rises from the bottom behind the conversation; the orb swirls fast, a comet of light circles it and a halo breathes (rotation and opacity only)
 - [x] Glass: three soft pools of the theme colour behind everything, cards are tinted glass with a light top edge, more blur on the bar and message box
 - [x] Sheets: swipe down from anywhere once the content is at its top (1:1 with the finger, flick or a third of the way closes, otherwise springs back); no more Android stretch pulling the content away from the sheet (it looked like two sheets); the glass blur switches on only once the sheet has stopped moving
+
+## 1.28.1: closing without a flash, one thinking light, words that blur in
+
+- [x] Closing the Coach: the conversation vanishes first (80 ms), then the page shows through the light as it thins and pulls back into the orb: no dark empty moment and no Coach-over-Today double image
+- [x] One thinking animation: the separate "Reading your log…" bubble is gone (kept for screen readers); the aurora behind the conversation is bigger and brighter and the message-box orb breathes in it
+- [x] Coach replies: each word arrives out of a soft blur, lit in the accent, and settles into the text colour
+- [x] Talk mode: stray letters and fragments ("L", "Jd") are never sent; it keeps listening and rests after three

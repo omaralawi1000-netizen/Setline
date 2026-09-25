@@ -211,13 +211,20 @@ function coachMorph(open, under) {
       setTimeout(() => { if (!under.classList.contains('on')) Object.assign(under.style, { transition: '', opacity: '', visibility: '', transform: '' }); }, 60);
     };
   } else {
+    // the page shows through the light as it thins and pulls back into the orb, so the screen is
+    // never an empty dark moment between the Coach and the tab
     const a = bloom.animate([
       { transform: `scale(${k1})`, opacity: 1 },
-      { opacity: 1, offset: 0.8 },
+      { transform: `scale(${k1 * 0.55})`, opacity: 0.55, offset: 0.35 },
+      { transform: `scale(${k0 * 1.6})`, opacity: 0.25, offset: 0.8 },
       { transform: `scale(${k0})`, opacity: 0 }
-    ], { duration: 560, easing: 'cubic-bezier(.22,.2,.2,1)' }); // quick off the mark: the rim of light is on screen at once
+    ], { duration: 520, delay: 120, easing: 'cubic-bezier(.3,.1,.2,1)', fill: 'backwards' });
+    // the conversation is gone before the page starts to show, so the two never overlap
+    const coach = $('#s-coach');
+    coach.style.transition = 'opacity .08s linear, visibility 0s .08s';
+    setTimeout(() => { if (!coach.classList.contains('on')) coach.style.transition = ''; }, 250);
     // the light condenses back into the orb as the bloom arrives
-    dockOrb?.animate([{ transform: 'scale(1.35)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 320, delay: 360, easing: 'cubic-bezier(.3,1.3,.5,1)', fill: 'backwards' });
+    dockOrb?.animate([{ transform: 'scale(1.35)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 320, delay: 440, easing: 'cubic-bezier(.3,1.3,.5,1)', fill: 'backwards' });
     a.onfinish = settleCoachFx;
     coachFx = () => { a.cancel(); aura.classList.remove('run'); };
   }
