@@ -16,6 +16,7 @@ import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav, autoW
 import { renderHistory, renderDetail } from './ui/history.js';
 import { renderSettings, initSettings } from './ui/settings.js';
 import { initVoice, orbHTML, voiceHandlePop, closeVoice, isVoiceOpen, openVoice } from './ui/voice.js';
+import { renderYou } from './ui/you.js';
 import { renderCoach, initCoach, ask as askCoach, ensureModels, weeklyCheckin, markWeeklySeen, sessionDebrief, markDebriefSeen } from './ui/coach.js';
 import { initCardio, setCardioNav, tickCardio, renderCardioDetail, syncGps, startCardioSession, pickTypeSheet } from './ui/cardio.js';
 import { initBody } from './ui/body.js';
@@ -42,7 +43,7 @@ import { nextRoutine } from './routines.js';
 import { repeatTemplate } from './insights.js';
 import { animateFigures } from './ui/figure.js';
 
-const TABS = ['today', 'workout', 'food', 'coach'];
+const TABS = ['today', 'workout', 'food', 'you', 'coach'];
 const SUB = ['history', 'detail', 'settings', 'routine', 'progress', 'exercise', 'body'];
 const view = { screen: 'today', detailId: null, detailKind: 'workout', parent: 'history' };
 const actions = {};
@@ -58,6 +59,7 @@ function renderScreen(name = view.screen) {
   else if (name === 'workout') renderWorkout(root);
   else if (name === 'history') renderHistory(root);
   else if (name === 'coach') renderCoach(root);
+  else if (name === 'you') renderYou(root);
   else if (name === 'detail') (view.detailKind === 'cardio' ? renderCardioDetail : renderDetail)(root, view.detailId);
   else if (name === 'routine') renderRoutine(root);
   else if (name === 'progress') renderProgress(root);
@@ -72,9 +74,10 @@ function renderDock() {
   const { t } = state;
   const dock = $('#dock');
   const tab = (name, icon, cls = '') => `<button class="tab${cls}" data-act="go" data-to="${name}">${icon}<span>${t('tab.' + name)}</span></button>`;
-  if (dock.dataset.built !== '2' || dock.dataset.lang !== state.lang) {
-    dock.innerHTML = '<span class="ind" aria-hidden="true"></span>' + tab('today', TAB_ICONS.today) + tab('workout', TAB_ICONS.workout) + orbHTML() + tab('food', TAB_ICONS.food) + tab('coach', TAB_ICONS.coach);
-    dock.dataset.built = '2';
+  if (dock.dataset.built !== '3' || dock.dataset.lang !== state.lang) {
+    // the orb in the middle is the Coach (tap) and the quick voice command (hold)
+    dock.innerHTML = '<span class="ind" aria-hidden="true"></span>' + tab('today', TAB_ICONS.today) + tab('workout', TAB_ICONS.workout) + orbHTML() + tab('food', TAB_ICONS.food) + tab('you', TAB_ICONS.you);
+    dock.dataset.built = '3';
     dock.dataset.lang = state.lang;
   }
   let on = null;
@@ -128,51 +131,84 @@ function renderAll() {
   else root?.querySelectorAll('[data-count]').forEach(el => { el.textContent = new Intl.NumberFormat(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: Number(el.dataset.dp || 0), minimumFractionDigits: Number(el.dataset.dp || 0) }).format(Number(el.dataset.count)); });
 }
 
-// On the Coach tab the orb leaves the dock and settles into the message box (and goes back when you
-// leave): a copy flies between the two places while the real ones wait out of sight.
-function flyOrb(toCoach) {
-  if (document.documentElement.dataset.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const dockOrb = $('#dock .orbbtn .orb'), boxOrb = $('#composer .corb .orb');
-  if (!dockOrb || !boxOrb) return;
-  // sizes from the layout (not the screen), so a half-shrunk orb never sets the size
-  const at = el => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, s: el.offsetWidth }; };
-  const home = at(dockOrb), box = at(boxOrb);
-  const [from, to] = toCoach ? [home, box] : [box, home];
-  $('.orbfly')?.remove();
-  const fly = dockOrb.cloneNode(true);
-  fly.className = 'orb orbfly'; // a component of its own, not a state
-  const k = from.s / to.s, dx = from.x - to.x, dy = from.y - to.y;
-  // starts where it takes off, even on the frame before the animation runs
-  fly.style.cssText = `--s:${to.s}px;left:${to.x - to.s / 2}px;top:${to.y - to.s / 2}px;transform:translate(${dx}px, ${dy}px) scale(${k})`;
-  app.appendChild(fly);
-  app.classList.add('orbflying');
-  const a = fly.animate([
-    { transform: `translate(${dx}px, ${dy}px) scale(${k})` },
-    { transform: `translate(${dx * 0.4}px, ${dy * 0.5 - 18}px) scale(${(k + 1) / 2})`, offset: 0.5 },
-    { transform: 'none' }
-  ], { duration: 480, easing: 'cubic-bezier(.32,.72,0,1)', fill: 'forwards' });
-  let done = false;
-  const land = () => {
-    if (done) return; done = true;
-    app.classList.remove('orbflying'); // the real orb fades in where the copy landed…
-    fly.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180, easing: 'ease-out' }).onfinish = () => fly.remove(); // …as the copy fades out
-  };
-  a.onfinish = land;
-  a.oncancel = () => { done = true; fly.remove(); app.classList.remove('orbflying'); };
+// The Coach is the orb, grown (1.31's light, in this design).
+const stillMotion = () => document.documentElement.dataset.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches;
+let coachFx = null; // tidies up the open or close in progress
+function settleCoachFx() { const c = coachFx; coachFx = null; c?.(); }
+
+// Two screen-sized layers, so the phone never has to draw anything bigger than the screen (a
+// giant scaled disc was what left the screen dark for a moment on Android): .bloom is a burst of
+// light that grows out of the orb and fades, .veil is the Coach's own background fading in under it.
+function coachMorph(open, under) {
+  settleCoachFx();
+  const aura = $('.aura'), bloom = aura?.querySelector('.bloom'), veil = aura?.querySelector('.veil'), orb = $('#dock .orbbtn');
+  if (!aura || !bloom || !veil || !orb) return;
+  haptic(open ? 'open' : 'tick');
+  // the orb's centre in the app's coordinates (layout, so a moving or shrunk bar can't skew it)
+  let x = orb.offsetWidth / 2, y = orb.offsetHeight / 2;
+  for (let n = orb; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }
+  aura.style.setProperty('--ax', x + 'px'); aura.style.setProperty('--ay', y + 'px');
+  if (stillMotion()) return;
+  const dockOrb = orb.querySelector('.orb'), coach = $('#s-coach');
+  const other = under && under !== coach ? under : null;
+  aura.classList.add('run');
+  const anims = [];
+  const go = (el, frames, opts) => { if (!el) return null; const a = el.animate(frames, opts); anims.push(a); return a; };
+  if (open) {
+    if (other) Object.assign(other.style, { transition: 'none', opacity: '1', visibility: 'visible', transform: 'none' });
+    go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
+    const last = go(bloom, [{ scale: 0.1, opacity: 0 }, { scale: 0.55, opacity: 1, offset: 0.3 }, { scale: 1.5, opacity: 0 }], { duration: 820, easing: 'cubic-bezier(.33,.1,.25,1)' });
+    go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: 560, delay: 90, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'backwards' });
+    go(other, [{ scale: 1, opacity: 1 }, { scale: 0.94, opacity: 0.3 }], { duration: 640, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'forwards' });
+    app.classList.add('coach-in');
+    last.onfinish = settleCoachFx;
+    coachFx = () => {
+      anims.forEach(a => a.cancel());
+      aura.classList.remove('run');
+      setTimeout(() => app.classList.remove('coach-in'), 300);
+      if (!other) return;
+      if (other.classList.contains('on')) { Object.assign(other.style, { transition: '', opacity: '', visibility: '', transform: '' }); return; }
+      Object.assign(other.style, { visibility: 'hidden', opacity: '0' }); // covered: gone at once
+      void other.offsetWidth; // settled first, so releasing the styles can't start a fade
+      setTimeout(() => { if (!other.classList.contains('on')) Object.assign(other.style, { transition: '', opacity: '', visibility: '', transform: '' }); }, 60);
+    };
+  } else {
+    // the conversation sinks away, the Coach's background fades, the light gathers back into the
+    // orb and the page comes forward; the orb takes the light in last
+    go(coach, [{ opacity: 1, transform: 'none', visibility: 'visible' }, { opacity: 0, transform: 'translateY(20px) scale(.97)', visibility: 'visible' }], { duration: 220, easing: 'cubic-bezier(.4,0,.6,1)' });
+    go(veil, [{ opacity: 1 }, { opacity: 0 }], { duration: 480, delay: 60, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'backwards' });
+    const last = go(bloom, [{ scale: 1.3, opacity: 0 }, { scale: 0.6, opacity: 0.85, offset: 0.5 }, { scale: 0.08, opacity: 0 }], { duration: 680, easing: 'cubic-bezier(.4,0,.25,1)' });
+    go(other, [{ scale: 0.95, opacity: 0.25 }, { scale: 1, opacity: 1 }], { duration: 560, delay: 80, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' });
+    go(dockOrb, [{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 460, delay: 380, easing: 'cubic-bezier(.3,1.25,.5,1)', fill: 'backwards' });
+    last.onfinish = settleCoachFx;
+    coachFx = () => { anims.forEach(a => a.cancel()); aura.classList.remove('run'); };
+  }
 }
 
 // Direction for the transition: tabs by position, sub screens push in from the right.
-const ORDER = { today: 0, workout: 1, food: 2, coach: 3, history: 4, detail: 5, settings: 4, routine: 4, progress: 5, body: 4, exercise: 6 };
-function show(name, { back = false } = {}) {
+const ORDER = { today: 0, workout: 1, food: 2, you: 3, coach: 4, history: 4, detail: 5, settings: 4, routine: 4, progress: 5, body: 4, exercise: 6 };
+function show(name, { back = false, still = false } = {}) {
   const prev = view.screen;
   view.screen = name;
+  // the Coach opening over a tab or closing back to one: the light does the moving, so the two
+  // screens involved appear and disappear in place
+  const coachSwap = prev !== name && (prev === 'coach' || name === 'coach') && TABS.includes(prev) && TABS.includes(name);
+  // Chrome is already animating this (its own back-swipe from the left edge): don't animate on top
+  if (still) { app.classList.add('uanav'); setTimeout(() => app.classList.remove('uanav'), 60); }
   const amb = document.querySelector('.ambient');
-  if (amb) amb.dataset.s = TABS.includes(name) ? name : 'sub';
+  if (amb && name !== 'coach') amb.dataset.s = TABS.includes(name) ? name : 'sub';
   const dir = prev === name ? 0 : (back ? -1 : Math.sign((ORDER[name] ?? 0) - (ORDER[prev] ?? 0)) || 1);
   for (const s of document.querySelectorAll('.screen')) {
     const on = s.dataset.screen === name;
     const was = s.classList.contains('on');
-    if (on && !was) {
+    if (on && !was && (coachSwap || still)) {
+      s.classList.add('instant');
+      s.style.setProperty('--off-x', '0px');
+      s.classList.add('on');
+      void s.offsetWidth;
+      s.classList.remove('instant');
+      s._counted = prev === 'coach' || still;
+    } else if (on && !was) {
       s.classList.add('instant');
       s.style.setProperty('--off-x', `${dir * 28}px`);
       void s.offsetWidth;
@@ -182,14 +218,20 @@ function show(name, { back = false } = {}) {
       clearTimeout(s._enter);
       s._enter = setTimeout(() => s.classList.remove('enter'), 800);
     } else if (!on && was) {
-      s.style.setProperty('--off-x', `${-dir * 28}px`);
+      s.style.setProperty('--off-x', coachSwap || still ? '0px' : `${-dir * 28}px`);
+      if (still) { s.classList.add('instant'); setTimeout(() => s.classList.remove('instant'), 60); }
       s.classList.remove('on', 'enter');
     }
     s.inert = !on;
   }
   app.classList.toggle('is-sub', SUB.includes(name));
-  const wasCoach = app.classList.contains('coaching');
-  if (wasCoach !== (name === 'coach') && !SUB.includes(name) && !SUB.includes(prev)) flyOrb(name === 'coach');
+  if (coachSwap && !still) coachMorph(name === 'coach', $('#s-' + (name === 'coach' ? prev : name)));
+  else if (prev === 'coach' || name === 'coach') settleCoachFx();
+  if (coachSwap && name !== 'coach') { // the bar comes back without a bounce, under the returning light
+    app.classList.add('uncoaching');
+    clearTimeout(app._uncoach);
+    app._uncoach = setTimeout(() => app.classList.remove('uncoaching'), 700);
+  }
   app.classList.toggle('coaching', name === 'coach');
   if (name === 'coach') { markWeeklySeen(); markDebriefSeen(); }
   requestAnimationFrame(() => app.dispatchEvent(new Event('screenchange')));
@@ -200,9 +242,21 @@ function show(name, { back = false } = {}) {
 function go(name, { quiet = false } = {}) {
   if (!TABS.includes(name)) return;
   if (name === view.screen) { if (!quiet) $('#s-' + name).scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  if (name === 'coach' && !SUB.includes(view.screen)) { // the Coach opens over the tab you're on; Back closes it
+    coachFrom = view.screen;
+    history.pushState({ screen: 'coach', from: coachFrom }, '');
+    show('coach');
+    return;
+  }
   history.replaceState({ screen: name }, '');
   $('#s-' + name).scrollTop = 0;
   show(name);
+}
+
+let coachFrom = 'today';
+function closeCoach() {
+  if (view.screen !== 'coach') return;
+  if (history.state?.screen === 'coach') history.back(); else go(coachFrom || 'today');
 }
 
 function pushSub(name, extra = {}) {
@@ -242,7 +296,7 @@ addEventListener('popstate', e => {
   if (s.detailId) { view.detailId = s.detailId; view.detailKind = s.detailKind || 'workout'; }
   if (s.exerciseId) view.exerciseId = s.exerciseId;
   const next = TABS.includes(s.screen) || SUB.includes(s.screen) ? s.screen : 'today';
-  show(next, { back: SUB.includes(view.screen) && !SUB.includes(next) });
+  show(next, { back: SUB.includes(view.screen) && !SUB.includes(next), still: !!e.hasUAVisualTransition });
 });
 
 // ---------- actions ----------
@@ -280,8 +334,8 @@ setOnboardNav({ go: name => go(name), ask: q => askCoach(q) });
 initWorkout($('#s-workout'), actions);
 initSettings(actions, $('#s-settings'));
 setWorkoutNav({ go, showDetail });
-initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings') });
-initCoach({ openSettings: () => pushSub('settings') });
+initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings'), openCoach: () => go('coach') });
+initCoach({ openSettings: () => pushSub('settings'), closeCoach: () => closeCoach() });
 setCardioNav({ go, showDetail });
 initCardio();
 initBody();

@@ -2022,3 +2022,85 @@ html[data-dock=icons] .dock .tab span{display:none}
 .sheet .sbody{overscroll-behavior-y:none}
 /* the one known lag source of this design: a live blur behind every chat bubble */
 .msg.ai .bub{-webkit-backdrop-filter:none;backdrop-filter:none}
+
+/* ======================= 1.33: the orb is the Coach (in the 1.23 design) =======================
+   Tapping the orb, its light blooms out and becomes the Coach's background; the conversation rises
+   into it and the bar steps aside. Closing, the light gathers back into the orb. The light is two
+   screen-sized layers (.bloom grows out of the orb and fades, .veil is the Coach's background), so
+   the phone never draws anything bigger than the screen. Only opacity and scale ever move. */
+.app.coaching .dock{opacity:0;transform:translateY(30px) scale(.94);pointer-events:none}
+.app.coaching .dock .orbbtn{transform:none;opacity:1}
+.app.uncoaching .dock{transition:opacity .3s cubic-bezier(.2,.8,.2,1),transform .4s cubic-bezier(.2,.8,.2,1)}
+.app.coaching:not(.is-sub):not(.voice) .composer{bottom:calc(var(--dock-bottom) + 6px)}
+.app.coaching.inputting:not(.is-sub):not(.voice) .composer,.app.coaching.kb:not(.is-sub):not(.voice) .composer{transform:none}
+.app.coaching .screen#s-coach{padding-bottom:calc(var(--dock-bottom) + 90px)}
+.app.coaching.has-mini #s-coach{padding-bottom:calc(var(--dock-bottom) + 90px)}
+.app.coaching.has-mini:not(.inputting):not(.kb) .composer{bottom:calc(var(--dock-bottom) + 6px)}
+.app.kb #s-coach,.app.coaching.inputting .screen#s-coach,.app.coaching.kb .screen#s-coach{padding-bottom:84px}
+.app.coaching .intent,.app.coaching .toast{bottom:calc(var(--dock-bottom) + 76px)}
+.app.coaching.has-mini .minibar{opacity:0;pointer-events:none}
+#s-coach{z-index:3}
+#s-coach > .cclose{margin-top:10px}
+.dock .orbbtn.pressing{transform:scale(.9)}
+
+.aura{--ax:50%;--ay:calc(100% - var(--dock-bottom) - 40px);position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden;visibility:hidden}
+.app.coaching .aura,.aura.run{visibility:visible}
+.aura .veil{position:absolute;inset:0;opacity:0;
+  background:radial-gradient(130% 62% at var(--ax) var(--ay),color-mix(in srgb,var(--accent) 16%,var(--bg)) 0%,color-mix(in srgb,var(--violet) 12%,var(--bg)) 20%,color-mix(in srgb,var(--blue) 5%,var(--bg)) 42%,var(--bg) 70%)}
+.app.coaching .aura .veil{opacity:1}
+.aura .bloom{position:absolute;inset:0;opacity:0;scale:1;transform-origin:var(--ax) var(--ay);will-change:scale,opacity;
+  background:radial-gradient(circle at var(--ax) var(--ay),color-mix(in srgb,var(--accent-hi) 70%,transparent) 0,color-mix(in srgb,var(--accent) 45%,transparent) 9%,color-mix(in srgb,var(--violet) 22%,transparent) 26%,transparent 52%)}
+/* the conversation arrives with the light */
+.app.coach-in #s-coach > *{animation:coachin .5s cubic-bezier(.2,.75,.2,1) both;animation-delay:.16s}
+.app.coach-in #s-coach > *:nth-child(2){animation-delay:.2s}
+.app.coach-in #s-coach > *:nth-child(n+3){animation-delay:.24s}
+@keyframes coachin{from{opacity:0;transform:translateY(14px) scale(.985)}}
+.app.coaching:not(.is-sub):not(.voice) .composer{transition:opacity .45s cubic-bezier(.2,.8,.2,1) .2s,transform .55s cubic-bezier(.2,.8,.2,1) .2s,box-shadow .4s}
+.composer{transition:opacity .16s cubic-bezier(.4,0,1,1),transform .3s cubic-bezier(.2,.8,.2,1),box-shadow .4s}
+.app.coach-in .composer .corb .orb{animation:orbin .7s cubic-bezier(.3,1.25,.5,1) .32s both}
+@keyframes orbin{from{transform:scale(.3);opacity:0}}
+/* the message box stays where it is while it fades out (it used to jump up to its place above the bar) */
+.app.uncoaching .composer{bottom:calc(var(--dock-bottom) + 6px)}
+
+/* thinking: one soft light. A slow aurora rises behind the conversation and the message-box orb
+   breathes in it; the separate thinking bubble is kept for screen readers only */
+.aura .glow{position:absolute;left:50%;bottom:-56vw;width:130vw;max-width:780px;aspect-ratio:1;translate:-50% 0;border-radius:50%;opacity:0;scale:.8;
+  background:conic-gradient(from 0deg,var(--accent),var(--violet),var(--blue),color-mix(in srgb,var(--warm) 60%,var(--violet)),var(--accent));
+  -webkit-mask:radial-gradient(closest-side,#000 0%,rgba(0,0,0,.55) 38%,transparent 72%);mask:radial-gradient(closest-side,#000 0%,rgba(0,0,0,.55) 38%,transparent 72%);
+  transition:opacity .9s cubic-bezier(.2,.8,.2,1),scale 1.4s cubic-bezier(.2,.8,.2,1);animation:auraspin 14s linear infinite paused;will-change:rotate}
+.app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .glow{opacity:.7;scale:1;animation-play-state:running}
+@keyframes auraspin{to{rotate:360deg}}
+.msg.ai.is-thinking{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.orb{isolation:isolate}
+.orb::before{content:"";position:absolute;inset:-45%;z-index:-1;border-radius:50%;pointer-events:none;opacity:0;transition:opacity .4s;background:radial-gradient(closest-side,rgba(var(--a-rgb),.55),rgba(var(--v-rgb),.25) 55%,transparent)}
+:is(.composer[data-talk=thinking] .corb .orb,.app:has(#s-coach .msg.ai.is-thinking) .composer .corb .orb)::before{opacity:1;animation:orbhalo 2.6s ease-in-out infinite}
+:is(.composer[data-talk=thinking] .corb .orb,.app:has(#s-coach .msg.ai.is-thinking) .composer .corb .orb) .core{animation:orbwork 2.6s ease-in-out infinite}
+@keyframes orbhalo{0%,100%{opacity:.45;scale:.85}50%{opacity:1;scale:1.08}}
+@keyframes orbwork{0%,100%{scale:1}50%{scale:1.07}}
+
+/* You */
+#s-you .yhero{width:100%;margin-top:14px;padding:16px;border-radius:28px;display:flex;align-items:center;gap:14px;text-align:left}
+#s-you .yav{width:54px;height:54px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:22px;font-weight:800;color:var(--accent-ink);
+  background:radial-gradient(circle at 35% 30%,var(--accent-hi),var(--accent) 55%,var(--violet));box-shadow:0 8px 22px -8px rgba(var(--v-rgb),.7)}
+#s-you :is(.yhero,.ytile) .l{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+#s-you :is(.yhero,.ytile) strong{font-size:17px;font-weight:800;letter-spacing:-.01em}
+#s-you :is(.yhero,.ytile) small{font-size:13px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#s-you :is(.yhero,.ytile) > svg{width:18px;height:18px;flex:none;color:var(--dim);stroke-width:2.4}
+#s-you .ylist{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+#s-you .ytile{width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:22px;text-align:left}
+#s-you .ytile .tic{width:40px;height:40px;flex:none;border-radius:14px;display:grid;place-items:center;background:rgba(var(--a-rgb),.1);color:var(--accent)}
+#s-you .ytile .tic svg{width:21px;height:21px}
+
+/* Chrome's own back-swipe animation (from the left edge) is running: nothing of ours on top */
+.app.uanav .screen,.app.uanav .screen.on{transition:none!important}
+.app.uanav .screen.enter > *{animation:none!important}
+
+/* ---------- 1.33: iOS-style sheets ----------
+   A sheet lifts the page off the background: it shrinks back a little with rounded corners and
+   dims, and while you swipe the sheet down the page follows your finger back to full size.
+   The iOS sheet curve; the page and the sheet move together. */
+.sheet{transition:transform .34s cubic-bezier(.4,0,.9,.6)}
+.sheet.show{transition:transform .52s cubic-bezier(.32,.72,0,1)}
+.sheet.dragging{transition:none}
+.scrim{transition:opacity .45s cubic-bezier(.32,.72,0,1)}
+/* the page's depth itself is animated in sheet.js (scale and position only) */

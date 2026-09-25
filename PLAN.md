@@ -431,3 +431,11 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Top-edge glass blur actually blurs (a view-transition name had cut it off); no live blur behind chat bubbles
 - [x] Progress with no data: one calm card; Today doesn't count up again after the Coach
 - Left out on purpose: the You tab (Progress, History and Body are on Train again, Settings on Today), the orb-as-Coach bloom, the 1.24+ bar and motion experiments
+
+## 1.33.0: the orb opens the Coach again, iOS-style sheets, Android back-swipe
+
+- [x] Tap the orb in the middle: its light blooms out and becomes the Coach, the conversation rises into it and the bar steps aside; ✓ or Back pulls the light back into the orb. Hold the orb: quick voice command, as before. The 1.31 light (screen-sized layers only, no flash) in the 1.23 design; the fourth tab is You again (Progress, History, Body, What your coach knows, Make it yours, Settings) and Train no longer repeats those tiles
+- [x] Thinking: one slow aurora behind the conversation, the message-box orb breathes in it
+- [x] Sheets, like iOS: the page behind shrinks back with rounded corners and dims as a sheet rises (iOS curve); swiping the sheet down, the page follows your finger back to full size; let go and it settles back, flick or pull past a third and it closes
+- [x] Android back-swipe from the left edge: Chrome draws its own animation there, so the app no longer plays a second, generic one on top (it now matches the right-edge back)
+- [x] The shrunk bar's lens sits exactly on its tab
