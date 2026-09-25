@@ -357,3 +357,12 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 - [x] Quieter colours: Violet, Slate, Sage, Sand, Clay, Graphite (old colours map to their nearest)
 - [x] Lag: no blur filters in any animation (screens, pop-ups, sheets, coach words, thinking steps), no full-screen blur behind sheets, no blur on every chat bubble; a sheet's content no longer ran a second slide on top of the sheet's own
 - [x] Talk mode: a lone noise word ("Sink.") is ignored and it keeps listening
+
+## 1.27.0: polish: voice you can trust, one motion system, calmer screens
+
+- [x] Speech-to-text: segments Whisper marks as "probably not speech" and its film-subtitle ghosts ("Danske tekster af …", "Tak fordi du så med", "Thanks for watching") are dropped before anything is sent; a pause with only noise keeps listening; on Auto, anything heard as Norwegian/Swedish is transcribed again as Danish
+- [x] Coach: answers what you just said first, never repeats an earlier point ("you haven't logged anything"), asks when a message looks misheard, speaks in plain natural sentences; the app guide knows the new bar and You tab
+- [x] Reply voice: after Gemini's free daily limit (429) the phone voice takes over for an hour with no waiting; the status line says Instant when that's the choice, and explains the limit instead of "Gemini failed (429)"
+- [x] One motion system (tokens.css: 4 speeds, 3 curves): tabs and pages hand over cleanly (the old one is gone before the new one arrives, a small slide in the direction you went, cards rise in); every pop-up is the same sheet (long ease up, quicker down; new content in the same sheet fades in); voice cards and toasts share one rise; presses one squeeze. Removed: the card-grows-into-page effect (it ghosted over its neighbours), the sheet's second animation, the pop-in bounce, the fade on Coach close
+- [x] Less work while moving: the background glow and orbs pause during screen and sheet moves; the hidden message-box orb no longer animates
+- [x] Calmer screens: Progress with no data is one card with "Start your first workout"; sub pages show their title once (the small header title appears only after scrolling); Train no longer repeats the Progress / History / Body tiles that live on You

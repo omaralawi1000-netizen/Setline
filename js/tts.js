@@ -334,11 +334,19 @@ async function clip(text, opts) {
   return buf;
 }
 
+// Gemini's free voices have a small daily limit. Once it answers 429 the phone's voice takes over
+// for an hour, so no reply waits on a request that is going to fail.
+const QUOTA_KEY = 'setline.ttsQuotaUntil';
+const quotaUntil = () => { try { return Number(localStorage.getItem(QUOTA_KEY)) || 0; } catch { return 0; } };
+const quotaHit = () => { try { localStorage.setItem(QUOTA_KEY, String(Date.now() + 3_600_000)); } catch {} };
+
 export async function speak(text, opts) {
   if (!text) return;
   stop();
   const mine = ++seq;
-  if (opts.key && opts.model !== 'device') { // 'device': the phone's own voice, no network wait
+  const resting = opts.model !== 'device' && Date.now() < quotaUntil();
+  if (resting) lastSpeech.error = 'quota';
+  if (opts.key && opts.model !== 'device' && !resting) { // 'device': the phone's own voice, no network wait
     const parts = splitSpeech(text);
     const jobs = parts.map(p => clip(p, opts));
     jobs.forEach(j => j.catch(() => {})); // a later piece failing is handled when we get to it
@@ -354,11 +362,12 @@ export async function speak(text, opts) {
       }
       return;
     } catch (e) {
-      lastSpeech.error = e?.status ? String(e.status) : e?.name === 'AbortError' ? 'timeout' : 'failed';
+      lastSpeech.error = e?.status === 429 ? 'quota' : e?.status ? String(e.status) : e?.name === 'AbortError' ? 'timeout' : 'failed';
+      if (e?.status === 429) quotaHit();
       console.warn('tts fallback', lastSpeech.error);
     }
     text = parts.slice(played).join(' ');
-  } else lastSpeech.error = opts.model === 'device' ? null : 'nokey';
+  } else if (!resting) lastSpeech.error = opts.model === 'device' ? null : 'nokey';
   lastSpeech.engine = 'device';
   if (mine !== seq || !opts.canSpeak()) return;
   await fallback(text, opts.lang, mine);

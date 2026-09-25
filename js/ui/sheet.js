@@ -27,14 +27,14 @@ export function openSheet(render, { onClose = null, label = '' } = {}) {
     sheet: el,
     close: () => closeTop(),
     // swap contents without touching history (confirm chains)
-    replace: (next, opts = {}) => { entry.onClose = opts.onClose ?? null; fill(next); }
+    replace: (next, opts = {}) => { entry.onClose = opts.onClose ?? null; fill(next, true); }
   };
   // Each fill gets a fresh container, so listeners from the previous content go with it.
-  function fill(fn) {
+  function fill(fn, swap = false) {
     el.innerHTML = '<div class="grab" aria-hidden="true"></div>';
     el.style.height = '';
     const box = document.createElement('div');
-    box.className = 'sin';
+    box.className = swap ? 'sin swap' : 'sin'; // new content in the same sheet fades in
     el.append(box);
     fn(box, api);
     const f = box.querySelector('[autofocus]');
@@ -43,6 +43,7 @@ export function openSheet(render, { onClose = null, label = '' } = {}) {
   fill(render);
   scrim.addEventListener('click', () => closeTop());
   dragToClose(el, scrim, entry);
+  app.classList.add('sheeting');
   requestAnimationFrame(() => requestAnimationFrame(() => { scrim.classList.add('show'); el.classList.add('show'); }));
   return api;
 }
@@ -80,11 +81,11 @@ function dragToClose(el, scrim, entry) {
 function dismiss(entry) {
   entry.el.classList.remove('show');
   entry.scrim.classList.remove('show');
-  const kill = () => { entry.el.remove(); entry.scrim.remove(); };
+  const kill = () => { entry.el.remove(); entry.scrim.remove(); if (!stack.length) $('#app').classList.remove('sheeting'); };
   // only the sheet's own slide counts; a button's transition inside it would cut the slide short
   const onEnd = e => { if (e.target === entry.el && e.propertyName === 'transform') { entry.el.removeEventListener('transitionend', onEnd); kill(); } };
   entry.el.addEventListener('transitionend', onEnd);
-  setTimeout(kill, 600);
+  setTimeout(kill, 500);
   entry.onClose?.();
 }
 

@@ -16,6 +16,11 @@
   --safe-bottom:env(safe-area-inset-bottom);
   --dock-bottom:calc(22px + var(--safe-bottom));
   --dock-h:72px;
+
+  /* motion: every screen, sheet and card uses these (1.27). Decelerate in, accelerate out,
+     a gentle spring only for things you press. */
+  --m-press:.12s; --m-fast:.18s; --m-base:.32s; --m-slow:.46s;
+  --e-out:cubic-bezier(.2,.8,.2,1); --e-in:cubic-bezier(.4,0,1,1); --e-spring:cubic-bezier(.32,1.2,.5,1);
 }
 
 /* accent themes (Customize). Quiet, low-saturation tones; violet is the default above. */

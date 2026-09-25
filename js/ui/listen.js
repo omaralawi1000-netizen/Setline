@@ -28,7 +28,7 @@ export function listenSmart({ stt, onLevel = () => {}, onState = () => {}, pause
     try { text = await transcribe(blob, stt); } catch { if (spec === mine) { spec = null; waiting = true; onState('listening'); } return; }
     if (spec !== mine || over) return;
     spec = null;
-    if (looksUnfinished(text)) { waiting = true; onState('wait'); return; }
+    if (!text || looksUnfinished(text)) { waiting = true; onState('wait'); return; }
     end(() => { mic.cancel(); resolve(text); });
   }
   const tick = now => {

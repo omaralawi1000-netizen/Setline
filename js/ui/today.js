@@ -77,7 +77,7 @@ function resumeHTML() {
 
 // Start cards, shared with the Workout tab's empty state.
 export function startCardsHTML() {
-  return weekPlanHTML() + upNextHTML() + toolsHTML() + cardioRowHTML() + routinesHTML();
+  return weekPlanHTML() + upNextHTML() + cardioRowHTML() + routinesHTML(); // Progress, History and Body live on You (1.27)
 }
 
 // Your week at a glance: each day's routine (from its weekday), what's done, and today.
@@ -97,18 +97,6 @@ function weekPlanHTML() {
   });
   if (!byDay.size) return ''; // no routine has a day yet: nothing to show
   return `<div class="section"><span class="label">${t('plan.week')}</span></div><div class="wplan">${days.join('')}</div>`;
-}
-
-// Everything else about your training, one tap away.
-function toolsHTML() {
-  const { t } = state;
-  const tile = (attr, icon, title, sub) => `<button class="ttile solid" ${attr}><span class="tic">${icon}</span><strong>${title}</strong><small>${sub}</small></button>`;
-  const prs = state.history.filter(w => w.startedAt >= Date.now() - 30 * 86_400_000).reduce((a, w) => a + (w.prs?.length || 0), 0);
-  return `<div class="tgrid">
-    ${tile('data-progress', I.chart, t('hub.progress'), esc(t('hub.progressSub', { n: prs })))}
-    ${tile('data-historyscreen', I.history, t('history.title'), esc(t('hub.historySub', { n: state.history.length })))}
-    ${tile('data-bodyscreen', I.ruler, t('bodyx.title'), esc(t('hub.bodySub')))}
-  </div>`;
 }
 
 function cardioRowHTML() {

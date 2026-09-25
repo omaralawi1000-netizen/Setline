@@ -52,9 +52,12 @@ const seg = (key, options, labels) => `<div class="seg" role="group">${options.m
 
 function speechStatus() {
   const { t } = state;
+  if (state.settings.ttsQuality === 'instant') return t('speech.instant'); // the chosen voice, not a failure
   if (!lastSpeech.engine) return getKey('google') ? t('speech.unknown') : t('speech.noKey');
   if (lastSpeech.engine === 'gemini') return t('speech.gemini');
-  return t('speech.device', { why: lastSpeech.error === 'nokey' ? t('speech.why.nokey') : t('speech.why.error', { code: lastSpeech.error }) });
+  if (!lastSpeech.error) return t('speech.instant');
+  const why = lastSpeech.error === 'nokey' ? t('speech.why.nokey') : lastSpeech.error === 'quota' ? t('speech.why.quota') : t('speech.why.error', { code: lastSpeech.error });
+  return t('speech.device', { why });
 }
 
 // Weight steps: how far − and + move for each kind of kit (and how big the suggested jumps are)

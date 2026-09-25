@@ -159,26 +159,11 @@ function renderAll() {
   else root?.querySelectorAll('[data-count]').forEach(el => { el.textContent = new Intl.NumberFormat(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: Number(el.dataset.dp || 0), minimumFractionDigits: Number(el.dataset.dp || 0) }).format(Number(el.dataset.count)); });
 }
 
-// The Coach grows out of the orb (a circle opening from it) and shrinks back into it when you close it.
-// A card opens into its page: the card itself grows into the new screen (a shared-element
-// transition), instead of one screen swapping for another.
+// A card opening its page: since 1.27 every page opens the same way (it slides in), so this only
+// adds the soft double tap. The card-grows-into-the-page effect ghosted over its neighbours.
 function heroNav(el, fn) {
-  const card = el.closest('.solid, .glass, .ttile, .grid2 > *, .upcoming, .pr, .hitem') || el;
-  const vt = document.startViewTransition && document.documentElement.dataset.motion !== 'off' && !matchMedia('(prefers-reduced-motion: reduce)').matches
-    && card.getBoundingClientRect().height < innerHeight * 0.8;
-  if (!vt) return fn();
-  const was = card.style.viewTransitionName;
-  card.style.viewTransitionName = 'hero';
-  app.classList.add('vt');
-  let target = null;
-  const t = document.startViewTransition(() => {
-    card.style.viewTransitionName = was;
-    fn();
-    target = $('.screen.on');
-    if (target) target.style.viewTransitionName = 'hero';
-  });
-  t.finished.finally(() => { if (target) target.style.viewTransitionName = ''; app.classList.remove('vt'); });
   haptic('open');
+  fn();
 }
 
 function revealCoach(open, prevEl = null) {
@@ -198,7 +183,8 @@ function revealCoach(open, prevEl = null) {
   } else {
     // keep it on top and visible while it closes into the orb
     Object.assign(s.style, { opacity: '1', visibility: 'visible', transition: 'none', zIndex: '4' });
-    const anim = s.animate([{ clipPath: big }, { clipPath: small, opacity: 0.6 }], { duration: 420, easing: 'cubic-bezier(.5,0,.2,1)' });
+    // no fade on the way: a see-through Coach over the page reads as two screens at once
+    const anim = s.animate([{ clipPath: big }, { clipPath: small }], { duration: 400, easing: 'cubic-bezier(.4,0,.2,1)' });
     anim.onfinish = anim.oncancel = () => Object.assign(s.style, { opacity: '', visibility: '', transition: '', zIndex: '' });
   }
   haptic(open ? 'open' : 'tick');
@@ -268,6 +254,9 @@ function show(name, { back = false } = {}) {
     }
     s.inert = !on;
   }
+  app.classList.add('moving'); // the background glow holds still while the screens move
+  clearTimeout(app._moving);
+  app._moving = setTimeout(() => app.classList.remove('moving'), 600);
   app.classList.toggle('is-sub', SUB.includes(name));
   const wasCoach = app.classList.contains('coaching');
   if (wasCoach !== (name === 'coach')) revealCoach(name === 'coach', $('#s-' + prev));

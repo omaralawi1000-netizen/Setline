@@ -31,11 +31,14 @@ export function renderProgress(root) {
   const lifts = liftSummaries(state.history).slice(0, 8);
   const prs = prTimeline(state.history).slice(0, 12);
   const pct = (a, b) => (b ? Math.round(((a - b) / b) * 100) : 0);
+  const none = !state.history.length && !state.cardio.length; // nothing yet: one calm card, no empty charts
   root.innerHTML = `<header class="top">
       <button class="iconbtn" data-act="back" aria-label="${t('common.back')}">${I.back}</button>
       <div class="ttl"><strong>${t('progress.title')}</strong></div><span class="spacer"></span>
     </header>
     <h1 class="h1">${t('progress.title')}</h1>
+    ${none ? `<div class="empty solid"><div class="emptyglyph">${I.chart}</div><h2>${t('progress.empty')}</h2><p>${t('progress.emptySub')}</p>
+      <button class="log" data-act="go" data-to="workout">${t('progress.startFirst')}</button></div>` : `
     <div class="seg hseg" role="group">${[4, 12, 52].map(n => `<button data-prange="${n}" aria-pressed="${range === n}">${t('progress.weeks', { n })}</button>`).join('')}</div>
 
     <div class="chartcard solid">
@@ -45,7 +48,7 @@ export function renderProgress(root) {
     <div class="chartcard solid">
       <div class="chead"><span class="label">${t('label.cardio')}</span><span class="cval"><b data-count="${cmin}">0</b> min</span></div>
       ${barChart(weeks.map((w, i) => ({ v: w.cardioMin, label: short(w.t), hot: i === weeks.length - 1 })), { axis, color: 'blue', fmt: v => `${Math.round(v)} min` })}
-    </div>
+    </div>`}
     ${bw && bw.series.length >= 2 ? `<div class="chartcard solid">
       <div class="chead"><span class="label">${t('body.weight')}</span><span class="cval"><b>${kg(bw.latest.kg)}</b> ${u()}</span></div>
       ${lineChart(bw.series, { h: 110, fmt: v => kg(v) })}</div>` : ''}
@@ -68,7 +71,7 @@ export function renderProgress(root) {
     <ol class="timeline">${prs.map((p, i) => `<li style="--i:${i}"><span class="tdot"></span><div>
       <strong>${esc(state.catalog.name(p.pr.exerciseId, lang))}</strong>
       <span>${esc(prText(p.pr))} · ${esc(day(p.t, lang))}</span></div></li>`).join('')}</ol>` : ''}
-    ${!state.history.length && !state.cardio.length ? `<div class="empty solid"><div class="emptyglyph">${I.chart}</div><h2>${t('progress.empty')}</h2><p>${t('progress.emptySub')}</p></div>` : ''}`;
+`;
 }
 
 function prText(p) {
