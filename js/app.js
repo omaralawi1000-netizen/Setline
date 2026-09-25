@@ -171,63 +171,55 @@ function heroNav(el, fn) {
 // into the orb. One soft element that only scales and fades (the phone's GPU does all of it), no
 // cut-outs and no stand-in copies of the orb, so nothing can flash or pop.
 const stillMotion = () => document.documentElement.dataset.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches;
-const BLOOM = 600; // the bloom's size in CSS; it is scaled from orb size up to past the screen corners
 let coachFx = null; // tidies up the open or close in progress
 function settleCoachFx() { const c = coachFx; coachFx = null; c?.(); }
 
+// Two screen-sized layers, so the phone never has to draw anything bigger than the screen (a
+// giant scaled disc was what left the screen dark for a moment on Android): .bloom is a burst of
+// light that grows out of the orb and fades, .veil is the Coach's own background fading in under it.
 function coachMorph(open, under) {
   settleCoachFx();
-  const aura = $('.aura'), bloom = aura?.querySelector('.bloom'), orb = $('#dock .orbbtn');
-  if (!aura || !bloom || !orb) return;
+  const aura = $('.aura'), bloom = aura?.querySelector('.bloom'), veil = aura?.querySelector('.veil'), orb = $('#dock .orbbtn');
+  if (!aura || !bloom || !veil || !orb) return;
   haptic(open ? 'open' : 'tick');
-  // the orb's centre, in the app's own coordinates (layout, so a moving or shrunk bar can't skew it)
+  // the orb's centre in the app's coordinates (layout, so a moving or shrunk bar can't skew it)
   let x = orb.offsetWidth / 2, y = orb.offsetHeight / 2;
   for (let n = orb; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }
-  const far = Math.hypot(Math.max(x, app.clientWidth - x), Math.max(y, app.clientHeight - y));
-  const k0 = orb.offsetWidth / BLOOM, k1 = (far + 30) / (BLOOM / 2 * 0.58); // solid out to 58 % of its radius (then a rim of light): past the far corner
-  aura.style.setProperty('--ax', x + 'px'); aura.style.setProperty('--ay', y + 'px'); aura.style.setProperty('--k1', k1);
+  aura.style.setProperty('--ax', x + 'px'); aura.style.setProperty('--ay', y + 'px');
   if (stillMotion()) return;
-  const dockOrb = orb.querySelector('.orb');
+  const dockOrb = orb.querySelector('.orb'), coach = $('#s-coach');
+  const other = under && under !== coach ? under : null;
   aura.classList.add('run');
+  const anims = [];
+  const go = (el, frames, opts) => { if (!el) return null; const a = el.animate(frames, opts); anims.push(a); return a; };
   if (open) {
-    if (under && under !== $('#s-coach')) Object.assign(under.style, { transition: 'none', opacity: '1', visibility: 'visible', transform: 'none' });
-    const a = bloom.animate([
-      { transform: `scale(${k0})`, opacity: 0 },
-      { opacity: 1, offset: 0.12 },
-      { transform: `scale(${k1})`, opacity: 1 }
-    ], { duration: 520, easing: 'cubic-bezier(.25,.75,.1,1)' }); // quick: the Coach is on screen as it lands
-    dockOrb?.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.35)', opacity: 0 }], { duration: 240, easing: 'ease-out', fill: 'forwards' });
-    // depth: the page sinks back and dims as the light comes over it
-    const sink = under && under !== $('#s-coach') ? under.animate([{ scale: 1, opacity: 1 }, { scale: 0.93, opacity: 0.35 }], { duration: 520, easing: 'cubic-bezier(.3,.7,.1,1)', fill: 'forwards' }) : null;
+    if (other) Object.assign(other.style, { transition: 'none', opacity: '1', visibility: 'visible', transform: 'none' });
+    go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
+    const last = go(bloom, [{ scale: 0.1, opacity: 0 }, { scale: 0.55, opacity: 1, offset: 0.3 }, { scale: 1.5, opacity: 0 }], { duration: 820, easing: 'cubic-bezier(.33,.1,.25,1)' });
+    go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: 560, delay: 90, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'backwards' });
+    go(other, [{ scale: 1, opacity: 1 }, { scale: 0.94, opacity: 0.3 }], { duration: 640, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'forwards' });
     app.classList.add('coach-in');
-    a.onfinish = settleCoachFx;
+    last.onfinish = settleCoachFx;
     coachFx = () => {
-      a.cancel();
-      sink?.cancel();
+      anims.forEach(a => a.cancel());
       aura.classList.remove('run');
-      dockOrb?.getAnimations().forEach(x => x.cancel());
-      setTimeout(() => app.classList.remove('coach-in'), 400);
-      if (!under || under === $('#s-coach')) return;
-      if (under.classList.contains('on')) { Object.assign(under.style, { transition: '', opacity: '', visibility: '', transform: '' }); return; }
-      Object.assign(under.style, { visibility: 'hidden', opacity: '0' }); // covered by the bloom: gone at once
-      void under.offsetWidth; // settled first, so releasing the styles can't start a fade
-      setTimeout(() => { if (!under.classList.contains('on')) Object.assign(under.style, { transition: '', opacity: '', visibility: '', transform: '' }); }, 60);
+      setTimeout(() => app.classList.remove('coach-in'), 300);
+      if (!other) return;
+      if (other.classList.contains('on')) { Object.assign(other.style, { transition: '', opacity: '', visibility: '', transform: '' }); return; }
+      Object.assign(other.style, { visibility: 'hidden', opacity: '0' }); // covered: gone at once
+      void other.offsetWidth; // settled first, so releasing the styles can't start a fade
+      setTimeout(() => { if (!other.classList.contains('on')) Object.assign(other.style, { transition: '', opacity: '', visibility: '', transform: '' }); }, 60);
     };
   } else {
-    // a soft crossfade: the conversation sinks toward the orb, the light fades as it draws in a
-    // little, and the page comes forward through it. Nothing sweeps across and nothing goes dark.
-    const a = bloom.animate([
-      { transform: `scale(${k1})`, opacity: 1 },
-      { transform: `scale(${k1 * 0.86})`, opacity: 0 }
-    ], { duration: 440, easing: 'cubic-bezier(.3,.6,.2,1)' });
-    const sinkCoach = $('#s-coach').animate([
-      { opacity: 1, transform: 'none', visibility: 'visible' },
-      { opacity: 0, transform: 'translateY(18px) scale(.97)', visibility: 'visible' }
-    ], { duration: 150, easing: 'cubic-bezier(.4,0,.6,1)' });
-    dockOrb?.animate([{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 380, delay: 160, easing: 'cubic-bezier(.3,1.35,.5,1)', fill: 'backwards' });
-    const rise = under?.animate([{ scale: 0.95, opacity: 0.2 }, { scale: 1, opacity: 1 }], { duration: 480, delay: 90, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
-    a.onfinish = settleCoachFx;
-    coachFx = () => { a.cancel(); rise?.cancel(); sinkCoach.cancel(); aura.classList.remove('run'); };
+    // the conversation sinks away, the Coach's background fades, the light gathers back into the
+    // orb and the page comes forward; the orb takes the light in last
+    go(coach, [{ opacity: 1, transform: 'none', visibility: 'visible' }, { opacity: 0, transform: 'translateY(20px) scale(.97)', visibility: 'visible' }], { duration: 220, easing: 'cubic-bezier(.4,0,.6,1)' });
+    go(veil, [{ opacity: 1 }, { opacity: 0 }], { duration: 480, delay: 60, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'backwards' });
+    const last = go(bloom, [{ scale: 1.3, opacity: 0 }, { scale: 0.6, opacity: 0.85, offset: 0.5 }, { scale: 0.08, opacity: 0 }], { duration: 680, easing: 'cubic-bezier(.4,0,.25,1)' });
+    go(other, [{ scale: 0.95, opacity: 0.25 }, { scale: 1, opacity: 1 }], { duration: 560, delay: 80, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' });
+    go(dockOrb, [{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 460, delay: 380, easing: 'cubic-bezier(.3,1.25,.5,1)', fill: 'backwards' });
+    last.onfinish = settleCoachFx;
+    coachFx = () => { anims.forEach(a => a.cancel()); aura.classList.remove('run'); };
   }
 }
 
@@ -718,8 +710,14 @@ if (globalThis.visualViewport) {
     app.style.setProperty('--kb', over + 'px');
     app.classList.toggle('kb', Math.max(over, full - vv.height) > 120); // …or the layout itself shrank
   };
-  vv.addEventListener('resize', onVV);
+  // the chat keeps its latest message in view as the keyboard comes and goes
+  const chat = $('#s-coach');
+  let atEnd = true;
+  chat?.addEventListener('scroll', () => { atEnd = chat.scrollHeight - chat.scrollTop - chat.clientHeight < 90; }, { passive: true });
+  const keepEnd = () => { if (chat && atEnd && app.classList.contains('coaching')) chat.scrollTop = chat.scrollHeight; };
+  vv.addEventListener('resize', () => { onVV(); keepEnd(); });
   vv.addEventListener('scroll', onVV);
+  addEventListener('resize', keepEnd);
 }
 // typing anywhere: the dock steps aside at once (before the keyboard has finished sliding up)
 app.addEventListener('focusin', e => { if (e.target.matches('input:not([type=range]):not([type=checkbox]),textarea')) app.classList.add('inputting'); });

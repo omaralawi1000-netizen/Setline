@@ -410,3 +410,9 @@ Known: some phones' "dark theme for websites" still re-colours the app even with
 
 - [x] Page and tab changes: the new page is at 92 % brightness or more from its first frame (it started at 20–50 %, which the recording showed as a dim flash); only a short glide says which way you went
 - [x] Coach: the conversation rises in with the light instead of after it, so there is no empty dark moment; the bloom is quicker
+
+## 1.31.0: the Coach's light rebuilt, no keyboard jump, a calmer orb
+
+- [x] The recording showed the screen dark for about a second after closing the Coach: the light was one disc scaled to about five times the screen, which the phone has to draw thousands of pixels wide. Now two screen-sized layers: a burst of light that grows out of the orb and fades, and the Coach's own background fading in under it. Open ≈ 0.8 s, close ≈ 0.7 s, both slower and softer; the page sinks back as the light comes and comes forward as it gathers back into the orb, which takes it in last
+- [x] Keyboard: the page now shrinks above the keyboard (viewport interactive-widget=resizes-content) instead of Android sliding the whole view up while the app also lifted the message box; the chat keeps its latest message in view as the keyboard comes and goes
+- [x] The orb moves slowly and softly: longer swirls, a slower thinking breath and aurora

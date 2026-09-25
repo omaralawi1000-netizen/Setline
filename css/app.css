@@ -2310,3 +2310,34 @@ html[data-cards=outline] .screen :is(.solid,.glass){background:transparent;borde
 .app.coach-in #s-coach > *:nth-child(2){animation-delay:.08s}
 .app.coach-in #s-coach > *:nth-child(n+3){animation-delay:.11s}
 .app.coaching:not(.is-sub):not(.voice) .composer{transition-delay:.06s}
+
+/* ======================= 1.31: the Coach's light, rebuilt =======================
+   Both layers are exactly the screen's size (a disc scaled up past the screen made the phone draw
+   something several thousand pixels wide, and it went dark while it did). */
+.aura .veil{position:absolute;inset:0;opacity:0;
+  background:radial-gradient(130% 62% at var(--ax) var(--ay),color-mix(in srgb,var(--accent) 16%,var(--bg)) 0%,color-mix(in srgb,var(--violet) 12%,var(--bg)) 20%,color-mix(in srgb,var(--blue) 5%,var(--bg)) 42%,var(--bg) 70%)}
+.app.coaching .aura .veil{opacity:1}
+.aura .bloom{position:absolute;inset:0;left:0;top:0;width:auto;height:auto;margin:0;border-radius:0;transform:none;opacity:0;scale:1;transform-origin:var(--ax) var(--ay);will-change:scale,opacity;
+  background:radial-gradient(circle at var(--ax) var(--ay),color-mix(in srgb,var(--accent-hi) 70%,transparent) 0,color-mix(in srgb,var(--accent) 45%,transparent) 9%,color-mix(in srgb,var(--violet) 22%,transparent) 26%,transparent 52%)}
+.app:not(.coaching) .aura:not(.run) .bloom,.app.coaching .aura:not(.run) .bloom{opacity:0}
+.aura .glow{width:130vw;bottom:-56vw}
+/* the conversation arrives with the light, gently */
+.app.coach-in #s-coach > *{animation:coachin .5s cubic-bezier(.2,.75,.2,1) both;animation-delay:.16s}
+.app.coach-in #s-coach > *:nth-child(2){animation-delay:.2s}
+.app.coach-in #s-coach > *:nth-child(n+3){animation-delay:.24s}
+.app.coaching:not(.is-sub):not(.voice) .composer{transition:opacity .45s var(--e-out) .2s,transform .55s var(--e-out) .2s,box-shadow .4s}
+.app.coach-in .composer .corb .orb{animation:orbin .7s cubic-bezier(.3,1.25,.5,1) .32s both}
+/* the orb moves slowly and softly: longer, calmer swirls, a slower breath */
+.orb .core b:nth-child(1){animation-duration:14s}
+.orb .core b:nth-child(2){animation-duration:17s}
+.orb .core b:nth-child(3){animation-duration:11s}
+:is(.think .orb,.composer[data-talk=thinking] .corb .orb,.app:has(#s-coach .msg.ai.is-thinking) .composer .corb .orb) .core{animation:orbwork 2.6s ease-in-out infinite}
+:is(.think .orb,.composer[data-talk=thinking] .corb .orb,.app:has(#s-coach .msg.ai.is-thinking) .composer .corb .orb)::before{animation:orbhalo 2.6s ease-in-out infinite}
+:is(.think .orb,.composer[data-talk=thinking] .corb .orb,.app:has(#s-coach .msg.ai.is-thinking) .composer .corb .orb) .core b:nth-child(1){animation-duration:3.4s}
+:is(.think .orb,.composer[data-talk=thinking] .corb .orb,.app:has(#s-coach .msg.ai.is-thinking) .composer .corb .orb) .core b:nth-child(2){animation-duration:4.1s}
+:is(.think .orb,.composer[data-talk=thinking] .corb .orb,.app:has(#s-coach .msg.ai.is-thinking) .composer .corb .orb) .core b:nth-child(3){animation-duration:2.6s}
+.aura .glow{animation-duration:14s}
+/* keyboard: the page itself now shrinks above the keyboard (viewport meta), so nothing is lifted
+   by hand as well: the message box just sits at the bottom of what's left */
+.app.coaching.kb:not(.is-sub):not(.voice) .composer,.app.coaching.inputting:not(.is-sub):not(.voice) .composer{transform:none}
+.app.kb #s-coach{padding-bottom:84px}
