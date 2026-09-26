@@ -98,6 +98,7 @@ export function renderCoach(root) {
   composer.querySelector('.csend').setAttribute('aria-label', t('coach.send'));
   composer.querySelector('.csend').innerHTML = inflight ? I.stop : I.fwd;
   // a message just sent from the box stays hidden until it flies up from there (sendFly)
+  syncThinking();
   const hold = pendingSend || sending;
   if (hold) { const mine = [...root.querySelectorAll('.msg.me')].pop(); if (mine && mine.textContent.trim() === hold.text) mine.classList.add('sending', 'seen'); }
   requestAnimationFrame(() => { (followers.get(root)?.raf ? follow(root) : scrollDown(root, false)); if (pendingSend) sendFly(root); });
@@ -217,6 +218,7 @@ function typewriter(root, id) {
         // the answer starts: the box's orb gives one pulse and the first line rises out of it
         if (msg?.classList.contains('is-thinking')) { msg.classList.add('arrive'); pulseOrb(); }
         msg?.classList.remove('is-thinking');
+        syncThinking();
         wordsHTML(bub, words.slice(0, shown).join(''), births, now, st);
       }
       follow(root);
@@ -233,6 +235,15 @@ function typewriter(root, id) {
     set(t) { words = t.match(/\S+\s*/g) || []; if (!raf) raf = requestAnimationFrame(step); },
     drain: () => (done() && !raf ? new Promise(r => setTimeout(r, WORD_MS)) : Promise.race([new Promise(r => waiters.push(r)), new Promise(r => setTimeout(r, 4000))]))
   };
+}
+
+// The Coach is thinking (a reply on its way with no words yet, or the orb's conversation waiting):
+// one class on the app drives the thinking look. (It used to be worked out by :has() selectors on the
+// whole app, which made every change anywhere restyle everything.)
+function syncThinking() {
+  const app = document.getElementById('app');
+  const on = !!document.querySelector('#s-coach .msg.ai.is-thinking') || document.getElementById('composer')?.dataset.talk === 'thinking';
+  if (app && app.classList.contains('thinking') !== on) app.classList.toggle('thinking', on);
 }
 
 function pulseOrb() {
@@ -611,6 +622,7 @@ export function initCoach(n) {
   const talk = { on: false, l: null, misses: 0 };
   const setTalk = phase => {
     composer.dataset.talk = phase || '';
+    syncThinking();
     composer.classList.toggle('talking', !!phase);
     input.placeholder = phase ? state.t('coach.talk.' + phase) : state.t('coach.ph');
     input.disabled = !!phase;
@@ -659,6 +671,10 @@ export function initCoach(n) {
     listenTurn();
   });
   document.getElementById('app').addEventListener('screenchange', () => { if (talk.on && !document.getElementById('app').classList.contains('coaching')) stopTalk(); });
+  // typing: the Coach's offers step aside
+  const typing = () => document.getElementById('app').classList.toggle('typing', !!input.value.trim());
+  input.addEventListener('input', typing);
+  composer.addEventListener('submit', () => requestAnimationFrame(typing));
   composer.addEventListener('submit', e => {
     e.preventDefault();
     if (inflight) { inflight.ctl.abort(); return; }

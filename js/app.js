@@ -143,7 +143,7 @@ function settleCoachFx() { const c = coachFx; coachFx = null; c?.(); }
 // the top and settling at its new size. A stand-in flies while the real orbs at both ends stay hidden.
 const relRect = el => { const a = app.getBoundingClientRect(), r = el.getBoundingClientRect(); return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height / 2, w: r.width }; };
 const layRect = el => { let x = el.offsetWidth / 2, y = el.offsetHeight / 2; for (let n = el; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; } return { x, y, w: el.offsetWidth }; };
-function flyOrb(from, to, { duration, delay = 0, go, onland }) {
+function flyOrb(from, to, { duration, delay = 0, go, onland, easing }) {
   const src = $('#dock .orbbtn .orb'), base = src?.offsetWidth || 60;
   if (!src || !from.w || !to.w || Math.hypot(to.x - from.x, to.y - from.y) < 4) return null;
   const ghost = src.cloneNode(true);
@@ -152,13 +152,8 @@ function flyOrb(from, to, { duration, delay = 0, go, onland }) {
   Object.assign(ghost.style, { left: `${from.x - base / 2}px`, top: `${from.y - base / 2}px` });
   app.append(ghost);
   const dx = to.x - from.x, dy = to.y - from.y, s0 = from.w / base, s1 = to.w / base;
-  const lift = -Math.min(84, 30 + Math.abs(dx) * 0.26), peak = Math.max(s0, s1) * 1.16;
-  // across at an even glide; up and over on its own curve, so the path is a smooth arc
-  go(ghost, [{ translate: '0 0' }, { translate: `${dx}px 0` }], { duration, delay, easing: 'cubic-bezier(.45,.05,.25,1)', fill: 'both' });
-  const a = go(ghost, [
-    { transform: `translateY(0) scale(${s0})`, easing: 'cubic-bezier(.25,.6,.4,1)' },
-    { transform: `translateY(${dy * 0.35 + lift}px) scale(${peak})`, offset: 0.42, easing: 'cubic-bezier(.62,0,.9,.55)' }, // it drops hard into the box
-    { transform: `translateY(${dy}px) scale(${s1})` }], { duration, delay, fill: 'both' });
+  // one straight line, no hop: it speeds up into the box (or eases out of it on the way home)
+  const a = go(ghost, [{ transform: `translate(0, 0) scale(${s0})` }, { transform: `translate(${dx}px, ${dy}px) scale(${s1})` }], { duration, delay, easing, fill: 'both' });
   const done = () => { ghost.remove(); };
   a.addEventListener('cancel', done);
   a.onfinish = () => { done(); onland?.(); };
@@ -167,14 +162,17 @@ function flyOrb(from, to, { duration, delay = 0, go, onland }) {
 
 // The orb hits the message box: it squashes on impact and wobbles back to round, the box gives a
 // little under it, a ring of light rings out and the phone taps.
-function impact(orbEl) {
+function impact(orbEl, vx = 0, vy = 1) {
   haptic('land');
+  // squashed along the way it was travelling, then it wobbles back to round
+  const side = Math.abs(vx) > Math.abs(vy), sq = (a, b) => (side ? `${a} ${b}` : `${b} ${a}`);
   orbEl.animate([
-    { scale: '1.5 0.58' }, { scale: '0.8 1.22', offset: 0.24 }, { scale: '1.12 0.9', offset: 0.46 },
-    { scale: '0.96 1.04', offset: 0.68 }, { scale: '1.01 0.99', offset: 0.85 }, { scale: '1 1' }], { duration: 640, easing: 'cubic-bezier(.25,.6,.35,1)' });
-  // the box takes the hit: it's pushed down and springs back, with a little shake
-  $('#composer')?.animate([{ translate: '0 0', scale: 1 }, { translate: '1.5px 8px', scale: 0.985, offset: 0.16 }, { translate: '-1px -3px', scale: 1.005, offset: 0.42 },
-    { translate: '0.5px 1px', offset: 0.66 }, { translate: '0 0', scale: 1 }], { duration: 560, easing: 'cubic-bezier(.25,.6,.35,1)' });
+    { scale: sq(0.6, 1.4) }, { scale: sq(1.18, 0.86), offset: 0.26 }, { scale: sq(0.92, 1.07), offset: 0.5 },
+    { scale: sq(1.03, 0.98), offset: 0.74 }, { scale: '1 1' }], { duration: 600, easing: 'cubic-bezier(.25,.6,.35,1)' });
+  // the box takes the hit: pushed the way the orb was going, then it springs back
+  const n = Math.hypot(vx, vy) || 1, px = (vx / n) * 7, py = (vy / n) * 7 + 2;
+  $('#composer')?.animate([{ translate: '0 0', scale: 1 }, { translate: `${px}px ${py}px`, scale: 0.985, offset: 0.16 }, { translate: `${-px * 0.35}px ${-py * 0.35}px`, scale: 1.004, offset: 0.44 },
+    { translate: `${px * 0.1}px ${py * 0.1}px`, offset: 0.7 }, { translate: '0 0', scale: 1 }], { duration: 540, easing: 'cubic-bezier(.25,.6,.35,1)' });
   const btn = orbEl.closest('.corb'), box = $('#composer');
   if (btn) { btn.classList.remove('impact'); void btn.offsetWidth; btn.classList.add('impact'); setTimeout(() => btn.classList.remove('impact'), 800); }
   // the impact spreads into the box: a soft light from where the orb hit runs along it and fades
@@ -205,7 +203,7 @@ function coachMorph(open, under) {
     let flying = null;
     queueMicrotask(() => {
       const corb = $('#composer .corb .orb');
-      flying = from && corb && flyOrb(from, layRect(corb), { duration: 500, go, onland: () => { app.classList.remove('orbtravel'); impact(corb); } });
+      flying = from && corb && flyOrb(from, layRect(corb), { duration: 380, easing: 'cubic-bezier(.55,0,.8,.3)', go, onland: () => { app.classList.remove('orbtravel'); const to = layRect(corb); impact(corb, to.x - from.x, to.y - from.y); } });
       if (flying) { app.classList.add('orbtravel', 'orbflown'); go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 900, fill: 'forwards' }); return; }
       go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
       setTimeout(() => haptic('land'), 560);
@@ -242,7 +240,7 @@ function coachMorph(open, under) {
     // the orb leaves the message box and flies home into the bar, which takes it with a small pulse
     const corb = $('#composer .corb .orb');
     let hold = null;
-    const flying = corb && dockOrb && flyOrb(relRect(corb), layRect(dockOrb), { duration: 500, delay: 40, go, onland: () => {
+    const flying = corb && dockOrb && flyOrb(relRect(corb), layRect(dockOrb), { duration: 420, delay: 40, easing: 'cubic-bezier(.3,.7,.3,1)', go, onland: () => {
       hold?.cancel();
       app.classList.remove('orbtravel');
       orb.classList.remove('pulse'); void orb.offsetWidth; orb.classList.add('pulse');
@@ -624,7 +622,7 @@ store.subscribe(reason => {
   }
   // starting a workout leaves Today straight away: no card glide on the page being left (its snapshot
   // would sit over the workout for a moment)
-  if (reason === 'start') {
+  if (reason === 'start' || reason === 'warmup-auto') {
     // and Today isn't redrawn (to its Resume card) in the moment it's being left; if nothing moves on, it catches up
     if (view.screen === 'today') { setTimeout(() => { if (view.screen === 'today') renderAll(); }, 60); return; }
     return renderAll();
@@ -638,6 +636,7 @@ store.subscribe(reason => {
 const cardKeys = root => [...root.children].map(el => el.style.viewTransitionName).join('|');
 function morph(fn) {
   const s = $('#s-' + view.screen);
+  const from = view.screen;
   const calm = view.screen === 'today' && document.startViewTransition && document.visibilityState === 'visible' &&
     document.documentElement.dataset.motion !== 'off' && !matchMedia('(prefers-reduced-motion: reduce)').matches &&
     !isVoiceOpen() && !document.querySelector('.sheet') && s && !s.classList.contains('enter');
@@ -646,7 +645,8 @@ function morph(fn) {
   renderToday(probe);
   if (!s.children.length || cardKeys(probe) === cardKeys(s)) return fn(); // the first paint doesn't glide
   const y = s.scrollTop;
-  try { document.startViewTransition(() => { fn(); s.scrollTop = y; }); } catch { fn(); }
+  // (if the page changed while the snapshot was taken, the new page is drawn as it is, not glided)
+  try { document.startViewTransition(() => { fn(); if (view.screen === from) s.scrollTop = y; }); } catch { fn(); }
 }
 
 // ---------- clock: derived from timestamps, only while visible ----------

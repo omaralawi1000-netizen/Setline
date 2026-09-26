@@ -208,17 +208,27 @@ const micSvg = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9
 
 // Shrink big numbers so "102.5" fits between the steppers.
 let measure = null;
+// All the measuring first, then all the writing: reading a width after changing a font size forces
+// the whole page to be laid out again, once per number.
+let numFont = '';
+const numWidth = new Map();
 function fitNums(root) {
   measure ||= document.createElement('canvas').getContext('2d');
-  for (const el of root.querySelectorAll('.num')) {
-    const avail = el.clientWidth - 6;
-    if (avail <= 0) continue;
-    const cs = getComputedStyle(el);
-    measure.font = `800 50px ${cs.fontFamily}`;
+  const els = [...root.querySelectorAll('.num')];
+  if (!els.length) return;
+  numFont ||= `800 50px ${getComputedStyle(els[0]).fontFamily}`;
+  measure.font = numFont;
+  const sizes = els.map(el => {
+    // the steppers' widths only change with the screen width: measured once per width
+    const k = `${el.id || el.dataset.k || ''}|${el.closest('.sheet') ? 's' : 'p'}|${innerWidth}`;
+    let avail = numWidth.get(k);
+    if (!(avail > 0)) { avail = el.clientWidth - 6; if (avail > 0) numWidth.set(k, avail); }
+    if (avail <= 0) return null;
     const text = el.value || '0';
     const w = measure.measureText(text).width - 2 * text.length; // letter-spacing -.04em
-    el.style.fontSize = Math.max(22, Math.min(50, (50 * avail) / Math.max(1, w))) + 'px';
-  }
+    return Math.max(22, Math.min(50, (50 * avail) / Math.max(1, w))) + 'px';
+  });
+  els.forEach((el, i) => { if (sizes[i] && el.style.fontSize !== sizes[i]) el.style.fontSize = sizes[i]; });
 }
 
 function setsHTML(w, ex) {

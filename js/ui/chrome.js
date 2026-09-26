@@ -15,9 +15,11 @@ export function edgeColor() {
   root.style.setProperty('--edge', out);
   return out;
 }
-const edge = () => edgeColor();
+// worked out once per theme: reading computed styles forces a style pass, and this ran on every class change
+let edgeCache = '';
+const edge = () => (edgeCache ||= edgeColor());
 let repaint = () => {};
-export const refreshChrome = () => repaint();
+export const refreshChrome = () => { edgeCache = ''; repaint(); };
 
 export function initChrome() {
   const app = document.getElementById('app');

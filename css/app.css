@@ -2068,13 +2068,13 @@ html[data-dock=icons] .dock .tab span{display:none}
   background:conic-gradient(from 0deg,var(--accent),var(--violet),var(--blue),color-mix(in srgb,var(--warm) 60%,var(--violet)),var(--accent));
   -webkit-mask:radial-gradient(closest-side,#000 0%,rgba(0,0,0,.55) 38%,transparent 72%);mask:radial-gradient(closest-side,#000 0%,rgba(0,0,0,.55) 38%,transparent 72%);
   transition:opacity .9s cubic-bezier(.2,.8,.2,1),scale 1.4s cubic-bezier(.2,.8,.2,1);animation:auraspin 14s linear infinite paused;will-change:rotate}
-.app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .glow{opacity:.7;scale:1;animation-play-state:running}
+.app.thinking .aura .glow{opacity:.7;scale:1;animation-play-state:running}
 @keyframes auraspin{to{rotate:360deg}}
 .msg.ai.is-thinking{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 .orb{isolation:isolate}
 .orb::before{content:"";position:absolute;inset:-45%;z-index:-1;border-radius:50%;pointer-events:none;opacity:0;transition:opacity .4s;background:radial-gradient(closest-side,rgba(var(--a-rgb),.55),rgba(var(--v-rgb),.25) 55%,transparent)}
-:is(.composer[data-talk=thinking] .corb .orb,.app:has(#s-coach .msg.ai.is-thinking) .composer .corb .orb)::before{opacity:1;animation:orbhalo 2.6s ease-in-out infinite}
-:is(.composer[data-talk=thinking] .corb .orb,.app:has(#s-coach .msg.ai.is-thinking) .composer .corb .orb) .core{animation:orbwork 2.6s ease-in-out infinite}
+.app.thinking .composer .corb .orb::before{opacity:1;animation:orbhalo 2.6s ease-in-out infinite}
+.app.thinking .composer .corb .orb .core{animation:orbwork 2.6s ease-in-out infinite}
 @keyframes orbhalo{0%,100%{opacity:.45;scale:.85}50%{opacity:1;scale:1.08}}
 @keyframes orbwork{0%,100%{scale:1}50%{scale:1.07}}
 
@@ -2227,9 +2227,9 @@ html[data-dock=icons] .dock .tab span{display:none}
 @keyframes cloud1{to{transform:translate(22vw,-10vh) scale(1.15)}}
 @keyframes cloud2{to{transform:translate(-26vw,-14vh) scale(.9)}}
 @keyframes cloud3{0%{transform:translateY(0) scale(.9)}100%{transform:translateY(-18vh) scale(1.2)}}
-.app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .clouds{opacity:1}
-.app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .clouds i{animation-play-state:running}
-.app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .glow{opacity:.45}
+.app.thinking .aura .clouds{opacity:1}
+.app.thinking .aura .clouds i{animation-play-state:running}
+.app.thinking .aura .glow{opacity:.45}
 /* and one quiet line in the conversation: what it's doing, in a shimmer of the theme colour
    (no bubble, no second orb) */
 .msg.ai.is-thinking{position:static;width:auto;height:auto;overflow:visible;clip-path:none}
@@ -2276,17 +2276,17 @@ html[data-dock=icons] .dock .tab span{display:none}
 .cthink .tl{grid-area:1/1;opacity:0;font-size:15.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   background:linear-gradient(90deg,var(--muted) 0%,var(--accent-hi) 40%,var(--violet) 55%,var(--muted) 90%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
   animation:shimmer 1.8s linear infinite,stepcycle 8s ease infinite;animation-delay:0s,calc(var(--i) * 2s);animation-play-state:paused}
-:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]) .cglow,
-:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]) .cthink{opacity:1}
-:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]) .cglow i,
-:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]) .cthink .tl{animation-play-state:running}
-:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking])::before{opacity:1;animation:cring var(--m-think) var(--e-soft) infinite alternate}
+.app.thinking .composer .cglow,
+.app.thinking .composer .cthink{opacity:1}
+.app.thinking .composer .cglow i,
+.app.thinking .composer .cthink .tl{animation-play-state:running}
+.app.thinking .composer::before{opacity:1;animation:cring var(--m-think) var(--e-soft) infinite alternate}
 @keyframes cring{from{opacity:.55}to{opacity:1}}
-:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]) input::placeholder{color:transparent}
+.app.thinking .composer input::placeholder{color:transparent}
 /* the screen stays calm: no clouds, no aurora; the Coach's own light drifts slowly instead */
 .aura .clouds{display:none}
-.app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .glow{opacity:0}
-.app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .veil{animation:veildrift var(--m-drift) var(--e-soft) infinite alternate}
+.app.thinking .aura .glow{opacity:0}
+.app.thinking .aura .veil{animation:veildrift var(--m-drift) var(--e-soft) infinite alternate}
 @keyframes veildrift{from{transform:none}to{transform:translateY(-4%) scale(1.08)}}
 /* the thinking line in the conversation is for screen readers only now (the box shows it) */
 .msg.ai.is-thinking{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
@@ -2335,11 +2335,11 @@ html[data-dock=icons] .dock .tab span{display:none}
   background:radial-gradient(40% 70% at 30% 50%,rgba(var(--b-rgb),.42),transparent 70%),radial-gradient(35% 80% at 72% 55%,rgba(var(--a-rgb),.36),transparent 70%);
   animation:cdrift2 calc(var(--m-think) * 1.3) var(--e-soft) infinite alternate;animation-play-state:paused}
 @keyframes cdrift2{from{transform:translateX(18%) scale(1.1)}to{transform:translateX(-18%) scale(.95)}}
-:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]) .cglow::after{animation-play-state:running}
+.app.thinking .composer .cglow::after{animation-play-state:running}
 
 /* the box's dark drop shadow would read as a band across the moving light: the breathing ring stands
    in for it while thinking (switched, not animated) */
-:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]){box-shadow:inset 0 1px 0 rgba(255,255,255,.1);transition-property:opacity,transform}
+.app.thinking .composer{box-shadow:inset 0 1px 0 rgba(255,255,255,.1);transition-property:opacity,transform}
 
 /* the Coach's background light fades out evenly from the orb (its violet step used to leave a darker
    ring just above the message box) */
@@ -2348,7 +2348,7 @@ html[data-dock=icons] .dock .tab span{display:none}
 /* …and the background moves: soft clouds of the theme colours drift behind the conversation (radial
    gradients moved on the GPU, no live blur), fading in only while the Coach thinks */
 .aura .clouds{display:block;height:75%}
-.app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .clouds{opacity:.7}
+.app.thinking .aura .clouds{opacity:.7}
 .aura .clouds i:nth-child(1){animation-duration:var(--m-drift)}
 .aura .clouds i:nth-child(2){animation-duration:calc(var(--m-drift) * 1.3)}
 .aura .clouds i:nth-child(3){animation-duration:calc(var(--m-drift) * .85)}
@@ -2370,12 +2370,12 @@ html[data-motion=off] .cglow::after,html[data-motion=off] .aura .clouds i{animat
 /* thinking: the soft gradients drift inside the box (no lines round it); the box is filled rather than
    live-blurred while the light moves, and the bottom blur steps aside */
 .cglow{opacity:0}
-:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking])::before{opacity:0;animation:none}
-:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]){-webkit-backdrop-filter:none;backdrop-filter:none;--gl-fill:color-mix(in srgb,var(--bg) 88%,transparent)}
-:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]) .cglow{opacity:.8}
-.app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .veil{animation:none}
-.app.coaching:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .edge.eb{visibility:hidden}
-.app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .clouds{opacity:.55}
+.app.thinking .composer::before{opacity:0;animation:none}
+.app.thinking .composer{-webkit-backdrop-filter:none;backdrop-filter:none;--gl-fill:color-mix(in srgb,var(--bg) 88%,transparent)}
+.app.thinking .composer .cglow{opacity:.8}
+.app.thinking .aura .veil{animation:none}
+.app.coaching.thinking .edge.eb{visibility:hidden}
+.app.thinking .aura .clouds{opacity:.55}
 
 /* words: a lighter blur is just as soft and far cheaper to paint on a phone */
 @keyframes wordblur{
@@ -2432,7 +2432,7 @@ html[data-motion=off] .orbghost{display:none}
 .dochip.going{opacity:.55;transform:scale(.97);transition:opacity var(--m-fast) var(--e-out),transform var(--m-fast) var(--e-out)}
 @keyframes dochipin{from{opacity:0;transform:translateY(8px) scale(.94)}}
 .msg:has(~ .msg.me) .dochips{display:none}
-.app:has(#composer input:not(:placeholder-shown)) .dochips{opacity:0;transform:translateY(4px);pointer-events:none}
+.app.typing .dochips{opacity:0;transform:translateY(4px);pointer-events:none}
 .msg.seen .dochip{animation:none}
 @media (prefers-reduced-motion: reduce){ .dochip{animation:none} }
 .chgfail{margin-top:8px;font-size:13.5px;font-weight:700;color:var(--muted)}
@@ -2503,3 +2503,14 @@ html[data-glass=liquid] .dock.glass{--gl-fill:rgba(18,20,28,.42);-webkit-backdro
   box-shadow:0 18px 40px -12px rgba(0,0,0,.7),inset 0 1px 1px rgba(255,255,255,.34),inset 0 -1px 1px rgba(255,255,255,.08),inset 0 0 0 .5px rgba(255,255,255,.14),inset 0 -12px 22px -16px rgba(var(--v-rgb),.4)}
 html[data-glass=off] .edge::after{-webkit-backdrop-filter:none;backdrop-filter:none}
 html[data-glass=off] .dock.glass,html[data-glass=off] .composer.glass{-webkit-backdrop-filter:none;backdrop-filter:none;--gl-fill:rgba(18,20,28,.92)}
+/* the edges, calmer (1.47): the top gradient hugs the status bar instead of reaching into the page,
+   and the bottom fade sits low, under the bar, rather than climbing up the screen */
+html[data-glass=liquid] .edge.et{height:calc(var(--safe-top) + 58px)}
+html[data-glass=liquid] .edge.et::before{background:linear-gradient(var(--edge) 0,color-mix(in srgb,var(--edge) 82%,transparent) calc(var(--safe-top) + 4px),color-mix(in srgb,var(--edge) 40%,transparent) calc(var(--safe-top) + 22px),color-mix(in srgb,var(--edge) 12%,transparent) calc(var(--safe-top) + 40px),transparent)}
+html[data-glass=liquid] .edge.et::after{-webkit-backdrop-filter:blur(14px) saturate(150%);backdrop-filter:blur(14px) saturate(150%);
+  -webkit-mask-image:linear-gradient(#000 0,#000 calc(var(--safe-top) + 6px),rgba(0,0,0,.45) calc(var(--safe-top) + 26px),transparent);
+  mask-image:linear-gradient(#000 0,#000 calc(var(--safe-top) + 6px),rgba(0,0,0,.45) calc(var(--safe-top) + 26px),transparent)}
+html[data-glass=liquid] .edge.eb{height:calc(var(--dock-bottom) + var(--dock-h) * .7)}
+html[data-glass=liquid] .edge.eb::before{background:linear-gradient(transparent,color-mix(in srgb,var(--bg) 22%,transparent) 50%,color-mix(in srgb,var(--bg) 55%,transparent))}
+html[data-glass=liquid] .edge.eb::after{-webkit-backdrop-filter:blur(12px) saturate(140%);backdrop-filter:blur(12px) saturate(140%);
+  -webkit-mask-image:linear-gradient(transparent,rgba(0,0,0,.6) 50%,#000);mask-image:linear-gradient(transparent,rgba(0,0,0,.6) 50%,#000)}

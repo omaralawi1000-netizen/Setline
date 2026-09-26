@@ -549,3 +549,11 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Streaming replies: finished lines are drawn once and only the line being written is redrawn (the whole reply used to be rebuilt every few frames); words used to be cut off 200 ms before their blur-in ended, which made each one jump
 - [x] Sending: the bubble lifts off where you typed on a spring, and the conversation above glides up to make room instead of jumping; the send button gives a little
 - [x] Top of the screen: the status bar's colour flows down into the page as a gradient over a progressive blur. New Customize → Glass (Liquid: this, a frosted fade behind the bottom bar and a clearer, brighter-rimmed bar; Soft; Off) and Background glow (On / Soft / Off)
+
+## 1.47.0: a straight landing, calmer edges, a faster workout start, no stray words
+
+- [x] The orb flies in one straight line from the bar into the message box, speeding up into it (no hop over the page), and hits it: squashed along the way it travelled, the box pushed the same way, a stronger haptic thump (65-35-25 ms; short pulses are hard to feel on Samsung phones). It flies straight home too
+- [x] Edges calmer: the top gradient hugs the status bar (58 px, was 110) with a lighter blur; the bottom fade sits low under the bar and is lighter
+- [x] Starting a workout: the warm-ups added at the start used to kick off Today's card glide, whose snapshot landed ~130 ms later over the workout, redrew it and cross-faded the whole page. Now one draw, no cross-fade; the longest frame halved (430-550 → 235-265 ms in the motion lab). The stepper numbers no longer re-lay out the page once per number, and the status-bar colour is no longer recomputed (a full style pass) on every class change
+- [x] The thinking look and the offers hiding while you type use two plain classes instead of :has() selectors on the whole app
+- [x] A single stray word from the hold-to-talk orb ("with", "doing") that isn't a command shows "Didn't catch that" instead of going to the Coach

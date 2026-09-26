@@ -24,7 +24,7 @@ import { aiMeal } from '../ai.js';
 import { MEAL_SCHEMA, mealPrompt, validateMeal } from '../meals.js';
 import { coachModels } from '../settings.js';
 import { addGoal } from './goals.js';
-import { isQuestion, isPlanRequest } from '../coach.js';
+import { isQuestion, isPlanRequest, isNoise } from '../coach.js';
 import { startCardioSession, finishSheet as cardioFinishSheet } from './cardio.js';
 import { dateKey } from '../body.js';
 import { planFor } from './routine.js';
@@ -554,6 +554,8 @@ export function handleText(text, { typed = false } = {}) {
   if (v.open) showWords(text);
   const intent = parse(text, parseCtx());
   if (intent.type === 'Unknown') {
+    // one stray word the mic caught ("with", "doing", gym noise) is not sent anywhere
+    if (!typed && isNoise(text)) return showError('voice.tooShort', 'voice.tooShortSub', { retry: true });
     if (isQuestion(text) || isPlanRequest(text)) return toCoach(text);
     if (getKey('google')) return aiFallback(text, intent, { typed });
   }
