@@ -21,7 +21,8 @@
      a gentle spring only for things you press. */
   --m-press:.12s; --m-fast:.18s; --m-base:.32s; --m-slow:.46s;
   --m-word:.85s; --m-think:2.4s; --m-drift:7s;
-  --e-out:cubic-bezier(.2,.8,.2,1); --e-soft:cubic-bezier(.25,.1,.25,1); --e-in:cubic-bezier(.4,0,1,1); --e-spring:cubic-bezier(.32,1.2,.5,1);
+  --m-orbit:3.6s;
+  --e-out:cubic-bezier(.2,.8,.2,1); --e-linear:linear; --e-soft:cubic-bezier(.25,.1,.25,1); --e-in:cubic-bezier(.4,0,1,1); --e-spring:cubic-bezier(.32,1.2,.5,1);
 }
 
 /* accent themes (Customize). Quiet, low-saturation tones; violet is the default above. */

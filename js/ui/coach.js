@@ -125,9 +125,9 @@ function typewriter(root, id) {
   const births = [];
   const done = () => (shown >= words.length);
   const step = now => {
-    if (!done() && now - last > 34) {
+    if (!done() && now - last > 66) { // new words every ~4 frames: each word fades in on its own clock, so this stays smooth and the thread isn't rebuilt every frame
       last = now;
-      shown = Math.min(words.length, shown + Math.max(1, Math.ceil((words.length - shown) / 10)));
+      shown = Math.min(words.length, shown + Math.max(2, Math.ceil((words.length - shown) / 6)));
       const bub = root.querySelector(`[data-id="${id}"] .bub`);
       if (bub) {
         bub.closest('.msg')?.classList.remove('is-thinking');
@@ -376,7 +376,7 @@ export function initCoach(n) {
   nav = n;
   const root = $('#s-coach');
   const composer = $('#composer');
-  composer.innerHTML = `<span class="cglow" aria-hidden="true"><i></i></span><button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span></button><input enterkeyhint="send" autocomplete="off" maxlength="5000"><button type="submit" class="csend">${I.fwd}</button>`;
+  composer.innerHTML = `<span class="chalo" aria-hidden="true"><i></i></span><span class="cglow" aria-hidden="true"><i></i></span><button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span></button><input enterkeyhint="send" autocomplete="off" maxlength="5000"><button type="submit" class="csend">${I.fwd}</button>`;
   // The composer's orb: talk to your coach. What you say is sent when you pause, the answer is
   // spoken, then it listens again, so it's a conversation. Tap while it listens to send at once;
   // tap while it thinks or speaks (or say nothing) to end it.

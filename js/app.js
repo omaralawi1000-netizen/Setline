@@ -158,6 +158,7 @@ function coachMorph(open, under) {
   const dockOrb = orb.querySelector('.orb'), coach = $('#s-coach');
   const other = under && under !== coach ? under : null;
   aura.classList.add('run');
+  app.classList.add('morphing'); // the blurred edges step aside while the light moves under them
   const anims = [];
   const go = (el, frames, opts) => { if (!el) return null; const a = el.animate(frames, opts); anims.push(a); return a; };
   if (open) {
@@ -166,14 +167,18 @@ function coachMorph(open, under) {
     const last = go(bloom, [{ scale: 0.1, opacity: 0 }, { scale: 0.55, opacity: 1, offset: 0.3 }, { scale: 1.5, opacity: 0 }], { duration: 820, easing: 'cubic-bezier(.33,.1,.25,1)' });
     // a ring of light ripples out of the orb with the bloom
     go(aura.querySelector('.wave'), [{ transform: `translate(-50%, -50%) scale(${r0})`, opacity: 0 }, { opacity: 1, offset: 0.1 }, { opacity: 0.85, offset: 0.62 }, { transform: 'translate(-50%, -50%) scale(1)', opacity: 0 }], { duration: 1050, easing: 'cubic-bezier(.22,.6,.2,1)' });
-    go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: 560, delay: 90, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'backwards' });
+    // held (fill both) until everything settles together: an animation ending on its own mid-way let
+    // the page underneath show through for a frame or two on the phone
+    go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: 560, delay: 90, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'both' });
     go(other, [{ scale: 1, opacity: 1 }, { scale: 0.94, opacity: 0.3 }], { duration: 640, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'forwards' });
     app.classList.add('coach-in');
     last.onfinish = settleCoachFx;
     coachFx = () => {
       anims.forEach(a => a.cancel());
       aura.classList.remove('run');
-      setTimeout(() => app.classList.remove('coach-in'), 300);
+      app.classList.remove('morphing');
+      // the messages have arrived: once coach-in goes they must not pick up another entrance animation
+      setTimeout(() => { for (const m of document.querySelectorAll('#s-coach .msg')) m.classList.add('seen'); app.classList.remove('coach-in'); }, 300);
       if (!other) return;
       if (other.classList.contains('on')) { Object.assign(other.style, { transition: '', opacity: '', visibility: '', transform: '' }); return; }
       Object.assign(other.style, { visibility: 'hidden', opacity: '0' }); // covered: gone at once
@@ -191,7 +196,7 @@ function coachMorph(open, under) {
     go(other, [{ scale: 0.95, opacity: 0.25 }, { scale: 1, opacity: 1 }], { duration: 560, delay: 80, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' });
     go(dockOrb, [{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 460, delay: 380, easing: 'cubic-bezier(.3,1.25,.5,1)', fill: 'backwards' });
     last.onfinish = settleCoachFx;
-    coachFx = () => { anims.forEach(a => a.cancel()); aura.classList.remove('run'); };
+    coachFx = () => { anims.forEach(a => a.cancel()); aura.classList.remove('run'); app.classList.remove('morphing'); };
   }
 }
 

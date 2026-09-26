@@ -507,3 +507,9 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Thinking: the step words ("Reading your log…") are gone; the message box fills with two drifting gradients, and soft clouds move in the background again. The box's dark drop shadow is off while thinking, and the Coach's background light fades out evenly (it had a darker ring above the box)
 - [x] While a reply or plan comes in, the thread follows it down in one smooth motion (it used to restart a smooth scroll every 140 ms); touching the thread lets go
 - [x] Bug: the empty Coach said "No answer came back. Try again." (two texts shared one name)
+
+## 1.42.0: smoother Coach, a thinking light round the box
+
+- [x] Opening the Coach: fixed two glitches seen on the phone recording. The page underneath showed through for two frames (the background's fade ended by itself mid-way; now everything settles together), and about 1.4 s after opening the whole conversation blinked and faded in again (the messages switched to a second entrance animation)
+- [x] Lighter to draw: the blurred screen edges step aside while the Coach opens or closes and while it thinks; the whole-screen background drift is gone (the clouds still move); the message box has no live blur while lit; reply words use a lighter blur and are added every ~4 frames instead of every 2
+- [x] Thinking: a ring of the theme colours turns round the edge of the message box with a soft glow outside it, the inside stays dark (the gradients inside had become a grey smear in the mono theme)
