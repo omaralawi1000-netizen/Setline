@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { dirname, relative, resolve } from 'node:path';
+import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { STRINGS, translator, resolveLang, joinList } from '../js/i18n.js';
 import { VERSION } from '../js/version.js';
@@ -20,7 +20,7 @@ function productionModules(entry = 'js/app.js', seen = new Set()) {
   const file = resolve(ROOT, entry), src = readFileSync(file, 'utf8');
   const re = /(?:\bfrom\s+|^\s*import\s+)['"](\.[^'"]+)['"]/gm;
   for (const m of src.matchAll(re)) {
-    const dep = relative(ROOT, resolve(dirname(file), m[1])).replaceAll('\\\\', '/');
+    const dep = relative(ROOT, resolve(dirname(file), m[1])).split(sep).join('/');
     if (dep.endsWith('.js')) productionModules(dep, seen);
   }
   return seen;
