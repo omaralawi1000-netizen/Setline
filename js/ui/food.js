@@ -16,7 +16,7 @@ import { openMealSheet, favRowHTML, toggleStar } from './meal.js';
 import { openScanner, scanIcon } from './scan.js';
 import { openFoodSearch } from './foodsearch.js';
 import { talkNow } from './voice.js';
-import { mealKey, makeTemplate, templateTotals } from '../meals.js';
+import { mealKey, makeTemplate, templateTotals, usualMeals } from '../meals.js';
 import { openFoodCustomize } from './customize.js';
 
 const view = { date: null };
@@ -92,15 +92,18 @@ function repeatHTML(slots) {
   }).join('')}</div>`;
 }
 
-// Saved meals first in the favourites row.
+// Saved meals first in the favourites row, then your usuals: the same foods together that you keep
+// eating (found from the last 30 days, not saved by hand), one tap each.
 function templatesHTML() {
   const { t } = state;
   const list = state.settings.mealTemplates || [];
-  if (!list.length) return '';
-  return `<div class="section"><span class="label">${t('tpl.title')}</span></div><div class="favrow tplrow">${list.map((x, i) => {
+  const same = (x, u) => x.items.length === u.items.length && x.items.every(i => u.items.some(j => j.name.toLowerCase() === i.name.toLowerCase()));
+  const usual = usualMeals(state.nutrition).filter(u => !list.some(x => same(x, u)));
+  if (!list.length && !usual.length) return '';
+  return `<div class="section"><span class="label">${t(list.length ? 'tpl.title' : 'tpl.usuals')}</span></div><div class="favrow tplrow">${list.map((x, i) => {
     const tt = templateTotals(x);
     return `<button class="favchip tpl solid" data-f="tpl" data-id="${esc(x.id)}" style="--i:${i}"><span class="fi">${STACK}</span><span class="fn">${esc(x.name)}</span><b>${nf().format(tt.kcal)} kcal</b></button>`;
-  }).join('')}</div>`;
+  }).join('')}${usual.map((u, i) => `<button class="favchip tpl usual solid" data-f="usual" data-key="${esc(u.key)}" style="--i:${list.length + i}" title="${esc(u.items.map(x => x.name).join(', '))}"><span class="fi">${I.undo}</span><span class="fn">${esc(t('tpl.usual', { slot: t('food.slot.' + u.slot).toLowerCase() }))}<small>${esc(u.items.map(x => x.name.split(/[,(]/)[0].trim()).join(', '))}</small></span><b>${nf().format(u.kcal)} kcal</b></button>`).join('')}</div>`;
 }
 
 async function logMany(meals, title, slot) {
@@ -389,6 +392,11 @@ export function initFood(root) {
       const y = state.nutrition.find(e => e.date === shiftDate(dateKey(), -1));
       const list = bySlot(y)[b.dataset.slot] || [];
       if (list.length) await logMany(list, t('food.slot.' + b.dataset.slot), b.dataset.slot);
+      return;
+    }
+    if (k === 'usual') {
+      const u = usualMeals(state.nutrition).find(x => x.key === b.dataset.key);
+      if (u) { b.classList.add('logged'); await logMany(u.items, t('tpl.usual', { slot: t('food.slot.' + u.slot).toLowerCase() }), u.slot); }
       return;
     }
     if (k === 'tpl') {

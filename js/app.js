@@ -2,7 +2,7 @@
 import * as store from './store.js';
 import { configureSteps } from './progression.js';
 import { state } from './store.js';
-import { elapsedSec, nextSetNumber } from './workout.js';
+import { elapsedSec, nextSetNumber, restFor as restSecFor } from './workout.js';
 import { clock } from './format.js';
 import { setHapticsGate, haptic } from './haptics.js';
 import { keepAwake } from './wakelock.js';
@@ -12,10 +12,11 @@ import { toast } from './ui/toast.js';
 import { handlePop } from './ui/sheet.js';
 import { renderToday, currentStall } from './ui/today.js';
 import { applyPlateauFix } from './plateau.js';
-import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav, autoWarmup, restBell } from './ui/workout.js';
+import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav, autoWarmup, restBell, plannedNext, logFromAway, restFromAway } from './ui/workout.js';
 import { markFinished, renderHistory, renderDetail } from './ui/history.js';
 import { renderSettings, initSettings } from './ui/settings.js';
 import { DUO } from './settings.js';
+import { afterSession, checkWeek, dropPin } from './ui/pins.js';
 import { initVoice, orbHTML, voiceHandlePop, closeVoice, isVoiceOpen, openVoice } from './ui/voice.js';
 import { renderYou } from './ui/you.js';
 import { renderCoach, initCoach, ask as askCoach, ensureModels, weeklyCheckin, markWeeklySeen, sessionDebrief, markDebriefSeen } from './ui/coach.js';
@@ -155,7 +156,9 @@ function flyOrb(from, to, { duration, delay = 0, go, onland, easing }) {
   app.append(ghost);
   const dx = to.x - from.x, dy = to.y - from.y, s0 = from.w / base, s1 = to.w / base;
   // one straight line, no hop: it shoots off at once and slows just before it arrives, then hits
-  const a = go(ghost, [{ transform: `translate(0, 0) scale(${s0})` }, { transform: `translate(${dx}px, ${dy}px) scale(${s1})` }], { duration, delay, easing, fill: 'both' });
+  // it shrinks to the box's size mostly on the way in, so it doesn't look like it deflates at the start
+  const a = go(ghost, [{ translate: '0 0', scale: s0 }, { scale: s0 + (s1 - s0) * 0.4, offset: 0.55 },
+    { translate: `${dx}px ${dy}px`, scale: s1 }], { duration, delay, easing, fill: 'both' });
   const done = () => { ghost.remove(); };
   a.addEventListener('cancel', done);
   a.onfinish = () => { done(); onland?.(); };
@@ -169,10 +172,10 @@ function impact(orbEl, vx = 0, vy = 1) {
   // squashed along the way it was travelling, then it wobbles back to round
   const side = Math.abs(vx) > Math.abs(vy), sq = (a, b) => (side ? `${a} ${b}` : `${b} ${a}`);
   orbEl.animate([
-    { scale: sq(0.6, 1.4) }, { scale: sq(1.18, 0.86), offset: 0.26 }, { scale: sq(0.92, 1.07), offset: 0.5 },
-    { scale: sq(1.03, 0.98), offset: 0.74 }, { scale: '1 1' }], { duration: 600, easing: 'cubic-bezier(.25,.6,.35,1)' });
+    { scale: sq(0.8, 1.2) }, { scale: sq(1.08, 0.94), offset: 0.3 }, { scale: sq(0.97, 1.02), offset: 0.6 },
+    { scale: '1 1' }], { duration: 520, easing: 'cubic-bezier(.25,.6,.35,1)' });
   // the box takes the hit: pushed the way the orb was going, then it springs back
-  const n = Math.hypot(vx, vy) || 1, px = (vx / n) * 7, py = (vy / n) * 7 + 2;
+  const n = Math.hypot(vx, vy) || 1, px = (vx / n) * 4, py = (vy / n) * 4 + 1;
   $('#composer')?.animate([{ translate: '0 0', scale: 1 }, { translate: `${px}px ${py}px`, scale: 0.985, offset: 0.16 }, { translate: `${-px * 0.35}px ${-py * 0.35}px`, scale: 1.004, offset: 0.44 },
     { translate: `${px * 0.1}px ${py * 0.1}px`, offset: 0.7 }, { translate: '0 0', scale: 1 }], { duration: 540, easing: 'cubic-bezier(.25,.6,.35,1)' });
   const btn = orbEl.closest('.corb'), box = $('#composer');
@@ -488,6 +491,14 @@ app.addEventListener('click', e => {
   if (f) { setHistoryFilter(f.dataset.hfilter); haptic('tap'); renderScreen('history'); return; }
   if (e.target.closest('[data-review=ask]')) { go('coach'); askCoach(state.t('review.prompt')); }
   if (e.target.closest('[data-weekly]')) { haptic('tap'); go('coach'); }
+  const pn = e.target.closest('[data-pin]');
+  if (pn) { // the Coach's pinned note: talk it through, or put it away
+    haptic('tap');
+    const p = state.settings.coachPin;
+    dropPin();
+    if (pn.dataset.pin === 'talk' && p?.ask) { if (view.screen !== 'coach') go('coach'); setTimeout(() => askCoach(p.ask), view.screen === 'coach' ? 0 : 350); }
+    return;
+  }
   const ck = e.target.closest('[data-ck]');
   if (ck && !ck.disabled) { onCheckinClick(ck, () => { renderScreen('today'); }); return; }
   const mo = e.target.closest('[data-month]');
@@ -579,7 +590,11 @@ function scheduleRestAlert() {
   clearTimeout(restTimer);
   restFor = r.endsAt;
   const w = state.active, ex = w?.exercises[w.current];
-  const msg = { type: 'rest', endsAt: r.endsAt, live: state.settings.restLive !== false, liveTitle: state.t('workout.restLive'), title: state.t('workout.restDone'), body: ex ? `${state.catalog.name(ex.exerciseId, state.lang)} · ${state.t('workout.setNext', { n: nextSetNumber(ex) })}` : '' };
+  const pn = plannedNext(w), exName = ex ? state.catalog.name(ex.exerciseId, state.lang) : '';
+  const msg = { type: 'rest', endsAt: r.endsAt, live: state.settings.restLive !== false, liveTitle: state.t('workout.restLive'), title: state.t('workout.restDone'), body: ex ? `${exName} · ${state.t('workout.setNext', { n: nextSetNumber(ex) })}${pn ? ` · ${pn.label}` : ''}` : '',
+    // the lock screen's buttons: log that set without opening the app, or 15 s more
+    next: pn ? { exId: pn.exId, setId: pn.setId, kg: pn.kg, reps: pn.reps } : null, logLabel: pn ? state.t('alerts.log', { set: pn.label }) : '', addLabel: state.t('alerts.add15'),
+    restSec: restSecFor(ex, state.settings.restByEx, state.settings.restSec), afterBody: ex ? `${exName} · ${state.t('toast.logged', { n: nextSetNumber(ex) })}` : '' };
   // the service worker keeps time even when this page is frozen in the background
   if (sw && r.endsAt - Date.now() < 270_000) { sw.postMessage(msg); return; }
   restTimer = setTimeout(async () => {
@@ -588,6 +603,27 @@ function scheduleRestAlert() {
     (await navigator.serviceWorker?.ready)?.showNotification(msg.title, { body: msg.body, tag: 'setline-rest', renotify: true, icon: 'icons/icon-192.png', vibrate: [220, 90, 220, 90, 320] });
   }, r.endsAt - Date.now());
 }
+
+// What was tapped on the lock screen while the app was away, picked up in order.
+let pulling = false, pullReady = false;
+async function pullPending() {
+  if (pulling || !pullReady || !globalThis.caches) return;
+  pulling = true;
+  try {
+    const c = await caches.open('setline-pending');
+    const items = [];
+    for (const req of await c.keys()) { try { items.push(await (await c.match(req)).json()); } catch {} await c.delete(req); }
+    items.sort((a, b) => a.at - b.at);
+    let logged = 0;
+    for (const it of items) {
+      if (it.kind === 'log' && logFromAway(it)) logged++;
+      else if (it.kind === 'add15') restFromAway(it.endsAt);
+    }
+    if (logged) toast({ title: esc(state.t('alerts.loggedAway', { n: logged })) });
+  } catch {} finally { pulling = false; }
+}
+navigator.serviceWorker?.addEventListener('message', e => { if (e.data?.type === 'pending') pullPending(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pullPending(); });
 
 // The first rest asks once (after the set's own toast has gone) whether to ping you when it ends.
 function maybeAskAlerts() {
@@ -608,7 +644,9 @@ store.subscribe(reason => {
   if (reason === 'finish') dotFill = true;
   if (reason === 'finish') { // the Coach looks at the session straight away
     const w = [...state.history].sort((a, b) => b.startedAt - a.startedAt)[0];
-    setTimeout(() => sessionDebrief(w, { onReady: () => { if (view.screen !== 'coach') toast({ title: esc(state.t('debrief.ready')), sub: esc(state.t('debrief.readySub')), action: state.t('debrief.read'), ms: 8000, onAction: () => go('coach') }); } }), 2500);
+    let review = null;
+    try { review = w && afterSession(w); } catch (err) { console.error('review', err); }
+    setTimeout(() => sessionDebrief(w, { review, onReady: () => { if (view.screen !== 'coach') toast({ title: esc(state.t('debrief.ready')), sub: esc(state.t('debrief.readySub')), action: state.t('debrief.read'), ms: 8000, onAction: () => go('coach') }); } }), 2500);
   }
   syncGps();
   scheduleRestAlert();
@@ -742,7 +780,9 @@ async function boot() {
   if (!new URLSearchParams(location.search).has('go')) maybeOnboard();
   // the Coach's Monday check-in is written quietly in the background
   setTimeout(() => weeklyCheckin(), 5000);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(() => weeklyCheckin(), 3000); });
+  setTimeout(() => checkWeek(), 1200); // is the week's goal slipping? then the Coach pins a note
+  pullReady = true; pullPending(); // sets logged from the lock screen while the app was closed
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { setTimeout(() => weeklyCheckin(), 3000); setTimeout(() => checkWeek(), 1200); } });
 }
 
 // Home-screen shortcuts (long-press the icon): ?go=next | cardio | talk

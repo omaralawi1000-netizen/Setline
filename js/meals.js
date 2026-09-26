@@ -138,6 +138,31 @@ export function favouriteMeals(entries, starred = [], now = Date.now(), n = 6) {
     .map(f => ({ key: f.key, starred: star.has(f.key), count: f.count, meal: f.last }));
 }
 
+// The meals you keep coming back to: the same foods together in the same meal of the day, on at
+// least two days in the last 30 ("your usual breakfast"). Most eaten first.
+export function usualMeals(entries, now = Date.now(), n = 5) {
+  const since = now - 30 * 86_400_000, slotAt = t => { const h = new Date(t).getHours(); return h < 11 ? 'breakfast' : h < 16 ? 'lunch' : h < 21 ? 'dinner' : 'snack'; };
+  const by = new Map();
+  for (const day of entries) {
+    const groups = {};
+    for (const m of day.meals || []) {
+      if (!(m.t >= since) || !mealKey(m.name)) continue;
+      const slot = SLOT_IDS.includes(m.slot) ? m.slot : slotAt(m.t);
+      (groups[slot] ||= []).push(m);
+    }
+    for (const [slot, items] of Object.entries(groups)) {
+      if (items.length < 2) continue; // single foods are the favourites row already
+      const key = slot + '|' + [...new Set(items.map(i => mealKey(i.name)))].sort().join('+');
+      const cur = by.get(key) || { key, slot, days: 0, last: 0, items };
+      cur.days++;
+      if (items[0].t > cur.last) { cur.last = items[0].t; cur.items = items; }
+      by.set(key, cur);
+    }
+  }
+  return [...by.values()].filter(u => u.days >= 2).sort((a, b) => b.days - a.days || b.last - a.last).slice(0, n)
+    .map(u => ({ key: u.key, slot: u.slot, days: u.days, items: u.items.map(item), kcal: u.items.reduce((a, i) => a + (i.kcal || 0), 0), protein: u.items.reduce((a, i) => a + (i.protein || 0), 0) }));
+}
+
 // ---------- repeating meals ----------
 
 const SLOT_IDS = ['breakfast', 'lunch', 'dinner', 'snack'];

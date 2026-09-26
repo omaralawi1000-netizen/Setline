@@ -22,6 +22,8 @@ import { goalCardsHTML } from './goals.js';
 import { stalledLifts } from '../plateau.js';
 import { isRoutineImport } from '../coach.js';
 import { monthly } from './bodyscreen.js';
+import { pinHTML, kgReps } from './pins.js';
+import { nextTargets } from '../review.js';
 
 const MIC = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.6 11.5a6.4 6.4 0 0 0 12.8 0M12 18v3"/></svg>';
 const C = 157.08; // ring r=25
@@ -53,10 +55,21 @@ function upNextHTML({ more = false } = {}) {
       ${more ? `<div class="uphead"><span class="label">${label}</span><button class="textbtn" data-act="go" data-to="workout">${t('today.otherRoutines')} →</button></div>` : `<span class="label">${label}</span>`}
       <h2>${esc(k == null ? routineName(r, lang) : withoutDay(routineName(r, lang)))}</h2>
       <p>${t('today.exercisesAbout', { n: r.exercises.length, min: estimateMinutes(r) })}</p>
-      <p class="exnames">${esc(names.slice(0, 4).join(' · '))}${names.length > 4 ? ` · +${names.length - 4}` : ''}</p>
+      ${nextHTML(r) || `<p class="exnames">${esc(names.slice(0, 4).join(' · '))}${names.length > 4 ? ` · +${names.length - 4}` : ''}</p>`}
       <button class="log" data-act="start-routine" data-id="${esc(r.id)}">${I.play}<span>${t('today.start')}</span></button>
       ${getKey('groq') ? `<p class="sayhint">${MIC}${esc(t('today.orSay', { text: `start ${routineName(r, lang).toLowerCase()}` }))}</p>` : ''}
     </div>`;
+}
+
+// Next time's targets on Up next, worked out from the last sessions ("Bench press 82.5 × 8 ↑").
+function nextHTML(r) {
+  if (!state.settings.suggestions) return '';
+  const nt = nextTargets(r, state.history, state.catalog);
+  if (!nt.length) return '';
+  const { lang, t } = state, mark = { up: '↑', deload: '↓', reps: '+1' };
+  const rows = nt.slice(0, 4).map(x => `<span class="nt${x.reason === 'up' ? ' up' : x.reason === 'deload' ? ' down' : ''}"><span>${esc(state.catalog.name(x.exerciseId, lang))}</span><b>${esc(kgReps(x.kg, x.reps))}${mark[x.reason] ? ` <i>${mark[x.reason]}</i>` : ''}</b></span>`).join('');
+  const rest = r.exercises.length - Math.min(4, nt.length);
+  return `<div class="ntargets"><span class="label">${esc(t('upnext.next'))}</span>${rows}${rest > 0 ? `<span class="ntmore">+${rest}</span>` : ''}</div>`;
 }
 
 function resumeHTML() {
@@ -344,7 +357,7 @@ export function renderToday(root) {
 ${state.settings.greeting ? `<h1 class="greet">${greeting(t(greetingKey(hour))).split(' ').map((w, i) => `<span class="gw" style="--i:${i}">${esc(w)}</span>`).join(' ')}</h1>
     <p class="sub${!busy && weekStreak(state.history, state.cardio, state.settings.weeklyGoal).streak ? ' streak' : ''}">${esc(subline())}</p>` : ''}
     ${busy ? '' : driveNudgeHTML({ stale: true })}
-    ${busy ? resumeHTML() : weeklyCardHTML() || debriefCardHTML()}
+    ${busy ? resumeHTML() : (getKey('google') ? pinHTML('today') : '') + (weeklyCardHTML() || debriefCardHTML())}
     ${busy ? '' : deloadHTML()}
     ${busy ? '' : monthCardHTML()}
     ${todayOrderOf(state.settings).map(k => part[k]()).join('')}

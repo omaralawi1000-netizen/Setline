@@ -24,6 +24,7 @@ import { actOnText, onConfirmWord } from './voice.js';
 import { I } from './icons.js';
 import { openSheet, closeTop } from './sheet.js';
 import { toast } from './toast.js';
+import { pinHTML } from './pins.js';
 
 let nav = { openSettings: () => {} };
 let inflight = null; // {ctl, id}
@@ -92,6 +93,7 @@ export function renderCoach(root) {
     <button class="iconbtn cclose" data-coach="close" aria-label="${t('common.close')}">${I.back.replace('d="M14.5 6 8.5 12l6 6"', 'd="M6 9.5l6 6 6-6"')}</button>
     <header class="coachhead"><div><h1 class="h1">${t('coach.title')}</h1><p class="sub">${t('coach.sub')}</p></div>
       ${chat.length ? `<button class="iconbtn" data-coach="clear" aria-label="${t('coach.clear')}">${I.trash}</button>` : ''}</header>
+    ${key ? pinHTML('coach') : ''}
     ${body}`;
   const composer = $('#composer');
   if (!composer.dataset.talk) composer.querySelector('input').placeholder = t('coach.ph'); // talking: the box shows what's happening
@@ -728,12 +730,15 @@ export async function weeklyCheckin({ force = false } = {}) {
       'WEEKLY CHECK-IN (the app asked for this, not the user). Write the Monday check-in for the week that starts today.',
       'First look back at last week (Monday to Sunday before today): sessions against the weekly goal, lifts that moved or stalled (with numbers), new records, food against the targets (average calories and protein) if logged, bodyweight change, sleep and readiness, goals.',
       'Then the plan for this week: which days and routines, two or three concrete targets (e.g. "bench 82.5 × 8"), and the one thing to fix. Use their MEMORIES and PROFILE.',
+      'Look at the WEIGHT TREND line: if they want to lose fat and the trend is not dropping 0.5–1% a week (or gaining faster than planned), say so and offer a new calorie target. Look at HARD DAYS: if a heavy leg day sits the day before or after wrestling (or another hard sport day), point it out.',
+      'Change nothing yourself: offer each change (a calorie target, moving a session) as an ACTION line, at most two, so they can tap yes.',
       'Warm and direct, like their coach. At most 140 words, short lines, no tables, no headings except "Last week" and "This week".'
     ].join(' ');
     const text = await withFallback(coachModels(state.settings, { background: true }), model => streamChat({ key, model, system: systemPrompt(lang), contents: chatContents([], context, ask) }), { rounds: 2, alsoRetry: ['timeout'] });
-    const { text: said } = splitMemories(text);
+    const { text: said0 } = splitMemories(text);
+    const { text: said, actions } = splitActions(splitChanges(said0).text); // offers only
     if (said) {
-      store.addChat('model', said, { weekly: monday });
+      store.addChat('model', said, { weekly: monday, ...(actions.length ? { actions } : {}) });
       store.setSettings({ weeklyFor: monday });
     }
   } catch { /* try again on the next open */ } finally { weeklyBusy = false; }
@@ -741,7 +746,7 @@ export async function weeklyCheckin({ force = false } = {}) {
 // After every workout the Coach looks at it straight away: what moved, what dropped, and exact
 // targets for next time this routine comes round. Quietly, in the background; a card and a toast say when it's there.
 let debriefBusy = false;
-export async function sessionDebrief(w, { onReady = () => {} } = {}) {
+export async function sessionDebrief(w, { onReady = () => {}, review = null } = {}) {
   const key = getKey('google');
   if (!w || debriefBusy || !key || !state.settings.debrief || !(w.exercises || []).some(e => e.sets.some(x => x.done && x.type !== 'warmup'))) return;
   if (state.chat.some(m => m.debrief === w.id)) return;
@@ -749,15 +754,25 @@ export async function sessionDebrief(w, { onReady = () => {} } = {}) {
   try {
     await ensureModels();
     const lang = state.lang, name = id => state.catalog.name(id, 'en');
-    const lines = w.exercises.map(e => `- ${name(e.exerciseId)}: ${e.sets.filter(x => x.done && x.type !== 'warmup').map(x => `${x.kg}x${x.reps}`).join(', ') || 'skipped'}`);
+    const lift = id => review?.lifts.find(l => l.exerciseId === id);
+    const lines = w.exercises.map(e => {
+      const l = lift(e.exerciseId), tg = l?.target ? ` | planned ${l.target.sets}x${l.target.kg ?? '?'}kg x${l.target.reps} → ${l.status.toUpperCase()}` : '';
+      const nx = l?.next ? ` | app's next target ${l.next.kg}kg x${l.next.reps} (${l.next.reason})` : '';
+      return `- ${name(e.exerciseId)}: ${e.sets.filter(x => x.done && x.type !== 'warmup').map(x => `${x.kg}x${x.reps}`).join(', ') || 'skipped'}${tg}${nx}`;
+    });
+    const concern = review?.concern === 'missed' ? `They MISSED the plan on ${review.missed} of ${review.planned} lifts. Say so plainly and kindly, name the likely reason from the data (sleep, food, readiness, wrestling or other sport the day before, too big a jump), and what to do next time.`
+      : review?.concern === 'deload' ? 'A lift has stalled three sessions running: the app will take it about 10% lighter next time to build back up. Explain that in one line.' : '';
     const ask = [
       'SESSION DEBRIEF (the app asked for this, not the user). They just finished this workout' + (w.name ? ` ("${w.name}")` : '') + ':',
       lines.join('\n'),
-      'Compare every lift with the last time they did it (in the training data). In at most 90 words: what moved (with numbers), anything that dropped and the likely reason (sleep, food, other sport or fatigue from the brief), then a line starting "Next time:" with two or three exact targets for this routine\'s next session (kg × reps). Warm, direct, no headings, no tables.'
-    ].join('\n');
+      concern,
+      'Compare every lift with the last time they did it (in the training data). In at most 90 words: what moved (with numbers), anything that dropped and the likely reason (sleep, food, other sport or fatigue from the brief), then a line starting "Next time:" with two or three exact targets for this routine\'s next session (kg × reps; use the app\'s next targets unless the data says otherwise). Warm, direct, no headings, no tables.',
+      'Change nothing yourself. If a change would help (a lighter jump, an extra rest day, moving a session), offer it with at most two ACTION lines so they can say yes.'
+    ].filter(Boolean).join('\n');
     const text = await withFallback(coachModels(state.settings, { background: true }), model => streamChat({ key, model, system: systemPrompt(lang), contents: chatContents([], buildContext(coachSnap()), ask) }), { rounds: 2, alsoRetry: ['timeout'] });
-    const { text: said } = splitMemories(text);
-    if (said) { store.addChat('model', said, { debrief: w.id, dname: w.name || '' }); store.setSettings({ debriefUnseen: w.id }); onReady(); }
+    const { text: said0 } = splitMemories(text);
+    const { text: said, actions } = splitActions(splitChanges(said0).text); // it only offers; nothing is changed from here
+    if (said) { store.addChat('model', said, { debrief: w.id, dname: w.name || '', ...(actions.length ? { actions } : {}) }); store.setSettings({ debriefUnseen: w.id }); onReady(); }
   } catch { /* the session is saved either way */ } finally { debriefBusy = false; }
 }
 export const markDebriefSeen = () => { if (state.settings.debriefUnseen) store.setSettings({ debriefUnseen: '' }); };

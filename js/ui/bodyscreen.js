@@ -2,7 +2,7 @@
 // before/after slider.
 import * as store from '../store.js';
 import { state } from '../store.js';
-import { bodyTrend, dateKey } from '../body.js';
+import { bodyTrend, weightTrend, dateKey } from '../body.js';
 import { SITES, POSES, measureSummary, photoDays, comparePair, validCm, monthlyPair, changeBetween } from '../measures.js';
 import { getKey } from '../keys.js';
 import { toDisplay } from '../units.js';
@@ -48,7 +48,7 @@ function monthHTML(m) {
 
 export function renderBody(root) {
   const { t, lang } = state;
-  const bw = bodyTrend(state.bodyweight);
+  const bw = bodyTrend(state.bodyweight), wt = weightTrend(state.bodyweight);
   const sum = measureSummary(state.measures);
   const cur = sum.find(s => s.site === site);
   const days = photoDays(state.photos);
@@ -60,7 +60,9 @@ export function renderBody(root) {
 
     <div class="chartcard solid">
       <div class="chead"><span class="label">${t('body.weight')}</span>${bw ? `<span class="cval"><b>${esc(weight(bw.latest.kg, state.settings.unit, lang))}</b> ${u()}</span>` : ''}</div>
-      ${bw && state.bodyweight.length >= 2 ? lineChart(state.bodyweight.slice(-60).map(e => ({ t: Date.parse(e.date), v: e.kg })), { h: 120, fmt: v => weight(v, state.settings.unit, lang) }) : `<p class="bnote">${t('body.noWeight')}</p>`}
+      ${wt ? `${lineChart(wt.series.slice(-60).map(e => ({ t: Date.parse(e.date), v: e.trend })), { h: 120, dots: false, fmt: v => weight(v, state.settings.unit, lang), scatter: wt.series.slice(-60).map(e => ({ t: Date.parse(e.date), v: e.kg })) })}
+        <p class="wtrend"><b>${esc(t('body.trend', { kg: `${weight(Math.round(wt.trend * 10) / 10, state.settings.unit, lang)} ${u()}` }))}</b> · ${esc(t('body.rate', { sign: wt.perWeek > 0 ? '+' : wt.perWeek < 0 ? '−' : '±', kg: `${weight(Math.round(Math.abs(wt.perWeek) * 10) / 10, state.settings.unit, lang)} ${u()}`, pct: `${wt.pctPerWeek > 0 ? '+' : wt.pctPerWeek < 0 ? '−' : '±'}${Math.abs(wt.pctPerWeek).toFixed(1)}` }))}</p>`
+        : bw && state.bodyweight.length >= 2 ? lineChart(state.bodyweight.slice(-60).map(e => ({ t: Date.parse(e.date), v: e.kg })), { h: 120, fmt: v => weight(v, state.settings.unit, lang) }) : `<p class="bnote">${t('body.noWeight')}</p>`}
       <button class="btn2 solid" data-body="weight">${I.plus}<span>${t('body.logTitle')}</span></button>
     </div>
 

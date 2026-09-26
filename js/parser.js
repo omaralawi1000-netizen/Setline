@@ -13,7 +13,7 @@ import { lbToKg, round } from './units.js';
 import { CARDIO_TYPES } from './cardio.js';
 import { parseMealLocal } from './fooddb.js';
 
-export const INTENTS = ['LogSet', 'LogSetNo', 'LogSets', 'LogBatch', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'LogWater', 'SetTarget', 'CheckIn', 'LogRel', 'SetGoal', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
+export const INTENTS = ['LogSet', 'LogSetNo', 'LogSets', 'LogBatch', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'RepeatMeal', 'LogWater', 'SetTarget', 'CheckIn', 'LogRel', 'SetGoal', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
   'AddWarmup', 'WarmupDone', 'AddExercise', 'SwapExercise', 'StartRoutine', 'StartEmpty', 'Finish', 'Discard', 'StartRest', 'AdjustRest', 'SkipRest',
   'AdjustNext', 'Confirm', 'Query', 'Cancel', 'Help', 'Ask', 'Unknown'];
 
@@ -369,6 +369,8 @@ export function parse(text, ctx = {}) {
   const said = String(text || '').trim();
   const pre = foodAndWater(said, ctx); // water, calorie targets
   if (pre) return pre;
+  const again = repeatMeal(said); // "same as yesterday's lunch"
+  if (again) return again;
   const hands = handsWords(said, ctx); // "yes" / "do it", "done", "that felt heavy"
   if (hands) return hands;
   text = gotReps(text); // "done, 7" / "got 7" = 7 reps at the planned weight
@@ -440,6 +442,22 @@ function foodAndWater(text, ctx) {
     const key = { calories: 'kcal', calorie: 'kcal', kcal: 'kcal', kalorier: 'kcal', protein: 'protein', carbs: 'carbs', kulhydrater: 'carbs', fat: 'fat', fedt: 'fat' }[m[1]];
     return out('SetTarget', { key, value: Number(m[2]) });
   }
+  return null;
+}
+
+// "same as yesterday's lunch", "same lunch as yesterday", "yesterday's breakfast again",
+// "samme frokost som i går", "samme som i går til frokost". No meal named: the meal of the hour.
+const SLOT_RE = '(breakfast|lunch|dinner|supper|snack|morgenmad|frokost|aftensmad|mellemmåltid)';
+export function repeatMeal(text) {
+  const s = String(text || '').toLowerCase().trim().replace(/[.!]+$/, '').replace(/^(?:log |i had |i ate |jeg fik |jeg spiste |spiste |fik )/, '');
+  let m;
+  if ((m = new RegExp(`^(?:the )?same (?:as )?(?:yesterday'?s?|yday'?s?) ${SLOT_RE}(?: again)?$`).exec(s)) ||
+      (m = new RegExp(`^(?:the )?same ${SLOT_RE} as yesterday$`).exec(s)) ||
+      (m = new RegExp(`^yesterday'?s ${SLOT_RE} again$`).exec(s)) ||
+      (m = new RegExp(`^samme ${SLOT_RE} som i ?går$`).exec(s)) ||
+      (m = new RegExp(`^samme som i ?går til ${SLOT_RE}$`).exec(s)) ||
+      (m = new RegExp(`^(?:gårsdagens|samme) ${SLOT_RE} igen$`).exec(s))) return { type: 'RepeatMeal', slot: SLOT_WORDS[m[1]], heard: String(text).trim() };
+  if (/^(?:the )?same (?:food |meal )?as yesterday$|^samme (?:mad )?som i ?går$/.test(s)) return { type: 'RepeatMeal', slot: null, heard: String(text).trim() };
   return null;
 }
 

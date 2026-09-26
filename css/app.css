@@ -2385,7 +2385,7 @@ html[data-motion=off] .cglow::after,html[data-motion=off] .aura .clouds i{animat
 
 /* ======================= 1.43: the orb travels, the light follows the voice ======================= */
 /* the orb's stand-in on its way between the bar and the message box */
-.orbghost{position:absolute;z-index:8;margin:0;pointer-events:none;will-change:transform,translate}
+.orbghost{position:absolute;z-index:8;margin:0;pointer-events:none;will-change:transform,translate,scale}
 .app.orbtravel .corb .orb{opacity:0!important;animation:none!important}
 /* when the orb flies in, the box comes up to meet it and the orb lands with its pulse of light
    (no separate scale-in) */
@@ -2550,3 +2550,71 @@ html[data-glass=liquid] .app.coaching .edge.eb{opacity:0}
 @keyframes tabspring{0%{transform:translateY(3px) scale(.82)}55%{transform:translateY(-3px) scale(1.12)}100%{transform:translateY(-1px) scale(1.06)}}
 .tab:active svg.ti{transform:scale(.84);transition-duration:var(--m-press)}
 @media (prefers-reduced-motion: reduce){ .dock .ind.moving,.tab.on svg.ti{animation:none} }
+
+/* 1.49: the top gradient only just below the status bar, short enough not to be noticed; the bar at
+   the bottom gets a little more of its own soft gradient blur */
+html[data-glass=liquid] .edge.et{height:calc(var(--safe-top) + 24px)}
+html[data-glass=liquid] .edge.et::before{background:linear-gradient(var(--edge) 0,var(--edge) var(--safe-top),color-mix(in srgb,var(--edge) 62%,transparent) calc(var(--safe-top) + 8px),color-mix(in srgb,var(--edge) 20%,transparent) calc(var(--safe-top) + 16px),transparent)}
+html[data-glass=liquid] .edge.et::after{-webkit-mask-image:linear-gradient(#000 0,#000 var(--safe-top),transparent);mask-image:linear-gradient(#000 0,#000 var(--safe-top),transparent)}
+html[data-glass=liquid] .edge.eb{left:0;right:0;bottom:calc(var(--dock-bottom) - 28px);height:calc(var(--dock-h) + 56px)}
+html[data-glass=liquid] .edge.eb::before{background:radial-gradient(closest-side,color-mix(in srgb,var(--bg) 58%,transparent) 50%,transparent)}
+html[data-glass=liquid] .edge.eb::after{-webkit-backdrop-filter:blur(12px) saturate(140%);backdrop-filter:blur(12px) saturate(140%);
+  -webkit-mask-image:radial-gradient(closest-side,#000 58%,transparent);mask-image:radial-gradient(closest-side,#000 58%,transparent)}
+html[data-glass=liquid] .app.compact:not(.is-sub):not(.voice):not(.kb) .edge.eb{left:calc(50% - 110px);right:calc(50% - 110px)}
+
+/* 1.49: the orb jumping in. The box used to be still sliding up when the orb got there, so the orb
+   landed in empty space. Now the box is already in place (a quick fade, no travel) and the orb arrives
+   on it. */
+.app.coaching.orbflown:not(.is-sub):not(.voice) .composer{transition:opacity var(--m-fast) var(--e-out),transform var(--m-fast) var(--e-out),box-shadow var(--m-base);transition-delay:0s}
+
+/* ======================= 1.49 ======================= */
+/* the weight trend: the smoothed line, each weigh-in a faint dot under it */
+.chart .raw{fill:var(--muted);opacity:.45}
+.wtrend{margin:8px 2px 12px;font-size:13px;color:var(--muted)}
+.wtrend b{color:var(--ink);font-weight:800}
+/* Up next: next time's targets, one line per lift */
+.ntargets{display:flex;flex-direction:column;gap:5px;margin:10px 0 14px}
+.ntargets .label{margin-bottom:2px}
+.ntargets .nt{display:flex;justify-content:space-between;gap:12px;font-size:14px;color:var(--muted)}
+.ntargets .nt span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ntargets .nt b{color:var(--ink);font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}
+.ntargets .nt i{font-style:normal;font-size:12px;color:var(--accent)}
+.ntargets .nt.down i{color:var(--muted)}
+.ntargets .ntmore{font-size:12.5px;color:var(--dim)}
+/* the Coach's pinned note */
+.cpin{display:flex;gap:12px;padding:14px;border-radius:24px;margin:12px 0 4px;animation:rise var(--m-slow) var(--e-out) both}
+.cpin .cpic{width:40px;height:40px;border-radius:14px;display:grid;place-items:center;background:rgba(var(--a-rgb),.14);color:var(--accent);flex:none}
+.cpin[data-kind=missed] .cpic,.cpin[data-kind=behind] .cpic{background:rgba(255,184,120,.14);color:#FFB878}
+.cpin .cpic svg{width:21px;height:21px}
+.cpin .l{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.cpin strong{font-size:15.5px;font-weight:800;line-height:1.25}
+.cpin small{font-size:13px;color:var(--muted);line-height:1.35}
+.cpin .cpacts{display:flex;align-items:center;gap:12px;margin-top:8px}
+.cpin .chip svg{width:15px;height:15px}
+#s-coach .cpin{margin:4px 0 12px}
+@media (prefers-reduced-motion: reduce){ .cpin{animation:none} }
+/* Food: your usual meals, the foods under the name */
+.favchip.usual .fn{display:flex;flex-direction:column;line-height:1.15}
+.favchip.usual .fn small{font-size:11.5px;font-weight:600;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+/* the records wall: each lift's best, a fresh record glows */
+.prwall{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.prtile{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:14px;border-radius:22px;text-align:left;min-width:0;overflow:hidden;animation:rise var(--m-slow) var(--e-out) both;animation-delay:calc(var(--i) * 40ms)}
+.prtile .prn{font-size:12.5px;font-weight:700;color:var(--muted);max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prtile b{font-size:22px;font-weight:850;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.prtile b small{font-size:12.5px;font-weight:700;color:var(--muted)}
+.prtile .pre,.prtile .prd{font-size:12px;color:var(--dim)}
+.prtile.fresh{border-color:rgba(255,200,140,.45)}
+.prtile.fresh::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:radial-gradient(120% 90% at 100% 0%,rgba(255,196,130,.22),transparent 60%);animation:prglow var(--m-think) var(--e-soft) infinite alternate}
+@keyframes prglow{from{opacity:.55}to{opacity:1}}
+@media (prefers-reduced-motion: reduce){ .prtile{animation:none} .prtile.fresh::before{animation:none} }
+/* a record mid-workout: a warm banner drops in, holds, lifts away */
+.prcel{position:absolute;z-index:30;left:50%;top:calc(var(--safe-top) + 10px);display:flex;align-items:center;gap:10px;max-width:calc(100% - 32px);padding:10px 16px 10px 10px;border-radius:999px;pointer-events:none;
+  background:linear-gradient(120deg,rgba(255,196,130,.28),rgba(var(--a-rgb),.2));border:1px solid rgba(255,210,160,.5);-webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%);
+  box-shadow:0 10px 30px rgba(0,0,0,.35),0 0 24px rgba(255,190,120,.25);animation:prcel var(--m-think) var(--e-out) both}
+.prcel .pci{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#FFD9A8;color:#3a2410;flex:none}
+.prcel .pci svg{width:19px;height:19px}
+.prcel .l{display:flex;flex-direction:column;min-width:0}
+.prcel small{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#FFD9A8}
+.prcel strong{font-size:14.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@keyframes prcel{0%{opacity:0;transform:translate(-50%,-24px) scale(.9)}12%{opacity:1;transform:translate(-50%,0) scale(1.04)}20%{transform:translate(-50%,0) scale(1)}82%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-14px) scale(.96)}}
+@media (prefers-reduced-motion: reduce){ .prcel{animation:prcelfade var(--m-think) linear both} @keyframes prcelfade{0%,100%{opacity:0}10%,85%{opacity:1}} .prcel{transform:translateX(-50%)} }

@@ -25,9 +25,10 @@ export function barChart(values, { h = 120, w = 340, color = 'lav', fmt = v => S
 }
 
 // Line with area and dots: points [{t, v}] → SVG that draws itself in.
-export function lineChart(points, { h = 150, w = 340, pad = 12, dots = true, warmLast = false, fmt = v => String(v), yLabels = true } = {}) {
+// scatter: the raw values under a smoothed line (e.g. each weigh-in under the weight trend), as faint dots
+export function lineChart(points, { h = 150, w = 340, pad = 12, dots = true, warmLast = false, fmt = v => String(v), yLabels = true, scatter = null } = {}) {
   if (points.length < 2) return '';
-  const vs = points.map(p => p.v);
+  const vs = [...points, ...(scatter || [])].map(p => p.v);
   let lo = Math.min(...vs), hi = Math.max(...vs);
   if (hi - lo < 1e-9) { lo -= 1; hi += 1; }
   const span = hi - lo;
@@ -54,6 +55,7 @@ export function lineChart(points, { h = 150, w = 340, pad = 12, dots = true, war
     ${yLabels ? `<text class="ax" x="0" y="10">${esc(fmt(hi))}</text><text class="ax" x="0" y="${h - 2}">${esc(fmt(lo))}</text>` : ''}
     <path class="area" d="${area}" fill="url(#${id}f)"/>
     <path class="stroke" d="${d}" pathLength="1" fill="none" stroke="url(#${id}s)" stroke-width="2.6" stroke-linecap="round"/>
+    ${scatter ? scatter.map(p => `<circle class="raw" cx="${tx(p.t).toFixed(1)}" cy="${ty(p.v).toFixed(1)}" r="2.2"/>`).join('') : ''}
     ${dotEls}
     ${warmLast ? `<circle class="halo" cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="10" fill="#FFD9A8"/>` : ''}
   </svg>`;

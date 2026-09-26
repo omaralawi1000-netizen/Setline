@@ -563,7 +563,7 @@ export function handleText(text, { typed = false } = {}) {
 }
 
 // The Coach box: a clear command (food, a set, water, targets…) is done, not discussed.
-const DO_TYPES = new Set(['LogSet', 'LogSets', 'LogBatch', 'LogRel', 'AdjustNext', 'LogMeal', 'LogWater', 'SetTarget', 'LogBodyweight', 'LogProtein', 'LogCardio', 'StartCardio', 'StartRoutine', 'CheckIn', 'AddWarmup', 'WarmupDone', 'SetGoal']);
+const DO_TYPES = new Set(['LogSet', 'LogSets', 'LogBatch', 'LogRel', 'AdjustNext', 'LogMeal', 'RepeatMeal', 'LogWater', 'SetTarget', 'LogBodyweight', 'LogProtein', 'LogCardio', 'StartCardio', 'StartRoutine', 'CheckIn', 'AddWarmup', 'WarmupDone', 'SetGoal']);
 export function actOnText(text) {
   text = String(text || '').trim();
   if (!text || /\?\s*$/.test(text) || isQuestion(text)) return null;

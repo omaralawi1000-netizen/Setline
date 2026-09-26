@@ -67,11 +67,36 @@ export function renderProgress(root) {
       </button></li>`;
     }).join('')}</ul>` : ''}
 
-    ${prs.length ? `<div class="section"><span class="label">${t('progress.records')}</span></div>
+    ${wallHTML()}
+    ${prs.length ? `<div class="section"><span class="label">${t('progress.recentRecords')}</span></div>
     <ol class="timeline">${prs.map((p, i) => `<li style="--i:${i}"><span class="tdot"></span><div>
       <strong>${esc(state.catalog.name(p.pr.exerciseId, lang))}</strong>
       <span>${esc(prText(p.pr))} · ${esc(day(p.t, lang))}</span></div></li>`).join('')}</ol>` : ''}
 `;
+}
+
+// The records wall: every lift's best, one tile each (heaviest set, estimated max, when); a record from
+// the last week glows.
+function wallHTML() {
+  const { t, lang } = state;
+  const by = new Map();
+  for (const r of state.prs) {
+    if (r.kind === 'reps') continue;
+    const b = by.get(r.exerciseId) || {};
+    b[r.kind] = r;
+    by.set(r.exerciseId, b);
+  }
+  const tiles = [...by].filter(([, b]) => b.weight || b.e1rm).map(([id, b]) => ({ id, ...b, last: Math.max(b.weight?.date || 0, b.e1rm?.date || 0) }))
+    .sort((a, b) => (b.e1rm?.value || 0) - (a.e1rm?.value || 0)).slice(0, 12);
+  if (!tiles.length) return '';
+  const fresh = Date.now() - 7 * 86_400_000;
+  return `<div class="section"><span class="label">${t('progress.records')}</span></div>
+    <div class="prwall">${tiles.map((x, i) => `<button class="prtile solid${x.last >= fresh ? ' fresh' : ''}" data-ex="${esc(x.id)}" style="--i:${i}">
+      <span class="prn">${esc(state.catalog.name(x.id, lang))}</span>
+      ${x.weight ? `<b>${esc(kg(x.weight.kg))}<small> ${u()} × ${x.weight.reps}</small></b>` : ''}
+      ${x.e1rm ? `<span class="pre">${esc(t('pr.e1rm'))} ${esc(kg(x.e1rm.value))} ${u()}</span>` : ''}
+      ${x.last ? `<span class="prd">${esc(day(x.last, lang))}</span>` : ''}
+    </button>`).join('')}</div>`;
 }
 
 function prText(p) {

@@ -427,6 +427,33 @@ function confirmHeavy(kg, reps, confirm, then) {
   });
 }
 
+// The set the next log fills, for the lock-screen "Log" button: only a planned set with its numbers.
+export function plannedNext(w = state.active) {
+  const ex = w?.exercises[w.current];
+  if (!ex) return null;
+  const i = W.firstPlannedIndex(ex), s = i === -1 ? null : ex.sets[i];
+  const prev = [...ex.sets].reverse().find(x => x.done && x.type !== 'warmup');
+  const kg = s?.kg ?? prev?.kg, reps = s?.reps ?? prev?.reps;
+  if (!s || !Number.isFinite(kg) || !Number.isInteger(reps) || !W.validateSet(kg, reps).ok) return null;
+  return { exId: ex.id, setId: s.id, kg, reps, label: setText(kg, reps) };
+}
+// A set logged from the notification, at the moment it was tapped (the same as saying "done").
+export function logFromAway({ exId, setId, kg, reps, at }) {
+  const w = state.active, idx = w ? w.exercises.findIndex(e => e.id === exId) : -1;
+  if (idx === -1) return false;
+  const i = W.firstPlannedIndex(w.exercises[idx]);
+  if (i === -1 || w.exercises[idx].sets[i].id !== setId) return false; // already logged in the app
+  try {
+    update(cur => { const r = W.logSet(cur, idx, { kg, reps }, at, W.restFor(cur.exercises[idx], state.settings.restByEx, state.settings.restSec)); return state.settings.autoAdvance ? W.advanceAfterLog(cur, r.workout, idx) : r.workout; }, { undo: 'log', reason: 'log' });
+  } catch { return false; }
+  return true;
+}
+// "+15 s" from the notification: the rest ends when the worker says.
+export function restFromAway(endsAt) {
+  if (!state.active?.rest || !Number.isFinite(endsAt)) return;
+  update(w => (w.rest && endsAt > w.rest.endsAt ? W.adjustRest(w, Math.round((endsAt - w.rest.endsAt) / 1000)) : w), { reason: 'rest' });
+}
+
 function logCurrent(root) {
   const w = state.active;
   if (!w?.exercises.length) return;
@@ -439,6 +466,21 @@ function logCurrent(root) {
   const go = () => doLog(kg, reps);
   if (check.confirm.length) confirmHeavy(kg, reps, check.confirm, go);
   else go();
+}
+
+// A record set mid-workout: a warm banner drops in from the top with the lift and the set, sparks
+// fly from it, and it lifts away.
+function celebrate(name, set) {
+  const app = document.getElementById('app');
+  if (!app) return;
+  app.querySelector('.prcel')?.remove();
+  const el = document.createElement('div');
+  el.className = 'prcel';
+  el.setAttribute('role', 'status');
+  el.innerHTML = `<span class="pci">${I.flame}</span><span class="l"><small>${esc(state.t('workout.newPr'))}</small><strong>${esc(name)} · ${esc(set)}</strong></span>`;
+  app.append(el);
+  requestAnimationFrame(() => burst(el.querySelector('.pci'), { warm: true, count: 16, spread: 70 }));
+  setTimeout(() => el.remove(), 2450);
 }
 
 function doLog(kg, reps) {
@@ -462,8 +504,8 @@ function doLog(kg, reps) {
   // the new row lands, then sparks fly from its check (warm for a record)
   requestAnimationFrame(() => {
     const ck = document.querySelector(`#sets [data-id="${set.id}"] .ck`);
-    burst(ck, { warm: pr, count: pr ? 18 : 10, spread: pr ? 74 : 48 });
-    if (pr) document.querySelector(`#sets [data-id="${set.id}"]`)?.classList.add('prflash');
+    burst(ck, { warm: pr, count: pr ? 26 : 10, spread: pr ? 90 : 48 });
+    if (pr) { document.querySelector(`#sets [data-id="${set.id}"]`)?.classList.add('prflash'); celebrate(exName(ex.exerciseId), setText(kg, reps)); }
   });
   toast({
     title: `${pr ? `<span class="tag sm">${t('workout.pr')}</span> ` : ''}${esc(exName(ex.exerciseId))} <span class="v">${esc(setText(kg, reps))}</span>`,

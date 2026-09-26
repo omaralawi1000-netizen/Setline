@@ -84,6 +84,8 @@ export const DEFAULTS = Object.freeze({
   debriefUnseen: '',   // the workout whose debrief hasn't been read yet // the Coach's Monday look back and plan
   weeklyFor: '',       // the week (its Monday) the last check-in was written for
   weeklySeen: '',      // …and the one you've opened
+  coachPin: null,      // a note the Coach pinned for you (missed targets, a stall, the week falling behind)
+  pinGone: '',         // the pin you put away, so it isn't pinned again
   foodTargets: null,   // {kcal, protein, carbs, fat, water} set by hand; null = worked out from the profile
   todayHide: ['balance', 'routines', 'cardio'], // Today sections tucked away (Customize)
   todayV: 2            // 2: cardio moved to Train by default
@@ -162,6 +164,8 @@ export function sanitize(input) {
   for (const k of ['deloadUntil', 'deloadSnoozed']) if (Number.isFinite(input[k]) && input[k] >= 0) s[k] = input[k];
   if (typeof input.debrief === 'boolean') s.debrief = input.debrief;
   if (typeof input.debriefUnseen === 'string' && input.debriefUnseen.length <= 80) s.debriefUnseen = input.debriefUnseen;
+  s.coachPin = sanitizePin(input.coachPin);
+  if (typeof input.pinGone === 'string' && input.pinGone.length <= 80) s.pinGone = input.pinGone;
   if (Array.isArray(input.mealTemplates)) s.mealTemplates = sanitizeTemplates(input.mealTemplates);
   if (typeof input.coachBrief === 'string') s.coachBrief = input.coachBrief.slice(0, 5000);
   if (typeof input.monthSeen === 'string' && input.monthSeen.length <= 80) s.monthSeen = input.monthSeen;
@@ -217,4 +221,12 @@ export function loadSettings(storage = globalThis.localStorage) {
 
 export function saveSettings(s, storage = globalThis.localStorage) {
   try { storage.setItem(SETTINGS_KEY, JSON.stringify(sanitize(s))); } catch { /* storage full or blocked */ }
+}
+
+// {id, kind, title, sub, ask, at}
+export function sanitizePin(p) {
+  if (!p || typeof p !== 'object' || !['missed', 'deload', 'behind'].includes(p.kind) || typeof p.id !== 'string' || !p.id || p.id.length > 80) return null;
+  const str = (v, n) => (typeof v === 'string' ? v.slice(0, n) : '');
+  const title = str(p.title, 160);
+  return title ? { id: p.id, kind: p.kind, title, sub: str(p.sub, 240), ask: str(p.ask, 400), at: Number.isFinite(p.at) ? p.at : 0 } : null;
 }

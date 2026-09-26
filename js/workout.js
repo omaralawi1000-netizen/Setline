@@ -14,6 +14,15 @@ export function makeSet({ kg = null, reps = null, type = 'normal', done = false,
   return { id, type, kg, reps, rir: null, note: '', done, completedAt };
 }
 
+// {kg, reps, sets} from a template's sets (the heaviest planned weight, the most planned reps).
+export function targetFromSets(sets) {
+  const ws = (sets || []).filter(s => s && s.type !== 'warmup');
+  const reps = Math.max(0, ...ws.map(s => (Number.isFinite(s.reps) ? s.reps : 0)));
+  if (!reps) return null;
+  const kgs = ws.map(s => s.kg).filter(Number.isFinite);
+  return { kg: kgs.length ? Math.max(...kgs) : null, reps, sets: ws.length };
+}
+
 // template: {name, routineId?, exercises: [{exerciseId, sets: [{kg, reps}]}]}
 export function createWorkout(template = {}, now = Date.now(), id = uid()) {
   const exercises = (template.exercises || []).slice(0, LIMITS.exercisesPerWorkout).map(e => ({
@@ -21,6 +30,7 @@ export function createWorkout(template = {}, now = Date.now(), id = uid()) {
     exerciseId: e.exerciseId,
     ...(e.suggestion ? { suggestion: e.suggestion } : {}),
     ...(Number.isFinite(e.restSec) ? { restSec: e.restSec } : {}),
+    ...(targetFromSets(e.sets) ? { target: targetFromSets(e.sets) } : {}), // the plan, kept for the review after
     sets: (e.sets || []).slice(0, LIMITS.setsPerExercise).map(s => makeSet({ kg: s.kg ?? null, reps: s.reps ?? null })),
     draft: null
   }));

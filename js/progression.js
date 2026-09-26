@@ -33,6 +33,23 @@ export function stepFor(ex) {
 
 const roundTo = (v, step) => Math.max(0, Math.round(v / step) * step);
 
+// Plate-aware: the weights you can actually load. A bar is 20 kg (an EZ bar 10) plus a pair of plates,
+// so its grid is two of the smallest plates (1.25 kg each, or your own barbell step); dumbbells come in
+// their step (2 kg, or yours); machines and cables in theirs (2.5, or yours).
+const BAR_KG = { barbell: 20, ezbar: 10, trapbar: 20 };
+export function gridFor(ex) {
+  const g = stepGroup(ex?.equipment);
+  if (custom?.[g]) return custom[g];
+  return g === 'dumbbell' ? 2 : 2.5;
+}
+// Nearest loadable weight (dir 1: the next one up, -1: the next one down). Never below the empty bar.
+export function loadable(kg, ex, dir = 0) {
+  if (!Number.isFinite(kg)) return kg;
+  const grid = gridFor(ex), base = BAR_KG[ex?.equipment] || 0, k = (kg - base) / grid;
+  const n = dir > 0 ? Math.ceil(k - 1e-9) : dir < 0 ? Math.floor(k + 1e-9) : Math.round(k);
+  return Math.max(base, Math.round((base + n * grid) * 100) / 100);
+}
+
 // Sessions for one exercise, newest first: [{t, sets: [{kg, reps}]}]
 export function sessionsFor(history, exerciseId, limit = 6) {
   const out = [];
@@ -59,10 +76,10 @@ export function suggest(history, exercise, targetReps = null) {
   if (exercise.equipment === 'bodyweight' && top === 0) {
     return hitAll(last.sets, target) ? { kg: 0, reps: target + 1, reason: 'reps', from } : { kg: 0, reps: target, reason: 'repeat', from };
   }
-  if (hitAll(last.sets, target)) return { kg: top + stepFor(exercise), reps: target, reason: 'up', from };
+  if (hitAll(last.sets, target)) return { kg: loadable(top + stepFor(exercise), exercise, 1), reps: target, reason: 'up', from };
   const stalled = sessions.slice(0, 3);
   if (stalled.length === 3 && stalled.every(x => topOf(x.sets) === top && !hitAll(x.sets, target))) {
-    return { kg: roundTo(top * 0.9, 2.5), reps: target, reason: 'deload', from };
+    return { kg: Math.min(top, loadable(top * 0.9, exercise, -1)), reps: target, reason: 'deload', from };
   }
   return { kg: top, reps: target, reason: 'repeat', from };
 }

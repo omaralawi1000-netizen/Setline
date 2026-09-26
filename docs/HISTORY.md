@@ -566,3 +566,17 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Bottom: no band across the screen; a soft blur feathers out around the navigation bar only (follows the pill). The bar: the indicator slides with a liquid stretch (no width animation), the chosen icon springs, presses give at once
 - [x] Two-tone themes: Aurora (lavender + teal), Sunset (peach + rose), Ocean (sky + mint) with two-colour buttons, chips, done dots, your chat bubbles, orb and background glow
 - [x] The Coach knows more: the last 7 days of food against targets, the latest 6 workouts, a compact base of training science, and the newest app features in its guide
+
+## 1.49.0: a Coach that watches your goals, lock-screen logging, trend, usuals, records wall, loadable weights
+
+- [x] After each session the app checks every lift against its plan (hit, missed, skipped; the plan is kept on each exercise when the workout starts) and works out next time's targets. Up next shows them ("Bench press 82.5 × 8 ↑")
+- [x] When most of a session's plan was missed, a lift stalls into a deload, or the week's workout goal can't be reached in the days left (rest and sport days counted), the Coach pins a note at the top of the Coach and on Today with "Talk it through" / "Put away". The debrief is told what was missed and why it might be, and can only offer changes as chips
+- [x] The Coach only changes things when told to directly; anything it thinks would help (moving legs away from wrestling, a new calorie target) is offered as a "Do it" chip. The context shows leg days next to marked sport days (HARD DAYS)
+- [x] Rest notification (lock screen and watch): "Log 75 kg × 8" logs the planned set at the moment of the tap and starts the next rest without opening the app; "+15 s" adds time. Picked up by the app when it comes back
+- [x] Body: a smoothed weight trend (weigh-ins as faint dots) with the rate per week and % of bodyweight; the Coach sees it and the Monday check-in offers a calorie change if fat loss isn't 0.5–1 % a week
+- [x] Food: "Your usuals" (the same foods together in the same meal on 2+ days of the last 30), and "same as yesterday's lunch" / "samme frokost som i går" by voice or text
+- [x] Progress: a records wall (best set, estimated max, date; a record from the last week glows). A record mid-workout drops a warm banner from the top with sparks
+- [x] Plate-aware suggestions: only weights you can load (bar + plate pairs, dumbbell steps, your own steps)
+- [x] Smooth haptics: single short pulses, no buzzing trains
+- [x] Orb jump-in: the message box is already there when the orb arrives (it used to still be sliding up), the orb shrinks mostly on the way in, and the squash is gentler
+- [x] Status bar gradient only just below the bar; the navigation bar's blur halo a little stronger

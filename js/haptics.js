@@ -1,6 +1,7 @@
 // navigator.vibrate behind the haptics setting.
-// every animation has its feel: a tick for moving around, a firm press for logging, a double for records
-const PATTERNS = { tick: 6, tap: 10, open: [8, 24, 14], success: [20, 30, 20], log: [28], pr: [30, 60, 30, 60, 60], bloom: [6, 34, 8, 30, 12, 26, 18], land: [65, 35, 25], error: 40 };
+// Smooth, not buzzy: a phone motor can't vary its strength, so long pulses and fast trains read as a
+// buzz. Every feel is one short pulse, or two with a real gap between them (a knock, then a softer one).
+const PATTERNS = { tick: 5, tap: 8, open: 9, success: [12, 90, 9], log: 14, pr: [14, 110, 10, 110, 18], bloom: 7, land: 18, error: [18, 90, 18] };
 let enabled = () => true;
 export const setHapticsGate = fn => { enabled = fn; };
 export function haptic(kind = 'tap') {

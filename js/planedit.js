@@ -162,3 +162,22 @@ export function weekText(routines, dayPlan, now = Date.now()) {
     return `${key} ${DAY_EN[new Date(keyToTs(key)).getDay()]}${k === 0 ? ' (today)' : k === 1 ? ' (tomorrow)' : ''}: ${what}${d.changed ? ' (changed for that day)' : ''}`;
   }).join('\n');
 }
+
+// Legs next to a hard day (wrestling, a match, any other sport the plan marks), yesterday through the
+// next 7 days: ["2026-09-27 Legs is the day after Wrestling"]. Only for the Coach to point out and offer
+// to move; nothing is moved from here.
+const LEGS = new Set(['quads', 'hamstrings', 'glutes']);
+export function hardDays(routines, dayPlan = {}, catalog = null, now = Date.now()) {
+  const keys = Array.from({ length: 9 }, (_, k) => dayKey(now + (k - 1) * 86_400_000));
+  const days = keys.map(k => ({ k, d: dayOf(k, routines, dayPlan) }));
+  const legsDay = r => { const n = r.exercises.filter(e => LEGS.has(catalog?.get?.(e.exerciseId)?.muscles?.[0])).length; return n >= 2 || (n && n * 2 >= r.exercises.length); };
+  const out = [];
+  days.forEach(({ k, d }, i) => {
+    if (!d.routine || !legsDay(d.routine) || i === 0 || i === days.length - 1) return;
+    const before = days[i - 1].d.label, after = days[i + 1].d.label;
+    const name = routineName(d.routine, 'en');
+    if (before) out.push(`${k} ${name} is the day after ${before}`);
+    if (after) out.push(`${k} ${name} is the day before ${after}`);
+  });
+  return out;
+}

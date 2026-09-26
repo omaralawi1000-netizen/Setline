@@ -48,3 +48,25 @@ export function addProtein(entries, date, grams) {
   const next = { ...(cur || {}), date, protein: Math.min(600, (cur?.protein || 0) + g) }; // meals and kcal stay
   return [...entries.filter(e => e.date !== date), next];
 }
+
+// The weight trend: a smoothed line through the weigh-ins (each day moves it a tenth of the way to the
+// scale, so water and salt swings wash out) and how fast it moves, per week and as % of bodyweight.
+// null until there are 4 weigh-ins over at least 10 days.
+export function weightTrend(list) {
+  const sorted = [...list].filter(e => validBodyweight(e.kg)).sort((a, b) => a.date.localeCompare(b.date));
+  if (sorted.length < 4 || daysBetween(sorted[0].date, sorted[sorted.length - 1].date) < 10) return null;
+  let tr = sorted[0].kg;
+  const series = [{ date: sorted[0].date, kg: sorted[0].kg, trend: tr }];
+  for (let i = 1; i < sorted.length; i++) {
+    const gap = Math.max(1, daysBetween(sorted[i - 1].date, sorted[i].date));
+    tr += (sorted[i].kg - tr) * (1 - Math.pow(0.9, gap));
+    series.push({ date: sorted[i].date, kg: sorted[i].kg, trend: tr });
+  }
+  const last = series[series.length - 1];
+  // the rate over the last two weeks (or what there is, at least 7 days)
+  const back = [...series].reverse().find(p => daysBetween(p.date, last.date) >= 14) || [...series].reverse().find(p => daysBetween(p.date, last.date) >= 7);
+  if (!back) return null;
+  const weeks = daysBetween(back.date, last.date) / 7, perWeek = (last.trend - back.trend) / weeks;
+  const r2 = n => Math.round(n * 100) / 100;
+  return { trend: r2(last.trend), perWeek: r2(perWeek), pctPerWeek: r2((perWeek / last.trend) * 100), series: series.map(p => ({ ...p, trend: r2(p.trend) })) };
+}

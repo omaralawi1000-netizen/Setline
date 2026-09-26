@@ -22,7 +22,7 @@ import { suggest } from './progression.js';
 import { warmupsFor, pendingWarmup } from './warmup.js';
 import { parseMealLocal } from './fooddb.js';
 import { splitMeal } from './meals.js';
-import { syncTargets, TARGET_LIMITS } from './nutrition.js';
+import { syncTargets, TARGET_LIMITS, slotOf } from './nutrition.js';
 import { validBodyweight, proteinTarget, dateKey, bodyTrend } from './body.js';
 
 export const AUTO_MS = 1500;
@@ -485,6 +485,17 @@ export function resolve(intent, snap, t, lang) {
       const local = parseMealLocal(intent.text, lang);
       if (local) return mealCommand(local, intent.slot, heard);
       return cmd('auto', { title: t('meal.estimating'), value: intent.text, sub: t('voice.heard', { text: heard }), say: '', run: { op: 'meal-ai', text: intent.text, slot: intent.slot || null } });
+    }
+    case 'RepeatMeal': {
+      // yesterday's meal, eaten again: logged in that meal's slot, with Undo
+      const y = (snap.nutrition || []).find(n => n.date === dateKey(snap.now - 86_400_000));
+      const h = new Date(snap.now).getHours();
+      const slot = intent.slot || (h < 11 ? 'breakfast' : h < 16 ? 'lunch' : h < 21 ? 'dinner' : 'snack');
+      const list = (y?.meals || []).filter(m => slotOf(m) === slot);
+      if (!list.length) { const nt = t('food.noYesterday', { slot: t('food.slot.' + slot).toLowerCase() }); return cmd('error', { title: nt, sub: '', say: say(nt) }); }
+      const k = list.reduce((a, m) => a + (m.kcal || 0), 0), p = list.reduce((a, m) => a + (m.protein || 0), 0);
+      return cmd('auto', { title: t('tpl.repeat', { slot: t('food.slot.' + slot).toLowerCase() }), value: `${k} kcal · ${p} g ${t('food.protein').toLowerCase()}`, sub: list.map(m => m.name).join(', '),
+        say: say(t('say.meal', { k, p })), run: { op: 'meal-log', meals: list.map(m => ({ name: m.name, kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat, source: m.source || 'voice', slot })) } });
     }
     case 'LogWater': {
       if (!(intent.ml > 0 && intent.ml <= 5000)) return err('voice.didntCatch');

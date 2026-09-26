@@ -1,6 +1,6 @@
 // Service worker: precached app shell, runtime cache for Google Fonts.
 // Bump VERSION on every release (keep js/version.js in sync).
-const VERSION = '1.48.0';
+const VERSION = '1.49.0';
 const CACHE = 'setline-' + VERSION;
 const FONTS = 'setline-fonts';
 const SHELL = [
@@ -94,6 +94,8 @@ const SHELL = [
   'js/ui/history.js',
   'js/ui/settings.js',
   'js/ui/voice.js',
+  'js/review.js',
+  'js/ui/pins.js',
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/icon-maskable-512.png'
@@ -105,7 +107,7 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {
-    for (const k of await caches.keys()) if (k !== CACHE && k !== FONTS) await caches.delete(k);
+    for (const k of await caches.keys()) if (k !== CACHE && k !== FONTS && k !== PENDING) await caches.delete(k);
     await self.clients.claim();
   })());
 });
@@ -118,8 +120,8 @@ const REST_MAX = 270_000;
 self.addEventListener('message', e => {
   const d = e.data;
   if (d === 'skipWaiting') { self.skipWaiting(); return; }
-  if (d?.type === 'rest' && Number.isFinite(d.endsAt)) { const r = rest = { ...d }; e.waitUntil(waitRest(r)); }
-  else if (d?.type === 'rest-cancel') { rest = null; e.waitUntil(closeRest()); }
+  if (d?.type === 'rest' && Number.isFinite(d.endsAt)) { const r = rest = last = { ...d }; e.waitUntil(waitRest(r)); }
+  else if (d?.type === 'rest-cancel') { rest = null; last = null; e.waitUntil(closeRest()); }
 });
 const sleep = ms => new Promise(res => setTimeout(res, ms));
 const clock = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
@@ -133,7 +135,7 @@ async function waitRest(r) {
     if (rest !== r) { if (shown && rest === null) closeRest(); return; }
     if (r.live && !(await appInFront())) {
       await self.registration.showNotification(`${r.liveTitle || 'Rest'} · ${clock(r.endsAt - Date.now())}`, {
-        body: r.body || '', tag: 'setline-rest', renotify: false, silent: true, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', timestamp: r.endsAt, data: { url: './' }
+        body: r.body || '', tag: 'setline-rest', renotify: false, silent: true, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', timestamp: r.endsAt, data: { url: './' }, actions: actionsOf(r)
       });
       shown = true;
     } else if (shown) { closeRest(); shown = false; }
@@ -146,15 +148,41 @@ async function waitRest(r) {
   if (await appInFront()) { if (shown) closeRest(); return; } // the app is open: it rings itself
   await self.registration.showNotification(r.title, {
     body: r.body || '', tag: 'setline-rest', renotify: true, silent: false, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png',
-    vibrate: [260, 110, 260, 110, 420], timestamp: r.endsAt, data: { url: './' }
+    vibrate: [180, 140, 180], timestamp: r.endsAt, data: { url: './' }, actions: actionsOf(r)
   });
+}
+// On the lock screen (and the watch): log the planned set without opening the app, or rest 15 s more.
+const actionsOf = r => [...(r.next && r.logLabel ? [{ action: 'log', title: r.logLabel }] : []), ...(r.addLabel ? [{ action: 'add15', title: r.addLabel }] : [])];
+
+// What was tapped is kept until the app picks it up (the page may be frozen, or closed).
+const PENDING = 'setline-pending';
+async function keepPending(item) {
+  const c = await caches.open(PENDING);
+  await c.put(new Request(`pending/${item.at}-${Math.random().toString(36).slice(2, 7)}`), new Response(JSON.stringify(item), { headers: { 'content-type': 'application/json' } }));
+  for (const cl of await self.clients.matchAll({ type: 'window', includeUncontrolled: true })) cl.postMessage({ type: 'pending' });
 }
 async function closeRest() {
   for (const n of await self.registration.getNotifications({ tag: 'setline-rest' })) n.close();
 }
 
-// Tapping a rest alert brings the app back.
+// Tapping a rest alert brings the app back; its buttons work without it.
+let last = null; // the latest rest handed over, so its buttons still work after it ended
 self.addEventListener('notificationclick', e => {
+  const r = rest || last;
+  if (e.action === 'log' && r?.next) {
+    // the set is logged at the moment of the tap, and the next rest starts from there
+    const at = Date.now();
+    const nr = rest = { ...r, endsAt: at + (r.restSec || 90) * 1000, next: null, body: r.afterBody || r.body };
+    last = nr;
+    e.waitUntil(keepPending({ kind: 'log', at, ...r.next }).then(() => waitRest(nr)));
+    return;
+  }
+  if (e.action === 'add15' && r) {
+    const at = Date.now(), nr = rest = { ...r, endsAt: Math.max(r.endsAt, at) + 15_000 };
+    last = nr;
+    e.waitUntil(keepPending({ kind: 'add15', at, endsAt: nr.endsAt }).then(() => waitRest(nr)));
+    return;
+  }
   e.notification.close();
   e.waitUntil((async () => {
     const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
