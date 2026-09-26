@@ -18,7 +18,7 @@ export const depthFor = (w, h) => { const size = Math.max(w, h); return size > 2
 function down(e) {
   if (e.button > 0 || reduced()) return;
   const el = e.target.closest?.(TARGET);
-  if (!el || el.matches(SKIP) || el.closest('.ofloat, .wk-live')) return; // the live workout presses with Motion
+  if (!el || el.matches(SKIP) || el.closest('.ofloat')) return;
   const r = el.getBoundingClientRect();
   release(true);
   cur = { el, t: performance.now(), s: depthFor(r.width, r.height), x: e.clientX, y: e.clientY };

@@ -405,12 +405,11 @@ html[data-motion=off] *,html[data-motion=off] *::before,html[data-motion=off] *:
 .num.tick-down{animation:tickDown .28s var(--ease)}
 @keyframes tickUp{from{transform:translateY(7px);opacity:.35}}
 @keyframes tickDown{from{transform:translateY(-7px);opacity:.35}}
-.slide-l .exhead,.slide-l .hero .cols,.slide-l .hero .ghost{animation:slideL .45s var(--ease)}
-.slide-r .exhead,.slide-r .hero .cols,.slide-r .hero .ghost{animation:slideR .45s var(--ease)}
+.slide-l .exhead,.slide-l .hero .cols,.slide-l .hero .ghost,.slide-l .sets{animation:slideL .45s var(--ease)}
+.slide-r .exhead,.slide-r .hero .cols,.slide-r .hero .ghost,.slide-r .sets{animation:slideR .45s var(--ease)}
 @keyframes slideL{from{opacity:0;transform:translateX(-22px)}}
 @keyframes slideR{from{opacity:0;transform:translateX(22px)}}
-/* live workout: presses are Motion springs (workout-motion.js), so :active doesn't squish as well */
-#s-workout.wk-live button:active{transform:none}
+.log.flash{animation:logflash .5s var(--ease)}
 @keyframes logflash{30%{transform:scale(.97);box-shadow:0 12px 40px -4px rgba(var(--a-rgb),.9),inset 0 1px 0 rgba(255,255,255,.65)}}
 .sayhint{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;font-size:13px;color:var(--muted);font-weight:600}
 .sayhint svg{width:14px;height:14px}
@@ -463,14 +462,11 @@ button.mini:active,button.pr:active{transform:scale(.98)}
 .pr polyline{stroke-dasharray:400;stroke-dashoffset:0}
 .screen.enter .pr polyline{animation:draw 1.2s var(--ease) both .15s}
 .screen.enter .pr path{animation:fadein .9s ease both .35s}
-.pr .spark{position:relative;flex:none;width:112px;height:56px}
-.pr .pulse{position:absolute;width:16.8px;height:16.8px;margin:-8.4px 0 0 -8.4px;border-radius:50%;background:#FFD9A8;opacity:.18;pointer-events:none;animation:prpulse 2.4s ease-in-out 4}
+.pr .pulse{transform-box:fill-box;transform-origin:center;animation:prpulse 2.4s ease-in-out 4}
 @keyframes draw{from{stroke-dashoffset:400}}
 @keyframes fadein{from{opacity:0}}
 @keyframes prpulse{50%{transform:scale(1.5);opacity:.05}}
 .screen:not(.on){pointer-events:none}
-/* nothing animates on a screen you can't see (it still cost a layout or paint every frame) */
-.screen:not(.on) *,.screen:not(.on) *::before,.screen:not(.on) *::after{animation-play-state:paused}
 
 /* ---------- coach ---------- */
 .coachhead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
@@ -833,7 +829,6 @@ button{-webkit-appearance:none;appearance:none}
 .ofloat[data-phase=opening] .orb.lift{animation:breathe 1s ease-in-out infinite}
 .obubble{position:absolute;left:24px;right:24px;bottom:calc(var(--dock-bottom) + var(--dock-h) + 196px);text-align:center;opacity:0;transform:translateY(10px);transition:opacity .35s var(--ease) .08s,transform .5s var(--ease) .08s;pointer-events:none}
 .ofloat.on .obubble{opacity:1;transform:none}
-#app:has(> .intent.show) .ofloat.on .obubble{opacity:0;transform:translateY(-8px);transition-delay:0s}
 .ostatus{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 14px;border-radius:999px;background:rgba(255,255,255,.07);font-size:12.5px;font-weight:800;color:var(--muted);letter-spacing:.01em}
 .ofloat[data-phase=listening] .ostatus{color:var(--accent);background:rgba(var(--a-rgb),.12)}
 .osay{margin-top:14px;font-size:25px;line-height:1.25;font-weight:700;letter-spacing:-.02em;min-height:32px}
@@ -1240,7 +1235,7 @@ p.ckwarn{margin:6px 0 0}
 
 /* sheets: the page behind dims and blurs a little */
 .scrim{-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
-.sheet .sin{animation:sheetin var(--spring-default-dur) var(--spring-default) both}
+.sheet .sin{animation:sheetin .5s var(--ease) both}
 @keyframes sheetin{from{opacity:0;transform:translateY(14px)}}
 
 /* ---------- 1.9: onboarding ---------- */
@@ -2022,7 +2017,7 @@ html[data-dock=icons] .dock .tab span{display:none}
 .frow.ingroup + .frow.ingroup{border-top-color:transparent}
 .fgroup + .frow{border-top:0}
 /* sheets: swipe down from anywhere; a flick leaves at the finger's speed, a let-go springs back */
-.sheet.show.snap{transition:transform var(--spring-expressive-dur) var(--spring-expressive)}
+.sheet.show.snap{transition:transform .42s cubic-bezier(.32,1.2,.5,1)}
 .sheet.flung{transition:transform .26s cubic-bezier(.2,.8,.2,1)!important}
 .sheet .sbody{overscroll-behavior-y:none}
 /* the one known lag source of this design: a live blur behind every chat bubble */
@@ -2105,12 +2100,7 @@ html[data-dock=icons] .dock .tab span{display:none}
    dims, and while you swipe the sheet down the page follows your finger back to full size.
    The iOS sheet curve; the page and the sheet move together. */
 .sheet{transition:transform .34s cubic-bezier(.4,0,.9,.6)}
-/* sheets rise on the expressive spring (css/motion.css); its small overshoot lifts the sheet a few
-   pixels, so a strip of the sheet's colour runs on below it and no gap ever shows at the bottom */
-.sheet.show{transition:transform var(--spring-expressive-dur) var(--spring-expressive)}
-.sheet::after{content:"";position:absolute;left:-1px;right:-1px;top:100%;height:80px;background:rgb(20,23,32);pointer-events:none}
-.sheet.scansheet::after{background:#05060A}
-.sheet.obsheet::after{background:rgb(12,14,20)}
+.sheet.show{transition:transform .52s cubic-bezier(.32,.72,0,1)}
 .sheet.dragging{transition:none}
 .scrim{transition:opacity .45s cubic-bezier(.32,.72,0,1)}
 /* the page's depth itself is animated in sheet.js (scale and position only) */
@@ -2118,16 +2108,16 @@ html[data-dock=icons] .dock .tab span{display:none}
 /* ======================= 1.35: the workout, polished =======================
    Every moment is timed from when it happened (--t is a negative delay), so a redraw continues it
    instead of restarting it. Only transform and opacity move. */
-:root{--glide:cubic-bezier(.2,.8,.2,1)} /* springs: the shared tokens in css/motion.css (same curves as js/motion-tokens.js) */
+:root{--spring:cubic-bezier(.34,1.45,.55,1);--glide:cubic-bezier(.2,.8,.2,1)}
 
 /* a logged set lands: it drops into place with a little spring, a ring of light fades off it and
    the check draws itself */
-.set.fresh{animation:setland var(--spring-expressive-dur) var(--spring-expressive) both;animation-delay:var(--t,0ms)}
+.set.fresh{animation:setland .62s var(--spring) both;animation-delay:var(--t,0ms)}
 @keyframes setland{0%{opacity:0;transform:translateY(-10px) scale(.94)}100%{opacity:1;transform:none}}
 .set.fresh::after{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;border:1.5px solid rgba(var(--a-rgb),.7);background:rgba(var(--a-rgb),.14);
   animation:setglow 1.6s var(--glide) both;animation-delay:var(--t,0ms)}
 @keyframes setglow{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.035)}}
-.set.fresh .ck{animation:ckpop var(--spring-expressive-dur) var(--spring-expressive) both;animation-delay:calc(var(--t,0ms) + .12s)}
+.set.fresh .ck{animation:ckpop .5s var(--spring) both;animation-delay:calc(var(--t,0ms) + .12s)}
 @keyframes ckpop{0%{opacity:0;transform:scale(.3)}100%{opacity:1;transform:none}}
 .set.fresh .ck svg path{stroke-dasharray:22;stroke-dashoffset:22;animation:ckdraw .38s ease-out forwards;animation-delay:calc(var(--t,0ms) + .24s)}
 @keyframes ckdraw{to{stroke-dashoffset:0}}
@@ -2135,7 +2125,7 @@ html[data-dock=icons] .dock .tab span{display:none}
 @keyframes valin{from{opacity:0;transform:translateY(5px)}}
 /* a record: warm light instead, the tag springs in and "New record" floats up off the row */
 .set.prfresh::after{border-color:rgba(255,217,168,.8);background:rgba(255,217,168,.16);animation-duration:2.2s}
-.set.prfresh .tag{animation:ckpop var(--spring-expressive-dur) var(--spring-expressive) both;animation-delay:calc(var(--t,0ms) + .3s)}
+.set.prfresh .tag{animation:ckpop .55s var(--spring) both;animation-delay:calc(var(--t,0ms) + .3s)}
 .set.prflash{animation:none}
 .sw{position:relative}
 .prfloat{position:absolute;right:88px;top:50%;margin-top:-11px;z-index:3;pointer-events:none;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:800;letter-spacing:.02em;
@@ -2143,12 +2133,12 @@ html[data-dock=icons] .dock .tab span{display:none}
   opacity:0;animation:prfloat 1.9s var(--glide) both;animation-delay:calc(var(--t,0ms) + .25s)}
 @keyframes prfloat{0%{opacity:0;transform:translateX(12px) scale(.7)}16%{opacity:1;transform:none}78%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-6px) scale(.96)}}
 /* the log button gives a short, firm press and its set number ticks over */
-.log.flash{animation:logpress var(--spring-tap-dur) var(--spring-tap)}
+.log.flash{animation:logpress .42s var(--spring)}
 @keyframes logpress{0%{transform:scale(.95)}100%{transform:none}}
 .log.flash > span{display:inline-block;animation:tickUp .4s var(--glide)}
 
 /* rest: the card drops in with a spring; the ring drains smoothly (driven from JS) */
-.rest.in{animation:restin2 var(--spring-default-dur) var(--spring-default) both}
+.rest.in{animation:restin2 .55s var(--spring) both}
 @keyframes restin2{from{opacity:0;transform:translateY(-12px) scale(.96)}}
 .ring .fg{transition:none}
 .ring::after{content:"";position:absolute;inset:-8px;border-radius:50%;pointer-events:none;opacity:0;background:radial-gradient(closest-side,rgba(var(--a-rgb),.5),transparent)}
@@ -2160,7 +2150,7 @@ html[data-dock=icons] .dock .tab span{display:none}
 /* rest over: the ring fills back up in one sweep, a check pops in and the card glows once */
 .ring.bloom .fg{animation:ringfill .7s var(--glide) both;animation-delay:var(--t,0ms)}
 @keyframes ringfill{from{stroke-dashoffset:157.08}to{stroke-dashoffset:0}}
-.ring.bloom b svg{width:22px;height:22px;stroke-width:2.6;color:var(--accent);animation:ckpop var(--spring-fast-dur) var(--spring-fast) both;animation-delay:calc(var(--t,0ms) + .35s)}
+.ring.bloom b svg{width:22px;height:22px;stroke-width:2.6;color:var(--accent);animation:ckpop .5s var(--spring) both;animation-delay:calc(var(--t,0ms) + .35s)}
 .ring.bloom b svg path{stroke-dasharray:22;stroke-dashoffset:22;animation:ckdraw .35s ease-out forwards;animation-delay:calc(var(--t,0ms) + .45s)}
 .ring.bloom::after{animation:hotglow 1.2s ease-out both;animation-delay:var(--t,0ms)}
 .rest.over{position:relative;isolation:isolate}
@@ -2178,12 +2168,12 @@ html[data-dock=icons] .dock .tab span{display:none}
 @keyframes dringdraw{to{stroke-dashoffset:0}}
 .dring .ck{fill:none;stroke:var(--accent-hi);stroke-width:6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:56;stroke-dashoffset:56;
   animation:ckdraw .34s ease-out forwards;animation-delay:calc(var(--t,0ms) + .66s)}
-.donehero{animation:heropop var(--spring-expressive-dur) var(--spring-expressive) both;animation-delay:var(--t,0ms)}
+.donehero{animation:heropop .8s var(--spring) both;animation-delay:var(--t,0ms)}
 @keyframes heropop{0%{opacity:0;transform:scale(.7)}60%{opacity:1}100%{transform:none}}
 .dlabel{font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);animation:valin .5s var(--glide) both;animation-delay:calc(var(--t,0ms) + .8s)}
 #s-detail.finished > *{animation:finrise .6s var(--glide) both;animation-delay:calc(var(--t,0ms) + var(--d,.9s))}
 #s-detail.finished > .top{animation:none}
-#s-detail.finished > .donehero{animation:heropop var(--spring-expressive-dur) var(--spring-expressive) both;animation-delay:var(--t,0ms)}
+#s-detail.finished > .donehero{animation:heropop .8s var(--spring) both;animation-delay:var(--t,0ms)}
 #s-detail.finished > .h1{--d:.86s}
 #s-detail.finished > .detail-date{--d:.92s}
 #s-detail.finished > .summary{--d:1s}
@@ -2191,7 +2181,7 @@ html[data-dock=icons] .dock .tab span{display:none}
 #s-detail.finished > :nth-child(n+7){--d:1.22s}
 #s-detail.finished > :nth-child(n+8){--d:1.3s}
 @keyframes finrise{from{opacity:0;transform:translateY(16px)}}
-#s-detail.finished .prs li{animation:ckpop var(--spring-expressive-dur) var(--spring-expressive) both;animation-delay:calc(var(--t,0ms) + 1.25s + var(--i,0) * .14s)}
+#s-detail.finished .prs li{animation:ckpop .55s var(--spring) both;animation-delay:calc(var(--t,0ms) + 1.25s + var(--i,0) * .14s)}
 
 /* your own program (Add a program sheet) and "Save as a routine" */
 .ownprog{display:flex;flex-direction:column;gap:6px;padding:14px;border-radius:22px;margin-top:10px}

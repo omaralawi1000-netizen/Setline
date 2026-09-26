@@ -484,3 +484,9 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Found with the motion lab: the pulsing dot on Today's record card was a scaling SVG circle, which re-laid out the page every frame for ~10 s, even behind other tabs (57 layouts a second at rest). Now an HTML dot on the compositor, and animations on hidden screens pause: at rest, 0 layouts
 - [x] Count-up numbers only touch the page when the number changes; the status-bar colour is only set when it changes (it restyled the whole page on every sheet and voice change); in voice, the words you said step aside when the command card comes up (they overlapped it)
 - Motion lab, whole app: layout work during animations went from 30–210 per animation to 0–20; frame rates here are software-rendered (no GPU), so they read low for everything
+
+## 1.38.0: back to 1.36.0
+
+- [x] The app is exactly 1.36.0 again (every app file restored; only the version number moves forward so phones update by themselves). Undone from 1.37.0: the Motion library and spring presets, the workout-screen spring layer, the spring sheets, the record-pulse and count-up changes, and `css/motion.css` (it was never part of 1.36)
+- Kept, dev only and never loaded by the app: `node scripts/screens.mjs`, `npm run motion`, the design skill and the cloud-session hook
+

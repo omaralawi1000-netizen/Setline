@@ -38,11 +38,9 @@ export function countUp(el, to, { ms = 900, format = v => Math.round(v).toLocale
   if (reduced()) { el.textContent = format(to); return; }
   const t0 = performance.now();
   const ease = t => 1 - Math.pow(1 - t, 3);
-  let shown = el.textContent;
   const step = now => {
     const k = Math.min(1, (now - t0) / ms);
-    const next = format(to * ease(k));
-    if (next !== shown) el.textContent = shown = next; // each write is a relayout: only when it changes
+    el.textContent = format(to * ease(k));
     if (k < 1) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);

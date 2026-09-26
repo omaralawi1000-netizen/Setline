@@ -202,12 +202,9 @@ export function renderFood(root) {
 function countBetween(el, from, to, ms = 900) {
   if (from === to || reduced()) { el.textContent = nf().format(to); return; }
   const t0 = performance.now(), ease = k => 1 - Math.pow(1 - k, 3);
-  const f = nf();
-  let shown = el.textContent;
   const step = now => {
     const k = Math.min(1, (now - t0) / ms);
-    const next = f.format(Math.round(from + (to - from) * ease(k)));
-    if (next !== shown) el.textContent = shown = next; // each write is a relayout: only when it changes
+    el.textContent = nf().format(Math.round(from + (to - from) * ease(k)));
     if (k < 1) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
