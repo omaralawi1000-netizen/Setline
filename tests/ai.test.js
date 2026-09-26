@@ -242,13 +242,12 @@ test('the coach remembers what you tell it, and the line stays hidden', () => {
   assert.deepEqual(m.map(x => x.text), ['hates lunges', 'trains at 6 am'], 'no duplicates');
 });
 
-import { pickLiveModel } from '../js/ai.js';
-test('pickLiveModel: newest native-audio Live model, only ones that can hold a live session', () => {
-  const m = (name, methods) => ({ name: 'models/' + name, supportedGenerationMethods: methods });
-  const list = [m('gemini-2.5-flash', ['generateContent']), m('gemini-live-2.5-flash-preview', ['bidiGenerateContent']),
-    m('gemini-2.5-flash-native-audio-preview-09-2025', ['bidiGenerateContent']), m('gemini-3.1-flash-native-audio', ['bidiGenerateContent', 'countTokens'])];
-  assert.equal(pickLiveModel(list), 'gemini-3.1-flash-native-audio');
-  assert.equal(pickLiveModel([m('gemini-live-2.5-flash-preview', ['bidiGenerateContent'])]), 'gemini-live-2.5-flash-preview');
-  assert.equal(pickLiveModel([m('gemini-2.5-flash', ['generateContent'])]), null);
-  assert.equal(pickLiveModel(['gemini-live-x']), null);
+
+import { asksBack } from '../js/coach.js';
+test('asksBack: only a reply that ends with a question keeps the conversation open', () => {
+  assert.equal(asksBack('You sound bored. Crush it with a workout. Should we start the workout?'), true);
+  assert.equal(asksBack('Skal vi starte træningen?”'), true);
+  assert.equal(asksBack('Want to try? Otherwise rest today.'), false);
+  assert.equal(asksBack('Done, rest is 2 minutes.'), false);
+  assert.equal(asksBack('Should I move it?\nCHANGE: {"day":"2026-09-26","rest":true}'), true);
 });

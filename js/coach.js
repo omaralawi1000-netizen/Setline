@@ -46,14 +46,6 @@ export function systemPrompt(lang) {
   ].join(' ');
 }
 
-// Added to the instructions in a live spoken conversation (Gemini Live), where there is no text to hide lines in.
-export const LIVE_RULES = [
-  'LIVE VOICE: this is a live spoken conversation. The user hears you and can cut in at any moment. Keep answers short and natural (one to three sentences), like a coach standing next to them.',
-  'Never say CHANGE, ACTION or REMEMBER lines, JSON or anything technical out loud. Instead of CHANGE lines, call the change_app tool with changes_json: a JSON array of the same objects a CHANGE line would contain (plan changes, settings, "do" commands, "open"). Instead of REMEMBER lines, call the remember tool.',
-  'Make a change when the user asks for it. When you want to suggest one, ask a short yes-or-no question first and call change_app only after they agree. After a change, confirm it in a few words.',
-  'If you could not hear something clearly, ask them to say it again rather than guessing.'
-].join(' ');
-
 // What the app can do and where, so the Coach can explain it.
 export const APP_GUIDE = [
   'APP GUIDE (Setline, a voice-first gym app).',
@@ -459,3 +451,7 @@ export function addMemories(list, facts, now = Date.now()) {
   }
   return out.slice(-40);
 }
+
+// A reply that ends by asking you something (its last sentence is a question): in a spoken
+// conversation the orb then listens for the answer by itself.
+export const asksBack = text => /\?["”'’)\]\s]*$/.test(String(text || '').replace(/\n?\s*(?:CHANGE|ACTION|REMEMBER):[^]*$/i, '').trim());

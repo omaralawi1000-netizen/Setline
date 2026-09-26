@@ -21,6 +21,8 @@ export function openCustomize() {
         <div class="field"><label>${t('look.title')}</label><div class="slist solid">
           <div class="srow"><span class="l"><strong>${t('look.start')}</strong><small>${t('look.startSub')}</small></span>${seg('startTab', ['today', 'workout', 'food', 'coach'], k => t('tab.' + k))}</div>
           <div class="srow"><span class="l"><strong>${t('look.text')}</strong></span>${seg('textSize', ['small', 'normal', 'large'], k => t('look.text.' + k))}</div>
+          <div class="srow"><span class="l"><strong>${t('look.glass')}</strong><small>${t('look.glassSub')}</small></span>${seg('glass', ['liquid', 'soft', 'off'], k => t('look.glass.' + k))}</div>
+          <div class="srow"><span class="l"><strong>${t('look.glow')}</strong><small>${t('look.glowSub')}</small></span>${seg('glow', ['on', 'soft', 'off'], k => t('look.glow.' + k))}</div>
           ${tog('greeting', 'look.greeting', 'look.greetingSub')}
         </div></div>
         <div class="field"><label>${t('look.workout')}</label><div class="slist solid">

@@ -1,9 +1,9 @@
 // Coach tab: chat thread, composer, streamed answers, spoken when complete.
 import * as store from '../store.js';
 import { state } from '../store.js';
-import { streamChat, AiError, withFallback, aiPlan, pickTextModels, pickLiveModel, nextQuotaReset } from '../ai.js';
+import { streamChat, AiError, withFallback, aiPlan, pickTextModels, nextQuotaReset } from '../ai.js';
 import { listModels, pickTtsModel } from '../tts.js';
-import { splitMemories, hideMemoryTail as hideMem, addMemories } from '../coach.js';
+import { splitMemories, hideMemoryTail as hideMem, addMemories, asksBack } from '../coach.js';
 import { splitChanges, hideChangeTail, applyChanges } from '../planedit.js';
 import { splitAppChanges, planAppChanges, PAGES, splitActions, hideActionTail, isAffirm } from '../appedit.js';
 // the reply without its hidden lines (memories and plan changes), also while it streams in
@@ -11,11 +11,10 @@ const hideMemoryTail = text => hideActionTail(hideChangeTail(hideMem(text)));
 import { weekStart } from '../stats.js';
 import { dateKey } from '../body.js';
 import { weight } from '../format.js';
-import { buildContext, chatContents, systemPrompt, LIVE_RULES, formatAnswer, speakable, isPlanRequest, PLAN_SCHEMA, planSchema, planSystem, validatePlan, planToRoutines, isRoutineImport, IMPORT_SCHEMA, importSystem, validateImport, isNoise } from '../coach.js';
+import { buildContext, chatContents, systemPrompt, formatAnswer, speakable, isPlanRequest, PLAN_SCHEMA, planSchema, planSystem, validatePlan, planToRoutines, isRoutineImport, IMPORT_SCHEMA, importSystem, validateImport, isNoise } from '../coach.js';
 import { getKey } from '../keys.js';
 import { coachModels, ttsModelId, ttsAlt, sttModelId } from '../settings.js';
 import * as tts from '../tts.js';
-import { startLive, stopLive } from '../live.js';
 import { isRecording } from '../voice.js';
 import { haptic } from '../haptics.js';
 import { $, esc } from './dom.js';
@@ -107,11 +106,11 @@ export function renderCoach(root) {
 // iOS-style send: the words you typed lift out of the message box as a bubble and glide up into the
 // conversation, landing with a little give. Measured from where the text sat in the box.
 let pendingSend = null, sending = null;
-function sendStart(input, text) {
+function sendStart(input, text, root) {
   const r = input.getBoundingClientRect(), cs = getComputedStyle(input);
   const ctx = document.createElement('canvas').getContext('2d');
   ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-  return { text: text.trim(), x: r.left + parseFloat(cs.paddingLeft || 0), y: r.top + r.height / 2, w: Math.min(r.width, ctx.measureText(text).width), at: performance.now() };
+  return { text: text.trim(), x: r.left + parseFloat(cs.paddingLeft || 0), y: r.top + r.height / 2, w: Math.min(r.width, ctx.measureText(text).width), at: performance.now(), scroll: root?.scrollTop ?? 0 };
 }
 function sendFly(root) {
   const p = pendingSend;
@@ -131,24 +130,30 @@ function sendFly(root) {
   const dx = p.x - (b.left + pad), dy = p.y - (b.top + b.height / 2);
   // a one-line message starts at the text's own width; longer ones unfold as they rise
   const s0 = Math.max(0.6, Math.min(1, (p.w + pad * 2) / b.width));
+  const spring = 'cubic-bezier(.2,1.18,.32,1)';
+  // the bubble lifts off where the words were typed, swells a touch as it rises and settles into place
   const fly = ghost.firstChild.animate([
-    { transform: `translate(${dx}px, ${dy}px) scale(${s0})`, opacity: 0.5 },
-    { opacity: 1, offset: 0.2 },
-    { transform: 'translate(0, 0) scale(1)', opacity: 1 }], { duration: 520, easing: 'cubic-bezier(.25,1.15,.4,1)', fill: 'both' });
+    { transform: `translate(${dx}px, ${dy}px) scale(${s0})`, opacity: 0.9 },
+    { transform: `translate(${dx * 0.1}px, ${dy * 0.1}px) scale(1.03)`, opacity: 1, offset: 0.62 },
+    { transform: 'translate(0, 0) scale(1)', opacity: 1 }], { duration: 560, easing: spring, fill: 'both' });
+  // …and the conversation above makes room for it by gliding up, instead of jumping
+  const moved = root.scrollTop - (p.scroll || 0), thread = root.querySelector('#thread');
+  if (thread && moved > 2) thread.animate([{ transform: `translateY(${moved}px)` }, { transform: 'none' }], { duration: 520, easing: spring });
+  $('#composer .csend')?.animate([{ scale: 1 }, { scale: 0.86, offset: 0.3 }, { scale: 1 }], { duration: 360, easing: 'cubic-bezier(.3,1.4,.5,1)' });
   const done = () => { reveal(); requestAnimationFrame(() => ghost.remove()); };
   fly.onfinish = done;
-  setTimeout(done, 900);
+  setTimeout(done, 950);
 }
 
 // Streamed words don't appear in lumps: each word blurs in, lit by the accent, and settles.
 // The text on screen glides after what has arrived, faster the further behind it is.
-const WORD_MS = 650;
-function wordsHTML(bub, text, births, now) {
-  bub.innerHTML = formatAnswer(hideMemoryTail(text));
-  const walker = document.createTreeWalker(bub, NodeFilter.SHOW_TEXT);
+const WORD_MS = 850; // the same as --m-word: a word is left alone only once its blur-in has finished
+// Words are wrapped so each can blur in on its own clock (a negative delay says how far along it is).
+function wordify(el, births, start, now) {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
   const nodes = [];
   while (walker.nextNode()) nodes.push(walker.currentNode);
-  let i = 0;
+  let i = start;
   for (const n of nodes) {
     const frag = document.createDocumentFragment();
     for (const part of n.nodeValue.split(/(\s+)/)) {
@@ -164,10 +169,43 @@ function wordsHTML(bub, text, births, now) {
     }
     n.replaceWith(frag);
   }
+  return i - start;
+}
+// One line of the answer as its block (a paragraph, or a list item that joins the list above it).
+function lineBlock(line) {
+  const t = document.createElement('template');
+  t.innerHTML = formatAnswer(line);
+  return t.content.firstElementChild;
+}
+function place(bub, el) {
+  if (el.tagName === 'UL' && bub.lastElementChild?.tagName === 'UL') { const li = el.firstElementChild; bub.lastElementChild.append(li); return li; }
+  bub.append(el);
+  return el;
+}
+// Streaming, cheaply: lines that are finished are drawn once and left alone; only the line still
+// being written is redrawn on each step (it used to rebuild the whole reply every few frames).
+function wordsHTML(bub, text, births, now, st) {
+  if (bub._st !== st) { bub.innerHTML = ''; bub._st = st; Object.assign(st, { n: 0, w: 0, live: null, liveUl: null }); }
+  const lines = hideMemoryTail(text).split('\n'), tail = lines.pop();
+  const drop = () => { st.live?.remove(); if (st.liveUl && !st.liveUl.children.length) st.liveUl.remove(); st.live = st.liveUl = null; };
+  while (st.n < lines.length) {
+    drop();
+    const el = lines[st.n].trim() && lineBlock(lines[st.n]);
+    if (el) { st.w += wordify(el, births, st.w, now); place(bub, el); }
+    st.n++;
+  }
+  drop();
+  const el = tail.trim() && lineBlock(tail);
+  if (el) {
+    wordify(el, births, st.w, now);
+    const newUl = el.tagName === 'UL' && bub.lastElementChild?.tagName !== 'UL';
+    st.live = place(bub, el);
+    if (newUl) st.liveUl = el;
+  }
 }
 function typewriter(root, id) {
   let words = [], shown = 0, raf = 0, last = 0, waiters = [];
-  const births = [];
+  const births = [], st = {};
   const done = () => (shown >= words.length);
   const step = now => {
     if (!done() && now - last > 66) { // new words every ~4 frames: each word fades in on its own clock, so this stays smooth and the thread isn't rebuilt every frame
@@ -179,7 +217,7 @@ function typewriter(root, id) {
         // the answer starts: the box's orb gives one pulse and the first line rises out of it
         if (msg?.classList.contains('is-thinking')) { msg.classList.add('arrive'); pulseOrb(); }
         msg?.classList.remove('is-thinking');
-        wordsHTML(bub, words.slice(0, shown).join(''), births, now);
+        wordsHTML(bub, words.slice(0, shown).join(''), births, now, st);
       }
       follow(root);
     }
@@ -323,7 +361,7 @@ let picking = null;
 tts.whenModelMissing(() => store.setSettings({ ttsModel: '', ttsLite: '' })); // listed again next time
 export function ensureModels() {
   const s = state.settings;
-  if (!getKey('google') || ((s.coachOverride || (s.coachModel && s.coachAlt && s.proChecked)) && (s.ttsOverride || s.ttsLite) && s.liveChecked)) return Promise.resolve();
+  if (!getKey('google') || ((s.coachOverride || (s.coachModel && s.coachAlt && s.proChecked)) && (s.ttsOverride || s.ttsLite))) return Promise.resolve();
   picking ||= (async () => {
     try {
       const r = await listModels(getKey('google'));
@@ -331,8 +369,7 @@ export function ensureModels() {
       const text = pickTextModels(r.models);
       store.setSettings({
         cmdModel: text.command || '', coachModel: text.coach || '', cmdAlt: text.commandAlt || '', coachAlt: text.coachAlt || '', coachPro: text.pro || '', proChecked: true,
-        ttsModel: pickTtsModel(r.models, null, 'natural') || '', ttsLite: pickTtsModel(r.models, null, 'fast') || '',
-        liveModel: pickLiveModel(r.models) || '', liveChecked: true
+        ttsModel: pickTtsModel(r.models, null, 'natural') || '', ttsLite: pickTtsModel(r.models, null, 'fast') || ''
       });
     } catch { /* fall back to defaults */ } finally { picking = null; }
   })();
@@ -560,14 +597,6 @@ function syncButton() {
   if (b) { b.innerHTML = inflight ? I.stop : I.fwd; b.classList.toggle('stop', !!inflight); }
 }
 
-// What Gemini Live can do besides talking (see LIVE_RULES in coach.js)
-const LIVE_TOOLS = [
-  { name: 'change_app', description: 'Change the training plan or the app, or do something the app understands from words. Call it when the user asks for a change or agrees to one you suggested.',
-    parameters: { type: 'OBJECT', properties: { changes_json: { type: 'STRING', description: 'A JSON array of change objects, exactly the forms a CHANGE line would contain, e.g. [{"day":"2026-09-26","label":"Wrestling"}] or [{"setting":"restSec","value":120},{"do":"log 2 eggs and toast"}]' } }, required: ['changes_json'] } },
-  { name: 'remember', description: 'Keep a lasting fact the user told you about themselves (a preference, injury, schedule, event, goal).',
-    parameters: { type: 'OBJECT', properties: { fact: { type: 'STRING', description: 'The fact in a few words' } }, required: ['fact'] } }
-];
-
 export function initCoach(n) {
   nav = n;
   const root = $('#s-coach');
@@ -610,126 +639,33 @@ export function initCoach(n) {
     setTalk('thinking');
     await ask(text, { root, voice: true });
     if (!talk.on) return;
-    // the answer is spoken, then it rests: tap the orb to talk again (it never opens the mic by itself)
+    // the answer has been spoken. If it asked you something ("Should we start the workout?"), the orb
+    // listens for your answer straight away; otherwise it rests (tap the orb to talk again)
+    const last = [...state.chat].reverse().find(m => m.role !== 'user');
+    if (last && !last.error && asksBack(last.text)) return listenTurn();
     talk.on = false;
     setTalk(null);
   };
-  // Gemini Live: when the key has a Live model (and it's on in Settings), the orb holds a real
-  // conversation: you just talk, it answers in its voice at once, you can cut in, and it changes the
-  // app through tools. Both sides are written into the chat. If Live can't start, the orb falls back
-  // to taking turns (listen → answer → rest).
-  const live = { s: null, userId: null, modelId: null, typer: null, n: 0, open: null, lat: [] };
-  const liveWanted = () => state.settings.live && !!getKey('google');
-  const endLiveTurn = () => { live.userId = null; live.modelId = null; live.typer = null; };
-  const liveOff = reason => {
-    if (!live.s && composer.dataset.talk !== 'connecting') return;
-    live.s = null;
-    if (live.modelId) store.updateChat(live.modelId, { streaming: false }, { persist: true });
-    endLiveTurn();
-    setTalk(null);
-    composer.classList.remove('speaking'); composer.style.removeProperty('--sv'); orbBtn.style.removeProperty('--lv');
-    if (live.lat.length) { const sorted = [...live.lat].sort((a, b) => a - b); store.setSettings({ liveMs: sorted[sorted.length >> 1] }); live.lat = []; }
-    if (reason === 'idle' || reason === 'closed') toast({ title: esc(state.t('coach.live.ended')) });
-    const page = live.open; live.open = null;
-    if (page) setTimeout(() => openPage(page), 250);
-  };
-  const liveTool = async (name, args) => {
-    if (name === 'remember') {
-      const before = state.settings.memories || [], mem = addMemories(before, [String(args.fact || '')]);
-      if (mem.length > before.length) store.setSettings({ memories: mem });
-      return { ok: true };
-    }
-    if (name !== 'change_app') return { ok: false, error: 'unknown tool' };
-    let changes;
-    try { changes = JSON.parse(args.changes_json || '[]'); } catch { return { ok: false, error: 'changes_json is not valid JSON' }; }
-    if (!Array.isArray(changes)) changes = [changes];
-    if (!live.modelId) { live.modelId = store.addChat('model', '', { streaming: true, live: true }).id; live.typer = typewriter(root, live.modelId); }
-    const key = `${live.modelId}:${++live.n}`;
-    const { done, open } = await applyCoachChanges(key, changes);
-    const m = state.chat.find(x => x.id === live.modelId);
-    if (done.length) { store.updateChat(live.modelId, { acted: [...(m?.acted || []), { key, label: '', done }] }, { quiet: true }); haptic('success'); }
-    if (open) live.open = open;
-    return done.length ? { ok: true, done } : { ok: false, error: 'nothing could be changed (unknown name or value)' };
-  };
-  const startLiveTalk = async () => {
-    setTalk('connecting');
-    await ensureModels();
-    const model = state.settings.liveModel;
-    if (!model || !liveWanted() || composer.dataset.talk !== 'connecting') return false;
-    try {
-      live.s = await startLive({
-        key: getKey('google'), model, voice: state.settings.voice, tools: LIVE_TOOLS, onTool: liveTool,
-        system: `${systemPrompt(state.lang)}\n\n${LIVE_RULES}\n\nTraining data:\n${buildContext(coachSnap())}`,
-        on: {
-          state: (st, reason) => {
-            if (st === 'off') return liveOff(reason);
-            setTalk(st === 'listening' ? 'live' : st);
-            composer.classList.toggle('speaking', st === 'speaking');
-          },
-          // what it hears shows in the box as you speak; it goes into the chat when the answer starts
-          user: (text, final) => {
-            if (!final) { input.placeholder = text.trim() || state.t('coach.talk.hearing'); return; }
-            if (text.trim()) { live.userId = store.addChat('user', text.trim()).id; requestAnimationFrame(() => follow(root, true)); }
-          },
-          model: (text, final) => {
-            if (!live.modelId) { live.modelId = store.addChat('model', '', { streaming: true, live: true }).id; live.typer = typewriter(root, live.modelId); }
-            if (!final) { store.updateChat(live.modelId, { text }, { quiet: true }); live.typer?.set(text); return; }
-            const m = state.chat.find(x => x.id === live.modelId);
-            store.updateChat(live.modelId, { text, streaming: false, ...(m?.acted?.length ? { acted: m.acted } : {}) }, { persist: true });
-            endLiveTurn();
-          },
-          level: (inL, outL) => {
-            orbBtn.style.setProperty('--lv', (composer.dataset.talk === 'speaking' ? 0 : inL).toFixed(3));
-            composer.style.setProperty('--sv', outL.toFixed(3));
-          },
-          latency: ms => { if (ms > 0 && ms < 20000) live.lat.push(ms); },
-          error: () => {}
-        }
-      });
-      if (composer.dataset.talk === 'connecting') setTalk('live');
-      haptic('success');
-      return true;
-    } catch (e) {
-      live.s = null;
-      if (e?.code === 'mic') { toast({ title: esc(state.t('voice.micDenied')), error: true }); setTalk(null); return 'stop'; }
-      if (e?.code === 'stopped') return 'stop';
-      console.warn('live unavailable', e?.code || e);
-      return false;
-    }
-  };
-  orbBtn.addEventListener('click', async () => {
-    if (live.s || composer.dataset.talk === 'connecting') { haptic('tap'); stopLive('user'); liveOff('user'); return; }
+  orbBtn.addEventListener('click', () => {
     if (talk.on) { haptic('tap'); if (talk.l && composer.dataset.talk !== 'thinking') talk.l.stop(); else stopTalk(); return; }
+    if (!getKey('groq')) { toast({ title: esc(state.t('voice.noKey')), error: true }); return; }
     haptic('tap');
     unlockAudio();
     input.blur();
-    const typed = input.value.trim();
-    if (!typed && liveWanted()) {
-      const ok = await startLiveTalk();
-      if (ok) return;
-      if (ok === 'stop') return;
-      setTalk(null);
-      if (state.settings.liveModel) toast({ title: esc(state.t('coach.live.fallback')) });
-    }
-    if (!getKey('groq')) { toast({ title: esc(state.t('voice.noKey')), error: true }); return; }
     talk.on = true;
     talk.misses = 0;
+    const typed = input.value.trim();
     if (typed) { input.value = ''; setTalk('thinking'); ask(typed, { root, voice: true }).then(() => { talk.on = false; setTalk(null); }); return; }
     listenTurn();
   });
-  document.getElementById('app').addEventListener('screenchange', () => {
-    if (document.getElementById('app').classList.contains('coaching')) return;
-    if (talk.on) stopTalk();
-    if (live.s) stopLive('left');
-  });
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && live.s) stopLive('hidden'); });
+  document.getElementById('app').addEventListener('screenchange', () => { if (talk.on && !document.getElementById('app').classList.contains('coaching')) stopTalk(); });
   composer.addEventListener('submit', e => {
     e.preventDefault();
     if (inflight) { inflight.ctl.abort(); return; }
     const input = composer.querySelector('input');
     const q = input.value;
     if (!q.trim()) return;
-    pendingSend = sendStart(input, q);
+    pendingSend = sendStart(input, q, root);
     input.value = '';
     input.blur(); // the keyboard goes down so the answer has the screen
     haptic('tap');

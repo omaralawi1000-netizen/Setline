@@ -29,10 +29,7 @@ export const DEFAULTS = Object.freeze({
   weeklyGoal: 3,       // workouts per week, Today ring
   cmdModel: '',        // Flash-Lite text model for command fallback (picked on key test)
   coachModel: '',      // Flash text model for the Coach
-  live: true,          // talk to the Coach with Gemini Live when the key has a Live model
-  liveModel: '',       // the Live (native audio) model, picked from the key's model list
-  liveChecked: false,  // the model list was checked for Live
-  liveMs: 0,           // how quickly Live last started answering (ms), shown in Settings
+  coachBrain: 'fast',  // fast: the newest Flash (quick, and thinks a little) | smart: the newest Pro (slower, deepest)
   cmdOverride: '',
   coachOverride: '',
   cmdAlt: '',          // runner-up models, tried on 503/429/404
@@ -64,6 +61,7 @@ export const DEFAULTS = Object.freeze({
   startTab: 'today',   // the tab the app opens on (a running workout always opens Workout)
   textSize: 'normal',  // small | normal | large
   glow: 'on',
+  glass: 'liquid',     // blur behind the bars: liquid (a frosted fade under the status bar and the bar at the bottom) | soft | off
   fx: 'wow',           // motion: calm | lively | wow
   orbStyle: 'aurora',  // aurora | glass | ring | dot
   bar: 'glass',        // glass | solid | minimal
@@ -137,9 +135,11 @@ export function sanitize(input) {
   if (ACCENTS.includes(input.accent)) s.accent = input.accent;
   else if (OLD_ACCENT[input.accent]) s.accent = OLD_ACCENT[input.accent];
   if (typeof input.proChecked === 'boolean') s.proChecked = input.proChecked;
+  if (['fast', 'smart'].includes(input.coachBrain)) s.coachBrain = input.coachBrain;
   if (['today', 'workout', 'food', 'coach'].includes(input.startTab)) s.startTab = input.startTab;
   if (['small', 'normal', 'large'].includes(input.textSize)) s.textSize = input.textSize;
   if (['on', 'soft', 'off'].includes(input.glow)) s.glow = input.glow;
+  if (['liquid', 'soft', 'off'].includes(input.glass)) s.glass = input.glass;
   if (['calm', 'lively', 'wow'].includes(input.fx)) s.fx = input.fx;
   if (['aurora', 'glass', 'ring', 'dot'].includes(input.orbStyle)) s.orbStyle = input.orbStyle;
   if (['glass', 'solid', 'minimal'].includes(input.bar)) s.bar = input.bar;
@@ -185,10 +185,7 @@ export function sanitize(input) {
   // 1.34: the Gemini voice is the default again; a choice made after that is kept
   if (['instant', 'natural', 'fast'].includes(input.ttsQuality) && input.ttsV === 2) s.ttsQuality = input.ttsQuality;
   if (['fast', 'accurate'].includes(input.stt)) s.stt = input.stt;
-  if (typeof input.live === 'boolean') s.live = input.live;
-  if (typeof input.liveChecked === 'boolean') s.liveChecked = input.liveChecked;
-  if (Number.isFinite(input.liveMs) && input.liveMs >= 0 && input.liveMs < 60000) s.liveMs = Math.round(input.liveMs);
-  for (const k of ['ttsModel', 'ttsLite', 'ttsOverride', 'cmdModel', 'coachModel', 'cmdOverride', 'coachOverride', 'cmdAlt', 'coachAlt', 'coachPro', 'liveModel']) if (typeof input[k] === 'string' && (input[k] === '' || MODEL_ID.test(input[k].trim()))) s[k] = input[k].trim();
+  for (const k of ['ttsModel', 'ttsLite', 'ttsOverride', 'cmdModel', 'coachModel', 'cmdOverride', 'coachOverride', 'cmdAlt', 'coachAlt', 'coachPro']) if (typeof input[k] === 'string' && (input[k] === '' || MODEL_ID.test(input[k].trim()))) s[k] = input[k].trim();
   return s;
 }
 
@@ -206,7 +203,7 @@ export const cmdModels = s => [cmdModelId(s), s.cmdOverride ? '' : s.cmdAlt, 'ge
 // the Coach's brain: Pro first when you want the best answers (slower), then Flash
 // Chat is Flash (answers start in a second or two). Pro only works in the background, where
 // nobody waits: the weekly check-in and the after-workout debrief.
-export const coachModels = (s, { background = false } = {}) => [s.coachOverride || (background ? s.coachPro : ''), coachModelId(s), s.coachOverride ? '' : s.coachAlt, 'gemini-flash-latest', s.cmdModel, 'gemini-flash-lite-latest'];
+export const coachModels = (s, { background = false } = {}) => [s.coachOverride || (background || s.coachBrain === 'smart' ? s.coachPro : ''), coachModelId(s), s.coachOverride ? '' : s.coachAlt, 'gemini-flash-latest', s.cmdModel, 'gemini-flash-lite-latest'];
 export const ttsModelId = s => (s.ttsQuality === 'instant' && !s.ttsOverride ? 'device' : null) || s.ttsOverride || (s.ttsQuality === 'fast' ? s.ttsLite || s.ttsModel : s.ttsModel || s.ttsLite) || DEFAULT_TTS_MODEL;
 // runner-up voice model: the other family
 export const ttsAlt = s => (s.ttsOverride || s.ttsQuality === 'instant' ? [] : [s.ttsQuality === 'fast' ? s.ttsModel : s.ttsLite, DEFAULT_TTS_MODEL].filter(Boolean));

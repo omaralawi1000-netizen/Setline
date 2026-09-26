@@ -540,3 +540,12 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Up next → workout: the card's surface opens out into the workout page under the arriving cards; Today no longer flips to its Resume card (and its glide no longer shows over the workout) in the moment it's left
 - [x] After finishing: today's dot in the week strip fills in with a pop, a ring and a tick the next time Today or Train is shown
 - [x] The orb's landing in the message box now also sends a soft light along the box
+
+## 1.46.0: no Live, a harder landing, smooth streaming, iOS send, liquid glass
+
+- [x] Gemini Live removed (it listened all the time and felt less clever). The Coach stays on the newest Flash with capped thinking; new Settings → Voice → Coach brain: Fast (Flash) or Smartest (Pro, slower)
+- [x] Talking through the message-box orb: after the answer is spoken it listens again by itself only when the answer ended with a question ("Should we start the workout?"); otherwise it rests
+- [x] The orb's landing: it drops hard into the box (faster fall, deep squash and wobble), a double shockwave, light floods the box, the box is pushed down and shakes a little, and a strong haptic thump (42-30-18 ms, was a 14 ms tick)
+- [x] Streaming replies: finished lines are drawn once and only the line being written is redrawn (the whole reply used to be rebuilt every few frames); words used to be cut off 200 ms before their blur-in ended, which made each one jump
+- [x] Sending: the bubble lifts off where you typed on a spring, and the conversation above glides up to make room instead of jumping; the send button gives a little
+- [x] Top of the screen: the status bar's colour flows down into the page as a gradient over a progressive blur. New Customize → Glass (Liquid: this, a frosted fade behind the bottom bar and a clearer, brighter-rimmed bar; Soft; Off) and Background glow (On / Soft / Off)

@@ -117,7 +117,7 @@ function renderAll() {
   document.documentElement.lang = state.lang;
   document.documentElement.dataset.motion = state.settings.motion;
   const glowWas = document.documentElement.dataset.glow;
-  Object.assign(document.documentElement.dataset, { text: state.settings.textSize, glow: state.settings.glow, dock: state.settings.dockLabels ? 'labels' : 'icons' });
+  Object.assign(document.documentElement.dataset, { text: state.settings.textSize, glow: state.settings.glow, glass: state.settings.glass, dock: state.settings.dockLabels ? 'labels' : 'icons' });
   if (glowWas !== state.settings.glow) refreshChrome();
   configureSteps(state.settings.kgSteps);
   if (document.documentElement.dataset.accent !== state.settings.accent) { document.documentElement.dataset.accent = state.settings.accent; refreshChrome(); }
@@ -152,12 +152,12 @@ function flyOrb(from, to, { duration, delay = 0, go, onland }) {
   Object.assign(ghost.style, { left: `${from.x - base / 2}px`, top: `${from.y - base / 2}px` });
   app.append(ghost);
   const dx = to.x - from.x, dy = to.y - from.y, s0 = from.w / base, s1 = to.w / base;
-  const lift = -Math.min(64, 22 + Math.abs(dx) * 0.2), peak = Math.max(s0, s1) * 1.1;
+  const lift = -Math.min(84, 30 + Math.abs(dx) * 0.26), peak = Math.max(s0, s1) * 1.16;
   // across at an even glide; up and over on its own curve, so the path is a smooth arc
   go(ghost, [{ translate: '0 0' }, { translate: `${dx}px 0` }], { duration, delay, easing: 'cubic-bezier(.45,.05,.25,1)', fill: 'both' });
   const a = go(ghost, [
     { transform: `translateY(0) scale(${s0})`, easing: 'cubic-bezier(.25,.6,.4,1)' },
-    { transform: `translateY(${dy * 0.35 + lift}px) scale(${peak})`, offset: 0.45, easing: 'cubic-bezier(.5,0,.65,.95)' },
+    { transform: `translateY(${dy * 0.35 + lift}px) scale(${peak})`, offset: 0.42, easing: 'cubic-bezier(.62,0,.9,.55)' }, // it drops hard into the box
     { transform: `translateY(${dy}px) scale(${s1})` }], { duration, delay, fill: 'both' });
   const done = () => { ghost.remove(); };
   a.addEventListener('cancel', done);
@@ -170,9 +170,11 @@ function flyOrb(from, to, { duration, delay = 0, go, onland }) {
 function impact(orbEl) {
   haptic('land');
   orbEl.animate([
-    { scale: '1.3 0.72' }, { scale: '0.88 1.12', offset: 0.3 }, { scale: '1.06 0.95', offset: 0.55 },
-    { scale: '0.98 1.02', offset: 0.78 }, { scale: '1 1' }], { duration: 560, easing: 'cubic-bezier(.3,.6,.4,1)' });
-  $('#composer')?.animate([{ translate: '0 0' }, { translate: '0 4px', offset: 0.22 }, { translate: '0 -1.5px', offset: 0.6 }, { translate: '0 0' }], { duration: 460, easing: 'cubic-bezier(.3,.6,.4,1)' });
+    { scale: '1.5 0.58' }, { scale: '0.8 1.22', offset: 0.24 }, { scale: '1.12 0.9', offset: 0.46 },
+    { scale: '0.96 1.04', offset: 0.68 }, { scale: '1.01 0.99', offset: 0.85 }, { scale: '1 1' }], { duration: 640, easing: 'cubic-bezier(.25,.6,.35,1)' });
+  // the box takes the hit: it's pushed down and springs back, with a little shake
+  $('#composer')?.animate([{ translate: '0 0', scale: 1 }, { translate: '1.5px 8px', scale: 0.985, offset: 0.16 }, { translate: '-1px -3px', scale: 1.005, offset: 0.42 },
+    { translate: '0.5px 1px', offset: 0.66 }, { translate: '0 0', scale: 1 }], { duration: 560, easing: 'cubic-bezier(.25,.6,.35,1)' });
   const btn = orbEl.closest('.corb'), box = $('#composer');
   if (btn) { btn.classList.remove('impact'); void btn.offsetWidth; btn.classList.add('impact'); setTimeout(() => btn.classList.remove('impact'), 800); }
   // the impact spreads into the box: a soft light from where the orb hit runs along it and fades
@@ -203,7 +205,7 @@ function coachMorph(open, under) {
     let flying = null;
     queueMicrotask(() => {
       const corb = $('#composer .corb .orb');
-      flying = from && corb && flyOrb(from, layRect(corb), { duration: 540, go, onland: () => { app.classList.remove('orbtravel'); impact(corb); } });
+      flying = from && corb && flyOrb(from, layRect(corb), { duration: 500, go, onland: () => { app.classList.remove('orbtravel'); impact(corb); } });
       if (flying) { app.classList.add('orbtravel', 'orbflown'); go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 900, fill: 'forwards' }); return; }
       go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
       setTimeout(() => haptic('land'), 560);
