@@ -2252,3 +2252,8 @@ html[data-dock=icons] .dock .tab span{display:none}
 /* the week strip: a day changed by the Coach (wrestling, a moved session) */
 .wpday.other .wr{color:var(--warm)}
 .wpday.changed{border-color:rgba(var(--a-rgb),.35)}
+
+/* found with the motion lab: the pulsing dot on the record card scaled an SVG circle, which re-laid out
+   the page every frame, and animations kept running on screens you can't see */
+@keyframes prpulse{50%{opacity:.04}}
+.screen:not(.on) *{animation-play-state:paused!important}
