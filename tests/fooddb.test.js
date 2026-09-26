@@ -34,3 +34,11 @@ test('online search maps Open Food Facts products', async () => {
   assert.equal(r[0].per100.protein, 8.6);
   assert.deepEqual(await searchOnline('ab', 'da', { fetchFn }), []);
 });
+
+import { parseMealLocal as pml } from '../js/fooddb.js';
+import { parse as P2 } from '../js/parser.js';
+test('replies and short words are never a meal ("ok" was beef mince, "no" noodles, "hi" raspberries)', () => {
+  for (const s of ['ok', 'Ok', 'no', 'hi', 'yes', 'thanks', 'ja', 'tak']) assert.equal(pml(s, 'en'), null, s);
+  for (const s of ['Ok', 'ok.', 'Hi']) assert.notEqual(P2(s, {}).type, 'LogMeal', s);
+  for (const [s, n] of [['æg', 'Egg'], ['ris', 'Rice'], ['tea', 'Tea'], ['2 eggs', 'Egg']]) assert.equal(pml(s, 'en')?.name, n, s);
+});

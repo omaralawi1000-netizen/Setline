@@ -37,8 +37,8 @@ test('local food parse keeps each item', () => {
 });
 
 test('the quiet palette, with old colours mapped to their neighbour', () => {
-  assert.deepEqual(ACCENTS, ['violet', 'slate', 'sage', 'sand', 'clay', 'mono']);
-  assert.equal(sanitize({ accent: 'ocean' }).accent, 'slate');
+  assert.deepEqual(ACCENTS, ['violet', 'aurora', 'sunset', 'ocean', 'slate', 'sage', 'sand', 'clay', 'mono']);
+  assert.equal(sanitize({ accent: 'ocean' }).accent, 'ocean'); // a two-tone theme again (1.48)
   assert.equal(sanitize({ accent: 'crimson' }).accent, 'clay');
   assert.equal(sanitize({ accent: 'lime' }).accent, 'sage');
   assert.equal(sanitize({ accent: 'nope' }).accent, 'violet');

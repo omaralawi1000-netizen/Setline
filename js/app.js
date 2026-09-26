@@ -15,6 +15,7 @@ import { applyPlateauFix } from './plateau.js';
 import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav, autoWarmup, restBell } from './ui/workout.js';
 import { markFinished, renderHistory, renderDetail } from './ui/history.js';
 import { renderSettings, initSettings } from './ui/settings.js';
+import { DUO } from './settings.js';
 import { initVoice, orbHTML, voiceHandlePop, closeVoice, isVoiceOpen, openVoice } from './ui/voice.js';
 import { renderYou } from './ui/you.js';
 import { renderCoach, initCoach, ask as askCoach, ensureModels, weeklyCheckin, markWeeklySeen, sessionDebrief, markDebriefSeen } from './ui/coach.js';
@@ -120,6 +121,7 @@ function renderAll() {
   Object.assign(document.documentElement.dataset, { text: state.settings.textSize, glow: state.settings.glow, glass: state.settings.glass, dock: state.settings.dockLabels ? 'labels' : 'icons' });
   if (glowWas !== state.settings.glow) refreshChrome();
   configureSteps(state.settings.kgSteps);
+  document.documentElement.toggleAttribute('data-duo', DUO.includes(state.settings.accent));
   if (document.documentElement.dataset.accent !== state.settings.accent) { document.documentElement.dataset.accent = state.settings.accent; refreshChrome(); }
   renderScreen();
   animateFigures($('#s-' + view.screen));
@@ -152,7 +154,7 @@ function flyOrb(from, to, { duration, delay = 0, go, onland, easing }) {
   Object.assign(ghost.style, { left: `${from.x - base / 2}px`, top: `${from.y - base / 2}px` });
   app.append(ghost);
   const dx = to.x - from.x, dy = to.y - from.y, s0 = from.w / base, s1 = to.w / base;
-  // one straight line, no hop: it speeds up into the box (or eases out of it on the way home)
+  // one straight line, no hop: it shoots off at once and slows just before it arrives, then hits
   const a = go(ghost, [{ transform: `translate(0, 0) scale(${s0})` }, { transform: `translate(${dx}px, ${dy}px) scale(${s1})` }], { duration, delay, easing, fill: 'both' });
   const done = () => { ghost.remove(); };
   a.addEventListener('cancel', done);
@@ -203,7 +205,7 @@ function coachMorph(open, under) {
     let flying = null;
     queueMicrotask(() => {
       const corb = $('#composer .corb .orb');
-      flying = from && corb && flyOrb(from, layRect(corb), { duration: 380, easing: 'cubic-bezier(.55,0,.8,.3)', go, onland: () => { app.classList.remove('orbtravel'); const to = layRect(corb); impact(corb, to.x - from.x, to.y - from.y); } });
+      flying = from && corb && flyOrb(from, layRect(corb), { duration: 330, easing: 'cubic-bezier(.18,.82,.32,1)', go, onland: () => { app.classList.remove('orbtravel'); const to = layRect(corb); impact(corb, to.x - from.x, to.y - from.y); } });
       if (flying) { app.classList.add('orbtravel', 'orbflown'); go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 900, fill: 'forwards' }); return; }
       go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
       setTimeout(() => haptic('land'), 560);

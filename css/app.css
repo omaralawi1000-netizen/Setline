@@ -2514,3 +2514,39 @@ html[data-glass=liquid] .edge.eb{height:calc(var(--dock-bottom) + var(--dock-h) 
 html[data-glass=liquid] .edge.eb::before{background:linear-gradient(transparent,color-mix(in srgb,var(--bg) 22%,transparent) 50%,color-mix(in srgb,var(--bg) 55%,transparent))}
 html[data-glass=liquid] .edge.eb::after{-webkit-backdrop-filter:blur(12px) saturate(140%);backdrop-filter:blur(12px) saturate(140%);
   -webkit-mask-image:linear-gradient(transparent,rgba(0,0,0,.6) 50%,#000);mask-image:linear-gradient(transparent,rgba(0,0,0,.6) 50%,#000)}
+
+/* ======================= 1.48 ======================= */
+/* two-tone themes: the second colour runs through the primary buttons, the chips, the done dots and the swatches */
+.swatches{grid-template-columns:repeat(5,1fr);row-gap:6px}
+.swatch[data-accent=aurora] i{background:radial-gradient(circle at 30% 28%,#F1EDFF,transparent 45%),linear-gradient(135deg,#8C7CF6,#2FB9B0)}
+.swatch[data-accent=sunset] i{background:radial-gradient(circle at 30% 28%,#FFF1E8,transparent 45%),linear-gradient(135deg,#FFB08A,#D9477F)}
+.swatch[data-accent=ocean] i{background:radial-gradient(circle at 30% 28%,#EEF8FF,transparent 45%),linear-gradient(135deg,#5AA8FF,#22C79B)}
+html[data-duo] .log{background:linear-gradient(115deg,var(--accent) 10%,var(--accent2) 95%)}
+html[data-duo] .dochip:first-child{background:linear-gradient(115deg,var(--accent-hi),var(--accent) 45%,var(--accent2))}
+html[data-duo] .wpday.done .wdot{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent}
+html[data-duo] .msg.me .bub{background:linear-gradient(135deg,rgba(var(--a-rgb),.2),color-mix(in srgb,var(--accent2) 16%,transparent));border-color:rgba(var(--a-rgb),.26)}
+
+/* the status bar and the page are one colour: the gradient under it starts as exactly the status bar's
+   colour (solid for a moment, so nothing bright shows at the seam) and only then fades into the page */
+html[data-glass=liquid] .edge.et{height:calc(var(--safe-top) + 64px)}
+html[data-glass=liquid] .edge.et::before{background:linear-gradient(var(--edge) 0,var(--edge) calc(var(--safe-top) + 8px),color-mix(in srgb,var(--edge) 86%,transparent) calc(var(--safe-top) + 20px),color-mix(in srgb,var(--edge) 52%,transparent) calc(var(--safe-top) + 36px),color-mix(in srgb,var(--edge) 18%,transparent) calc(var(--safe-top) + 52px),transparent)}
+html[data-glass=liquid] .edge.et::after{-webkit-mask-image:linear-gradient(#000 0,#000 calc(var(--safe-top) + 14px),rgba(0,0,0,.4) calc(var(--safe-top) + 34px),transparent);
+  mask-image:linear-gradient(#000 0,#000 calc(var(--safe-top) + 14px),rgba(0,0,0,.4) calc(var(--safe-top) + 34px),transparent)}
+
+/* the bottom: no band across the screen, only a soft blur that feathers out around the bar itself */
+html[data-glass=liquid] .edge.eb{left:4px;right:4px;bottom:calc(var(--dock-bottom) - 20px);height:calc(var(--dock-h) + 40px);transition:opacity var(--m-base) var(--e-out)}
+html[data-glass=liquid] .edge.eb::before{background:radial-gradient(closest-side,color-mix(in srgb,var(--bg) 45%,transparent) 55%,transparent);opacity:1}
+html[data-glass=liquid] .edge.eb::after{opacity:1;-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%);
+  -webkit-mask-image:radial-gradient(closest-side,#000 62%,transparent);mask-image:radial-gradient(closest-side,#000 62%,transparent)}
+html[data-glass=liquid] .app.compact:not(.is-sub):not(.voice):not(.kb) .edge.eb{left:calc(50% - 100px);right:calc(50% - 100px)}
+html[data-glass=liquid] .app.coaching .edge.eb{opacity:0}
+
+/* the bar moves better: the indicator slides (no width animation) with a liquid stretch, the icon you
+   pick springs up, and a press gives at once */
+.dock .ind{transition:transform var(--m-slow) var(--e-spring),opacity var(--m-base)}
+.dock .ind.moving{animation:indstretch var(--m-slow) var(--e-out)}
+@keyframes indstretch{0%{scale:1 1}35%{scale:1.22 .9}70%{scale:.97 1.03}100%{scale:1 1}}
+.tab.on svg.ti{animation:tabspring var(--m-slow) var(--e-spring)}
+@keyframes tabspring{0%{transform:translateY(3px) scale(.82)}55%{transform:translateY(-3px) scale(1.12)}100%{transform:translateY(-1px) scale(1.06)}}
+.tab:active svg.ti{transform:scale(.84);transition-duration:var(--m-press)}
+@media (prefers-reduced-motion: reduce){ .dock .ind.moving,.tab.on svg.ti{animation:none} }

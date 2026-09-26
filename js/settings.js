@@ -89,9 +89,10 @@ export const DEFAULTS = Object.freeze({
   todayV: 2            // 2: cardio moved to Train by default
 });
 
-export const ACCENTS = ['violet', 'slate', 'sage', 'sand', 'clay', 'mono'];
+export const ACCENTS = ['violet', 'aurora', 'sunset', 'ocean', 'slate', 'sage', 'sand', 'clay', 'mono'];
+export const DUO = ['aurora', 'sunset', 'ocean']; // two-tone themes
 // the brighter colours from before 1.26 map onto their quieter neighbour
-const OLD_ACCENT = { ocean: 'slate', jade: 'sage', lime: 'sage', gold: 'sand', ember: 'sand', crimson: 'clay', rose: 'clay' };
+const OLD_ACCENT = { jade: 'sage', lime: 'sage', gold: 'sand', ember: 'sand', crimson: 'clay', rose: 'clay' };
 export const FOOD_PARTS = ['calories', 'carbs', 'fat', 'water', 'favourites', 'quickProtein', 'week'];
 export const FOOD_ORDER = ['favourites', 'quickProtein', 'water', 'meals', 'week'];
 export const TODAY_ORDER = ['checkin', 'upnext', 'weekplan', 'plateau', 'goals', 'cardio', 'week', 'balance', 'body', 'review', 'routines'];

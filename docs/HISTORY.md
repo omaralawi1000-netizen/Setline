@@ -557,3 +557,12 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Starting a workout: the warm-ups added at the start used to kick off Today's card glide, whose snapshot landed ~130 ms later over the workout, redrew it and cross-faded the whole page. Now one draw, no cross-fade; the longest frame halved (430-550 → 235-265 ms in the motion lab). The stepper numbers no longer re-lay out the page once per number, and the status-bar colour is no longer recomputed (a full style pass) on every class change
 - [x] The thinking look and the offers hiding while you type use two plain classes instead of :has() selectors on the whole app
 - [x] A single stray word from the hold-to-talk orb ("with", "doing") that isn't a command shows "Didn't catch that" instead of going to the Coach
+
+## 1.48.0: "Ok" isn't food, a quick launch, a seamless status bar, two-tone themes, a smarter Coach
+
+- [x] Bug: short replies were matched to foods by their first letters ("ok" → beef mince via "okse", "no" → noodles, "hi" → raspberries), so typing "Ok" in the Coach logged a meal. Short words now count only as a food's own name or alias, and replies are never meals
+- [x] The orb launches at once and slows just before the message box (330 ms, was a 380 ms slow start), then hits
+- [x] Status bar: the gradient under it starts as exactly its colour (solid for a moment) and only then fades, so nothing bright shows at the seam
+- [x] Bottom: no band across the screen; a soft blur feathers out around the navigation bar only (follows the pill). The bar: the indicator slides with a liquid stretch (no width animation), the chosen icon springs, presses give at once
+- [x] Two-tone themes: Aurora (lavender + teal), Sunset (peach + rose), Ocean (sky + mint) with two-colour buttons, chips, done dots, your chat bubbles, orb and background glow
+- [x] The Coach knows more: the last 7 days of food against targets, the latest 6 workouts, a compact base of training science, and the newest app features in its guide

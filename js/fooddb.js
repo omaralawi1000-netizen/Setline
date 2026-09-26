@@ -48,9 +48,11 @@ const ALIAS = { egg: 'aeg', æg: 'aeg', aeg: 'aeg', milk: 'letmaelk', mælk: 'le
   banana: 'banan', banan: 'banan', apple: 'aeble', æble: 'aeble', toast: 'toast', 'rye bread': 'rugbrod', rugbrød: 'rugbrod' };
 const FILL = new Set(['of', 'af', 'some', 'lidt', 'my', 'min', 'mit', 'the', 'with', 'large', 'small', 'big', 'stor', 'lille', 'stort', 'plain']);
 
+// what you say back in a conversation is never a meal
+const REPLY_WORDS = /^(?:ok|okay|k|no|nope|nah|yes|yeah|yep|hi|hey|hello|yo|thanks|thank you|thx|ty|cool|nice|great|sure|fine|good|done|ja|nej|jo|tak|hej|fint|godt|okay then|ok then)$/;
 export function parseMealLocal(text, lang = 'en') {
   const raw = String(text || '').toLowerCase().replace(/(\d),(\d)/g, '$1.$2').replace(/[.!?]+$/, '').trim();
-  if (!raw) return null;
+  if (!raw || REPLY_WORDS.test(raw)) return null;
   const parts = raw.split(/\s*(?:,|&|\+|\band\b|\bog\b|\bwith\b|\bmed\b|\bplus\b)\s*/).map(x => x.trim()).filter(Boolean);
   if (!parts.length || parts.length > 8) return null;
   const items = [];
@@ -69,6 +71,8 @@ export function parseMealLocal(text, lang = 'en') {
     const hit = alias ? { p: localFood(alias, lang), per: 100 }
       : [scoredLocal(name, lang, 1)[0], scoredLocal(name.replace(/s\b/g, ''), lang, 1)[0]].filter(Boolean).sort((a, b) => b.per - a.per || a.p.name.length - b.p.name.length)[0];
     if (!hit?.p || hit.per < 70) return null; // not sure what this is: let the AI estimate it
+    // a short word only counts when it's a food's own name or a known alias ("ok" is not okse, "no" not noodles)
+    if (!alias && name.length < 4 && hit.per < 100) return null;
     const p = hit.p;
     const grams = unit ? (qty ?? 1) * UNIT[unit] : (qty ?? 1) * (p.servingG || 100);
     if (!(grams > 0 && grams <= 3000)) return null;
