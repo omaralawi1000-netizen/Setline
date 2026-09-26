@@ -280,6 +280,31 @@ export function resolve(intent, snap, t, lang) {
       const reps = (intent.reps ?? last.set.reps) + (intent.repsDelta || 0);
       return editCommand(kg, reps);
     }
+    case 'AdjustNext': {
+      // "that felt heavy" / "easy": the rest of this lift's planned sets (or the next one) go down or up
+      const need = needWorkout(); if (need) return need;
+      const i = w.current, ex = cur();
+      if (!ex) return err('voice.noExercise');
+      const d = intent.kgDelta || 0;
+      const planned = ex.sets.filter(s => !s.done && s.type !== 'warmup');
+      const base = planned[0]?.kg ?? ex.draft?.kg ?? lastDone(ex)?.set.kg;
+      if (base == null) return err('voice.noSetYet');
+      const to = Math.max(0, Math.round((base + d) * 1000) / 1000);
+      const fn = cw => {
+        const e = cw.exercises[i];
+        const left = e.sets.filter(s => !s.done && s.type !== 'warmup');
+        if (!left.length) return W.setDraft(cw, i, { kg: to, reps: e.draft?.reps ?? lastDone(e)?.set.reps ?? 8 });
+        let x = cw;
+        for (const s of left) x = W.editSet(x, i, s.id, { kg: Math.max(0, Math.round(((s.kg ?? base) + d) * 1000) / 1000), reps: s.reps ?? 8 });
+        return x;
+      };
+      return cmd('auto', {
+        title: name(ex.exerciseId), value: `${d > 0 ? '+' : '−'}${kgTxt(Math.abs(d))} ${u}`,
+        sub: t(d > 0 ? 'voice.nextHeavier' : 'voice.nextLighter', { kg: kgTxt(to), unit: u }),
+        say: say(t(d > 0 ? 'say.nextHeavier' : 'say.nextLighter', { kg: kgTxt(to), unit: sayUnit })), run: { op: 'update', fn, nav: 'workout' }
+      });
+    }
+    case 'Confirm': return err('voice.nothingToConfirm');
     case 'LogRel': {
       const need = needWorkout(); if (need) return need;
       return relCommand(intent);

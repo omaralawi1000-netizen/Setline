@@ -15,7 +15,7 @@ import { parseMealLocal } from './fooddb.js';
 
 export const INTENTS = ['LogSet', 'LogSetNo', 'LogSets', 'LogBatch', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'LogWater', 'SetTarget', 'CheckIn', 'LogRel', 'SetGoal', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
   'AddWarmup', 'WarmupDone', 'AddExercise', 'SwapExercise', 'StartRoutine', 'StartEmpty', 'Finish', 'Discard', 'StartRest', 'AdjustRest', 'SkipRest',
-  'Query', 'Cancel', 'Help', 'Ask', 'Unknown'];
+  'AdjustNext', 'Confirm', 'Query', 'Cancel', 'Help', 'Ask', 'Unknown'];
 
 // ---------- text cleanup ----------
 
@@ -369,6 +369,9 @@ export function parse(text, ctx = {}) {
   const said = String(text || '').trim();
   const pre = foodAndWater(said, ctx); // water, calorie targets
   if (pre) return pre;
+  const hands = handsWords(said, ctx); // "yes" / "do it", "done", "that felt heavy"
+  if (hands) return hands;
+  text = gotReps(text); // "done, 7" / "got 7" = 7 reps at the planned weight
   text = shortBy(text);
   const r = parseOne(text, ctx);
   r.heard = said;
@@ -391,6 +394,27 @@ export function parse(text, ctx = {}) {
   }
   return r;
 }
+
+// ---------- hands-free words ----------
+// What you'd say mid-set with the phone in your pocket.
+const AFFIRM = /^(?:yes|yeah|yep|yup|sure|yes please|please do|do it|go ahead|go for it|sounds good|ok do it|okay do it|lets do it|lets go|ja|jo|ja tak|ja gerne|gør det|gør det bare|kør|kør på|det gør vi|lad os gøre det)$/;
+const HEAVY = /^(?:that |it |this |the last one |det |den |sættet |sidste )?(?:set )?(?:felt|was|feels|feel|føltes|var|er)?\s*(?:really |very |pretty |super |way |a bit |kind of |lidt |meget |ret )?(?:too |for )?(?:heavy|hard|tough|grindy|brutal|tung|tungt|hårdt|svært)$/;
+const EASY = /^(?:that |it |this |the last one |det |den |sættet |sidste )?(?:set )?(?:felt|was|feels|feel|føltes|var|er)?\s*(?:really |very |pretty |super |way |a bit |kind of |lidt |meget |ret )?(?:too |for )?(?:easy|light|let|nemt|lets|for let)$/;
+function handsWords(text, ctx) {
+  const s = clean(text).replace(/[.!,]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const lang = detectLang(s, ctx.lang);
+  const out = (type, f = {}) => ({ type, ...f, lang, heard: String(text).trim() });
+  if (AFFIRM.test(s)) return out('Confirm');
+  if (!ctx.current) return null;
+  // "done" with sets still planned on this lift is the set, as planned (the workout ends with "finish")
+  if (ctx.current.planned && /^(?:done|set done|that set is done|færdig|sæt færdigt|klar)$/.test(s)) return out('LogRel');
+  const step = ctx.unit === 'lb' ? lbToKg(5) : 2.5;
+  if (HEAVY.test(s)) return out('AdjustNext', { kgDelta: -step });
+  if (EASY.test(s)) return out('AdjustNext', { kgDelta: step });
+  return null;
+}
+// "done, 7", "done 7 reps", "got 7", "I did 7", "færdig, 7", "fik 7" → "7 reps"
+const gotReps = text => String(text || '').replace(/^\s*(?:set )?(?:done|finished|got|i got|did|i did|made|færdig|fik|jeg fik|lavede|jeg lavede)[\s,.:!-]+(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty)(?:\s*(?:reps?|gentagelser|rep))?[.!]?\s*$/i, '$1 reps');
 
 // ---------- food, water and targets ----------
 

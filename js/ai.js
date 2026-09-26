@@ -32,6 +32,14 @@ export function pickTextModels(models) {
   return { command: newest(lite), coach: newest(flash), commandAlt: second(lite), coachAlt: second(flash), pro: newest(pro) };
 }
 
+// The newest model that can hold a live, spoken conversation (Gemini Live, bidiGenerateContent);
+// native-audio models sound the most natural and are preferred.
+export function pickLiveModel(models) {
+  const ids = (models || []).filter(m => typeof m === 'object' && m.supportedGenerationMethods?.includes('bidiGenerateContent')).map(id).filter(s => /^gemini/.test(s));
+  const native = ids.filter(s => /native-audio/.test(s)), live = ids.filter(s => /live/.test(s));
+  return newest(native) || newest(live) || newest(ids) || null;
+}
+
 // ---------- SSE (pure) ----------
 
 // Feed text chunks; returns {events: [parsed JSON], rest} with the unfinished tail kept.

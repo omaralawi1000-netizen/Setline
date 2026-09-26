@@ -16,6 +16,7 @@ import { haptic } from '../haptics.js';
 import { esc } from './dom.js';
 import { toast } from './toast.js';
 import { handleAmbient, speakCue } from './voice.js';
+import { liveOn } from '../live.js';
 
 const hf = { want: false, on: false, stream: null, src: null, node: null, sink: null, vad: null, busy: 0, quietUntil: 0, status: 'off', heard: '', cue: { ten: 0, go: 0 }, timer: 0, lvlAt: 0 };
 let worklet = null;
@@ -82,7 +83,7 @@ function onSamples(buf) {
   if (!hf.on) return;
   const now = performance.now();
   // never listen to ourselves, or while the orb is recording
-  if (tts.isSpeaking() || mic.isRecording()) { hf.quietUntil = now + 600; hf.vad.reset(); return; }
+  if (tts.isSpeaking() || mic.isRecording() || liveOn()) { hf.quietUntil = now + 600; hf.vad.reset(); return; }
   if (now < hf.quietUntil) { hf.vad.reset(); return; }
   const utts = hf.vad.push(buf);
   if (now - hf.lvlAt > 60) { hf.lvlAt = now; level(Math.min(1, Math.pow(hf.vad.level * 7, 0.7))); }

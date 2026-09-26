@@ -1,26 +1,27 @@
 // Coach tab: chat thread, composer, streamed answers, spoken when complete.
 import * as store from '../store.js';
 import { state } from '../store.js';
-import { streamChat, AiError, withFallback, aiPlan, pickTextModels, nextQuotaReset } from '../ai.js';
+import { streamChat, AiError, withFallback, aiPlan, pickTextModels, pickLiveModel, nextQuotaReset } from '../ai.js';
 import { listModels, pickTtsModel } from '../tts.js';
 import { splitMemories, hideMemoryTail as hideMem, addMemories } from '../coach.js';
 import { splitChanges, hideChangeTail, applyChanges } from '../planedit.js';
-import { splitAppChanges, planAppChanges, PAGES } from '../appedit.js';
+import { splitAppChanges, planAppChanges, PAGES, splitActions, hideActionTail, isAffirm } from '../appedit.js';
 // the reply without its hidden lines (memories and plan changes), also while it streams in
-const hideMemoryTail = text => hideChangeTail(hideMem(text));
+const hideMemoryTail = text => hideActionTail(hideChangeTail(hideMem(text)));
 import { weekStart } from '../stats.js';
 import { dateKey } from '../body.js';
 import { weight } from '../format.js';
-import { buildContext, chatContents, systemPrompt, formatAnswer, speakable, isPlanRequest, PLAN_SCHEMA, planSchema, planSystem, validatePlan, planToRoutines, isRoutineImport, IMPORT_SCHEMA, importSystem, validateImport, isNoise } from '../coach.js';
+import { buildContext, chatContents, systemPrompt, LIVE_RULES, formatAnswer, speakable, isPlanRequest, PLAN_SCHEMA, planSchema, planSystem, validatePlan, planToRoutines, isRoutineImport, IMPORT_SCHEMA, importSystem, validateImport, isNoise } from '../coach.js';
 import { getKey } from '../keys.js';
 import { coachModels, ttsModelId, ttsAlt, sttModelId } from '../settings.js';
 import * as tts from '../tts.js';
+import { startLive, stopLive } from '../live.js';
 import { isRecording } from '../voice.js';
 import { haptic } from '../haptics.js';
 import { $, esc } from './dom.js';
 import { listenSmart } from './listen.js';
 import { unlockAudio } from '../audio.js';
-import { actOnText } from './voice.js';
+import { actOnText, onConfirmWord } from './voice.js';
 import { I } from './icons.js';
 import { openSheet, closeTop } from './sheet.js';
 import { toast } from './toast.js';
@@ -53,8 +54,12 @@ function bubble(m) {
   const head = m.weekly ? `<p class="wkhead">${I.chart}<span>${esc(t('weekly.head', { date: new Intl.DateTimeFormat(state.lang === 'da' ? 'da-DK' : 'en-GB', { day: 'numeric', month: 'short' }).format(new Date(m.weekly + 'T12:00')) }))}</span></p>` : '';
   const kept = m.remembered?.length ? `<p class="memnote">${I.check}<span>${esc(t('memory.kept', { what: m.remembered.join(' · ') }))}</span></p>` : '';
   // what the Coach changed in the plan, with Undo
-  const changed = m.changed?.length ? `<div class="chgnote${m.undone ? ' undone' : ''}"><span class="chgic">${I.check}</span><span class="chgtxt">${m.changed.map(c => `<b>${esc(c)}</b>`).join('')}</span>${m.undone ? `<span class="chgu">${esc(t('change.undone'))}</span>` : undoable.has(m.id) ? `<button class="chip sm" data-coach="undo-change" data-id="${esc(m.id)}">${t('common.undo')}</button>` : ''}</div>` : '';
-  return `<li class="msg ai${m.streaming ? ' is-streaming' : ''}${m.streaming && !m.text ? ' is-thinking' : ''}${m.weekly || m.debrief ? ' weekly' : ''}" data-id="${m.id}"><div class="bub">${head}${dhead}${m.text ? formatAnswer(hideMemoryTail(m.text)) : thinkingHTML(m)}${kept}${changed}</div></li>`;
+  const note = (lines, undone, key) => `<div class="chgnote${undone ? ' undone' : ''}"><span class="chgic">${I.check}</span><span class="chgtxt">${lines.map(c => `<b>${esc(c)}</b>`).join('')}</span>${undone ? `<span class="chgu">${esc(t('change.undone'))}</span>` : undoable.has(key) ? `<button class="chip sm" data-coach="undo-change" data-id="${esc(m.id)}" data-key="${esc(key)}">${t('common.undo')}</button>` : ''}</div>`;
+  const changed = m.changed?.length ? note(m.changed, m.undone, m.id) : '';
+  // offers taken ("Do it" chips tapped), each with its own Undo, then the offers still open
+  const acted = (m.acted || []).map(a => (a.failed ? `<p class="chgfail">${esc(a.done[0])}</p>` : note(a.done, a.undone, a.key))).join('');
+  const offers = m.actions?.length && !m.streaming ? `<div class="dochips">${m.actions.map((a, i) => `<button class="dochip" data-coach="act" data-id="${esc(m.id)}" data-i="${i}" style="--i:${i}"><span class="dox">${I.check}</span><span>${esc(a.label)}</span></button>`).join('')}</div>` : '';
+  return `<li class="msg ai${m.streaming ? ' is-streaming' : ''}${m.streaming && !m.text ? ' is-thinking' : ''}${m.weekly || m.debrief ? ' weekly' : ''}" data-id="${m.id}"><div class="bub">${head}${dhead}${m.text ? formatAnswer(hideMemoryTail(m.text)) : thinkingHTML(m)}${kept}${changed}${acted}</div>${offers}</li>`;
 }
 
 function planCard(m) {
@@ -90,7 +95,7 @@ export function renderCoach(root) {
       ${chat.length ? `<button class="iconbtn" data-coach="clear" aria-label="${t('coach.clear')}">${I.trash}</button>` : ''}</header>
     ${body}`;
   const composer = $('#composer');
-  composer.querySelector('input').placeholder = t('coach.ph');
+  if (!composer.dataset.talk) composer.querySelector('input').placeholder = t('coach.ph'); // talking: the box shows what's happening
   composer.querySelector('.csend').setAttribute('aria-label', t('coach.send'));
   composer.querySelector('.csend').innerHTML = inflight ? I.stop : I.fwd;
   // a message just sent from the box stays hidden until it flies up from there (sendFly)
@@ -170,7 +175,10 @@ function typewriter(root, id) {
       shown = Math.min(words.length, shown + Math.max(2, Math.ceil((words.length - shown) / 6)));
       const bub = root.querySelector(`[data-id="${id}"] .bub`);
       if (bub) {
-        bub.closest('.msg')?.classList.remove('is-thinking');
+        const msg = bub.closest('.msg');
+        // the answer starts: the box's orb gives one pulse and the first line rises out of it
+        if (msg?.classList.contains('is-thinking')) { msg.classList.add('arrive'); pulseOrb(); }
+        msg?.classList.remove('is-thinking');
         wordsHTML(bub, words.slice(0, shown).join(''), births, now);
       }
       follow(root);
@@ -189,24 +197,82 @@ function typewriter(root, id) {
   };
 }
 
+function pulseOrb() {
+  const btn = $('#composer .corb');
+  if (!btn || stillMotion()) return;
+  btn.classList.remove('answer'); void btn.offsetWidth; btn.classList.add('answer');
+  setTimeout(() => btn.classList.remove('answer'), 900);
+}
+
+// Following along: while a reply is read out, the sentence being spoken stays bright and the rest of
+// the reply rests a little dimmer. Sentences are marked once the reply has settled on screen.
+let speakId = null;
+function markSentences(bub) {
+  if (bub.dataset.sents) return;
+  const skip = '.chgnote,.memnote,.wkhead,.chgfail,button';
+  const walker = document.createTreeWalker(bub, NodeFilter.SHOW_TEXT, { acceptNode: n => (n.parentElement.closest(skip) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  let k = 0;
+  for (const n of nodes) {
+    const frag = document.createDocumentFragment();
+    for (const part of n.nodeValue.split(/(?<=[.!?…])(\s+)/)) {
+      if (!part) continue;
+      if (/^\s+$/.test(part)) { frag.append(part); k++; continue; }
+      const sp = document.createElement('span');
+      sp.className = 'sn'; sp.dataset.s = k; sp.textContent = part;
+      frag.append(sp);
+    }
+    if (/[.!?…]\s*$/.test(n.nodeValue)) k++;
+    n.replaceWith(frag);
+  }
+  // where each sentence ends, as a share of all the text: position → sentence
+  const len = [];
+  for (const sp of bub.querySelectorAll('.sn')) len[sp.dataset.s] = (len[sp.dataset.s] || 0) + sp.textContent.length;
+  const total = len.reduce((a, x) => a + (x || 0), 0) || 1;
+  let acc = 0;
+  bub._ends = len.map(x => (acc += x || 0) / total);
+  bub.dataset.sents = String(len.length);
+}
+function followAlong(pos) {
+  const bub = speakId && document.querySelector(`#s-coach [data-id="${speakId}"]:not(.is-streaming) .bub`);
+  if (!bub) return;
+  markSentences(bub);
+  if (!bub._ends?.length || bub._ends.length < 2) return; // one sentence: nothing to follow
+  const k = pos == null ? -1 : Math.max(0, bub._ends.findIndex(e => pos <= e + 0.01));
+  if (bub._k === k) return;
+  bub._k = k;
+  bub.classList.toggle('reading', k >= 0);
+  for (const sp of bub.querySelectorAll('.sn')) sp.classList.toggle('now', +sp.dataset.s === k);
+}
+function endFollow() {
+  for (const bub of document.querySelectorAll('#s-coach .bub.reading')) { bub.classList.remove('reading'); bub._k = undefined; }
+}
+
 // While the Coach speaks, the message-box orb moves with its voice: its light swells on the loud
 // parts and settles in the pauses. The level comes from the clip itself (tts.speechLevel).
 function voiceLight(composer) {
   let raf = 0, lv = 0;
+  let quiet = 0;
   const stop = () => {
     cancelAnimationFrame(raf); raf = 0; lv = 0;
     composer.classList.remove('speaking'); composer.style.removeProperty('--sv');
+    // between two pieces of one reply the voice stops for a moment: only let go after a real pause
+    clearTimeout(quiet);
+    quiet = setTimeout(() => { if (!raf) endFollow(); }, 700);
   };
   const frame = now => {
     const raw = tts.speechLevel();
     const target = raw == null ? 0.35 + 0.25 * Math.abs(Math.sin(now / 190)) : raw; // the phone's voice: a gentle beat
     lv += (target - lv) * (target > lv ? 0.35 : 0.12); // rises quickly, settles slowly
     composer.style.setProperty('--sv', lv.toFixed(3));
+    followAlong(tts.speechPos());
     raf = requestAnimationFrame(frame);
   };
   tts.onSpeaking(on => {
     if (!on) return stop();
-    if (raf || stillMotion() || !document.getElementById('app')?.classList.contains('coaching')) return;
+    clearTimeout(quiet);
+    if (raf || !document.getElementById('app')?.classList.contains('coaching')) return;
     composer.classList.add('speaking');
     raf = requestAnimationFrame(frame);
   });
@@ -257,7 +323,7 @@ let picking = null;
 tts.whenModelMissing(() => store.setSettings({ ttsModel: '', ttsLite: '' })); // listed again next time
 export function ensureModels() {
   const s = state.settings;
-  if (!getKey('google') || ((s.coachOverride || (s.coachModel && s.coachAlt && s.proChecked)) && (s.ttsOverride || s.ttsLite))) return Promise.resolve();
+  if (!getKey('google') || ((s.coachOverride || (s.coachModel && s.coachAlt && s.proChecked)) && (s.ttsOverride || s.ttsLite) && s.liveChecked)) return Promise.resolve();
   picking ||= (async () => {
     try {
       const r = await listModels(getKey('google'));
@@ -265,7 +331,8 @@ export function ensureModels() {
       const text = pickTextModels(r.models);
       store.setSettings({
         cmdModel: text.command || '', coachModel: text.coach || '', cmdAlt: text.commandAlt || '', coachAlt: text.coachAlt || '', coachPro: text.pro || '', proChecked: true,
-        ttsModel: pickTtsModel(r.models, null, 'natural') || '', ttsLite: pickTtsModel(r.models, null, 'fast') || ''
+        ttsModel: pickTtsModel(r.models, null, 'natural') || '', ttsLite: pickTtsModel(r.models, null, 'fast') || '',
+        liveModel: pickLiveModel(r.models) || '', liveChecked: true
       });
     } catch { /* fall back to defaults */ } finally { picking = null; }
   })();
@@ -306,14 +373,50 @@ async function applyCoachChanges(id, changes) {
   done.push(...a.dos.map(text => state.t('change.did', { text })));
   return { done, open: a.open };
 }
-async function undoChange(id) {
-  const before = undoable.get(id);
+async function undoChange(id, key = id) {
+  const before = undoable.get(key);
   if (!before) return;
-  undoable.delete(id);
+  undoable.delete(key);
   haptic('tap');
   if (JSON.stringify(before.routines) !== JSON.stringify(state.routines)) await store.replaceRoutines(before.routines);
   store.setSettings({ dayPlan: before.dayPlan, ...before.settings });
-  store.updateChat(id, { undone: true }, { persist: true });
+  if (key === id) return store.updateChat(id, { undone: true }, { persist: true });
+  const m = state.chat.find(x => x.id === id);
+  store.updateChat(id, { acted: (m?.acted || []).map(a => (a.key === key ? { ...a, undone: true } : a)) }, { persist: true });
+}
+
+// A "Do it" chip: the offer is applied at once (with Undo) and turns into a note of what changed.
+let acting = false;
+async function runAction(id, i = 0) {
+  const m = state.chat.find(x => x.id === id), a = m?.actions?.[i];
+  if (!a || acting) return false;
+  acting = true;
+  try {
+    const key = `${id}:${Date.now().toString(36)}`;
+    const { done, open } = await applyCoachChanges(key, a.changes);
+    const fresh = state.chat.find(x => x.id === id) || m;
+    const note = done.length ? { key, label: a.label, done } : { key, label: a.label, done: [state.t('change.failed', { label: a.label })], failed: true };
+    store.updateChat(id, { actions: (fresh.actions || []).filter((_, j) => j !== i), acted: [...(fresh.acted || []), note] }, { persist: true });
+    haptic(done.length ? 'success' : 'error');
+    if (open) setTimeout(() => openPage(open), 700);
+    return true;
+  } finally { acting = false; }
+}
+// The newest reply's first offer, if it's still the last thing in the conversation
+function topAction() {
+  // the newest offer that nothing you've said since has moved past
+  for (let i = state.chat.length - 1; i >= 0; i--) {
+    const m = state.chat[i];
+    if (m.role === 'user') return null;
+    if (m.actions?.length) return Date.now() - (m.at || 0) < 15 * 60_000 ? m.id : null;
+  }
+  return null;
+}
+export function runTopAction() {
+  const id = topAction();
+  if (!id) return false;
+  runAction(id, 0);
+  return true;
 }
 function openPage(page) {
   if (!page || !PAGES[page]) return;
@@ -324,6 +427,9 @@ function openPage(page) {
 export async function ask(question, { root = $('#s-coach'), voice = false } = {}) {
   question = String(question || '').trim();
   if (!question) return;
+  // "yes" / "do it" with an offer on screen: that's the answer to it
+  const offer = isAffirm(question) && topAction();
+  if (offer) { runAction(offer, 0); store.addChat('user', question); return; }
   // "I had 2 eggs", "bench 80 for 8", "set my calories to 2400": done straight away (with Undo), not discussed
   const did = actOnText(question);
   if (did) {
@@ -359,11 +465,13 @@ export async function ask(question, { root = $('#s-coach'), voice = false } = {}
     }), { rounds: 3, wait: 2500, alsoRetry: ['timeout'] }).finally(() => clearTimeout(slow)); // busy servers get a patient second and third go
     // the voice starts as soon as the answer is in, while the words are still appearing on screen
     const { text: saidMem, facts: all } = splitMemories(text);
-    const { text: saidClean, changes } = splitChanges(saidMem);
+    const { text: saidPlain, changes } = splitChanges(saidMem);
+    const { text: saidClean, actions } = splitActions(saidPlain);
     const said = saidClean;
     const talk = said && (voice || state.settings.spoken !== 'off')
       ? tts.speak(speakable(said), { key, model: ttsModelId(state.settings), alt: ttsAlt(state.settings), voice: state.settings.voice, lang, canSpeak: () => !isRecording() })
       : null;
+    if (talk) { speakId = reply.id; talk.finally(() => { if (speakId === reply.id) speakId = null; }); }
     await typer.drain();
     // "REMEMBER: …" lines become memories and leave the reply
     const before = state.settings.memories || [], mem = addMemories(before, all);
@@ -371,7 +479,7 @@ export async function ask(question, { root = $('#s-coach'), voice = false } = {}
     if (facts.length) store.setSettings({ memories: mem });
     // "CHANGE: {…}" lines change the plan (a day, a routine), with Undo
     const { done: changed, open } = await applyCoachChanges(reply.id, changes);
-    store.updateChat(reply.id, { text: saidClean, streaming: false, ...(facts.length ? { remembered: facts } : {}), ...(changed.length ? { changed } : {}) }, { persist: true });
+    store.updateChat(reply.id, { text: saidClean, streaming: false, ...(facts.length ? { remembered: facts } : {}), ...(changed.length ? { changed } : {}), ...(actions.length ? { actions } : {}) }, { persist: true });
     if (changed.length) haptic('success');
     if (open) setTimeout(() => openPage(open), talk ? 900 : 1400); // after the reply has been seen
     haptic('tap');
@@ -452,16 +560,25 @@ function syncButton() {
   if (b) { b.innerHTML = inflight ? I.stop : I.fwd; b.classList.toggle('stop', !!inflight); }
 }
 
+// What Gemini Live can do besides talking (see LIVE_RULES in coach.js)
+const LIVE_TOOLS = [
+  { name: 'change_app', description: 'Change the training plan or the app, or do something the app understands from words. Call it when the user asks for a change or agrees to one you suggested.',
+    parameters: { type: 'OBJECT', properties: { changes_json: { type: 'STRING', description: 'A JSON array of change objects, exactly the forms a CHANGE line would contain, e.g. [{"day":"2026-09-26","label":"Wrestling"}] or [{"setting":"restSec","value":120},{"do":"log 2 eggs and toast"}]' } }, required: ['changes_json'] } },
+  { name: 'remember', description: 'Keep a lasting fact the user told you about themselves (a preference, injury, schedule, event, goal).',
+    parameters: { type: 'OBJECT', properties: { fact: { type: 'STRING', description: 'The fact in a few words' } }, required: ['fact'] } }
+];
+
 export function initCoach(n) {
   nav = n;
   const root = $('#s-coach');
   const composer = $('#composer');
-  composer.innerHTML = `<span class="cglow" aria-hidden="true"><i></i></span><button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span></button><input enterkeyhint="send" autocomplete="off" maxlength="5000"><button type="submit" class="csend">${I.fwd}</button>`;
+  composer.innerHTML = `<span class="cglow" aria-hidden="true"><i></i></span><span class="chit" aria-hidden="true"></span><button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span></button><input enterkeyhint="send" autocomplete="off" maxlength="5000"><button type="submit" class="csend">${I.fwd}</button>`;
   // The composer's orb: talk to your coach. What you say is sent when you pause, the answer is
   // spoken, then it listens again, so it's a conversation. Tap while it listens to send at once;
   // tap while it thinks or speaks (or say nothing) to end it.
   const input = composer.querySelector('input'), orbBtn = composer.querySelector('.corb');
   voiceLight(composer);
+  onConfirmWord(runTopAction); // "yes" / "do it" said to the orb anywhere takes the Coach's latest offer
   const talk = { on: false, l: null, misses: 0 };
   const setTalk = phase => {
     composer.dataset.talk = phase || '';
@@ -497,19 +614,115 @@ export function initCoach(n) {
     talk.on = false;
     setTalk(null);
   };
-  orbBtn.addEventListener('click', () => {
+  // Gemini Live: when the key has a Live model (and it's on in Settings), the orb holds a real
+  // conversation: you just talk, it answers in its voice at once, you can cut in, and it changes the
+  // app through tools. Both sides are written into the chat. If Live can't start, the orb falls back
+  // to taking turns (listen → answer → rest).
+  const live = { s: null, userId: null, modelId: null, typer: null, n: 0, open: null, lat: [] };
+  const liveWanted = () => state.settings.live && !!getKey('google');
+  const endLiveTurn = () => { live.userId = null; live.modelId = null; live.typer = null; };
+  const liveOff = reason => {
+    if (!live.s && composer.dataset.talk !== 'connecting') return;
+    live.s = null;
+    if (live.modelId) store.updateChat(live.modelId, { streaming: false }, { persist: true });
+    endLiveTurn();
+    setTalk(null);
+    composer.classList.remove('speaking'); composer.style.removeProperty('--sv'); orbBtn.style.removeProperty('--lv');
+    if (live.lat.length) { const sorted = [...live.lat].sort((a, b) => a - b); store.setSettings({ liveMs: sorted[sorted.length >> 1] }); live.lat = []; }
+    if (reason === 'idle' || reason === 'closed') toast({ title: esc(state.t('coach.live.ended')) });
+    const page = live.open; live.open = null;
+    if (page) setTimeout(() => openPage(page), 250);
+  };
+  const liveTool = async (name, args) => {
+    if (name === 'remember') {
+      const before = state.settings.memories || [], mem = addMemories(before, [String(args.fact || '')]);
+      if (mem.length > before.length) store.setSettings({ memories: mem });
+      return { ok: true };
+    }
+    if (name !== 'change_app') return { ok: false, error: 'unknown tool' };
+    let changes;
+    try { changes = JSON.parse(args.changes_json || '[]'); } catch { return { ok: false, error: 'changes_json is not valid JSON' }; }
+    if (!Array.isArray(changes)) changes = [changes];
+    if (!live.modelId) { live.modelId = store.addChat('model', '', { streaming: true, live: true }).id; live.typer = typewriter(root, live.modelId); }
+    const key = `${live.modelId}:${++live.n}`;
+    const { done, open } = await applyCoachChanges(key, changes);
+    const m = state.chat.find(x => x.id === live.modelId);
+    if (done.length) { store.updateChat(live.modelId, { acted: [...(m?.acted || []), { key, label: '', done }] }, { quiet: true }); haptic('success'); }
+    if (open) live.open = open;
+    return done.length ? { ok: true, done } : { ok: false, error: 'nothing could be changed (unknown name or value)' };
+  };
+  const startLiveTalk = async () => {
+    setTalk('connecting');
+    await ensureModels();
+    const model = state.settings.liveModel;
+    if (!model || !liveWanted() || composer.dataset.talk !== 'connecting') return false;
+    try {
+      live.s = await startLive({
+        key: getKey('google'), model, voice: state.settings.voice, tools: LIVE_TOOLS, onTool: liveTool,
+        system: `${systemPrompt(state.lang)}\n\n${LIVE_RULES}\n\nTraining data:\n${buildContext(coachSnap())}`,
+        on: {
+          state: (st, reason) => {
+            if (st === 'off') return liveOff(reason);
+            setTalk(st === 'listening' ? 'live' : st);
+            composer.classList.toggle('speaking', st === 'speaking');
+          },
+          // what it hears shows in the box as you speak; it goes into the chat when the answer starts
+          user: (text, final) => {
+            if (!final) { input.placeholder = text.trim() || state.t('coach.talk.hearing'); return; }
+            if (text.trim()) { live.userId = store.addChat('user', text.trim()).id; requestAnimationFrame(() => follow(root, true)); }
+          },
+          model: (text, final) => {
+            if (!live.modelId) { live.modelId = store.addChat('model', '', { streaming: true, live: true }).id; live.typer = typewriter(root, live.modelId); }
+            if (!final) { store.updateChat(live.modelId, { text }, { quiet: true }); live.typer?.set(text); return; }
+            const m = state.chat.find(x => x.id === live.modelId);
+            store.updateChat(live.modelId, { text, streaming: false, ...(m?.acted?.length ? { acted: m.acted } : {}) }, { persist: true });
+            endLiveTurn();
+          },
+          level: (inL, outL) => {
+            orbBtn.style.setProperty('--lv', (composer.dataset.talk === 'speaking' ? 0 : inL).toFixed(3));
+            composer.style.setProperty('--sv', outL.toFixed(3));
+          },
+          latency: ms => { if (ms > 0 && ms < 20000) live.lat.push(ms); },
+          error: () => {}
+        }
+      });
+      if (composer.dataset.talk === 'connecting') setTalk('live');
+      haptic('success');
+      return true;
+    } catch (e) {
+      live.s = null;
+      if (e?.code === 'mic') { toast({ title: esc(state.t('voice.micDenied')), error: true }); setTalk(null); return 'stop'; }
+      if (e?.code === 'stopped') return 'stop';
+      console.warn('live unavailable', e?.code || e);
+      return false;
+    }
+  };
+  orbBtn.addEventListener('click', async () => {
+    if (live.s || composer.dataset.talk === 'connecting') { haptic('tap'); stopLive('user'); liveOff('user'); return; }
     if (talk.on) { haptic('tap'); if (talk.l && composer.dataset.talk !== 'thinking') talk.l.stop(); else stopTalk(); return; }
-    if (!getKey('groq')) { toast({ title: esc(state.t('voice.noKey')), error: true }); return; }
     haptic('tap');
     unlockAudio();
     input.blur();
+    const typed = input.value.trim();
+    if (!typed && liveWanted()) {
+      const ok = await startLiveTalk();
+      if (ok) return;
+      if (ok === 'stop') return;
+      setTalk(null);
+      if (state.settings.liveModel) toast({ title: esc(state.t('coach.live.fallback')) });
+    }
+    if (!getKey('groq')) { toast({ title: esc(state.t('voice.noKey')), error: true }); return; }
     talk.on = true;
     talk.misses = 0;
-    const typed = input.value.trim();
     if (typed) { input.value = ''; setTalk('thinking'); ask(typed, { root, voice: true }).then(() => { talk.on = false; setTalk(null); }); return; }
     listenTurn();
   });
-  document.getElementById('app').addEventListener('screenchange', () => { if (talk.on && !document.getElementById('app').classList.contains('coaching')) stopTalk(); });
+  document.getElementById('app').addEventListener('screenchange', () => {
+    if (document.getElementById('app').classList.contains('coaching')) return;
+    if (talk.on) stopTalk();
+    if (live.s) stopLive('left');
+  });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && live.s) stopLive('hidden'); });
   composer.addEventListener('submit', e => {
     e.preventDefault();
     if (inflight) { inflight.ctl.abort(); return; }
@@ -527,7 +740,8 @@ export function initCoach(n) {
     if (!b) return;
     const k = b.dataset.coach;
     if (k === 'ask' || k === 'retry') { haptic('tap'); ask(b.dataset.q, { root }); }
-    if (k === 'undo-change') { undoChange(b.dataset.id); return; }
+    if (k === 'undo-change') { undoChange(b.dataset.id, b.dataset.key || b.dataset.id); return; }
+    if (k === 'act') { b.disabled = true; b.classList.add('going'); runAction(b.dataset.id, Number(b.dataset.i) || 0); return; }
     else if (k === 'saveplan') { b.closest('.pacts')?.querySelectorAll('button').forEach(x => { x.disabled = true; }); savePlan(b.dataset.id, b.dataset.mode); }
     else if (k === 'settings') nav.openSettings();
     else if (k === 'close') { haptic('tap'); nav.closeCoach?.(); }

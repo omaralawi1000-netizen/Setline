@@ -530,3 +530,13 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Bug: on the Food screen, "Say it" logged anything as food ("what's going on?"). Questions and small talk now go to the Coach, and a meal estimate that comes back "not food" hands the words to the Coach
 - [x] Bug: a long one-word day in the week strip ("Wrestling") was cut off to "Wrestli"; it now breaks onto the second line
 - [x] Bug: 1.43's reply sweep had replaced the press shine on primary buttons (same animation name); gone with the sweep
+
+## 1.45.0: "Do it" chips, Gemini Live, hands-free words, follow-along, Up next into the workout
+
+- [x] "Do it" chips: the Coach offers what it suggests (ACTION lines) as up to two chips under its reply; a tap applies it with Undo (a failed one says so); "yes" / "do it" (said or typed) takes the first; they hide while you type and once you've said something new
+- [x] Gemini Live (js/live.js): the Coach's message-box orb holds a real conversation over one WebSocket when the key has a Live model (native audio preferred): 16 kHz mic in, 24 kHz voice out, interruptions, a live caption in the box, transcripts into the chat, tools change_app (the same changes as CHANGE lines, with Undo notes) and remember; it ends on a tap, when leaving the Coach or the app, or after 60 s of silence; falls back to turn-taking talk if it can't start (a note says so); hands-free pauses while it runs; a fallback stops the mic while it speaks if the phone's echo cancelling lets its voice cut itself off. Settings → Voice: on/off, the model, how fast the last reply started. Tested here against a fake Live server (no real key in the cloud), so the phone test decides
+- [x] Hands-free words: "done" = the planned set (was: finish workout); "done, 7" / "got 7" = 7 reps at the planned weight; "that felt heavy" / "easy" = the rest of that lift's sets 2.5 kg (5 lb) lighter or heavier; "yes" / "do it" = confirm (was: guessed an exercise to add); English and Danish
+- [x] Replies: the orb pulses once as the answer starts and the first line rises out of the box; while it's read out, the sentence being spoken stays bright (timed from the voice clip, or the phone voice's word events)
+- [x] Up next → workout: the card's surface opens out into the workout page under the arriving cards; Today no longer flips to its Resume card (and its glide no longer shows over the workout) in the moment it's left
+- [x] After finishing: today's dot in the week strip fills in with a pop, a ring and a tick the next time Today or Train is shown
+- [x] The orb's landing in the message box now also sends a soft light along the box

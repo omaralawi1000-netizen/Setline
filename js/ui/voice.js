@@ -561,7 +561,7 @@ export function handleText(text, { typed = false } = {}) {
 }
 
 // The Coach box: a clear command (food, a set, water, targets…) is done, not discussed.
-const DO_TYPES = new Set(['LogSet', 'LogSets', 'LogBatch', 'LogRel', 'LogMeal', 'LogWater', 'SetTarget', 'LogBodyweight', 'LogProtein', 'LogCardio', 'StartCardio', 'StartRoutine', 'CheckIn', 'AddWarmup', 'WarmupDone', 'SetGoal']);
+const DO_TYPES = new Set(['LogSet', 'LogSets', 'LogBatch', 'LogRel', 'AdjustNext', 'LogMeal', 'LogWater', 'SetTarget', 'LogBodyweight', 'LogProtein', 'LogCardio', 'StartCardio', 'StartRoutine', 'CheckIn', 'AddWarmup', 'WarmupDone', 'SetGoal']);
 export function actOnText(text) {
   text = String(text || '').trim();
   if (!text || /\?\s*$/.test(text) || isQuestion(text)) return null;
@@ -573,7 +573,7 @@ export function actOnText(text) {
 
 // Hands-free: speech the app overheard. It acts only on what reads as a workout command, or on
 // anything said after "Coach"/"Setline"; everything else (chat, music, the gym) is ignored.
-const HF_OK = new Set(['LogSet', 'LogSets', 'AddWarmup', 'WarmupDone', 'LogRel', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
+const HF_OK = new Set(['LogSet', 'LogSets', 'AddWarmup', 'WarmupDone', 'LogRel', 'AdjustNext', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
   'StartRest', 'AdjustRest', 'SkipRest', 'Query', 'AddExercise', 'SwapExercise', 'LogProtein', 'LogBodyweight']);
 export const WAKE = /^\s*(?:hey |hej |ok |okay )?(?:coach|setline|set line|sætlajn)\b[\s,.:!-]*/i;
 export function handleAmbient(text) {
@@ -643,7 +643,15 @@ async function aiFallback(text, parsed, { typed }) {
   if (v.open) setPhase('result');
 }
 
+// "yes" / "do it": confirms the card waiting for it, else runs the Coach's top suggestion (see coach.js)
+let confirmHook = () => false;
+export const onConfirmWord = fn => { confirmHook = fn; };
+
 function present(intent, { typed = false } = {}) {
+  if (intent.type === 'Confirm') {
+    if (card.cmd?.kind === 'confirm' && !card.committed) { const c = card.cmd; if (v.open) closeVoice(); commitConfirmed(c); return; }
+    if (confirmHook()) { if (v.open) closeVoice(); return; }
+  }
   const lang = langFor(intent);
   const cmd = resolve(intent, snapshot(), tFor(lang), lang);
   cmd.lang = lang;

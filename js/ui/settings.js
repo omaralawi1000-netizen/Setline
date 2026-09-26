@@ -160,6 +160,8 @@ export function renderSettings(root) {
       <div class="srow"><span class="l"><strong>${t('settings.voiceName')}</strong><small id="speechstat">${esc(speechStatus())}</small></span>
         <span class="stepper"><select class="select" data-set="voice" aria-label="${t('settings.voiceName')}">${VOICES.map(n => `<option value="${n}" ${n === s.voice ? 'selected' : ''}>${n} · ${t('feel.' + VOICE_FEEL[n])}</option>`).join('')}</select>
         <button class="chip" data-act="preview-voice">${t('settings.preview')}</button></span></div>
+      <div class="srow"><span class="l"><strong>${t('set.live')}</strong><small>${t('set.liveSub')}. ${esc(s.liveModel ? t('set.liveModel', { model: s.liveModel }) + (s.liveMs ? ' · ' + t('set.liveMs', { s: (s.liveMs / 1000).toLocaleString(state.lang === 'da' ? 'da-DK' : 'en-GB', { maximumFractionDigits: 1 }) }) : '') : s.liveChecked ? t('set.liveNone') : '')}</small></span>
+        <button class="toggle" role="switch" aria-checked="${s.live}" aria-label="${t('set.live')}" data-act="toggle" data-key="live"></button></div>
       <button class="srow" data-act="save-reply"><span class="l"><strong>${t('settings.saveReply')}</strong><small>${t('settings.saveReplySub')}</small></span>${I.download.replace('class="i"', 'class="i" style="width:20px;height:20px;color:var(--accent)"')}</button>
     </div></div>
 

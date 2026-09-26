@@ -27,3 +27,24 @@ test('do and open', () => {
   assert.equal(r.open, 'workout');
   assert.equal(r.failed.length, 1);
 });
+
+import { splitActions, hideActionTail, isAffirm } from '../js/appedit.js';
+test('splitActions reads offers and hides them from the reply', () => {
+  const r = splitActions('Legs fit better on Friday.\nACTION: {"label":"Move legs to Friday","changes":[{"routine":"Legs","weekday":"Fri"}]}\nACTION: {"label":"Log 2 eggs","do":"log 2 eggs"}\nACTION: {"label":"Third","do":"x"}');
+  assert.equal(r.text, 'Legs fit better on Friday.');
+  assert.equal(r.actions.length, 2);
+  assert.deepEqual(r.actions[1], { label: 'Log 2 eggs', changes: [{ do: 'log 2 eggs' }] });
+});
+test('splitActions skips broken offers', () => {
+  const r = splitActions('Hi\nACTION: {"label":"No changes"}\nACTION: {not json}');
+  assert.equal(r.text, 'Hi');
+  assert.equal(r.actions.length, 0);
+});
+test('hideActionTail hides a half-streamed offer', () => {
+  assert.equal(hideActionTail('Sure.\nACTION: {"label":"Mo'), 'Sure.');
+  assert.equal(hideActionTail('Sure.\nACTI'), 'Sure.');
+});
+test('isAffirm', () => {
+  for (const s of ['yes', 'Do it!', 'ja tak', 'gør det', 'go ahead']) assert.equal(isAffirm(s), true, s);
+  for (const s of ['yes but later', 'do it tomorrow', 'no']) assert.equal(isAffirm(s), false, s);
+});

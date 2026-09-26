@@ -29,6 +29,10 @@ export const DEFAULTS = Object.freeze({
   weeklyGoal: 3,       // workouts per week, Today ring
   cmdModel: '',        // Flash-Lite text model for command fallback (picked on key test)
   coachModel: '',      // Flash text model for the Coach
+  live: true,          // talk to the Coach with Gemini Live when the key has a Live model
+  liveModel: '',       // the Live (native audio) model, picked from the key's model list
+  liveChecked: false,  // the model list was checked for Live
+  liveMs: 0,           // how quickly Live last started answering (ms), shown in Settings
   cmdOverride: '',
   coachOverride: '',
   cmdAlt: '',          // runner-up models, tried on 503/429/404
@@ -181,7 +185,10 @@ export function sanitize(input) {
   // 1.34: the Gemini voice is the default again; a choice made after that is kept
   if (['instant', 'natural', 'fast'].includes(input.ttsQuality) && input.ttsV === 2) s.ttsQuality = input.ttsQuality;
   if (['fast', 'accurate'].includes(input.stt)) s.stt = input.stt;
-  for (const k of ['ttsModel', 'ttsLite', 'ttsOverride', 'cmdModel', 'coachModel', 'cmdOverride', 'coachOverride', 'cmdAlt', 'coachAlt', 'coachPro']) if (typeof input[k] === 'string' && (input[k] === '' || MODEL_ID.test(input[k].trim()))) s[k] = input[k].trim();
+  if (typeof input.live === 'boolean') s.live = input.live;
+  if (typeof input.liveChecked === 'boolean') s.liveChecked = input.liveChecked;
+  if (Number.isFinite(input.liveMs) && input.liveMs >= 0 && input.liveMs < 60000) s.liveMs = Math.round(input.liveMs);
+  for (const k of ['ttsModel', 'ttsLite', 'ttsOverride', 'cmdModel', 'coachModel', 'cmdOverride', 'coachOverride', 'cmdAlt', 'coachAlt', 'coachPro', 'liveModel']) if (typeof input[k] === 'string' && (input[k] === '' || MODEL_ID.test(input[k].trim()))) s[k] = input[k].trim();
   return s;
 }
 

@@ -173,8 +173,10 @@ function impact(orbEl) {
     { scale: '1.3 0.72' }, { scale: '0.88 1.12', offset: 0.3 }, { scale: '1.06 0.95', offset: 0.55 },
     { scale: '0.98 1.02', offset: 0.78 }, { scale: '1 1' }], { duration: 560, easing: 'cubic-bezier(.3,.6,.4,1)' });
   $('#composer')?.animate([{ translate: '0 0' }, { translate: '0 4px', offset: 0.22 }, { translate: '0 -1.5px', offset: 0.6 }, { translate: '0 0' }], { duration: 460, easing: 'cubic-bezier(.3,.6,.4,1)' });
-  const btn = orbEl.closest('.corb');
+  const btn = orbEl.closest('.corb'), box = $('#composer');
   if (btn) { btn.classList.remove('impact'); void btn.offsetWidth; btn.classList.add('impact'); setTimeout(() => btn.classList.remove('impact'), 800); }
+  // the impact spreads into the box: a soft light from where the orb hit runs along it and fades
+  if (box) { box.classList.remove('hit'); void box.offsetWidth; box.classList.add('hit'); setTimeout(() => box.classList.remove('hit'), 1000); }
 }
 
 function coachMorph(open, under) {
@@ -255,6 +257,38 @@ function coachMorph(open, under) {
   }
 }
 
+// Up next becomes the workout: the card's surface opens out into the page while the workout's cards
+// arrive on top of it (only when the workout screen follows the tap straight away; a readiness question
+// in between breaks the link, so then it's the normal page change).
+let grow = null, dotFill = false;
+function growSource(card) {
+  grow = card && !stillMotion() ? { r: card.getBoundingClientRect(), at: performance.now() } : null;
+}
+function growInto() {
+  const g = grow;
+  grow = null;
+  if (!g || performance.now() - g.at > 900 || document.querySelector('.sheet')) return;
+  const a = app.getBoundingClientRect();
+  const el = document.createElement('div');
+  el.className = 'growcard';
+  el.setAttribute('aria-hidden', 'true');
+  // drawn at full size and scaled down to the card, so it only ever grows (transform + opacity); the
+  // corners are pre-stretched so they stay round while it's scaled
+  const sx = g.r.width / a.width, sy = g.r.height / a.height;
+  const dx = g.r.left - a.left, dy = g.r.top - a.top;
+  el.style.borderRadius = `${30 / sx}px / ${30 / sy}px`;
+  app.append(el);
+  // above Today (which it covers as it grows), under the workout's cards (which arrive on top)
+  const ws = $('#s-workout');
+  ws.style.zIndex = '2';
+  const anim = el.animate([
+    { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`, opacity: 0 },
+    { opacity: 0.95, offset: 0.3 },
+    { opacity: 0.95, offset: 0.55 },
+    { transform: 'translate(0, 0) scale(1, 1)', opacity: 0 }], { duration: 600, easing: 'cubic-bezier(.3,.7,.1,1)' });
+  anim.onfinish = anim.oncancel = () => { el.remove(); ws.style.zIndex = ''; };
+}
+
 // Direction for the transition: tabs by position, sub screens push in from the right.
 const ORDER = { today: 0, workout: 1, food: 2, you: 3, coach: 4, history: 4, detail: 5, settings: 4, routine: 4, progress: 5, body: 4, exercise: 6 };
 function show(name, { back = false, still = false } = {}) {
@@ -297,6 +331,15 @@ function show(name, { back = false, still = false } = {}) {
   app.classList.toggle('is-sub', SUB.includes(name));
   if (coachSwap && !still) coachMorph(name === 'coach', $('#s-' + (name === 'coach' ? prev : name)));
   else if (prev === 'coach' || name === 'coach') settleCoachFx();
+  if (name === 'workout' && prev !== 'workout') growInto(); else grow = null;
+  // back from a finished workout: today's dot in the week strip fills in, once, where you can see it
+  if (dotFill && (name === 'today' || name === 'workout')) requestAnimationFrame(() => {
+    const d = $(`#s-${name} .wpday.today.done`);
+    if (!d || stillMotion()) return;
+    dotFill = false;
+    d.classList.add('fillnow');
+    setTimeout(() => haptic('tick'), 260);
+  });
   if (coachSwap && name !== 'coach') { // the bar comes back without a bounce, under the returning light
     app.classList.add('uncoaching');
     clearTimeout(app._uncoach);
@@ -380,7 +423,7 @@ Object.assign(actions, {
   'open-settings': () => pushSub('settings'),
   customize: () => openCustomize(),
   detail: el => pushSub('detail', { detailId: el.dataset.id, detailKind: el.dataset.kind || 'workout' }),
-  'start-routine': el => startRoutine(el.dataset.id),
+  'start-routine': el => { growSource(el.closest('.upcoming')); startRoutine(el.dataset.id); },
   'save-routine': el => {
     const w = state.history.find(x => x.id === el.dataset.id);
     if (!w) return;
@@ -560,6 +603,7 @@ function maybeAskAlerts() {
 store.subscribe(reason => {
   keepAwake(!!state.active || !!state.activeCardio);
   if (reason === 'finish' || (reason === 'cardio' && !state.activeCardio)) setTimeout(autoBackup, 1500);
+  if (reason === 'finish') dotFill = true;
   if (reason === 'finish') { // the Coach looks at the session straight away
     const w = [...state.history].sort((a, b) => b.startedAt - a.startedAt)[0];
     setTimeout(() => sessionDebrief(w, { onReady: () => { if (view.screen !== 'coach') toast({ title: esc(state.t('debrief.ready')), sub: esc(state.t('debrief.readySub')), action: state.t('debrief.read'), ms: 8000, onAction: () => go('coach') }); } }), 2500);
@@ -575,6 +619,13 @@ store.subscribe(reason => {
   if (reason === 'error') {
     if (state.error) toast({ title: esc(state.t('toast.storageError')), error: true, ms: 6000 });
     return;
+  }
+  // starting a workout leaves Today straight away: no card glide on the page being left (its snapshot
+  // would sit over the workout for a moment)
+  if (reason === 'start') {
+    // and Today isn't redrawn (to its Resume card) in the moment it's being left; if nothing moves on, it catches up
+    if (view.screen === 'today') { setTimeout(() => { if (view.screen === 'today') renderAll(); }, 60); return; }
+    return renderAll();
   }
   morph(renderAll);
 });

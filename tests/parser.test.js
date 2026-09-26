@@ -304,3 +304,30 @@ test('Food screen: questions and small talk are not logged as food', () => {
     assert.equal(parse(f, { screen: 'food' }).type, 'LogMeal', f);
   }
 });
+
+test('hands-free: "done, 7" and "got 7" log that many reps at the planned weight', () => {
+  for (const s of ['done, 7', 'done 7 reps', 'got 7', 'I got 7', 'færdig, 7']) {
+    const r = P(s);
+    assert.equal(r.type, 'LogSet', s);
+    assert.equal(r.reps, 7, s);
+    assert.equal(r.kg, 80, s);
+  }
+});
+
+test('hands-free: "done" with sets planned is the set as planned; "finish" still ends the workout', () => {
+  assert.equal(P('done').type, 'LogRel');
+  assert.equal(P('færdig').type, 'LogRel');
+  assert.equal(P('finish').type, 'Finish');
+  assert.equal(P('finished').type, 'Finish');
+  assert.equal(P('done', { current: { exerciseId: 'bench-press', lastSet: { kg: 80, reps: 8 }, planned: null } }).type, 'Finish');
+});
+
+test('hands-free: "that felt heavy" / "easy" move the next sets', () => {
+  for (const s of ['that felt heavy', 'too heavy', 'that was hard', 'det var tungt']) assert.deepEqual([P(s).type, P(s).kgDelta], ['AdjustNext', -2.5], s);
+  for (const s of ['easy', 'that was easy', 'felt light', 'det var let']) assert.deepEqual([P(s).type, P(s).kgDelta], ['AdjustNext', 2.5], s);
+  assert.equal(P('easy', { current: null }).type === 'AdjustNext', false);
+});
+
+test('"yes" and "do it" confirm instead of guessing an exercise', () => {
+  for (const s of ['yes', 'Yes please', 'do it', 'go ahead', 'ja', 'gør det']) assert.equal(P(s).type, 'Confirm', s);
+});

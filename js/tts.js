@@ -239,7 +239,7 @@ function playPcm({ pcm, rate }, mine, text = '') {
       if (current?.source === source) { current = null; emit(false); }
       res();
     };
-    current = { source, gain, until: performance.now() + audio.duration * 1000 + 1500, env: envelope(samples, realRate), ac };
+    current = { source, gain, until: performance.now() + audio.duration * 1000 + 1500, env: envelope(samples, realRate), ac, dur: audio.duration };
     emit(true);
     if (ac.state === 'suspended') ac.resume().catch(() => {});
     source.start();
@@ -282,8 +282,9 @@ async function fallback(text, lang, mine) {
   const voices = ss.getVoices().filter(v => v.lang?.toLowerCase().startsWith(want));
   const score = v => (/natural|neural|online|premium|enhanced/i.test(v.name) ? 4 : 0) + (/google/i.test(v.name) ? 2 : 0) + (v.localService ? 0 : 1);
   const voice = voices.sort((a, b) => score(b) - score(a))[0];
-  const one = (part, retry = true) => new Promise(resolve => {
+  const one = (part, retry = true, at = 0) => new Promise(resolve => {
     const u = new SpeechSynthesisUtterance(part);
+    u.onboundary = e => { if (track && e.charIndex >= 0) track.dpos = at + e.charIndex; };
     if (voice) u.voice = voice;
     u.lang = lang === 'da' ? 'da-DK' : 'en-GB';
     u.rate = 1.04;
@@ -297,16 +298,19 @@ async function fallback(text, lang, mine) {
     const kick = setTimeout(async () => {
       if (started || over) return;
       try { ss.cancel(); } catch {}
-      if (retry && mine === seq) { over = true; clearTimeout(guard); await pause(80); resolve(await one(part, false)); } else end(false);
+      if (retry && mine === seq) { over = true; clearTimeout(guard); await pause(80); resolve(await one(part, false, at)); } else end(false);
     }, 1600);
     // it started but onend never came (an Android habit): move on after a generous estimate
     const guard = setTimeout(() => end(true), 4000 + part.length * 110);
     try { ss.speak(u); } catch { end(false); }
   });
   emit(true);
+  let at = track ? Math.max(0, track.total - text.length) : 0; // after a Gemini piece that already played
   for (const part of speechChunks(text)) {
     if (mine !== seq) return;
-    const r = await one(part);
+    if (track) track.dpos = at;
+    const r = await one(part, true, at);
+    at += part.length + 1;
     if (r === 'stop') break;
   }
   if (mine === seq && current) { current = null; emit(false); }
@@ -357,10 +361,15 @@ let onMissing = () => {};
 export const whenModelMissing = fn => { onMissing = fn; };
 export function clearVoiceRest() { try { localStorage.removeItem(QUOTA_KEY); } catch {} }
 
+// How far through the text the voice is (for following along on screen): which piece is playing and
+// where in it. Set by speak(), read by speechPos().
+let track = null;
+
 export async function speak(text, opts) {
   if (!text) return;
   stop();
   const mine = ++seq;
+  track = { total: Math.max(1, text.length), done: 0, part: 0, dpos: null };
   const resting = opts.model !== 'device' && Date.now() < quotaUntil();
   if (resting) lastSpeech.error = 'quota';
   if (opts.key && opts.model !== 'device' && !resting) { // 'device': the phone's own voice, no network wait
@@ -373,6 +382,7 @@ export async function speak(text, opts) {
         const buf = await jobs[i];
         if (mine !== seq || !opts.canSpeak()) return;
         lastSpeech.engine = 'gemini'; lastSpeech.error = null;
+        track.done = i ? parts.slice(0, i).join(' ').length + 1 : 0; track.part = parts[i].length;
         await playPcm(buf, mine, parts[i]);
         played++;
         if (mine !== seq) return;
@@ -407,6 +417,14 @@ export function envelope(samples, rate) {
   }
   for (let i = 0; i < out.length; i++) out[i] = Math.min(1, out[i] / (peak * 0.8));
   return out;
+}
+// 0–1 through the text being spoken, or null when it can't be told.
+export function speechPos() {
+  if (!current || !track) return null;
+  if (current.utter) return track.dpos == null ? null : Math.min(1, track.dpos / track.total);
+  if (current.t0 == null || !current.dur) return track.done / track.total;
+  const f = Math.min(1, Math.max(0, (current.ac.currentTime - current.t0) / current.dur));
+  return Math.min(1, (track.done + f * track.part) / track.total);
 }
 export function speechLevel() {
   if (!current) return 0;

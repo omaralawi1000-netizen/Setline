@@ -241,3 +241,14 @@ test('the coach remembers what you tell it, and the line stays hidden', () => {
   m = addMemories(m, ['Hates lunges.', 'trains at 6 am'], 2);
   assert.deepEqual(m.map(x => x.text), ['hates lunges', 'trains at 6 am'], 'no duplicates');
 });
+
+import { pickLiveModel } from '../js/ai.js';
+test('pickLiveModel: newest native-audio Live model, only ones that can hold a live session', () => {
+  const m = (name, methods) => ({ name: 'models/' + name, supportedGenerationMethods: methods });
+  const list = [m('gemini-2.5-flash', ['generateContent']), m('gemini-live-2.5-flash-preview', ['bidiGenerateContent']),
+    m('gemini-2.5-flash-native-audio-preview-09-2025', ['bidiGenerateContent']), m('gemini-3.1-flash-native-audio', ['bidiGenerateContent', 'countTokens'])];
+  assert.equal(pickLiveModel(list), 'gemini-3.1-flash-native-audio');
+  assert.equal(pickLiveModel([m('gemini-live-2.5-flash-preview', ['bidiGenerateContent'])]), 'gemini-live-2.5-flash-preview');
+  assert.equal(pickLiveModel([m('gemini-2.5-flash', ['generateContent'])]), null);
+  assert.equal(pickLiveModel(['gemini-live-x']), null);
+});
