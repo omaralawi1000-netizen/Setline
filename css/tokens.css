@@ -1,4 +1,4 @@
-/* Design tokens, copied from design-target.html. */
+/* Design tokens. The running app is the design reference (see SPEC.md section 2). */
 :root{
   /* the app is dark by design: stop Chrome's "dark theme for websites" from re-darkening it */
   color-scheme:dark only;

@@ -17,17 +17,16 @@ This file replaces every earlier spec and amendment.
 - **No backend.** The user types API keys into Settings, and they are stored only in that browser (localStorage). Keys never go into code, commits, logs, error messages or backups.
 - **PWA:** `manifest.webmanifest` (name "Setline", display standalone, theme and background `#0D0F15`, PNG icons 192 and 512 plus a maskable icon) and `sw.js` caching the app shell so it opens offline. Bump the cache version on every release and show "Update ready, tap to reload" when a new version is waiting.
 - **Tests:** `node --test` with zero dependencies, covering pure logic (parser, set rules, units, PR and 1RM math, backup validation). Keep logic modules free of DOM code so they can be tested.
-- **Suggested layout** (adapt sensibly): `index.html`, `manifest.webmanifest`, `sw.js`, `icons/`, `css/tokens.css`, `css/app.css`, `js/` (app, store, db, workout, parser, voice, stt, tts, ai, coach, i18n, ui/…), `data/exercises.js`, `tests/`, `PLAN.md`. `design-target.html` stays in the repo as a reference and is never linked from the app.
+- **Suggested layout** (adapt sensibly): `index.html`, `manifest.webmanifest`, `sw.js`, `icons/`, `css/tokens.css`, `css/app.css`, `js/` (app, store, db, workout, parser, voice, stt, tts, ai, coach, i18n, ui/…), `data/exercises.js`, `tests/`, `PLAN.md`.
 
 ## 2. Design
 
-- `design-target.html` is the visual source of truth: tokens, layout, glass surfaces, the Voice Orb, and motion. Copy its CSS tokens into `css/tokens.css`. Match it closely and don't genericize it.
-- **Brand:** background `#0D0F15`, card `#191C25`, ink `#F1F0F6`, muted `#9293A6`, accent lavender `#C6BBFA`, violet `#7A67F2`, blue `#5B86FF`, warm `#FFD9A8` (PRs only), hairline `rgba(207,199,255,.09)`. Font Manrope (Google Fonts, cached by the service worker) with a system fallback. Tabular numerals for all numbers.
-- **Surfaces:** backdrop blur only on the dock, sheets, the voice screen and one hero card per screen. Everything else uses translucent fill, hairline border and soft shadow.
-- **Motion:** transform and opacity only, easing `cubic-bezier(.16,1,.3,1)`, 60 fps on a mid-range phone. Respect `prefers-reduced-motion` and an in-app motion toggle. Decorative motion never delays state updates.
-- **Haptics:** `navigator.vibrate` (about 10 ms tap, 20-30-20 success, 40 error) behind a setting.
-- **Navigation:** floating glass dock with Today, Workout, the Voice Orb (center), Coach and History. A tab only appears once its screen works. Settings opens from the icon on Today. While a workout is active, a mini bar above the dock shows elapsed time and the current exercise.
-- **Review loop:** after building each screen, compare it with `design-target.html` (take screenshots if you can), list visible differences and fix them. Screens not in the mockup reuse the same tokens and surfaces, with at most one flourish per screen.
+- **Reference:** the running app is the visual source of truth (the old `design-target.html` mockup was retired once the app outgrew it). `node scripts/screens.mjs` takes screenshots of every main screen into `screenshots/` to check against. Improve execution; don't replace the direction below.
+- **Brand:** background `#0D0F15`, card `#191C25`, ink `#F1F0F6`, muted `#9293A6`, accent lavender `#C6BBFA`, violet `#7A67F2`, blue `#5B86FF`, warm `#FFD9A8` (PRs only), hairline `rgba(207,199,255,.09)`. Quiet accent themes (violet, slate, sage, sand, clay, mono) in Customize. Font Manrope with a system fallback. Tabular numerals for all numbers. Tokens live in `css/tokens.css`.
+- **Surfaces:** backdrop blur only on the dock, sheets, the Coach and one hero card per screen. Everything else uses translucent fill, hairline border and soft shadow.
+- **Motion:** transform and opacity only, timings and easings from the motion tokens in `css/tokens.css`, 60 fps on a mid-range phone. Respect `prefers-reduced-motion` and the in-app motion setting. Decorative motion never delays state updates.
+- **Haptics:** `navigator.vibrate` patterns in `js/haptics.js`, behind a setting.
+- **Navigation:** floating glass dock with Today, Train, the Orb (center), Food and You. Tapping the Orb blooms the Coach open over the whole screen; holding it is hold-to-talk. Settings opens from the icon on Today and from You. While a workout is active, a mini bar shows elapsed time and the current exercise.
 
 ## 3. Data
 
@@ -63,13 +62,13 @@ The goal is a Wispr Flow feel: hold, speak, release, and the result shows in abo
 - Fuzzy exercise matching using aliases, normalized spelling, edit distance and the user's usage frequency.
 - At least 60 meaningful tests split across English and Danish, including real mishearings.
 
-**Text-to-speech** (`js/tts.js`): Gemini API `generateContent` with `responseModalities: ["AUDIO"]` and a prebuilt voice from settings. Default model `gemini-3.8-flash-lite-tts`, auto-selected from the model list if that name changes. The response is base64 16-bit PCM, 24 kHz mono; play it through Web Audio. Style: brief, calm and upbeat, like a training partner. Cache audio in IndexedDB keyed by text plus voice so repeated phrases ("Rest, 90 seconds") play instantly. If there's no key or it fails, fall back to `speechSynthesis` with a da-DK or en voice, and never block the UI.
+**Text-to-speech** (`js/tts.js`): Gemini API `generateContent` with `responseModalities: ["AUDIO"]` and a prebuilt voice from settings. Default is the natural Flash TTS model (Flash-Lite TTS and the phone's own voice are options), auto-selected from the model list; a quota error only pauses Gemini briefly. The response is base64 16-bit PCM, 24 kHz mono; play it through Web Audio. Style: brief, calm and upbeat, like a training partner. Cache audio in IndexedDB keyed by text plus voice so repeated phrases ("Rest, 90 seconds") play instantly. If there's no key or it fails, fall back to `speechSynthesis` with a da-DK or en voice, and never block the UI.
 
 ## 5. AI brain and Coach
 
 - **Model selection:** call `GET https://generativelanguage.googleapis.com/v1beta/models` on key test and pick the newest stable matches: a Flash-Lite text model for command fallback, a Flash text model (not lite, tts, image or live) for the Coach, a Flash-Lite TTS model for speech. Show the chosen ids in Settings with an override.
 - **Command fallback:** send the transcript and small context (current workout, current exercise, last sets, catalog names) to Flash-Lite with JSON schema output (`responseMimeType: application/json` and a response schema). The response is either intents matching the parser's intent shape or `{type: "question"}`. Validate strictly and reject anything invalid. Timeout 4 s, then "Didn't catch that" with Retry and Edit. Local commands are never blocked by an AI request in flight. If the state changed meanwhile, show the result as a suggestion to confirm.
-- **Coach tab:** a chat thread with a text box and the Orb. Questions asked through the Orb also land here, so the thread is the full conversation. Stream answers (`streamGenerateContent?alt=sse`) and speak them when complete, per the spoken-reply setting.
+- **Coach:** opened from the Orb; a chat thread with a text box and a small orb for dictation. Questions asked through the Orb also land here, so the thread is the full conversation. Stream answers (`streamGenerateContent?alt=sse`) and speak them when complete, per the spoken-reply setting.
 - **Coach context:** a compact summary built locally, not raw history: the current workout; per exercise the best set, e1RM trend and last three sessions; weekly volume for 8 weeks; routines; bodyweight trend; the last ~12 chat turns. Keep it under about 6k tokens.
 - **Coach system prompt:** experienced strength coach; answers in the user's language; voice-friendly, three sentences or fewer unless asked for detail; uses only the provided data and says so when data is missing; for pain or injury, gives general guidance and suggests seeing a professional.
 - **Privacy:** only the text needed for a request leaves the phone. No audio is stored. Settings says which provider receives what.
@@ -78,15 +77,9 @@ The goal is a Wispr Flow feel: hold, speak, release, and the result shows in abo
 
 App language (auto, Dansk, English), voice input language (auto, da, en), units, default rest (30-300 s, default 90), spoken replies (off, minimal, full), voice with a preview button, mic mode, haptics, motion, Groq and Google keys (masked, each with a Test button and a link to where to get one), advanced model ids, backup export/import, reset all data (confirmed twice).
 
-## 7. Phases (stop after each one)
+## 7. Phases (all done)
 
-For each phase: build it, run `node --test`, review it against this spec and the design target, update `PLAN.md`, commit and push, then stop with what changed and a short test checklist for the phone. Don't start the next phase until the user says so.
-
-1. **Foundation and touch workout loop (no AI).** PWA shell and install, tokens, dock, i18n EN/DA, Today with start and resume, the Workout screen as in the mockup (steppers, log set, previous performance, set list with swipe-to-delete, rest ring with ±15 and skip, auto-rest after logging), exercise picker (search, add custom), start empty workout, the Push Day routine, finish with confirmation, History list and workout detail, PR detection, undo, full persistence (closing the app mid-workout resumes exactly), wake lock, basic Settings.
-2. **Voice.** Orb and voice screen as in the mockup, hold-to-talk, Groq speech-to-text, parser and tests, intent card and undo, spoken replies with cache and fallback, type-instead, keys with Test buttons, clear error states (no key, offline, mic denied). With the mic denied, everything still works by touch.
-3. **AI brain and Coach.** Gemini command fallback, the Coach tab with voice and text, spoken answers, history-aware context, model auto-selection.
-4. **Routines and plans.** Routine editor (create, edit, duplicate, reorder, delete, start), starter routines (Push/Pull/Legs, Upper/Lower, Full Body 3×), and a voice plan builder through the Coach ("make me a 4-day upper/lower, 60 minutes, focus chest, dumbbells only") producing an editable plan card that saves as routines.
-5. **Progress and extras.** Progress charts in SVG (lift history, e1RM, weekly volume, PR timeline), Today cards as in the mockup (week ring, last session, latest PR), bodyweight log, plate calculator (bar 20/15/10/0 kg, plates 25/20/15/10/5/2.5/1.25 per side), backup export and import, and a final polish pass on motion, empty states and accessibility.
+The five build phases (foundation, voice, AI and Coach, routines and plans, progress and extras) are finished; their details are in `docs/HISTORY.md`. Work now is fixes and polish on request: build it, run `node --test`, update `PLAN.md`, commit and push, then reply with what changed and a short phone test checklist.
 
 ## 8. Definition of done
 
