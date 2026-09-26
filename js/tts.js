@@ -239,10 +239,11 @@ function playPcm({ pcm, rate }, mine, text = '') {
       if (current?.source === source) { current = null; emit(false); }
       res();
     };
-    current = { source, gain, until: performance.now() + audio.duration * 1000 + 1500 };
+    current = { source, gain, until: performance.now() + audio.duration * 1000 + 1500, env: envelope(samples, realRate), ac };
     emit(true);
     if (ac.state === 'suspended') ac.resume().catch(() => {});
     source.start();
+    current.t0 = ac.currentTime;
   });
 }
 
@@ -388,6 +389,31 @@ export async function speak(text, opts) {
   lastSpeech.engine = 'device';
   if (mine !== seq || !opts.canSpeak()) return;
   await fallback(text, opts.lang, mine);
+}
+
+// How loud the voice is right now (0–1), so the Coach's light can move with it. Worked out once from
+// the clip itself (30 ms steps), so it costs nothing while playing. The phone's own voice gives no
+// audio to measure: null.
+const ENV_STEP = 0.03;
+export function envelope(samples, rate) {
+  const n = Math.max(1, Math.round(rate * ENV_STEP)), out = new Float32Array(Math.ceil(samples.length / n));
+  let peak = 1e-6;
+  for (let i = 0; i < out.length; i++) {
+    let sum = 0;
+    const end = Math.min(samples.length, (i + 1) * n);
+    for (let j = i * n; j < end; j++) sum += samples[j] * samples[j];
+    out[i] = Math.sqrt(sum / Math.max(1, end - i * n));
+    if (out[i] > peak) peak = out[i];
+  }
+  for (let i = 0; i < out.length; i++) out[i] = Math.min(1, out[i] / (peak * 0.8));
+  return out;
+}
+export function speechLevel() {
+  if (!current) return 0;
+  if (!current.env) return null;
+  if (current.t0 == null) return 0;
+  const i = Math.floor((current.ac.currentTime - current.t0) / ENV_STEP);
+  return i >= 0 && i < current.env.length ? current.env[i] : 0;
 }
 
 export const isSpeaking = () => {

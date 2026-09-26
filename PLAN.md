@@ -1,6 +1,6 @@
 # Setline plan
 
-All five phases from SPEC.md section 7 are done. Work now happens as fixes and polish the user asks for. The current version is in `js/version.js` (1.42.0). The release log, including releases that were later undone, is in `docs/HISTORY.md`; read it only when you need the story behind something.
+All five phases from SPEC.md section 7 are done. Work now happens as fixes and polish the user asks for. The current version is in `js/version.js` (1.43.0). The release log, including releases that were later undone, is in `docs/HISTORY.md`; read it only when you need the story behind something.
 
 ## What's in the app now
 
@@ -16,7 +16,7 @@ All five phases from SPEC.md section 7 are done. Work now happens as fixes and p
 
 **Voice.** Groq Whisper speech-to-text with junk filtering and a Danish re-run; a local English/Danish parser (sets in any order, "set one is done but only nine reps", "same again", "one more rep", …); Gemini fallback for anything else. Spoken replies use Gemini's natural voice by default, with short quota pauses and the phone's own voice as a fallback. The mic never reopens by itself after a reply.
 
-**Coach.** Streaming chat that knows your log, routines, food and the next 7 days. It remembers facts (`REMEMBER:` lines) and changes the plan (`CHANGE:` lines: a day becomes Wrestling or rest, routines move days, exercises are swapped, added or removed), always with Undo. Tapping the orb sends a fine ring of light up to the top of the screen, and closing brings it back down into the orb. While it thinks, light runs round the edge of the message box with a soft glow outside it (no words), and soft clouds move in the background. Reply words blur in and the thread glides down after them; touching the thread stops the follow. The orb reacts to your voice with a halo and ripples; the bloom has haptics.
+**Coach.** Streaming chat that knows your log, routines, food and the next 7 days. It remembers facts (`REMEMBER:` lines) and changes the plan (`CHANGE:` lines: a day becomes Wrestling or rest, routines move days, exercises are swapped, added or removed), always with Undo. Tapping the orb sends a fine ring of light up to the top of the screen while the orb itself flies in an arc from the bar into the message box; closing reverses both, and the bar takes the orb back with a pulse. The dock orb gives under your finger and its light gathers. While it thinks, light runs round the edge of the message box with a soft glow outside it (no words), and soft clouds move in the background. While the Coach speaks, the light round the box moves with its voice (faster and brighter on the loud parts). A finished reply gets one sweep of light as the box's glow lets go. Reply words blur in and the thread glides down after them; touching the thread stops the follow. The orb reacts to your voice with a halo and ripples; the bloom has haptics.
 
 ## Next
 

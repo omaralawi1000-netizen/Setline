@@ -513,3 +513,10 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Opening the Coach: fixed two glitches seen on the phone recording. The page underneath showed through for two frames (the background's fade ended by itself mid-way; now everything settles together), and about 1.4 s after opening the whole conversation blinked and faded in again (the messages switched to a second entrance animation)
 - [x] Lighter to draw: the blurred screen edges step aside while the Coach opens or closes and while it thinks; the whole-screen background drift is gone (the clouds still move); the message box has no live blur while lit; reply words use a lighter blur and are added every ~4 frames instead of every 2
 - [x] Thinking: a ring of the theme colours turns round the edge of the message box with a soft glow outside it, the inside stays dark (the gradients inside had become a grey smear in the mono theme)
+
+## 1.43.0: the orb travels, the light follows the voice
+
+- [x] Opening the Coach: the orb flies from the bar into the message box on a short arc (swelling a little at the top, settling to the box's size) while the bloom and ring of light go up; the box comes up to meet it and the orb lands with its pulse and the haptic tap. Closing: it flies home and the bar takes it back with a pulse
+- [x] While the Coach speaks, the light round the message box moves with its voice: faster and brighter on the loud parts, calm in the pauses (the loudness is worked out once from the voice clip, so it costs nothing while playing; the phone's own voice gets a gentle beat)
+- [x] A finished reply (or plan) gets one sweep of light across it, and the box's glow lets go in a soft swell
+- [x] The dock orb gives quickly under your finger (it used to take half a second) and its light gathers while pressed

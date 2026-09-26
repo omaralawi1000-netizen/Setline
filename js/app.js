@@ -139,13 +139,38 @@ function settleCoachFx() { const c = coachFx; coachFx = null; c?.(); }
 // Two screen-sized layers, so the phone never has to draw anything bigger than the screen (a
 // giant scaled disc was what left the screen dark for a moment on Android): .bloom is a burst of
 // light that grows out of the orb and fades, .veil is the Coach's own background fading in under it.
+// The orb itself travels between the bar and the message box on a short arc, swelling a little at
+// the top and settling at its new size. A stand-in flies while the real orbs at both ends stay hidden.
+const relRect = el => { const a = app.getBoundingClientRect(), r = el.getBoundingClientRect(); return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height / 2, w: r.width }; };
+const layRect = el => { let x = el.offsetWidth / 2, y = el.offsetHeight / 2; for (let n = el; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; } return { x, y, w: el.offsetWidth }; };
+function flyOrb(from, to, { duration, delay = 0, go, onland }) {
+  const src = $('#dock .orbbtn .orb'), base = src?.offsetWidth || 60;
+  if (!src || !from.w || !to.w || Math.hypot(to.x - from.x, to.y - from.y) < 4) return null;
+  const ghost = src.cloneNode(true);
+  ghost.className = 'orb orbghost';
+  ghost.setAttribute('aria-hidden', 'true');
+  Object.assign(ghost.style, { left: `${from.x - base / 2}px`, top: `${from.y - base / 2}px` });
+  app.append(ghost);
+  const dx = to.x - from.x, dy = to.y - from.y, s0 = from.w / base, s1 = to.w / base;
+  const lift = -Math.min(64, 22 + Math.abs(dx) * 0.2), peak = Math.max(s0, s1) * 1.1;
+  // across at an even glide; up and over on its own curve, so the path is a smooth arc
+  go(ghost, [{ translate: '0 0' }, { translate: `${dx}px 0` }], { duration, delay, easing: 'cubic-bezier(.45,.05,.25,1)', fill: 'both' });
+  const a = go(ghost, [
+    { transform: `translateY(0) scale(${s0})`, easing: 'cubic-bezier(.25,.6,.4,1)' },
+    { transform: `translateY(${dy * 0.35 + lift}px) scale(${peak})`, offset: 0.45, easing: 'cubic-bezier(.5,0,.65,.95)' },
+    { transform: `translateY(${dy}px) scale(${s1})` }], { duration, delay, fill: 'both' });
+  const done = () => { ghost.remove(); };
+  a.addEventListener('cancel', done);
+  a.onfinish = () => { done(); onland?.(); };
+  return ghost;
+}
+
 function coachMorph(open, under) {
   settleCoachFx();
   const aura = $('.aura'), bloom = aura?.querySelector('.bloom'), veil = aura?.querySelector('.veil'), orb = $('#dock .orbbtn');
   if (!aura || !bloom || !veil || !orb) return;
   // the light swelling out of the orb is felt as a rising ripple, then a soft landing
   haptic(open ? 'bloom' : 'tick');
-  if (!stillMotion()) setTimeout(() => haptic('land'), open ? 560 : 520);
   // the orb's centre in the app's coordinates (layout, so a moving or shrunk bar can't skew it)
   let x = orb.offsetWidth / 2, y = orb.offsetHeight / 2;
   for (let n = orb; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }
@@ -163,7 +188,16 @@ function coachMorph(open, under) {
   const go = (el, frames, opts) => { if (!el) return null; const a = el.animate(frames, opts); anims.push(a); return a; };
   if (open) {
     if (other) Object.assign(other.style, { transition: 'none', opacity: '1', visibility: 'visible', transform: 'none' });
-    go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
+    // the orb leaves the bar and lands in the message box (once the Coach's layout is in place)
+    const from = dockOrb ? relRect(dockOrb) : null;
+    let flying = null;
+    queueMicrotask(() => {
+      const corb = $('#composer .corb .orb');
+      flying = from && corb && flyOrb(from, layRect(corb), { duration: 540, go, onland: () => { app.classList.remove('orbtravel'); haptic('land'); } });
+      if (flying) { app.classList.add('orbtravel', 'orbflown'); go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 900, fill: 'forwards' }); return; }
+      go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
+      setTimeout(() => haptic('land'), 560);
+    });
     const last = go(bloom, [{ scale: 0.1, opacity: 0 }, { scale: 0.55, opacity: 1, offset: 0.3 }, { scale: 1.5, opacity: 0 }], { duration: 820, easing: 'cubic-bezier(.33,.1,.25,1)' });
     // a ring of light ripples out of the orb with the bloom
     go(aura.querySelector('.wave'), [{ transform: `translate(-50%, -50%) scale(${r0})`, opacity: 0 }, { opacity: 1, offset: 0.1 }, { opacity: 0.85, offset: 0.62 }, { transform: 'translate(-50%, -50%) scale(1)', opacity: 0 }], { duration: 1050, easing: 'cubic-bezier(.22,.6,.2,1)' });
@@ -176,7 +210,8 @@ function coachMorph(open, under) {
     coachFx = () => {
       anims.forEach(a => a.cancel());
       aura.classList.remove('run');
-      app.classList.remove('morphing');
+      app.classList.remove('morphing', 'orbtravel');
+      setTimeout(() => app.classList.remove('orbflown'), 400);
       // the messages have arrived: once coach-in goes they must not pick up another entrance animation
       setTimeout(() => { for (const m of document.querySelectorAll('#s-coach .msg')) m.classList.add('seen'); app.classList.remove('coach-in'); }, 300);
       if (!other) return;
@@ -194,9 +229,23 @@ function coachMorph(open, under) {
     // the ring comes back down from the top of the screen and gathers into the orb
     go(aura.querySelector('.wave'), [{ transform: 'translate(-50%, -50%) scale(1)', opacity: 0 }, { opacity: 0.85, offset: 0.3 }, { opacity: 1, offset: 0.8 }, { transform: `translate(-50%, -50%) scale(${r0})`, opacity: 0 }], { duration: 620, easing: 'cubic-bezier(.55,0,.35,1)' });
     go(other, [{ scale: 0.95, opacity: 0.25 }, { scale: 1, opacity: 1 }], { duration: 560, delay: 80, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' });
-    go(dockOrb, [{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 460, delay: 380, easing: 'cubic-bezier(.3,1.25,.5,1)', fill: 'backwards' });
+    // the orb leaves the message box and flies home into the bar, which takes it with a small pulse
+    const corb = $('#composer .corb .orb');
+    let hold = null;
+    const flying = corb && dockOrb && flyOrb(relRect(corb), layRect(dockOrb), { duration: 500, delay: 40, go, onland: () => {
+      hold?.cancel();
+      app.classList.remove('orbtravel');
+      orb.classList.remove('pulse'); void orb.offsetWidth; orb.classList.add('pulse');
+      setTimeout(() => orb.classList.remove('pulse'), 900);
+      haptic('land');
+    } });
+    if (flying) { app.classList.add('orbtravel'); hold = go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 700, fill: 'forwards' }); }
+    else {
+      go(dockOrb, [{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 460, delay: 380, easing: 'cubic-bezier(.3,1.25,.5,1)', fill: 'backwards' });
+      setTimeout(() => haptic('land'), 520);
+    }
     last.onfinish = settleCoachFx;
-    coachFx = () => { anims.forEach(a => a.cancel()); aura.classList.remove('run'); app.classList.remove('morphing'); };
+    coachFx = () => { anims.forEach(a => a.cancel()); aura.classList.remove('run'); app.classList.remove('morphing', 'orbtravel'); };
   }
 }
 

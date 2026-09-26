@@ -149,6 +149,52 @@ function typewriter(root, id) {
   };
 }
 
+// A reply has landed: one sweep of light passes over it and the box's light lets go.
+function landed(root, id) {
+  if (stillMotion()) return;
+  const composer = $('#composer');
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const bub = root.querySelector(`[data-id="${id}"] .bub`);
+    if (bub && !bub.querySelector('.sheen')) {
+      const sh = document.createElement('span');
+      sh.className = 'sheen'; sh.setAttribute('aria-hidden', 'true'); sh.innerHTML = '<i></i>';
+      bub.append(sh);
+      sh.firstChild.addEventListener('animationend', () => sh.remove(), { once: true });
+      setTimeout(() => sh.remove(), 2500);
+    }
+    composer?.classList.remove('landed'); void composer?.offsetWidth;
+    composer?.classList.add('landed');
+    clearTimeout(composer?._landed);
+    if (composer) composer._landed = setTimeout(() => composer.classList.remove('landed'), 1100);
+  }));
+}
+
+// While the Coach speaks, the light round the box moves with its voice: faster and brighter on the
+// loud parts, calm in the pauses. The level comes from the clip itself (tts.speechLevel).
+function voiceLight(composer) {
+  let raf = 0, lv = 0;
+  const rings = () => [...composer.querySelectorAll('.cglow i, .chalo i')].flatMap(el => el.getAnimations());
+  const stop = () => {
+    cancelAnimationFrame(raf); raf = 0; lv = 0;
+    composer.classList.remove('speaking'); composer.style.removeProperty('--sv');
+    for (const a of rings()) a.updatePlaybackRate?.(1);
+  };
+  const frame = now => {
+    const raw = tts.speechLevel();
+    const target = raw == null ? 0.35 + 0.25 * Math.abs(Math.sin(now / 190)) : raw; // the phone's voice: a gentle beat
+    lv += (target - lv) * (target > lv ? 0.35 : 0.12); // rises quickly, settles slowly
+    composer.style.setProperty('--sv', lv.toFixed(3));
+    for (const a of rings()) a.updatePlaybackRate?.(1.3 + lv * 2.4);
+    raf = requestAnimationFrame(frame);
+  };
+  tts.onSpeaking(on => {
+    if (!on) return stop();
+    if (raf || stillMotion() || !document.getElementById('app')?.classList.contains('coaching')) return;
+    composer.classList.add('speaking');
+    raf = requestAnimationFrame(frame);
+  });
+}
+
 function scrollDown(root, smooth = true) {
   if (smooth) return follow(root);
   root.scrollTop = root.scrollHeight;
@@ -293,6 +339,7 @@ export async function ask(question, { root = $('#s-coach'), voice = false } = {}
     // "CHANGE: {…}" lines change the plan (a day, a routine), with Undo
     const changed = await applyCoachChanges(reply.id, changes);
     store.updateChat(reply.id, { text: saidClean, streaming: false, ...(facts.length ? { remembered: facts } : {}), ...(changed.length ? { changed } : {}) }, { persist: true });
+    landed(root, reply.id);
     if (changed.length) haptic('success');
     haptic('tap');
     if (talk && voice) await talk;
@@ -328,6 +375,7 @@ async function buildPlan(question, reply, { key, lang, ctl, root, copy = false }
     if (!plan) store.updateChat(reply.id, { streaming: false, text: t('plan.invalid') }, { persist: true });
     else {
       store.updateChat(reply.id, { streaming: false, text: plan.summary || plan.name, plan }, { persist: true });
+      landed(root, reply.id);
       haptic('success');
       if (plan.summary && state.settings.spoken !== 'off') tts.speak(speakable(plan.summary), { key, model: ttsModelId(state.settings), alt: ttsAlt(state.settings), voice: state.settings.voice, lang, canSpeak: () => !isRecording() });
     }
@@ -381,6 +429,7 @@ export function initCoach(n) {
   // spoken, then it listens again, so it's a conversation. Tap while it listens to send at once;
   // tap while it thinks or speaks (or say nothing) to end it.
   const input = composer.querySelector('input'), orbBtn = composer.querySelector('.corb');
+  voiceLight(composer);
   const talk = { on: false, l: null, misses: 0 };
   const setTalk = phase => {
     composer.dataset.talk = phase || '';

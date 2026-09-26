@@ -2410,3 +2410,42 @@ html[data-motion=off] .cglow::after,html[data-motion=off] .aura .clouds i{animat
   .cglow i,.chalo i{animation:none!important}
 }
 html[data-motion=off] :is(.cglow,.chalo) i{animation:none!important}
+
+/* ======================= 1.43: the orb travels, the light follows the voice ======================= */
+/* the orb's stand-in on its way between the bar and the message box */
+.orbghost{position:absolute;z-index:8;margin:0;pointer-events:none;will-change:transform,translate}
+.app.orbtravel .corb .orb{opacity:0!important;animation:none!important}
+/* when the orb flies in, the box comes up to meet it and the orb lands with its pulse of light
+   (no separate scale-in) */
+.app.coaching.orbflown:not(.is-sub):not(.voice) .composer{transition-delay:.06s,.06s,0s}
+.app.coach-in.orbflown .composer .corb .orb{animation:none}
+.app.coach-in.orbflown .composer .corb .orb::before{animation-delay:.52s}
+
+/* pressing the orb: it gives quickly under your finger, its light gathers, and it springs back */
+.dock .orbbtn.pressing{transform:scale(.88);transition:transform var(--m-press) var(--e-out)}
+.dock .orbbtn.pressing .orb::before{opacity:.75;transition:opacity var(--m-fast) var(--e-out)}
+
+/* the Coach speaking: the same light runs round the box, faster and brighter on the loud parts
+   (speed from JS via playbackRate, brightness from --sv) */
+.app.coaching .composer.speaking .cglow{opacity:calc(.55 + var(--sv, 0) * .45)}
+.app.coaching .composer.speaking .chalo{opacity:calc(.3 + var(--sv, 0) * .9)}
+.app.coaching .composer.speaking :is(.cglow,.chalo) i{animation-play-state:running}
+.app.coaching .composer.speaking .corb .orb::before{opacity:calc(.25 + var(--sv, 0) * .9);transform:scale(calc(.9 + var(--sv, 0) * .5));transition:none;animation:none}
+.app.coaching .composer.speaking{-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.1)}
+
+/* a reply lands: one sweep of light passes over it, and the box's light lets go in a soft swell */
+.msg .bub{position:relative}
+.bub .sheen{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none;z-index:2}
+.bub .sheen i{position:absolute;top:-10%;bottom:-10%;left:-50%;width:50%;mix-blend-mode:plus-lighter;opacity:0;will-change:transform,opacity;
+  background:linear-gradient(100deg,transparent 0%,rgba(var(--a-rgb),.1) 30%,rgba(var(--a-rgb),.32) 50%,rgba(var(--a-rgb),.1) 70%,transparent 100%);
+  animation:sheen calc(var(--m-slow) * 2.6) var(--e-soft) forwards}
+@keyframes sheen{0%{transform:translateX(0);opacity:0}15%{opacity:1}80%{opacity:1}100%{transform:translateX(300%);opacity:0}}
+.composer.landed:not(.speaking) .chalo{animation:chalorelease calc(var(--m-slow) * 2) var(--e-out)}
+.composer.landed:not(.speaking) :is(.cglow,.chalo) i{animation-play-state:running}
+@keyframes chalorelease{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.14)}}
+
+@media (prefers-reduced-motion: reduce){
+  .bub .sheen,.orbghost{display:none}
+  .composer.landed .chalo{animation:none}
+}
+html[data-motion=off] :is(.bub .sheen,.orbghost){display:none}
