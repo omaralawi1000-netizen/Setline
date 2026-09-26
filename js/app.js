@@ -143,7 +143,9 @@ function coachMorph(open, under) {
   settleCoachFx();
   const aura = $('.aura'), bloom = aura?.querySelector('.bloom'), veil = aura?.querySelector('.veil'), orb = $('#dock .orbbtn');
   if (!aura || !bloom || !veil || !orb) return;
-  haptic(open ? 'open' : 'tick');
+  // the light swelling out of the orb is felt as a rising ripple, then a soft landing
+  haptic(open ? 'bloom' : 'tick');
+  if (!stillMotion()) setTimeout(() => haptic('land'), open ? 560 : 520);
   // the orb's centre in the app's coordinates (layout, so a moving or shrunk bar can't skew it)
   let x = orb.offsetWidth / 2, y = orb.offsetHeight / 2;
   for (let n = orb; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }

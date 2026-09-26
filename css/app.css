@@ -2257,3 +2257,64 @@ html[data-dock=icons] .dock .tab span{display:none}
    the page every frame, and animations kept running on screens you can't see */
 @keyframes prpulse{50%{opacity:.04}}
 .screen:not(.on) *{animation-play-state:paused!important}
+
+/* ======================= 1.40: thinking lives in the message box =======================
+   While the Coach thinks, the box itself comes alive: a soft gradient of the theme colours drifts
+   through it, a ring of light breathes round it and the steps ("Reading your log…") shimmer where
+   you type. The screen stays calm (no clouds filling the empty space); only the Coach's background
+   light drifts slowly. */
+.composer{isolation:isolate}
+.composer > :not(.cglow){position:relative;z-index:1}
+.cglow{position:absolute!important;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none;z-index:0;opacity:0;transition:opacity var(--m-slow) var(--e-out)}
+.cglow i{position:absolute;top:-60%;left:-100%;width:300%;height:220%;will-change:transform;
+  background:linear-gradient(100deg,transparent 16%,rgba(var(--v-rgb),.5) 30%,rgba(var(--a-rgb),.38) 44%,rgba(var(--b-rgb),.45) 56%,rgba(var(--v-rgb),.3) 68%,transparent 82%);
+  animation:cdrift var(--m-think) var(--e-soft) infinite alternate;animation-play-state:paused}
+@keyframes cdrift{from{transform:translateX(-22%) rotate(-4deg)}to{transform:translateX(22%) rotate(4deg)}}
+.composer::before{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;z-index:2;opacity:0;
+  box-shadow:0 0 0 1.5px rgba(var(--a-rgb),.55),0 0 22px -2px rgba(var(--v-rgb),.6),0 12px 36px -12px rgba(var(--v-rgb),.7);transition:opacity var(--m-slow) var(--e-out)}
+.cthink{position:absolute!important;left:58px;right:62px;top:0;bottom:0;display:grid;align-items:center;pointer-events:none;opacity:0;transition:opacity var(--m-base) var(--e-out)}
+.cthink .tl{grid-area:1/1;opacity:0;font-size:15.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  background:linear-gradient(90deg,var(--muted) 0%,var(--accent-hi) 40%,var(--violet) 55%,var(--muted) 90%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:shimmer 1.8s linear infinite,stepcycle 8s ease infinite;animation-delay:0s,calc(var(--i) * 2s);animation-play-state:paused}
+:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]) .cglow,
+:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]) .cthink{opacity:1}
+:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]) .cglow i,
+:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]) .cthink .tl{animation-play-state:running}
+:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking])::before{opacity:1;animation:cring var(--m-think) var(--e-soft) infinite alternate}
+@keyframes cring{from{opacity:.55}to{opacity:1}}
+:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]) input::placeholder{color:transparent}
+/* the screen stays calm: no clouds, no aurora; the Coach's own light drifts slowly instead */
+.aura .clouds{display:none}
+.app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .glow{opacity:0}
+.app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .veil{animation:veildrift var(--m-drift) var(--e-soft) infinite alternate}
+@keyframes veildrift{from{transform:none}to{transform:translateY(-4%) scale(1.08)}}
+/* the thinking line in the conversation is for screen readers only now (the box shows it) */
+.msg.ai.is-thinking{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+
+/* replies: each word surfaces out of a soft blur, lit in the accent, and settles, slower and smoother */
+.bub .w{animation:wordblur var(--m-word) var(--e-soft) both}
+@keyframes wordblur{
+  0%{opacity:0;filter:blur(10px);color:var(--accent-hi);transform:translateY(.3em)}
+  40%{opacity:.85;filter:blur(3px);color:color-mix(in srgb,var(--accent-hi) 75%,var(--ink))}
+  100%{opacity:1;filter:none;color:inherit;transform:none}}
+
+/* the orb listens: its light swells with your voice, its colours swirl faster and a ring ripples out */
+.composer:is([data-talk=listening],[data-talk=hearing]) .corb .orb::before{opacity:calc(.35 + var(--lv, 0) * 1.3);transform:scale(calc(.9 + var(--lv, 0) * 1.2));transition:transform .09s linear,opacity .09s linear;animation:none}
+.composer:is([data-talk=listening],[data-talk=hearing]) .corb .orb .core b:nth-child(1){animation-duration:3s}
+.composer:is([data-talk=listening],[data-talk=hearing]) .corb .orb .core b:nth-child(2){animation-duration:3.6s}
+.composer:is([data-talk=listening],[data-talk=hearing]) .corb .orb .core b:nth-child(3){animation-duration:2.2s}
+.corb{position:relative}
+.corb::after{content:"";position:absolute;inset:4px;border-radius:50%;pointer-events:none;opacity:0;box-shadow:0 0 0 1.5px rgba(var(--a-rgb),.7)}
+.composer:is([data-talk=listening],[data-talk=hearing]) .corb::after{animation:corbring 1.6s var(--e-out) infinite}
+@keyframes corbring{0%{opacity:.8;transform:scale(.9)}100%{opacity:0;transform:scale(1.9)}}
+/* …and the big orb (hold to talk, anywhere): the same living light around it */
+.ofloat .orb.lift::before{opacity:calc(.25 + var(--l, 0) * 1.4);transform:scale(calc(.85 + var(--l, 0) * .9));transition:transform .09s linear,opacity .09s linear;animation:none}
+.ofloat[data-phase=listening] .orb.lift .core b:nth-child(1){animation-duration:3s}
+.ofloat[data-phase=listening] .orb.lift .core b:nth-child(2){animation-duration:3.6s}
+.ofloat[data-phase=listening] .orb.lift .core b:nth-child(3){animation-duration:2.2s}
+
+@media (prefers-reduced-motion: reduce){
+  .cglow i,.cthink .tl,.aura .veil,.corb::after,.composer::before{animation:none!important}
+  .cthink .tl:first-child{opacity:1}
+  .bub .w{animation:none}
+}
