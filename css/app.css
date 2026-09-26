@@ -2201,3 +2201,54 @@ html[data-dock=icons] .dock .tab span{display:none}
 .screen.on{transition:opacity .12s ease-out,transform .42s cubic-bezier(.2,.9,.25,1),visibility 0s 0s}
 .screen.enter > *{animation:enterglide .46s cubic-bezier(.2,.8,.2,1) both}
 @keyframes enterglide{from{opacity:.7;transform:translateY(8px)}}
+
+/* ======================= 1.37: the Coach opens and thinks beautifully ======================= */
+/* opening: a thin ring of light ripples out of the orb with the bloom */
+.aura .wave{position:absolute;left:var(--ax);top:var(--ay);width:120px;height:120px;border-radius:50%;opacity:0;transform:translate(-50%,-50%);will-change:transform,opacity;
+  box-shadow:0 0 0 1.5px rgba(var(--a-rgb),.75),0 0 24px 4px rgba(var(--v-rgb),.45),inset 0 0 18px 2px rgba(var(--a-rgb),.35)}
+/* the conversation arrives: header first, then the last messages one after another, each from a little lower */
+.app.coach-in #s-coach .msg{animation:coachmsg .55s cubic-bezier(.2,.8,.2,1) both}
+.app.coach-in #s-coach .msg:nth-last-child(1){animation-delay:.34s}
+.app.coach-in #s-coach .msg:nth-last-child(2){animation-delay:.29s}
+.app.coach-in #s-coach .msg:nth-last-child(3){animation-delay:.24s}
+.app.coach-in #s-coach .msg:nth-last-child(n+4){animation-delay:.2s}
+@keyframes coachmsg{from{opacity:0;transform:translateY(18px) scale(.98)}}
+/* the message-box orb lands with a soft pulse of light */
+.app.coach-in .composer .corb .orb::before{opacity:1;animation:orbland 1.1s ease-out .45s both}
+@keyframes orbland{0%{opacity:0;scale:.6}35%{opacity:1;scale:1.25}100%{opacity:0;scale:1.5}}
+
+/* thinking: gradient clouds of the theme colour drift and breathe behind the conversation (soft
+   radial gradients, moved on the GPU: no live blur), the aurora turns slowly under them */
+.aura .clouds{position:absolute;left:0;right:0;bottom:0;height:70%;pointer-events:none;opacity:0;transition:opacity .9s cubic-bezier(.2,.8,.2,1)}
+.aura .clouds i{position:absolute;width:90vw;max-width:520px;aspect-ratio:1;border-radius:50%;will-change:transform;animation-play-state:paused}
+.aura .clouds i:nth-child(1){left:-18%;bottom:-18%;background:radial-gradient(closest-side,rgba(var(--v-rgb),.55),rgba(var(--v-rgb),0));animation:cloud1 7s ease-in-out infinite alternate}
+.aura .clouds i:nth-child(2){right:-22%;bottom:-8%;background:radial-gradient(closest-side,rgba(var(--b-rgb),.45),rgba(var(--b-rgb),0));animation:cloud2 9s ease-in-out infinite alternate}
+.aura .clouds i:nth-child(3){left:18%;bottom:-30%;background:radial-gradient(closest-side,rgba(var(--a-rgb),.42),rgba(var(--a-rgb),0));animation:cloud3 6s ease-in-out infinite alternate}
+@keyframes cloud1{to{transform:translate(22vw,-10vh) scale(1.15)}}
+@keyframes cloud2{to{transform:translate(-26vw,-14vh) scale(.9)}}
+@keyframes cloud3{0%{transform:translateY(0) scale(.9)}100%{transform:translateY(-18vh) scale(1.2)}}
+.app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .clouds{opacity:1}
+.app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .clouds i{animation-play-state:running}
+.app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .glow{opacity:.45}
+/* and one quiet line in the conversation: what it's doing, in a shimmer of the theme colour
+   (no bubble, no second orb) */
+.msg.ai.is-thinking{position:static;width:auto;height:auto;overflow:visible;clip-path:none}
+.msg.ai.is-thinking .bub{background:none!important;border:0!important;box-shadow:none!important;padding:4px 2px!important}
+.msg.ai.is-thinking .bub::before,.msg.ai.is-thinking .bub::after,.msg.ai.is-thinking .think .orb{display:none}
+.msg.ai.is-thinking .think .tl{font-size:15.5px;font-weight:700;background:linear-gradient(90deg,var(--muted) 0%,var(--accent-hi) 40%,var(--violet) 55%,var(--muted) 90%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent}
+.msg.ai.is-thinking{animation:thinkin .5s cubic-bezier(.2,.8,.2,1) both}
+@keyframes thinkin{from{opacity:0;transform:translateY(8px)}}
+
+/* what the Coach changed in the plan, under its reply */
+.chgnote{display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px 10px 10px 12px;border-radius:18px;background:rgba(var(--a-rgb),.08);border:1px solid rgba(var(--a-rgb),.22);animation:thinkin .5s cubic-bezier(.2,.8,.2,1) both}
+.chgnote .chgic{width:24px;height:24px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink)}
+.chgnote .chgic svg{width:14px;height:14px;stroke-width:2.8}
+.chgnote .chgtxt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;font-size:14px;line-height:1.3}
+.chgnote .chgtxt b{font-weight:800}
+.chgnote .chip{flex:none}
+.chgnote .chgu{font-size:12.5px;font-weight:800;color:var(--muted)}
+.chgnote.undone{opacity:.6}
+.chgnote.undone .chgtxt b{text-decoration:line-through}
+/* the week strip: a day changed by the Coach (wrestling, a moved session) */
+.wpday.other .wr{color:var(--warm)}
+.wpday.changed{border-color:rgba(var(--a-rgb),.35)}

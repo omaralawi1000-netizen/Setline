@@ -131,13 +131,19 @@ const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateStrin
 // The routine to do next. When routines have weekdays, it's the week that decides: today's if you
 // haven't trained yet today, otherwise the next day that has one (a rest day shows tomorrow's, not
 // whichever was done longest ago). Without weekdays: the one done least recently (never done first).
-export function nextRoutine(routines, history, now = Date.now()) {
+const localKey = ts => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+// dayPlan: one-off changes to single days ({routineId} | {label} | {rest}); a day changed to wrestling or
+// rest is skipped, a day changed to a routine counts even if that routine has no weekday.
+export function nextRoutine(routines, history, now = Date.now(), dayPlan = {}) {
   if (!routines.length) return null;
   const dated = routines.filter(r => routineDay(r) != null);
-  if (dated.length) {
+  const trained = history.some(w => sameDay(w.startedAt, now));
+  if (dated.length || Object.keys(dayPlan || {}).length) {
     const d0 = new Date(now).getDay();
-    const trained = history.some(w => sameDay(w.startedAt, now));
     for (let k = trained ? 1 : 0; k <= 7; k++) {
+      const o = dayPlan?.[localKey(now + k * 86_400_000)];
+      if (o?.routineId) { const r = routines.find(x => x.id === o.routineId); if (r) return r; }
+      if (o) continue;
       const r = dated.find(x => routineDay(x) === (d0 + k) % 7);
       if (r) return r;
     }
@@ -147,12 +153,14 @@ export function nextRoutine(routines, history, now = Date.now()) {
 }
 
 // When a routine is next on: 0 today, 1 tomorrow, … (null for a routine without a weekday).
-export function daysUntil(r, history, now = Date.now()) {
-  const d = routineDay(r);
-  if (d == null) return null;
-  const d0 = new Date(now).getDay(), trained = history.some(w => sameDay(w.startedAt, now));
-  const k = (d - d0 + 7) % 7;
-  return k === 0 && trained ? 7 : k;
+export function daysUntil(r, history, now = Date.now(), dayPlan = {}) {
+  const trained = history.some(w => sameDay(w.startedAt, now));
+  for (let k = trained ? 1 : 0; k <= 7; k++) {
+    const o = dayPlan?.[localKey(now + k * 86_400_000)];
+    if (o?.routineId === r.id) return k;
+    if (!o && routineDay(r) === new Date(now + k * 86_400_000).getDay()) return k;
+  }
+  return null;
 }
 
 // A finished workout as a routine: its lifts in order, each with the sets you actually did

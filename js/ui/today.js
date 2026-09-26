@@ -6,6 +6,7 @@ import { dayTotals } from '../nutrition.js';
 import { esc } from './dom.js';
 import { I } from './icons.js';
 import { routineName, estimateMinutes, nextRoutine, routineDay, withoutDay, daysUntil } from '../routines.js';
+import { dayOf } from '../planedit.js';
 import { greetingKey, clock, total, weight, num } from '../format.js';
 import { toDisplay } from '../units.js';
 import { doneSetCount, elapsedSec } from '../workout.js';
@@ -36,7 +37,7 @@ const sortedRoutines = () => [...state.routines].sort((a, b) => (a.createdAt || 
 // "Up next" hero: the routine done least recently.
 function upNextHTML({ more = false } = {}) {
   const { t, lang, catalog } = state;
-  const r = nextRoutine(sortedRoutines(), state.history);
+  const r = nextRoutine(sortedRoutines(), state.history, Date.now(), state.settings.dayPlan);
   if (!r) { // no routines yet: the quickest way in is telling the Coach (or it reads your brief)
     const fromBrief = isRoutineImport(state.settings.coachBrief || '');
     return `<div class="upcoming glass setup" data-part="setup"><span class="label">${t('setup.label')}</span><h2>${t('setup.title')}</h2><p>${t('setup.sub')}</p>
@@ -45,7 +46,7 @@ function upNextHTML({ more = false } = {}) {
   }
   const names = r.exercises.map(e => catalog.name(e.exerciseId, lang));
   // "Up next · Tomorrow", "Up next · Saturday"; the day then leaves the name
-  const k = daysUntil(r, state.history);
+  const k = daysUntil(r, state.history, Date.now(), state.settings.dayPlan);
   const when = k == null ? '' : k === 0 ? t('plan.today') : k === 1 ? t('plan.tomorrow') : new Intl.DateTimeFormat(lang === 'da' ? 'da-DK' : 'en-GB', { weekday: 'long' }).format(Date.now() + k * 86_400_000);
   const label = `${t('label.upNext')}${when ? ` · ${esc(when)}` : ''}`;
   return `<div class="upcoming glass">
@@ -92,14 +93,15 @@ function weekPlanHTML() {
   const start = weekStart(Date.now()), today = dateKey();
   const trained = new Set([...state.history, ...state.cardio].map(w => dateKey(w.startedAt)));
   const fmt = new Intl.DateTimeFormat(lang === 'da' ? 'da-DK' : 'en-GB', { weekday: 'short' });
+  const plan = state.settings.dayPlan || {};
   const days = Array.from({ length: 7 }, (_, i) => {
-    const at = start + i * 86_400_000, key = dateKey(at), r = byDay.get(new Date(at).getDay());
+    const at = start + i * 86_400_000, key = dateKey(at), day = dayOf(key, sortedRoutines(), plan), r = day.routine || null;
     const done = trained.has(key), isToday = key === today, past = key < today;
-    const cls = [done ? 'done' : '', isToday ? 'today' : '', !r ? 'rest' : '', past && !done && r ? 'missed' : ''].filter(Boolean).join(' ');
+    const cls = [done ? 'done' : '', isToday ? 'today' : '', !r && !day.label ? 'rest' : '', day.label ? 'other' : '', day.changed ? 'changed' : '', past && !done && r ? 'missed' : ''].filter(Boolean).join(' ');
     return `<button class="wpday ${cls}" ${r && !state.active ? `data-act="start-routine" data-id="${esc(r.id)}"` : 'disabled'} style="--i:${i}">
-      <span class="wd">${esc(fmt.format(at).replace('.', ''))}</span><span class="wdot">${done ? I.check : ''}</span><span class="wr">${esc(r ? withoutDay(routineName(r, lang)) : byDay.size ? t('plan.rest') : '')}</span></button>`;
+      <span class="wd">${esc(fmt.format(at).replace('.', ''))}</span><span class="wdot">${done ? I.check : ''}</span><span class="wr">${esc(r ? withoutDay(routineName(r, lang)) : day.label ? day.label : byDay.size ? t('plan.rest') : '')}</span></button>`;
   });
-  if (!byDay.size) return ''; // no routine has a day yet: nothing to show
+  if (!byDay.size && !Object.keys(plan).length) return ''; // no routine has a day yet: nothing to show
   return `<div class="section"><span class="label">${t('plan.week')}</span></div><div class="wplan">${days.join('')}</div>`;
 }
 

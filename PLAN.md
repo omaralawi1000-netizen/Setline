@@ -463,3 +463,9 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Up next follows the week: today's routine if you haven't trained, else the next day that has one (a rest day now shows tomorrow's, not the one done longest ago); the card says when ("Up next · Tomorrow")
 - [x] Reply voice after turning on billing: an earlier "daily limit" made the app wait for Google's overnight reset; now limits only pause it for 30 s (per minute) or 10 min (daily), the old rest is dropped, a missing voice model is looked up again, and Settings → Voice → test says exactly what happened (model and error)
 - [x] Bug sweep: measured frame by frame, every tab or page change dipped 10–15 % darker for a moment (the old screen faded before the new one's cards showed): gone; Coach open/close and sheets measured clean; 111 buttons tapped without errors
+
+## 1.37.0: the Coach changes your plan; a more beautiful Coach
+
+- [x] Tell the Coach and it changes the app: "I have wrestling today" → today says Wrestling (in the week strip, and Up next skips it); "rest on Saturday", "do chest on Tuesday instead", "move legs to Thursday from now on", "swap leg extension for hack squat", "4 sets of 6 on hack squat", "add lateral raises to legs", "remove leg curls". It confirms in a sentence and shows what changed under its reply, with Undo. The Coach now sees the next 7 days with dates; one-off day changes are kept a few weeks
+- [x] Opening the Coach: a thin ring of light ripples out of the orb with the bloom, the last messages rise in one after another, and the message-box orb lands with a pulse of light
+- [x] Thinking: soft gradient clouds of the theme colour drift and breathe up behind the conversation (no live blur), with one quiet shimmering line of what it's doing ("Reading your log…"), no bubble and no second orb

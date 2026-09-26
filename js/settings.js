@@ -1,4 +1,5 @@
 // Settings: defaults, sanitizing, localStorage. API keys are not stored here.
+import { sanitizeDayPlan } from './planedit.js';
 import { LIMITS } from './workout.js';
 import { sanitizeProfile } from './profile.js';
 import { sanitizeGoals } from './goals.js';
@@ -44,7 +45,8 @@ export const DEFAULTS = Object.freeze({
   restByEx: {},        // exerciseId → seconds, learned when rest is adjusted
   monthSeen: '',       // the latest monthly photo pair you've opened (its after-photo id)
   photoNudge: '',      // the month (YYYY-MM) the photo-day reminder was shown
-  plateauSnooze: {},   // exerciseId → until when a stall isn't brought up again
+  plateauSnooze: {},
+  dayPlan: {},         // one-off changes to single days ("wrestling today"), set by the Coach   // exerciseId → until when a stall isn't brought up again
   autoAdvance: true,   // move to the next exercise when its planned sets are done
   autoWarmup: true,    // put warm-up sets in front of the first lift for each muscle
   deloadUntil: 0,      // timestamp: deload week running until then
@@ -159,6 +161,7 @@ export function sanitize(input) {
   if (typeof input.coachBrief === 'string') s.coachBrief = input.coachBrief.slice(0, 5000);
   if (typeof input.monthSeen === 'string' && input.monthSeen.length <= 80) s.monthSeen = input.monthSeen;
   if (typeof input.photoNudge === 'string' && /^(\d{4}-\d{2})?$/.test(input.photoNudge)) s.photoNudge = input.photoNudge;
+  s.dayPlan = sanitizeDayPlan(input.dayPlan);
   if (input.plateauSnooze && typeof input.plateauSnooze === 'object') {
     s.plateauSnooze = {};
     for (const [k, v] of Object.entries(input.plateauSnooze).slice(-100)) if (typeof k === 'string' && k.length <= 80 && Number.isFinite(v) && v > 0) s.plateauSnooze[k] = v;

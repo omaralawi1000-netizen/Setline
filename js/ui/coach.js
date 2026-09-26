@@ -3,7 +3,10 @@ import * as store from '../store.js';
 import { state } from '../store.js';
 import { streamChat, AiError, withFallback, aiPlan, pickTextModels, nextQuotaReset } from '../ai.js';
 import { listModels, pickTtsModel } from '../tts.js';
-import { splitMemories, hideMemoryTail, addMemories } from '../coach.js';
+import { splitMemories, hideMemoryTail as hideMem, addMemories } from '../coach.js';
+import { splitChanges, hideChangeTail, applyChanges } from '../planedit.js';
+// the reply without its hidden lines (memories and plan changes), also while it streams in
+const hideMemoryTail = text => hideChangeTail(hideMem(text));
 import { weekStart } from '../stats.js';
 import { dateKey } from '../body.js';
 import { weight } from '../format.js';
@@ -48,7 +51,9 @@ function bubble(m) {
   const dhead = m.debrief ? `<p class="wkhead">${I.workout}<span>${esc(t('debrief.head', { name: m.dname || t('debrief.session') }))}</span></p>` : '';
   const head = m.weekly ? `<p class="wkhead">${I.chart}<span>${esc(t('weekly.head', { date: new Intl.DateTimeFormat(state.lang === 'da' ? 'da-DK' : 'en-GB', { day: 'numeric', month: 'short' }).format(new Date(m.weekly + 'T12:00')) }))}</span></p>` : '';
   const kept = m.remembered?.length ? `<p class="memnote">${I.check}<span>${esc(t('memory.kept', { what: m.remembered.join(' · ') }))}</span></p>` : '';
-  return `<li class="msg ai${m.streaming ? ' is-streaming' : ''}${m.streaming && !m.text ? ' is-thinking' : ''}${m.weekly || m.debrief ? ' weekly' : ''}" data-id="${m.id}"><div class="bub">${head}${dhead}${m.text ? formatAnswer(hideMemoryTail(m.text)) : thinkingHTML(m)}${kept}</div></li>`;
+  // what the Coach changed in the plan, with Undo
+  const changed = m.changed?.length ? `<div class="chgnote${m.undone ? ' undone' : ''}"><span class="chgic">${I.check}</span><span class="chgtxt">${m.changed.map(c => `<b>${esc(c)}</b>`).join('')}</span>${m.undone ? `<span class="chgu">${esc(t('change.undone'))}</span>` : undoable.has(m.id) ? `<button class="chip sm" data-coach="undo-change" data-id="${esc(m.id)}">${t('common.undo')}</button>` : ''}</div>` : '';
+  return `<li class="msg ai${m.streaming ? ' is-streaming' : ''}${m.streaming && !m.text ? ' is-thinking' : ''}${m.weekly || m.debrief ? ' weekly' : ''}" data-id="${m.id}"><div class="bub">${head}${dhead}${m.text ? formatAnswer(hideMemoryTail(m.text)) : thinkingHTML(m)}${kept}${changed}</div></li>`;
 }
 
 function planCard(m) {
@@ -178,6 +183,29 @@ export const coachSnap = () => ({
 let goalLines = () => [];
 export const setGoalLines = fn => { goalLines = fn; };
 
+// The Coach's plan changes: applied to the routines and the day plan at once; the state before is
+// kept (for this session) so Undo puts it back.
+const undoable = new Map();
+async function applyCoachChanges(id, changes) {
+  if (!changes?.length) return [];
+  const before = { routines: state.routines, dayPlan: state.settings.dayPlan || {} };
+  const r = applyChanges(before, changes, { catalog: state.catalog, lang: state.lang, t: state.t });
+  if (!r.done.length) return [];
+  if (JSON.stringify(r.routines) !== JSON.stringify(before.routines)) await store.replaceRoutines(r.routines);
+  store.setSettings({ dayPlan: r.dayPlan });
+  undoable.set(id, before);
+  return r.done;
+}
+async function undoChange(id) {
+  const before = undoable.get(id);
+  if (!before) return;
+  undoable.delete(id);
+  haptic('tap');
+  if (JSON.stringify(before.routines) !== JSON.stringify(state.routines)) await store.replaceRoutines(before.routines);
+  store.setSettings({ dayPlan: before.dayPlan });
+  store.updateChat(id, { undone: true }, { persist: true });
+}
+
 // Ask the coach. Used by the composer, the example chips, and voice questions.
 export async function ask(question, { root = $('#s-coach'), voice = false } = {}) {
   question = String(question || '').trim();
@@ -215,7 +243,9 @@ export async function ask(question, { root = $('#s-coach'), voice = false } = {}
       onText: full => { clearTimeout(slow); store.updateChat(reply.id, { text: full }, { quiet: true }); typer.set(full); }
     }), { rounds: 3, wait: 2500, alsoRetry: ['timeout'] }).finally(() => clearTimeout(slow)); // busy servers get a patient second and third go
     // the voice starts as soon as the answer is in, while the words are still appearing on screen
-    const { text: said, facts: all } = splitMemories(text);
+    const { text: saidMem, facts: all } = splitMemories(text);
+    const { text: saidClean, changes } = splitChanges(saidMem);
+    const said = saidClean;
     const talk = said && (voice || state.settings.spoken !== 'off')
       ? tts.speak(speakable(said), { key, model: ttsModelId(state.settings), alt: ttsAlt(state.settings), voice: state.settings.voice, lang, canSpeak: () => !isRecording() })
       : null;
@@ -224,7 +254,10 @@ export async function ask(question, { root = $('#s-coach'), voice = false } = {}
     const before = state.settings.memories || [], mem = addMemories(before, all);
     const facts = mem.slice(before.length).map(m => m.text); // only what's new
     if (facts.length) store.setSettings({ memories: mem });
-    store.updateChat(reply.id, { text: said, streaming: false, ...(facts.length ? { remembered: facts } : {}) }, { persist: true });
+    // "CHANGE: {…}" lines change the plan (a day, a routine), with Undo
+    const changed = await applyCoachChanges(reply.id, changes);
+    store.updateChat(reply.id, { text: saidClean, streaming: false, ...(facts.length ? { remembered: facts } : {}), ...(changed.length ? { changed } : {}) }, { persist: true });
+    if (changed.length) haptic('success');
     haptic('tap');
     if (talk && voice) await talk;
   } catch (e) {
@@ -376,6 +409,7 @@ export function initCoach(n) {
     if (!b) return;
     const k = b.dataset.coach;
     if (k === 'ask' || k === 'retry') { haptic('tap'); ask(b.dataset.q, { root }); }
+    if (k === 'undo-change') { undoChange(b.dataset.id); return; }
     else if (k === 'saveplan') { b.closest('.pacts')?.querySelectorAll('button').forEach(x => { x.disabled = true; }); savePlan(b.dataset.id, b.dataset.mode); }
     else if (k === 'settings') nav.openSettings();
     else if (k === 'close') { haptic('tap'); nav.closeCoach?.(); }

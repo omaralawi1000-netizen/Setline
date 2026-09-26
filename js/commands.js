@@ -449,7 +449,7 @@ export function resolve(intent, snap, t, lang) {
       const date = dateKey(snap.now);
       const prev = (snap.daily || []).find(d => d.date === date) || null;
       const next = mergeCheckin(prev, intent, date, snap.now);
-      const r = readiness(next, routineGroups(nextRoutine(snap.routines || [], snap.history || []), snap.catalog));
+      const r = readiness(next, routineGroups(nextRoutine(snap.routines || [], snap.history || [], snap.now ?? Date.now(), snap.settings?.dayPlan), snap.catalog));
       return cmd('auto', {
         title: t('checkin.title'), value: checkinText(next, t, lang), sub: r ? t('checkin.advice.' + r.advice, { score: r.score }) : t('voice.heard', { text: heard }),
         say: say(r ? t('say.checkin', { score: r.score, advice: t('say.checkin.' + r.advice) }) : t('checkin.saved')), run: { op: 'checkin', patch: intent }

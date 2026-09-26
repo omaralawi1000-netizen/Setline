@@ -158,6 +158,8 @@ function coachMorph(open, under) {
     if (other) Object.assign(other.style, { transition: 'none', opacity: '1', visibility: 'visible', transform: 'none' });
     go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
     const last = go(bloom, [{ scale: 0.1, opacity: 0 }, { scale: 0.55, opacity: 1, offset: 0.3 }, { scale: 1.5, opacity: 0 }], { duration: 820, easing: 'cubic-bezier(.33,.1,.25,1)' });
+    // a ring of light ripples out of the orb with the bloom
+    go(aura.querySelector('.wave'), [{ transform: 'translate(-50%, -50%) scale(.35)', opacity: 0 }, { opacity: 1, offset: 0.15 }, { transform: 'translate(-50%, -50%) scale(7)', opacity: 0 }], { duration: 900, easing: 'cubic-bezier(.2,.7,.2,1)' });
     go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: 560, delay: 90, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'backwards' });
     go(other, [{ scale: 1, opacity: 1 }, { scale: 0.94, opacity: 0.3 }], { duration: 640, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'forwards' });
     app.classList.add('coach-in');
@@ -629,7 +631,7 @@ function shortcut() {
   history.replaceState(history.state, '', location.pathname + (q.size ? `?${q}` : ''));
   if (to === 'next') {
     if (state.active || state.activeCardio) return go('workout');
-    const r = nextRoutine([...state.routines].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)), state.history);
+    const r = nextRoutine([...state.routines].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)), state.history, Date.now(), state.settings.dayPlan);
     if (r) startRoutine(r.id);
   } else if (to === 'cardio') {
     if (state.active || state.activeCardio) return go('workout');

@@ -13,7 +13,7 @@ const C = 2 * Math.PI * 21;
 let open = null;      // 'sleep' | 'sore' | 'feel': which extra row is showing on the summary
 
 export const todayCheckin = () => state.daily.find(d => d.date === dateKey()) || null;
-export const nextGroups = () => routineGroups(nextRoutine([...state.routines].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)), state.history), state.catalog);
+export const nextGroups = () => routineGroups(nextRoutine([...state.routines].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)), state.history, Date.now(), state.settings.dayPlan), state.catalog);
 
 // A small face: the mouth goes from a frown (1) to a smile (5).
 function face(n) {

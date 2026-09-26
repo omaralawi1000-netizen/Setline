@@ -11,6 +11,7 @@ import { profileText } from './profile.js';
 import { deloadStatus, muscleBalance, usualMinutes } from './insights.js';
 import { measureSummary } from './measures.js';
 import { nextRoutine, routineDay } from './routines.js';
+import { weekText } from './planedit.js';
 import { stalledLifts } from './plateau.js';
 import { EQUIPMENT, MUSCLES, makeCustom, normalize } from './catalog.js';
 
@@ -38,6 +39,7 @@ export function systemPrompt(lang) {
     'Use the PROFILE (age, goal, experience, days, equipment, injuries) to tailor every answer. "Planned" sets are what the plan says for the workout in progress.',
     'You can see the data but cannot change it yourself: when something should be logged or changed, say exactly what to tap or say.',
     'MEMORY: when the user tells you something lasting about themselves (a preference, dislike, injury or pain, schedule, event or deadline, equipment, sport, how they like to train), add at the very end of your reply one line per new fact: "REMEMBER: <the fact in a few words>" (at most two, only facts not already in MEMORIES). The app saves these and hides the line; never mention it. Use MEMORIES in every answer.',
+    'CHANGES: you can change the plan in the app. When the user asks for a change, or tells you something that changes their plan (a sport, match or trip on a day, a rest day, feeling ill, moving a session, swapping or adding an exercise, different sets or reps), make it by adding at the very end of your reply one line per change, exactly: CHANGE: {json}. The app applies them at once (with Undo), hides the lines and shows what changed; never mention the lines. Use the dates in THIS WEEK. Forms: {"day":"YYYY-MM-DD","label":"Wrestling"} (that day becomes the activity, replacing rest or a session); {"day":"YYYY-MM-DD","rest":true}; {"day":"YYYY-MM-DD","routine":"<routine name>"} (do that routine that day); {"day":"YYYY-MM-DD","clear":true} (back to the plan); {"routine":"<name>","weekday":"Thu"} (moves it for good, "any" for no day); {"routine":"<name>","rename":"<new name>"}; {"routine":"<name>","exercise":"<exercise>","sets":4,"reps":8,"kg":80} (changes it, or adds it if missing); {"routine":"<name>","remove":"<exercise>"}; {"routine":"<name>","swap":"<exercise>","for":"<exercise>"}. A one-off ("today", "this Saturday") is a day change; "from now on" is a routine change. If a session is displaced (wrestling on a lifting day), say where it could go and offer to move it rather than guessing. Confirm the change in one short sentence.',
     'The user is already talking to you in the Coach. Never tell them to go to the Coach tab. When they want a training plan, the app builds it from their request automatically; if a request reaches you anyway, say you will build it when they ask for it, e.g. "make me a 5-day plan".',
     APP_GUIDE
   ].join(' ');
@@ -105,8 +107,9 @@ export function buildContext(snap) {
       out.push(next ? `Next set: ${name(cur.exerciseId)} ${next.kg != null ? r1(next.kg) : '?'}x${next.reps ?? '?'}.` : `All planned sets of ${name(cur.exerciseId)} are done.`);
     }
   } else out.push('', 'No workout running.');
-  const up = nextRoutine(snap.routines || [], hist);
+  const up = nextRoutine(snap.routines || [], hist, now, settings.dayPlan);
   if (up && !w) out.push(`UP NEXT: ${up.name}.`);
+  if (snap.routines?.length) out.push('', 'THIS WEEK (date, weekday: what is planned):', weekText(snap.routines, settings.dayPlan || {}, now));
 
   // per exercise, most recently trained first
   const seen = new Map();
