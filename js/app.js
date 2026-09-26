@@ -150,6 +150,10 @@ function coachMorph(open, under) {
   let x = orb.offsetWidth / 2, y = orb.offsetHeight / 2;
   for (let n = orb; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }
   aura.style.setProperty('--ax', x + 'px'); aura.style.setProperty('--ay', y + 'px');
+  // the ring of light is drawn at the size that reaches the top corners, and grows into it from the orb
+  const reach = Math.hypot(Math.max(x, app.clientWidth - x), y) + 24;
+  aura.style.setProperty('--wd', Math.round(reach * 2) + 'px');
+  const r0 = Math.min(0.2, 34 / reach);
   if (stillMotion()) return;
   const dockOrb = orb.querySelector('.orb'), coach = $('#s-coach');
   const other = under && under !== coach ? under : null;
@@ -161,7 +165,7 @@ function coachMorph(open, under) {
     go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
     const last = go(bloom, [{ scale: 0.1, opacity: 0 }, { scale: 0.55, opacity: 1, offset: 0.3 }, { scale: 1.5, opacity: 0 }], { duration: 820, easing: 'cubic-bezier(.33,.1,.25,1)' });
     // a ring of light ripples out of the orb with the bloom
-    go(aura.querySelector('.wave'), [{ transform: 'translate(-50%, -50%) scale(.35)', opacity: 0 }, { opacity: 1, offset: 0.15 }, { transform: 'translate(-50%, -50%) scale(7)', opacity: 0 }], { duration: 900, easing: 'cubic-bezier(.2,.7,.2,1)' });
+    go(aura.querySelector('.wave'), [{ transform: `translate(-50%, -50%) scale(${r0})`, opacity: 0 }, { opacity: 1, offset: 0.1 }, { opacity: 0.85, offset: 0.62 }, { transform: 'translate(-50%, -50%) scale(1)', opacity: 0 }], { duration: 1050, easing: 'cubic-bezier(.22,.6,.2,1)' });
     go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: 560, delay: 90, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'backwards' });
     go(other, [{ scale: 1, opacity: 1 }, { scale: 0.94, opacity: 0.3 }], { duration: 640, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'forwards' });
     app.classList.add('coach-in');
@@ -182,6 +186,8 @@ function coachMorph(open, under) {
     go(coach, [{ opacity: 1, transform: 'none', visibility: 'visible' }, { opacity: 0, transform: 'translateY(20px) scale(.97)', visibility: 'visible' }], { duration: 220, easing: 'cubic-bezier(.4,0,.6,1)' });
     go(veil, [{ opacity: 1 }, { opacity: 0 }], { duration: 480, delay: 60, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'backwards' });
     const last = go(bloom, [{ scale: 1.3, opacity: 0 }, { scale: 0.6, opacity: 0.85, offset: 0.5 }, { scale: 0.08, opacity: 0 }], { duration: 680, easing: 'cubic-bezier(.4,0,.25,1)' });
+    // the ring comes back down from the top of the screen and gathers into the orb
+    go(aura.querySelector('.wave'), [{ transform: 'translate(-50%, -50%) scale(1)', opacity: 0 }, { opacity: 0.85, offset: 0.3 }, { opacity: 1, offset: 0.8 }, { transform: `translate(-50%, -50%) scale(${r0})`, opacity: 0 }], { duration: 620, easing: 'cubic-bezier(.55,0,.35,1)' });
     go(other, [{ scale: 0.95, opacity: 0.25 }, { scale: 1, opacity: 1 }], { duration: 560, delay: 80, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' });
     go(dockOrb, [{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 460, delay: 380, easing: 'cubic-bezier(.3,1.25,.5,1)', fill: 'backwards' });
     last.onfinish = settleCoachFx;

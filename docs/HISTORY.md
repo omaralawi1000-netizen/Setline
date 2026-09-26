@@ -499,3 +499,11 @@ Your feedback over the last day says the look and motion started going downhill 
 ## Docs tidy (no app release)
 
 - [x] PLAN.md now describes the app as it is; this history moved to docs/HISTORY.md; the outdated `design-target.html` mockup removed; SPEC.md and CLAUDE.md match the current app; the motion rule compares against the previous run
+
+## 1.41.0: the ring reaches the top, thinking without words, a gliding thread, a softer status bar
+
+- [x] Status bar: the app's colour at the very top, then a soft progressive blur (the dark band under it is gone)
+- [x] Opening the Coach: the ring of light is drawn at full-screen size and grows from the orb to the top of the screen as a fine line; closing, it comes back down into the orb
+- [x] Thinking: the step words ("Reading your log…") are gone; the message box fills with two drifting gradients, and soft clouds move in the background again. The box's dark drop shadow is off while thinking, and the Coach's background light fades out evenly (it had a darker ring above the box)
+- [x] While a reply or plan comes in, the thread follows it down in one smooth motion (it used to restart a smooth scroll every 140 ms); touching the thread lets go
+- [x] Bug: the empty Coach said "No answer came back. Try again." (two texts shared one name)

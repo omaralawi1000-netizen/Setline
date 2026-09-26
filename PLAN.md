@@ -1,10 +1,10 @@
 # Setline plan
 
-All five phases from SPEC.md section 7 are done. Work now happens as fixes and polish the user asks for. The current version is in `js/version.js` (1.40.0). The release log, including releases that were later undone, is in `docs/HISTORY.md`; read it only when you need the story behind something.
+All five phases from SPEC.md section 7 are done. Work now happens as fixes and polish the user asks for. The current version is in `js/version.js` (1.41.0). The release log, including releases that were later undone, is in `docs/HISTORY.md`; read it only when you need the story behind something.
 
 ## What's in the app now
 
-**Navigation.** A floating glass dock: Today, Train, the orb in the middle, Food, You. Tapping the orb blooms the Coach open over the whole screen; holding it is hold-to-talk for a voice command. Settings opens from the icon on Today and from You. Pages and sheets animate in; sheets are iOS-style (the page behind shrinks back) and close with a swipe down. The Android back swipe is respected.
+**Navigation.** A floating glass dock: Today, Train, the orb in the middle, Food, You. Tapping the orb blooms the Coach open over the whole screen; holding it is hold-to-talk for a voice command. Settings opens from the icon on Today and from You. The status bar is the app's own colour, with a soft blur beneath it when content scrolls under. Pages and sheets animate in; sheets are iOS-style (the page behind shrinks back) and close with a swipe down. The Android back swipe is respected.
 
 **Today.** Greeting and streak, "How do you feel today?" check-in, Up next (follows the weekday plan and one-off day changes, says "· Tomorrow" when relevant), the week strip, week cards (workouts ring, cardio, last session, run, latest record).
 
@@ -16,7 +16,7 @@ All five phases from SPEC.md section 7 are done. Work now happens as fixes and p
 
 **Voice.** Groq Whisper speech-to-text with junk filtering and a Danish re-run; a local English/Danish parser (sets in any order, "set one is done but only nine reps", "same again", "one more rep", …); Gemini fallback for anything else. Spoken replies use Gemini's natural voice by default, with short quota pauses and the phone's own voice as a fallback. The mic never reopens by itself after a reply.
 
-**Coach.** Streaming chat that knows your log, routines, food and the next 7 days. It remembers facts (`REMEMBER:` lines) and changes the plan (`CHANGE:` lines: a day becomes Wrestling or rest, routines move days, exercises are swapped, added or removed), always with Undo. Thinking shows as shimmering steps inside the message box while the background drifts; reply words blur in. The orb reacts to your voice with a halo and ripples; the bloom has haptics.
+**Coach.** Streaming chat that knows your log, routines, food and the next 7 days. It remembers facts (`REMEMBER:` lines) and changes the plan (`CHANGE:` lines: a day becomes Wrestling or rest, routines move days, exercises are swapped, added or removed), always with Undo. Tapping the orb sends a fine ring of light up to the top of the screen, and closing brings it back down into the orb. While it thinks, the message box fills with drifting light (no words) and soft clouds move in the background. Reply words blur in and the thread glides down after them; touching the thread stops the follow. The orb reacts to your voice with a halo and ripples; the bloom has haptics.
 
 ## Next
 

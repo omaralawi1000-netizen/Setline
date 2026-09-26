@@ -29,7 +29,7 @@ let inflight = null; // {ctl, id}
 const shown = new Set(); // chat message ids already rendered
 
 const errorText = (code, t) => ({
-  offline: t('coach.offline'), network: t('coach.offline'), badkey: t('coach.badKey'), busy: t('coach.busy'), quota: t('coach.quota', { time: new Date(nextQuotaReset()).toLocaleTimeString(state.lang === 'da' ? 'da-DK' : 'en-GB', { hour: '2-digit', minute: '2-digit' }) }), empty: t('coach.empty'), timeout: t('coach.timeout'), nomodel: t('coach.noModel'), nokey: t('coach.noKey')
+  offline: t('coach.offline'), network: t('coach.offline'), badkey: t('coach.badKey'), busy: t('coach.busy'), quota: t('coach.quota', { time: new Date(nextQuotaReset()).toLocaleTimeString(state.lang === 'da' ? 'da-DK' : 'en-GB', { hour: '2-digit', minute: '2-digit' }) }), empty: t('coach.noAnswer'), timeout: t('coach.timeout'), nomodel: t('coach.noModel'), nokey: t('coach.noKey')
 }[code] || t('coach.failed', { code }));
 
 // Thinking: the orb breathes, a glow runs round the bubble and the steps say what it's looking at.
@@ -92,7 +92,7 @@ export function renderCoach(root) {
   composer.querySelector('input').placeholder = t('coach.ph');
   composer.querySelector('.csend').setAttribute('aria-label', t('coach.send'));
   composer.querySelector('.csend').innerHTML = inflight ? I.stop : I.fwd;
-  requestAnimationFrame(() => scrollDown(root, false));
+  requestAnimationFrame(() => (followers.get(root)?.raf ? follow(root) : scrollDown(root, false)));
 }
 
 // Streamed words don't appear in lumps: each word blurs in, lit by the accent, and settles.
@@ -121,7 +121,7 @@ function wordsHTML(bub, text, births, now) {
   }
 }
 function typewriter(root, id) {
-  let words = [], shown = 0, raf = 0, last = 0, lastScroll = 0, waiters = [];
+  let words = [], shown = 0, raf = 0, last = 0, waiters = [];
   const births = [];
   const done = () => (shown >= words.length);
   const step = now => {
@@ -133,7 +133,7 @@ function typewriter(root, id) {
         bub.closest('.msg')?.classList.remove('is-thinking');
         wordsHTML(bub, words.slice(0, shown).join(''), births, now);
       }
-      if (now - lastScroll > 140) { lastScroll = now; scrollDown(root); }
+      follow(root);
     }
     if (done()) {
       // let the last words finish settling before anything re-renders the bubble
@@ -150,7 +150,42 @@ function typewriter(root, id) {
 }
 
 function scrollDown(root, smooth = true) {
-  root.scrollTo({ top: root.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+  if (smooth) return follow(root);
+  root.scrollTop = root.scrollHeight;
+}
+
+// While a reply comes in, the thread glides after it: every frame it closes part of the gap to the
+// bottom (one continuous motion, instead of a new smooth-scroll starting every few words). Touching
+// or scrolling the thread yourself lets go; it picks up again once you're back near the bottom or ask
+// something new.
+const followers = new WeakMap();
+const stillMotion = () => document.documentElement.dataset.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches;
+function follow(root, fresh = false) {
+  let f = followers.get(root);
+  if (!f) {
+    f = { raf: 0, t: 0, held: false };
+    const hold = () => { f.held = true; cancelAnimationFrame(f.raf); f.raf = 0; };
+    root.addEventListener('touchstart', hold, { passive: true });
+    root.addEventListener('wheel', hold, { passive: true });
+    followers.set(root, f);
+  }
+  const gap = () => root.scrollHeight - root.clientHeight - root.scrollTop;
+  if (fresh) f.held = false;
+  else if (f.held) { if (gap() > 90) return; f.held = false; }
+  if (stillMotion()) { root.scrollTop = root.scrollHeight; return; }
+  if (f.raf) return;
+  f.t = 0;
+  const step = now => {
+    const dt = f.t ? Math.min(50, now - f.t) : 16;
+    f.t = now;
+    const g = gap();
+    if (g < 1 || f.held) { f.raf = 0; return; }
+    const was = root.scrollTop;
+    root.scrollTop = was + Math.max(g * (1 - Math.exp(-dt / 150)), Math.min(g, 1));
+    if (root.scrollTop === was) root.scrollTop = root.scrollHeight; // the last sub-pixel
+    f.raf = requestAnimationFrame(step);
+  };
+  f.raf = requestAnimationFrame(step);
 }
 
 // Pick coach/command models once, from the key's model list.
@@ -222,6 +257,7 @@ export async function ask(question, { root = $('#s-coach'), voice = false } = {}
   const history = state.chat.filter(m => !m.error);
   store.addChat('user', question);
   const reply = store.addChat('model', '', { streaming: true, q: question });
+  requestAnimationFrame(() => follow(root, true)); // a new question: the thread follows again
   const key = getKey('google');
   if (!key) { store.updateChat(reply.id, { streaming: false, error: 'nokey' }, { persist: true }); return; }
   const ctl = new AbortController();
@@ -340,7 +376,7 @@ export function initCoach(n) {
   nav = n;
   const root = $('#s-coach');
   const composer = $('#composer');
-  composer.innerHTML = `<span class="cglow" aria-hidden="true"><i></i></span><button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span></button><input enterkeyhint="send" autocomplete="off" maxlength="5000"><span class="cthink" aria-hidden="true">${[1, 2, 3, 4].map((n, i) => `<span class="tl" style="--i:${i}">${esc(state.t('coach.step' + n))}</span>`).join('')}</span><button type="submit" class="csend">${I.fwd}</button>`;
+  composer.innerHTML = `<span class="cglow" aria-hidden="true"><i></i></span><button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span></button><input enterkeyhint="send" autocomplete="off" maxlength="5000"><button type="submit" class="csend">${I.fwd}</button>`;
   // The composer's orb: talk to your coach. What you say is sent when you pause, the answer is
   // spoken, then it listens again, so it's a conversation. Tap while it listens to send at once;
   // tap while it thinks or speaks (or say nothing) to end it.

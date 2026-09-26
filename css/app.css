@@ -2318,3 +2318,47 @@ html[data-dock=icons] .dock .tab span{display:none}
   .cthink .tl:first-child{opacity:1}
   .bub .w{animation:none}
 }
+
+/* ======================= 1.41 ======================= */
+/* the status bar: the app's own colour at the very top, then a soft progressive blur, like the bar at
+   the bottom (no dark band when content scrolls under it) */
+.edge.et{height:calc(var(--safe-top) + 64px)}
+.edge.et::before{background:linear-gradient(var(--edge) 0,color-mix(in srgb,var(--edge) 55%,transparent) calc(var(--safe-top) * .6),color-mix(in srgb,var(--edge) 16%,transparent) calc(var(--safe-top) + 22px),transparent)}
+.edge.et::after{-webkit-backdrop-filter:blur(14px) saturate(160%);backdrop-filter:blur(14px) saturate(160%);
+  -webkit-mask-image:linear-gradient(#000 0,#000 calc(var(--safe-top) * .6),rgba(0,0,0,.55) calc(var(--safe-top) + 22px),transparent);
+  mask-image:linear-gradient(#000 0,#000 calc(var(--safe-top) * .6),rgba(0,0,0,.55) calc(var(--safe-top) + 22px),transparent)}
+
+/* the ring of light: drawn at the size that reaches the top of the screen (set from the orb's place),
+   so it stays a fine line all the way up and back down into the orb */
+.aura .wave{width:var(--wd,120px);height:var(--wd,120px);
+  box-shadow:0 0 0 1.5px rgba(var(--a-rgb),.8),0 0 26px 3px rgba(var(--v-rgb),.42),inset 0 0 22px 2px rgba(var(--a-rgb),.3)}
+
+/* thinking in the message box: no words, just the light. Two soft gradients of the theme colours
+   drift through the box against each other while its ring breathes */
+.cthink{display:none!important}
+.cglow::after{content:"";position:absolute;inset:-40% -30%;will-change:transform;opacity:.9;
+  background:radial-gradient(40% 70% at 30% 50%,rgba(var(--b-rgb),.42),transparent 70%),radial-gradient(35% 80% at 72% 55%,rgba(var(--a-rgb),.36),transparent 70%);
+  animation:cdrift2 calc(var(--m-think) * 1.3) var(--e-soft) infinite alternate;animation-play-state:paused}
+@keyframes cdrift2{from{transform:translateX(18%) scale(1.1)}to{transform:translateX(-18%) scale(.95)}}
+:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]) .cglow::after{animation-play-state:running}
+
+/* the box's dark drop shadow would read as a band across the moving light: the breathing ring stands
+   in for it while thinking (switched, not animated) */
+:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]){box-shadow:inset 0 1px 0 rgba(255,255,255,.1);transition-property:opacity,transform}
+
+/* the Coach's background light fades out evenly from the orb (its violet step used to leave a darker
+   ring just above the message box) */
+.aura .veil{background:radial-gradient(130% 62% at var(--ax) var(--ay),color-mix(in srgb,var(--accent) 15%,var(--bg)) 0%,color-mix(in srgb,var(--accent) 7%,color-mix(in srgb,var(--violet) 9%,var(--bg))) 22%,color-mix(in srgb,var(--violet) 6%,var(--bg)) 40%,color-mix(in srgb,var(--blue) 2.5%,var(--bg)) 56%,var(--bg) 72%)}
+
+/* …and the background moves: soft clouds of the theme colours drift behind the conversation (radial
+   gradients moved on the GPU, no live blur), fading in only while the Coach thinks */
+.aura .clouds{display:block;height:75%}
+.app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .clouds{opacity:.7}
+.aura .clouds i:nth-child(1){animation-duration:var(--m-drift)}
+.aura .clouds i:nth-child(2){animation-duration:calc(var(--m-drift) * 1.3)}
+.aura .clouds i:nth-child(3){animation-duration:calc(var(--m-drift) * .85)}
+
+@media (prefers-reduced-motion: reduce){
+  .cglow::after,.aura .clouds i{animation:none!important}
+}
+html[data-motion=off] .cglow::after,html[data-motion=off] .aura .clouds i{animation:none!important}
