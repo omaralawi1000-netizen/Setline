@@ -494,6 +494,7 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Reply words blur in slower and softer
 - [x] Listening orb (Coach and hold-to-talk on the main screens): a halo that grows with your voice, faster colour, a ring that ripples out
 - [x] Haptics: a rising buzz as the Coach blooms open, a tap when it lands
+- [x] Version number bumped to 1.40.0 in a follow-up commit (the first push left it at 1.39.0, so phones kept the old files)
 
 ## Docs tidy (no app release)
 
