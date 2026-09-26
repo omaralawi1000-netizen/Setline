@@ -49,7 +49,7 @@ export function open() {
       res(db);
     };
     r.onerror = () => { dbp = null; rej(r.error); };
-    r.onblocked = () => rej(new Error('db blocked'));
+    r.onblocked = () => { dbp = null; rej(new Error('db blocked')); };
   });
   return dbp;
 }
