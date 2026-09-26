@@ -1,11 +1,30 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { dirname, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { STRINGS, translator, resolveLang, joinList } from '../js/i18n.js';
 import { VERSION } from '../js/version.js';
 import { sanitize, DEFAULTS } from '../js/settings.js';
 import { starterRoutines, estimateMinutes } from '../js/routines.js';
 import { createCatalog } from '../js/catalog.js';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const shellList = () => {
+  const sw = readFileSync(resolve(ROOT, 'sw.js'), 'utf8');
+  return sw.match(/const SHELL = \[([\s\S]*?)\];/)[1].match(/'([^']+)'/g).map(s => s.slice(1, -1));
+};
+function productionModules(entry = 'js/app.js', seen = new Set()) {
+  if (seen.has(entry)) return seen;
+  seen.add(entry);
+  const file = resolve(ROOT, entry), src = readFileSync(file, 'utf8');
+  const re = /(?:\bfrom\s+|^\s*import\s+)['"](\.[^'"]+)['"]/gm;
+  for (const m of src.matchAll(re)) {
+    const dep = relative(ROOT, resolve(dirname(file), m[1])).split(sep).join('/');
+    if (dep.endsWith('.js')) productionModules(dep, seen);
+  }
+  return seen;
+}
 
 test('English and Danish have the same keys', () => {
   const en = Object.keys(STRINGS.en).sort(), da = Object.keys(STRINGS.da).sort();
@@ -32,12 +51,16 @@ test('service worker version matches the app version', () => {
 });
 
 test('service worker precaches files that exist', () => {
-  const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
-  const list = sw.match(/const SHELL = \[([\s\S]*?)\];/)[1].match(/'([^']+)'/g).map(s => s.slice(1, -1));
+  const list = shellList();
   for (const p of list) if (p !== './') readFileSync(new URL('../' + p, import.meta.url));
   for (const f of ['js/app.js', 'css/app.css', 'css/tokens.css', 'data/exercises.js', 'manifest.webmanifest']) {
     assert.ok(list.includes(f), 'missing ' + f);
   }
+});
+
+test('service worker precaches the production module graph', () => {
+  const list = new Set(shellList());
+  for (const module of productionModules()) assert.ok(list.has(module), 'missing production module ' + module);
 });
 
 test('settings sanitize rejects junk and clamps rest', () => {
