@@ -520,3 +520,13 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] While the Coach speaks, the light round the message box moves with its voice: faster and brighter on the loud parts, calm in the pauses (the loudness is worked out once from the voice clip, so it costs nothing while playing; the phone's own voice gets a gentle beat)
 - [x] A finished reply (or plan) gets one sweep of light across it, and the box's glow lets go in a soft swell
 - [x] The dock orb gives quickly under your finger (it used to take half a second) and its light gathers while pressed
+
+## 1.44.0: back to the calm Coach, the orb lands with a bounce, iOS-style send, the Coach runs the app
+
+- [x] Reverted from 1.41–1.43 on request: the ring of light reaching the top of the screen (back to the small ripple), the glowing lines round the message box (thinking and speaking), and the sweep of light over replies. Kept: the orb flying into the message box, the orb moving with the Coach's voice, the soft thinking gradients in the box and the clouds, smooth follow-scroll, and the glitch and speed fixes
+- [x] The orb lands in the message box with an impact bounce: it squashes and wobbles back to round, a ring of light rings out, the box gives a little, the phone taps
+- [x] Sending a typed message: the words lift out of the message box as a bubble and glide up into the chat (a stand-in flies so a re-render can't cut it off)
+- [x] The Coach runs the app: besides plan changes it now changes settings (with Undo), does anything the app understands from words (log food, water, weight, cardio, sets, targets, start a routine) and opens pages; it sees the current settings and answers questions about the app
+- [x] Bug: on the Food screen, "Say it" logged anything as food ("what's going on?"). Questions and small talk now go to the Coach, and a meal estimate that comes back "not food" hands the words to the Coach
+- [x] Bug: a long one-word day in the week strip ("Wrestling") was cut off to "Wrestli"; it now breaks onto the second line
+- [x] Bug: 1.43's reply sweep had replaced the press shine on primary buttons (same animation name); gone with the sweep

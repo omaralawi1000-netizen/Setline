@@ -292,3 +292,15 @@ test('a whole session in one sentence', () => {
   assert.equal(parse('bench 3x8 at 80, then rows 3x10 at 60', { catalog, lang: 'en' }).items.length, 2);
   assert.equal(parse('bench 3x8 at 80', { catalog, lang: 'en' }).type, 'LogSet', 'one lift stays a set');
 });
+
+import { isChat } from '../js/parser.js';
+test('Food screen: questions and small talk are not logged as food', () => {
+  for (const q of ["what's going on", 'What is going on today?', 'how am I doing', 'hi coach', 'thanks', 'hvad sker der', 'should I eat more', 'I want to lose weight']) {
+    assert.equal(isChat(q), true, q);
+    assert.notEqual(parse(q, { screen: 'food' }).type, 'LogMeal', q);
+  }
+  for (const f of ['2 eggs and toast', 'chicken and rice', "I'm eating a banana", 'I had skyr with oats', 'kylling og ris']) {
+    assert.equal(isChat(f), false, f);
+    assert.equal(parse(f, { screen: 'food' }).type, 'LogMeal', f);
+  }
+});

@@ -692,6 +692,8 @@ async function estimateMeal(cmd, intent, lang) {
   try {
     await ensureModels();
     const raw = await withFallback(coachModels(state.settings), model => aiMeal({ key, model, prompt: mealPrompt(cmd.run.text, lang), schema: MEAL_SCHEMA, timeout: 20000 }), { rounds: 2 });
+    // not food after all ("what's going on?"): it was meant for the Coach
+    if (raw && raw.food === false) { if (mine === mealSeq) { dismissCard(); toCoach(intent.heard || cmd.run.text); } return; }
     meal = validateMeal(raw);
   } catch { meal = null; }
   if (mine !== mealSeq) return;

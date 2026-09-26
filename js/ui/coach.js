@@ -5,6 +5,7 @@ import { streamChat, AiError, withFallback, aiPlan, pickTextModels, nextQuotaRes
 import { listModels, pickTtsModel } from '../tts.js';
 import { splitMemories, hideMemoryTail as hideMem, addMemories } from '../coach.js';
 import { splitChanges, hideChangeTail, applyChanges } from '../planedit.js';
+import { splitAppChanges, planAppChanges, PAGES } from '../appedit.js';
 // the reply without its hidden lines (memories and plan changes), also while it streams in
 const hideMemoryTail = text => hideChangeTail(hideMem(text));
 import { weekStart } from '../stats.js';
@@ -92,7 +93,46 @@ export function renderCoach(root) {
   composer.querySelector('input').placeholder = t('coach.ph');
   composer.querySelector('.csend').setAttribute('aria-label', t('coach.send'));
   composer.querySelector('.csend').innerHTML = inflight ? I.stop : I.fwd;
-  requestAnimationFrame(() => (followers.get(root)?.raf ? follow(root) : scrollDown(root, false)));
+  // a message just sent from the box stays hidden until it flies up from there (sendFly)
+  const hold = pendingSend || sending;
+  if (hold) { const mine = [...root.querySelectorAll('.msg.me')].pop(); if (mine && mine.textContent.trim() === hold.text) mine.classList.add('sending', 'seen'); }
+  requestAnimationFrame(() => { (followers.get(root)?.raf ? follow(root) : scrollDown(root, false)); if (pendingSend) sendFly(root); });
+}
+
+// iOS-style send: the words you typed lift out of the message box as a bubble and glide up into the
+// conversation, landing with a little give. Measured from where the text sat in the box.
+let pendingSend = null, sending = null;
+function sendStart(input, text) {
+  const r = input.getBoundingClientRect(), cs = getComputedStyle(input);
+  const ctx = document.createElement('canvas').getContext('2d');
+  ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  return { text: text.trim(), x: r.left + parseFloat(cs.paddingLeft || 0), y: r.top + r.height / 2, w: Math.min(r.width, ctx.measureText(text).width), at: performance.now() };
+}
+function sendFly(root) {
+  const p = pendingSend;
+  pendingSend = null;
+  const msg = [...root.querySelectorAll('.msg.me.sending')].pop(), bub = msg?.querySelector('.bub'), app = document.getElementById('app');
+  const reveal = () => { sending = null; for (const m of root.querySelectorAll('.msg.me.sending')) m.classList.remove('sending'); };
+  if (!bub || !app || stillMotion() || performance.now() - p.at > 800) return reveal();
+  // a stand-in flies (the thread may re-render meanwhile); the real bubble shows when it lands
+  sending = p;
+  const a = app.getBoundingClientRect(), m = msg.getBoundingClientRect(), b = bub.getBoundingClientRect(), pad = parseFloat(getComputedStyle(bub).paddingLeft || 0);
+  const ghost = document.createElement('div');
+  ghost.className = 'msg me seen sendghost';
+  ghost.setAttribute('aria-hidden', 'true');
+  Object.assign(ghost.style, { left: `${m.left - a.left}px`, top: `${m.top - a.top}px`, width: `${m.width}px` });
+  ghost.append(bub.cloneNode(true));
+  app.append(ghost);
+  const dx = p.x - (b.left + pad), dy = p.y - (b.top + b.height / 2);
+  // a one-line message starts at the text's own width; longer ones unfold as they rise
+  const s0 = Math.max(0.6, Math.min(1, (p.w + pad * 2) / b.width));
+  const fly = ghost.firstChild.animate([
+    { transform: `translate(${dx}px, ${dy}px) scale(${s0})`, opacity: 0.5 },
+    { opacity: 1, offset: 0.2 },
+    { transform: 'translate(0, 0) scale(1)', opacity: 1 }], { duration: 520, easing: 'cubic-bezier(.25,1.15,.4,1)', fill: 'both' });
+  const done = () => { reveal(); requestAnimationFrame(() => ghost.remove()); };
+  fly.onfinish = done;
+  setTimeout(done, 900);
 }
 
 // Streamed words don't appear in lumps: each word blurs in, lit by the accent, and settles.
@@ -149,42 +189,19 @@ function typewriter(root, id) {
   };
 }
 
-// A reply has landed: one sweep of light passes over it and the box's light lets go.
-function landed(root, id) {
-  if (stillMotion()) return;
-  const composer = $('#composer');
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    const bub = root.querySelector(`[data-id="${id}"] .bub`);
-    if (bub && !bub.querySelector('.sheen')) {
-      const sh = document.createElement('span');
-      sh.className = 'sheen'; sh.setAttribute('aria-hidden', 'true'); sh.innerHTML = '<i></i>';
-      bub.append(sh);
-      sh.firstChild.addEventListener('animationend', () => sh.remove(), { once: true });
-      setTimeout(() => sh.remove(), 2500);
-    }
-    composer?.classList.remove('landed'); void composer?.offsetWidth;
-    composer?.classList.add('landed');
-    clearTimeout(composer?._landed);
-    if (composer) composer._landed = setTimeout(() => composer.classList.remove('landed'), 1100);
-  }));
-}
-
-// While the Coach speaks, the light round the box moves with its voice: faster and brighter on the
-// loud parts, calm in the pauses. The level comes from the clip itself (tts.speechLevel).
+// While the Coach speaks, the message-box orb moves with its voice: its light swells on the loud
+// parts and settles in the pauses. The level comes from the clip itself (tts.speechLevel).
 function voiceLight(composer) {
   let raf = 0, lv = 0;
-  const rings = () => [...composer.querySelectorAll('.cglow i, .chalo i')].flatMap(el => el.getAnimations());
   const stop = () => {
     cancelAnimationFrame(raf); raf = 0; lv = 0;
     composer.classList.remove('speaking'); composer.style.removeProperty('--sv');
-    for (const a of rings()) a.updatePlaybackRate?.(1);
   };
   const frame = now => {
     const raw = tts.speechLevel();
     const target = raw == null ? 0.35 + 0.25 * Math.abs(Math.sin(now / 190)) : raw; // the phone's voice: a gentle beat
     lv += (target - lv) * (target > lv ? 0.35 : 0.12); // rises quickly, settles slowly
     composer.style.setProperty('--sv', lv.toFixed(3));
-    for (const a of rings()) a.updatePlaybackRate?.(1.3 + lv * 2.4);
     raf = requestAnimationFrame(frame);
   };
   tts.onSpeaking(on => {
@@ -268,14 +285,26 @@ export const setGoalLines = fn => { goalLines = fn; };
 // kept (for this session) so Undo puts it back.
 const undoable = new Map();
 async function applyCoachChanges(id, changes) {
-  if (!changes?.length) return [];
-  const before = { routines: state.routines, dayPlan: state.settings.dayPlan || {} };
-  const r = applyChanges(before, changes, { catalog: state.catalog, lang: state.lang, t: state.t });
-  if (!r.done.length) return [];
-  if (JSON.stringify(r.routines) !== JSON.stringify(before.routines)) await store.replaceRoutines(r.routines);
-  store.setSettings({ dayPlan: r.dayPlan });
-  undoable.set(id, before);
-  return r.done;
+  if (!changes?.length) return { done: [] };
+  const { app, plan } = splitAppChanges(changes);
+  const before = { routines: state.routines, dayPlan: state.settings.dayPlan || {}, settings: {} };
+  const done = [];
+  if (plan.length) {
+    const r = applyChanges(before, plan, { catalog: state.catalog, lang: state.lang, t: state.t });
+    if (r.done.length) {
+      if (JSON.stringify(r.routines) !== JSON.stringify(before.routines)) await store.replaceRoutines(r.routines);
+      store.setSettings({ dayPlan: r.dayPlan });
+      done.push(...r.done);
+    }
+  }
+  // settings (with Undo), things said in words (the app's own commands, each with its own Undo card),
+  // and a page to open once the reply is read
+  const a = planAppChanges(app, state.settings, state.t);
+  if (Object.keys(a.settings).length) { store.setSettings(a.settings); before.settings = a.before; done.push(...a.done); }
+  if (done.length) undoable.set(id, before);
+  a.dos.forEach((text, i) => setTimeout(() => { if (actOnText(text)) haptic('tap'); }, 600 + i * 1900));
+  done.push(...a.dos.map(text => state.t('change.did', { text })));
+  return { done, open: a.open };
 }
 async function undoChange(id) {
   const before = undoable.get(id);
@@ -283,8 +312,12 @@ async function undoChange(id) {
   undoable.delete(id);
   haptic('tap');
   if (JSON.stringify(before.routines) !== JSON.stringify(state.routines)) await store.replaceRoutines(before.routines);
-  store.setSettings({ dayPlan: before.dayPlan });
+  store.setSettings({ dayPlan: before.dayPlan, ...before.settings });
   store.updateChat(id, { undone: true }, { persist: true });
+}
+function openPage(page) {
+  if (!page || !PAGES[page]) return;
+  if (PAGES[page] === 'tab') nav.go?.(page); else nav.open?.(page);
 }
 
 // Ask the coach. Used by the composer, the example chips, and voice questions.
@@ -337,10 +370,10 @@ export async function ask(question, { root = $('#s-coach'), voice = false } = {}
     const facts = mem.slice(before.length).map(m => m.text); // only what's new
     if (facts.length) store.setSettings({ memories: mem });
     // "CHANGE: {…}" lines change the plan (a day, a routine), with Undo
-    const changed = await applyCoachChanges(reply.id, changes);
+    const { done: changed, open } = await applyCoachChanges(reply.id, changes);
     store.updateChat(reply.id, { text: saidClean, streaming: false, ...(facts.length ? { remembered: facts } : {}), ...(changed.length ? { changed } : {}) }, { persist: true });
-    landed(root, reply.id);
     if (changed.length) haptic('success');
+    if (open) setTimeout(() => openPage(open), talk ? 900 : 1400); // after the reply has been seen
     haptic('tap');
     if (talk && voice) await talk;
   } catch (e) {
@@ -375,8 +408,7 @@ async function buildPlan(question, reply, { key, lang, ctl, root, copy = false }
     if (!plan) store.updateChat(reply.id, { streaming: false, text: t('plan.invalid') }, { persist: true });
     else {
       store.updateChat(reply.id, { streaming: false, text: plan.summary || plan.name, plan }, { persist: true });
-      landed(root, reply.id);
-      haptic('success');
+        haptic('success');
       if (plan.summary && state.settings.spoken !== 'off') tts.speak(speakable(plan.summary), { key, model: ttsModelId(state.settings), alt: ttsAlt(state.settings), voice: state.settings.voice, lang, canSpeak: () => !isRecording() });
     }
   } catch (e) {
@@ -424,7 +456,7 @@ export function initCoach(n) {
   nav = n;
   const root = $('#s-coach');
   const composer = $('#composer');
-  composer.innerHTML = `<span class="chalo" aria-hidden="true"><i></i></span><span class="cglow" aria-hidden="true"><i></i></span><button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span></button><input enterkeyhint="send" autocomplete="off" maxlength="5000"><button type="submit" class="csend">${I.fwd}</button>`;
+  composer.innerHTML = `<span class="cglow" aria-hidden="true"><i></i></span><button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span></button><input enterkeyhint="send" autocomplete="off" maxlength="5000"><button type="submit" class="csend">${I.fwd}</button>`;
   // The composer's orb: talk to your coach. What you say is sent when you pause, the answer is
   // spoken, then it listens again, so it's a conversation. Tap while it listens to send at once;
   // tap while it thinks or speaks (or say nothing) to end it.
@@ -484,6 +516,7 @@ export function initCoach(n) {
     const input = composer.querySelector('input');
     const q = input.value;
     if (!q.trim()) return;
+    pendingSend = sendStart(input, q);
     input.value = '';
     input.blur(); // the keyboard goes down so the answer has the screen
     haptic('tap');

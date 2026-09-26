@@ -36,7 +36,7 @@ export function mealPrompt(text, lang) {
     'Identify each food, estimate its portion in grams from visual cues (plate ~26 cm, fork, hand), then protein and kcal from typical values.',
     'Be realistic, not optimistic: sauces and oil add calories; cooked weights, not raw.',
     text ? `The user says: "${String(text).slice(0, 300)}". Trust their description over the photo where they disagree.` : '',
-    `Write names in ${l}. If it is not food, set food=false and zeros.`
+    `Write names in ${l}. If it is not food, or the text is not about something eaten or drunk (a question, a greeting, small talk, anything else), set food=false and zeros.`
   ].filter(Boolean).join('\n');
 }
 

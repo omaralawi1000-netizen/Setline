@@ -2328,11 +2328,6 @@ html[data-dock=icons] .dock .tab span{display:none}
   -webkit-mask-image:linear-gradient(#000 0,#000 calc(var(--safe-top) * .6),rgba(0,0,0,.55) calc(var(--safe-top) + 22px),transparent);
   mask-image:linear-gradient(#000 0,#000 calc(var(--safe-top) * .6),rgba(0,0,0,.55) calc(var(--safe-top) + 22px),transparent)}
 
-/* the ring of light: drawn at the size that reaches the top of the screen (set from the orb's place),
-   so it stays a fine line all the way up and back down into the orb */
-.aura .wave{width:var(--wd,120px);height:var(--wd,120px);
-  box-shadow:0 0 0 1.5px rgba(var(--a-rgb),.8),0 0 26px 3px rgba(var(--v-rgb),.42),inset 0 0 22px 2px rgba(var(--a-rgb),.3)}
-
 /* thinking in the message box: no words, just the light. Two soft gradients of the theme colours
    drift through the box against each other while its ring breathes */
 .cthink{display:none!important}
@@ -2371,31 +2366,13 @@ html[data-motion=off] .cglow::after,html[data-motion=off] .aura .clouds i{animat
 /* while the Coach opens or closes, the blurred edges step aside (the light is moving under them) */
 .app.morphing .edge{visibility:hidden}
 
-/* thinking: light runs round the edge of the message box (a turning ring of the theme colours, with
-   a soft glow of the same light outside it), the inside stays calm and dark, the orb breathes */
-.cglow i,.cglow::after{animation:none}
-.cglow{inset:0;overflow:hidden;background:none}
-.cglow i{position:absolute;left:50%;top:50%;width:130%;height:auto;aspect-ratio:1;translate:-50% -50%;will-change:transform;
-  background:conic-gradient(from 0deg,rgba(var(--a-rgb),.95),rgba(var(--v-rgb),.9) 22%,rgba(var(--b-rgb),.85) 42%,transparent 55%,transparent 62%,rgba(var(--v-rgb),.7) 80%,rgba(var(--a-rgb),.95));
-  animation:corbit var(--m-orbit) var(--e-linear) infinite;animation-play-state:paused}
-.cglow::after{content:"";position:absolute;inset:1.5px;border-radius:calc(24px - 1.5px);opacity:1;will-change:auto;transform:none;
-  background:linear-gradient(180deg,color-mix(in srgb,var(--card) 92%,var(--accent) 8%),color-mix(in srgb,var(--bg) 94%,var(--violet) 6%));
-  box-shadow:inset 0 0 22px -6px rgba(var(--a-rgb),.35)}
-@keyframes corbit{to{transform:rotate(1turn)}}
-.chalo{position:absolute;inset:-9px;border-radius:33px;overflow:hidden;pointer-events:none;z-index:0;opacity:0;filter:blur(16px);transition:opacity var(--m-slow) var(--e-out)}
-.chalo i{position:absolute;left:50%;top:50%;width:130%;aspect-ratio:1;translate:-50% -50%;will-change:transform;
-  background:conic-gradient(from 0deg,rgba(var(--a-rgb),.8),rgba(var(--v-rgb),.75) 22%,rgba(var(--b-rgb),.7) 42%,transparent 55%,transparent 62%,rgba(var(--v-rgb),.55) 80%,rgba(var(--a-rgb),.8));
-  animation:corbit var(--m-orbit) var(--e-linear) infinite;animation-play-state:paused}
-.composer > :not(.cglow):not(.chalo){position:relative;z-index:1}
-.composer > .chalo{position:absolute;z-index:0}
-:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]) .chalo{opacity:1}
-:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]) :is(.cglow,.chalo) i{animation-play-state:running}
-/* the old breathing ring is replaced by the turning light; the box needs no live blur while it's lit */
-:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking])::before{opacity:0;animation:none}
-:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]){-webkit-backdrop-filter:none;backdrop-filter:none}
 
-/* the background: the clouds drift slowly (no more whole-screen drift under the blurs), and the
-   bottom blur steps aside while they move */
+/* thinking: the soft gradients drift inside the box (no lines round it); the box is filled rather than
+   live-blurred while the light moves, and the bottom blur steps aside */
+.cglow{opacity:0}
+:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking])::before{opacity:0;animation:none}
+:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]){-webkit-backdrop-filter:none;backdrop-filter:none;--gl-fill:color-mix(in srgb,var(--bg) 88%,transparent)}
+:is(.app:has(#s-coach .msg.ai.is-thinking) .composer,.composer[data-talk=thinking]) .cglow{opacity:.8}
 .app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .veil{animation:none}
 .app.coaching:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .edge.eb{visibility:hidden}
 .app:is(:has(#s-coach .msg.ai.is-thinking),:has(.composer[data-talk=thinking])) .aura .clouds{opacity:.55}
@@ -2405,11 +2382,6 @@ html[data-motion=off] .cglow::after,html[data-motion=off] .aura .clouds i{animat
   0%{opacity:0;filter:blur(6px);color:var(--accent-hi);transform:translateY(.25em)}
   45%{opacity:.9;filter:blur(1.5px);color:color-mix(in srgb,var(--accent-hi) 70%,var(--ink))}
   100%{opacity:1;filter:none;color:inherit;transform:none}}
-
-@media (prefers-reduced-motion: reduce){
-  .cglow i,.chalo i{animation:none!important}
-}
-html[data-motion=off] :is(.cglow,.chalo) i{animation:none!important}
 
 /* ======================= 1.43: the orb travels, the light follows the voice ======================= */
 /* the orb's stand-in on its way between the bar and the message box */
@@ -2425,27 +2397,23 @@ html[data-motion=off] :is(.cglow,.chalo) i{animation:none!important}
 .dock .orbbtn.pressing{transform:scale(.88);transition:transform var(--m-press) var(--e-out)}
 .dock .orbbtn.pressing .orb::before{opacity:.75;transition:opacity var(--m-fast) var(--e-out)}
 
-/* the Coach speaking: the same light runs round the box, faster and brighter on the loud parts
-   (speed from JS via playbackRate, brightness from --sv) */
-.app.coaching .composer.speaking .cglow{opacity:calc(.55 + var(--sv, 0) * .45)}
-.app.coaching .composer.speaking .chalo{opacity:calc(.3 + var(--sv, 0) * .9)}
-.app.coaching .composer.speaking :is(.cglow,.chalo) i{animation-play-state:running}
-.app.coaching .composer.speaking .corb .orb::before{opacity:calc(.25 + var(--sv, 0) * .9);transform:scale(calc(.9 + var(--sv, 0) * .5));transition:none;animation:none}
-.app.coaching .composer.speaking{-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.1)}
 
-/* a reply lands: one sweep of light passes over it, and the box's light lets go in a soft swell */
-.msg .bub{position:relative}
-.bub .sheen{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none;z-index:2}
-.bub .sheen i{position:absolute;top:-10%;bottom:-10%;left:-50%;width:50%;mix-blend-mode:plus-lighter;opacity:0;will-change:transform,opacity;
-  background:linear-gradient(100deg,transparent 0%,rgba(var(--a-rgb),.1) 30%,rgba(var(--a-rgb),.32) 50%,rgba(var(--a-rgb),.1) 70%,transparent 100%);
-  animation:sheen calc(var(--m-slow) * 2.6) var(--e-soft) forwards}
-@keyframes sheen{0%{transform:translateX(0);opacity:0}15%{opacity:1}80%{opacity:1}100%{transform:translateX(300%);opacity:0}}
-.composer.landed:not(.speaking) .chalo{animation:chalorelease calc(var(--m-slow) * 2) var(--e-out)}
-.composer.landed:not(.speaking) :is(.cglow,.chalo) i{animation-play-state:running}
-@keyframes chalorelease{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.14)}}
+/* the Coach speaking: only the orb moves, its light swelling with the voice */
+.app.coaching .composer.speaking .corb .orb::before{opacity:calc(.25 + var(--sv, 0) * .9);transform:scale(calc(.9 + var(--sv, 0) * .5));transition:none;animation:none}
 
 @media (prefers-reduced-motion: reduce){
-  .bub .sheen,.orbghost{display:none}
-  .composer.landed .chalo{animation:none}
+  .orbghost{display:none}
 }
-html[data-motion=off] :is(.bub .sheen,.orbghost){display:none}
+html[data-motion=off] .orbghost{display:none}
+
+/* ======================= 1.44 ======================= */
+/* the orb lands in the message box: a ring of light rings out from the impact (the squash and the
+   box's give are in JS, on scale and translate) */
+.corb.impact::after{animation:corbring calc(var(--m-slow) * 1.5) var(--e-out)}
+@media (prefers-reduced-motion: reduce){ .corb.impact::after{animation:none} }
+/* a message on its way up from the message box (see sendFly): hidden for the frame before it flies */
+.msg.me.sending{opacity:0}
+.msg.me .bub{transform-origin:0 50%}
+.sendghost{position:absolute;z-index:7;pointer-events:none;animation:none!important;margin:0}
+/* the week strip: a long single word ("Wrestling") breaks onto the second line instead of being cut off */
+.wpday .wr{overflow-wrap:anywhere;-webkit-hyphens:auto;hyphens:auto}

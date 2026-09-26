@@ -419,6 +419,17 @@ function foodAndWater(text, ctx) {
   return null;
 }
 
+// A question, a greeting or talk ("what's going on?", "how am I doing", "hi coach", "thanks"), not a meal.
+const CHAT_START = /^(?:hey |hi |yo |ok |okay |so |and |but )?(?:what|what's|whats|how|how's|why|when|where|who|which|should|could|would|can|can't|is|are|am|do|does|did|will|tell me|explain|help|i want|i need|i feel|i'm|im|i am|let's|lets|hi|hey|hello|yo|thanks|thank you|ok|okay|good morning|good night|sup|hvad|hvordan|hvorfor|hvornår|hvor|hvem|hvilken|skal|kan|bør|er|vil|fortæl|forklar|hjælp|jeg vil|jeg har brug|jeg føler|hej|tak|godmorgen|godnat)\b/i;
+export function isChat(text) {
+  const s = String(text || '').toLowerCase().trim();
+  if (!s) return false;
+  if (/\?\s*$/.test(s)) return true;
+  // "I'm eating …", "I had …", "I ate …" are meals even though they start like talk
+  if (/^(?:i'm |im |i am |jeg )?(?:eating|having|had|ate|drinking|drank|spiser|spiste|drikker|drak|fik)\b/.test(s)) return false;
+  return CHAT_START.test(s);
+}
+
 const SLOT_WORDS = { breakfast: 'breakfast', morgenmad: 'breakfast', lunch: 'lunch', frokost: 'lunch', dinner: 'dinner', aftensmad: 'dinner', supper: 'dinner', snack: 'snack', mellemmåltid: 'snack' };
 function mealPhrase(text, ctx, unknown) {
   const s = String(text || '').toLowerCase().trim().replace(/[.!?]+$/, '');
@@ -434,8 +445,8 @@ function mealPhrase(text, ctx, unknown) {
   }
   // said on its own: "2 eggs and toast", "200 g skyr og en banan"
   if (parseMealLocal(s, lang)) return out(s);
-  // on the Food screen, anything that isn't a command is food
-  if (ctx.screen === 'food' && /[a-zæøå]{3}/.test(s) && !/\b(reps?|sets?|sæt|gentagelser|km|minutes?|minutter)\b/.test(s)) return out(s);
+  // on the Food screen, anything that isn't a command, a question or small talk is food
+  if (ctx.screen === 'food' && /[a-zæøå]{3}/.test(s) && !/\b(reps?|sets?|sæt|gentagelser|km|minutes?|minutter)\b/.test(s) && !isChat(text)) return out(s);
   return null;
 }
 

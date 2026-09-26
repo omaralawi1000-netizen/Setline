@@ -165,6 +165,18 @@ function flyOrb(from, to, { duration, delay = 0, go, onland }) {
   return ghost;
 }
 
+// The orb hits the message box: it squashes on impact and wobbles back to round, the box gives a
+// little under it, a ring of light rings out and the phone taps.
+function impact(orbEl) {
+  haptic('land');
+  orbEl.animate([
+    { scale: '1.3 0.72' }, { scale: '0.88 1.12', offset: 0.3 }, { scale: '1.06 0.95', offset: 0.55 },
+    { scale: '0.98 1.02', offset: 0.78 }, { scale: '1 1' }], { duration: 560, easing: 'cubic-bezier(.3,.6,.4,1)' });
+  $('#composer')?.animate([{ translate: '0 0' }, { translate: '0 4px', offset: 0.22 }, { translate: '0 -1.5px', offset: 0.6 }, { translate: '0 0' }], { duration: 460, easing: 'cubic-bezier(.3,.6,.4,1)' });
+  const btn = orbEl.closest('.corb');
+  if (btn) { btn.classList.remove('impact'); void btn.offsetWidth; btn.classList.add('impact'); setTimeout(() => btn.classList.remove('impact'), 800); }
+}
+
 function coachMorph(open, under) {
   settleCoachFx();
   const aura = $('.aura'), bloom = aura?.querySelector('.bloom'), veil = aura?.querySelector('.veil'), orb = $('#dock .orbbtn');
@@ -175,10 +187,6 @@ function coachMorph(open, under) {
   let x = orb.offsetWidth / 2, y = orb.offsetHeight / 2;
   for (let n = orb; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }
   aura.style.setProperty('--ax', x + 'px'); aura.style.setProperty('--ay', y + 'px');
-  // the ring of light is drawn at the size that reaches the top corners, and grows into it from the orb
-  const reach = Math.hypot(Math.max(x, app.clientWidth - x), y) + 24;
-  aura.style.setProperty('--wd', Math.round(reach * 2) + 'px');
-  const r0 = Math.min(0.2, 34 / reach);
   if (stillMotion()) return;
   const dockOrb = orb.querySelector('.orb'), coach = $('#s-coach');
   const other = under && under !== coach ? under : null;
@@ -193,14 +201,14 @@ function coachMorph(open, under) {
     let flying = null;
     queueMicrotask(() => {
       const corb = $('#composer .corb .orb');
-      flying = from && corb && flyOrb(from, layRect(corb), { duration: 540, go, onland: () => { app.classList.remove('orbtravel'); haptic('land'); } });
+      flying = from && corb && flyOrb(from, layRect(corb), { duration: 540, go, onland: () => { app.classList.remove('orbtravel'); impact(corb); } });
       if (flying) { app.classList.add('orbtravel', 'orbflown'); go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 900, fill: 'forwards' }); return; }
       go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
       setTimeout(() => haptic('land'), 560);
     });
     const last = go(bloom, [{ scale: 0.1, opacity: 0 }, { scale: 0.55, opacity: 1, offset: 0.3 }, { scale: 1.5, opacity: 0 }], { duration: 820, easing: 'cubic-bezier(.33,.1,.25,1)' });
     // a ring of light ripples out of the orb with the bloom
-    go(aura.querySelector('.wave'), [{ transform: `translate(-50%, -50%) scale(${r0})`, opacity: 0 }, { opacity: 1, offset: 0.1 }, { opacity: 0.85, offset: 0.62 }, { transform: 'translate(-50%, -50%) scale(1)', opacity: 0 }], { duration: 1050, easing: 'cubic-bezier(.22,.6,.2,1)' });
+    go(aura.querySelector('.wave'), [{ transform: 'translate(-50%, -50%) scale(.35)', opacity: 0 }, { opacity: 1, offset: 0.15 }, { transform: 'translate(-50%, -50%) scale(7)', opacity: 0 }], { duration: 900, easing: 'cubic-bezier(.2,.7,.2,1)' });
     // held (fill both) until everything settles together: an animation ending on its own mid-way let
     // the page underneath show through for a frame or two on the phone
     go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: 560, delay: 90, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'both' });
@@ -226,8 +234,6 @@ function coachMorph(open, under) {
     go(coach, [{ opacity: 1, transform: 'none', visibility: 'visible' }, { opacity: 0, transform: 'translateY(20px) scale(.97)', visibility: 'visible' }], { duration: 220, easing: 'cubic-bezier(.4,0,.6,1)' });
     go(veil, [{ opacity: 1 }, { opacity: 0 }], { duration: 480, delay: 60, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'backwards' });
     const last = go(bloom, [{ scale: 1.3, opacity: 0 }, { scale: 0.6, opacity: 0.85, offset: 0.5 }, { scale: 0.08, opacity: 0 }], { duration: 680, easing: 'cubic-bezier(.4,0,.25,1)' });
-    // the ring comes back down from the top of the screen and gathers into the orb
-    go(aura.querySelector('.wave'), [{ transform: 'translate(-50%, -50%) scale(1)', opacity: 0 }, { opacity: 0.85, offset: 0.3 }, { opacity: 1, offset: 0.8 }, { transform: `translate(-50%, -50%) scale(${r0})`, opacity: 0 }], { duration: 620, easing: 'cubic-bezier(.55,0,.35,1)' });
     go(other, [{ scale: 0.95, opacity: 0.25 }, { scale: 1, opacity: 1 }], { duration: 560, delay: 80, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' });
     // the orb leaves the message box and flies home into the bar, which takes it with a small pulse
     const corb = $('#composer .corb .orb');
@@ -408,7 +414,7 @@ initWorkout($('#s-workout'), actions);
 initSettings(actions, $('#s-settings'));
 setWorkoutNav({ go, showDetail });
 initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings'), openCoach: () => go('coach') });
-initCoach({ openSettings: () => pushSub('settings'), closeCoach: () => closeCoach() });
+initCoach({ openSettings: () => pushSub('settings'), closeCoach: () => closeCoach(), go: name => go(name, { quiet: true }), open: name => pushSub(name) });
 setCardioNav({ go, showDetail });
 initCardio();
 initBody();
