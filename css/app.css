@@ -2819,3 +2819,31 @@ svg.fig[data-move]{contain:layout paint}
 .orbbtn.pulse-land .orb{animation:none}
 .orbbtn.pulse-land::after{animation:orbringsoft calc(var(--m-slow) * 1.6) var(--e-out)}
 .btn2.delw{width:100%;margin:10px 0 8px}
+
+/* ======================= 1.56: typography and touch ======================= */
+/* headlines in two weights: the first word carries it, the rest is lighter and softer */
+.greet .gw{font-weight:560;color:color-mix(in srgb,var(--ink) 64%,transparent)}
+.greet .gw.gw-lead{font-weight:800;color:var(--ink)}
+/* titles arrive word by word: each blurs in and rises a touch */
+.greet .gw,.tw{display:inline-block}
+.screen.enter .greet .gw,.screen.enter .tw{animation:titleword calc(var(--m-slow) * 1.5) var(--e-out) both;animation-delay:calc(var(--i) * 65ms + var(--m-press) / 2)}
+@keyframes titleword{from{opacity:0;filter:blur(8px);transform:translateY(.32em)}}
+@media (prefers-reduced-motion: reduce){ .screen.enter .greet .gw,.screen.enter .tw{animation:none} }
+html[data-motion=off] .screen.enter :is(.greet .gw,.tw){animation:none}
+/* buttons are full pills */
+.log,.btn2{border-radius:999px}
+/* record tiles: a glossy medal on each (gold for a record from the last week), and a tilt when pressed */
+.prtile{padding-right:52px;transition:transform var(--m-slow) var(--e-spring)}
+.prtile.tilting{transition:transform var(--m-fast) var(--e-out)}
+.prbadge{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;transition:transform var(--m-slow) var(--e-spring);
+  background:conic-gradient(from 210deg,#f4f1ff,#a99af2 18%,#ffffff 32%,#7a67f2 52%,#d9d2ff 70%,#8f7ff0 86%,#f4f1ff);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.9),inset 0 -2px 3px rgba(40,25,110,.45),0 4px 12px -3px rgba(var(--v-rgb),.7)}
+.prbadge::before{content:"";position:absolute;inset:4px;border-radius:50%;background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--accent) 55%,#fff),var(--violet) 75%);box-shadow:inset 0 1px 2px rgba(20,10,60,.55)}
+.prbadge svg{position:relative;width:14px;height:14px;fill:#fff;filter:drop-shadow(0 1px 1px rgba(20,10,60,.5))}
+.prtile.fresh .prbadge{background:conic-gradient(from 210deg,#fff4e2,#e2a35c 18%,#fffaf0 32%,#b97a35 52%,#ffe2b8 70%,#cf9148 86%,#fff4e2);box-shadow:inset 0 1px 1px rgba(255,255,255,.9),inset 0 -2px 3px rgba(110,60,10,.45),0 4px 14px -3px rgba(255,190,110,.75)}
+.prtile.fresh .prbadge::before{background:radial-gradient(circle at 35% 30%,#fff1d6,#e0a256 75%);box-shadow:inset 0 1px 2px rgba(90,45,5,.5)}
+.prtile.fresh .prbadge svg{fill:#fffaf0;filter:drop-shadow(0 1px 1px rgba(90,45,5,.55))}
+.prshine{position:absolute;inset:0;pointer-events:none;border-radius:inherit;opacity:0;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.10) 50%,transparent 65%);transition:opacity var(--m-fast) var(--e-out),transform var(--m-slow) var(--e-spring)}
+.prtile.tilting .prshine{opacity:1}
+@media (prefers-reduced-motion: reduce){ .prtile,.prbadge,.prshine{transition:none} }
+.prtile{animation-fill-mode:backwards}

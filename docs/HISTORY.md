@@ -678,3 +678,10 @@ Your feedback over the last day says the look and motion started going downhill 
 
 - [x] The orb no longer hits the message box: no squash, wobble, box push or shake. It decelerates to a stop exactly in its place (the landing frames match the resting orb), a soft light spreads through the box, one light haptic. Closing glides it home the same way; the bar takes it with a faint ring instead of a squash-and-settle
 - [x] Delete a finished workout from its page: a confirm sheet, then it's gone with an Undo. Records are rebuilt from the remaining history in one transaction, so a record the deleted workout held moves back to whichever workout holds it now
+
+## 1.56.0: polish: titles, pill buttons, record medals
+
+- [x] The Today greeting in two weights: the first word bold, the rest lighter and softer ("**Good** evening.")
+- [x] Page titles (and the greeting) arrive word by word, each blurring in and rising a touch, on every page entrance
+- [x] Buttons are full pills
+- [x] Records wall: every record carries a glossy medal (lavender; gold for one set in the last week), and pressing a tile tilts it towards your finger in 3D with the medal shifting and a shine sliding across; it springs back on release (transform only)

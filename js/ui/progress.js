@@ -22,6 +22,7 @@ const kg = v => weight(v, state.settings.unit, state.lang);
 const short = t => new Intl.DateTimeFormat(state.lang === 'da' ? 'da-DK' : 'en-GB', { day: 'numeric', month: 'short' }).format(t);
 
 export function renderProgress(root) {
+  installTilt();
   const { t, lang } = state;
   const weeks = weeklySeries(state.history, state.cardio, range);
   const vol = weeks.reduce((a, w) => a + w.volume, 0);
@@ -93,6 +94,7 @@ function wallHTML() {
   const fresh = Date.now() - 7 * 86_400_000;
   return `<div class="section"><span class="label">${t('progress.records')}</span></div>
     <div class="prwall">${tiles.map((x, i) => `<button class="prtile solid${x.last >= fresh ? ' fresh' : ''}" data-ex="${esc(x.id)}" style="--i:${i}">
+      <span class="prbadge" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg></span><span class="prshine" aria-hidden="true"></span>
       <span class="prn">${esc(state.catalog.name(x.id, lang))}</span>
       ${x.weight ? `<b>${esc(kg(x.weight.kg))}<small> ${u()} × ${x.weight.reps}</small></b>` : ''}
       ${x.e1rm ? `<span class="pre">${esc(t('pr.e1rm'))} ${esc(kg(x.e1rm.value))} ${u()}</span>` : ''}
@@ -161,4 +163,37 @@ function sleepHTML() {
     <div class="chead"><span class="label">${t('checkin.sleepTitle')}</span><span class="cval"><b>${esc(fmt(tr.avg))}</b> ${esc(t('checkin.sleepAvg', { h: '' }).trim())}</span></div>
     ${barChart(tr.series.map((p, i) => ({ v: p.v, label: p.date, hot: i === tr.series.length - 1 })), { color: 'blue', fmt })}
   </div>`;
+}
+
+// Record tiles are objects you can touch: pressed, a tile tilts towards your finger with its medal
+// shifting a little and a shine sliding across it, and springs back when you let go (transform only).
+let tiltOn = false;
+function installTilt() {
+  if (tiltOn) return;
+  tiltOn = true;
+  const still = () => document.documentElement.dataset.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let cur = null;
+  const aim = (tile, e) => {
+    const r = tile.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+    tile.style.transform = `perspective(600px) rotateX(${(-y * 14).toFixed(2)}deg) rotateY(${(x * 16).toFixed(2)}deg) scale(.985)`;
+    tile.querySelector('.prbadge')?.style.setProperty('transform', `translate(${(x * 5).toFixed(1)}px, ${(y * 5).toFixed(1)}px)`);
+    tile.querySelector('.prshine')?.style.setProperty('transform', `translateX(${(x * 90).toFixed(1)}%)`);
+  };
+  const rest = () => {
+    if (!cur) return;
+    const t = cur; cur = null;
+    t.classList.remove('tilting');
+    t.style.transform = '';
+    t.querySelector('.prbadge')?.style.removeProperty('transform');
+    t.querySelector('.prshine')?.style.removeProperty('transform');
+  };
+  document.addEventListener('pointerdown', e => {
+    const t = e.target.closest?.('.prtile');
+    if (!t || still()) return;
+    cur = t;
+    t.classList.add('tilting');
+    aim(t, e);
+  }, { passive: true });
+  document.addEventListener('pointermove', e => { if (cur) aim(cur, e); }, { passive: true });
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) document.addEventListener(ev, rest, { passive: true });
 }

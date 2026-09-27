@@ -1,8 +1,10 @@
 # Setline plan
 
-All five phases from SPEC.md section 7 are done. Work now happens as fixes and polish the user asks for. The current version is in `js/version.js` (1.55.0). The release log, including releases that were later undone, is in `docs/HISTORY.md`; read it only when you need the story behind something.
+All five phases from SPEC.md section 7 are done. Work now happens as fixes and polish the user asks for. The current version is in `js/version.js` (1.56.0). The release log, including releases that were later undone, is in `docs/HISTORY.md`; read it only when you need the story behind something.
 
 ## What's in the app now
+
+**Look.** Headlines in two weights (the Today greeting's first word bold, the rest lighter and softer); page titles arrive word by word, each blurring in and rising a touch; buttons are full pills. Records on Progress carry a glossy medal (gold for one set in the last week), and a record tile tilts towards your finger with a shine sliding across it when pressed.
 
 **Navigation.** A floating glass dock: Today, Train, the orb in the middle, Food, You. Tapping the orb blooms the Coach open over the whole screen; holding it is hold-to-talk for a voice command. Settings opens from the icon on Today and from You. The status bar is the app's own colour; when content scrolls under it, a short gradient just below it (barely noticeable) blends it into the page; it also takes the Coach's, the voice screen's and an open sheet's colour. The bar at the bottom is clear, bright-rimmed live glass with a wide, soft gradient blur that feathers out around the bar (and follows it when it shrinks to the pill); its indicator slides with a liquid stretch and the chosen icon springs (Customize → Glass: Liquid / Soft / Off; Background glow: On / Soft / Off). Pages and sheets animate in; sheets are iOS-style (the page behind shrinks back) and close with a swipe down. The Android back swipe is respected.
 

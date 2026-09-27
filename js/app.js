@@ -122,6 +122,15 @@ function renderMini() {
 // they change (rewriting them on every render made the phone re-check the styles of the whole page,
 // many times a second while a voice command or a workout start redrew)
 const rootSet = (k, v) => { const d = document.documentElement.dataset; if (d[k] !== v) d[k] = v; };
+// Page titles arrive word by word, each blurring in and rising a touch (only while the page is entering;
+// plain-text titles only, so nothing interactive inside a title is touched)
+function titleWords(root) {
+  for (const h of root?.querySelectorAll(':scope > .h1, :scope > .hhead > .greet, :scope > .exhero .h1, :scope > .cdhead .h1') || []) {
+    if (h.dataset.w || h.children.length) continue;
+    h.dataset.w = '1';
+    h.innerHTML = h.textContent.trim().split(/\s+/).map((w, i) => `<span class="tw" style="--i:${i}">${esc(w)}</span>`).join(' ');
+  }
+}
 function renderAll() {
   const html = document.documentElement;
   if (html.lang !== state.lang) html.lang = state.lang;
@@ -134,6 +143,7 @@ function renderAll() {
   if (html.hasAttribute('data-duo') !== duo) html.toggleAttribute('data-duo', duo);
   if (document.documentElement.dataset.accent !== state.settings.accent) { document.documentElement.dataset.accent = state.settings.accent; refreshChrome(); }
   renderScreen();
+  titleWords($('#s-' + view.screen));
   animateFigures($('#s-' + view.screen));
   pauseHiddenFigures();
   renderDock();
