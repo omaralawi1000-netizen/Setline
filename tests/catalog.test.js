@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { EXERCISES } from '../data/exercises.js';
 import { createCatalog, normalize, makeCustom, MUSCLES, EQUIPMENT } from '../js/catalog.js';
 
-test('catalog has about 60 unique, complete exercises', () => {
-  assert.ok(EXERCISES.length >= 55 && EXERCISES.length <= 75, `count ${EXERCISES.length}`);
+test('catalog is a full gym: unique, complete exercises', () => {
+  assert.ok(EXERCISES.length >= 140, `count ${EXERCISES.length}`);
   const ids = new Set(), en = new Set(), da = new Set();
   for (const e of EXERCISES) {
     assert.ok(e.id && e.en && e.da, e.id);
@@ -65,14 +65,14 @@ test('usage frequency nudges ties', () => {
 test('names by language and custom exercises', () => {
   assert.equal(cat.name('bench-press', 'da'), 'Bænkpres');
   assert.equal(cat.name('bench-press', 'en'), 'Bench press');
-  const c = makeCustom({ name: '  Landmine  press ', muscle: 'shoulders', equipment: 'barbell' }, 'c-1');
+  const c = makeCustom({ name: '  Viking  press ', muscle: 'shoulders', equipment: 'barbell' }, 'c-1');
   assert.equal(c.ok, true);
-  assert.equal(c.exercise.en, 'Landmine press');
+  assert.equal(c.exercise.en, 'Viking press');
   const withCustom = createCatalog([c.exercise]);
-  assert.equal(withCustom.search('landmine')[0].id, 'c-1');
+  assert.equal(withCustom.search('viking')[0].id, 'c-1');
   assert.equal(withCustom.get('c-1').custom, true);
   assert.equal(makeCustom({ name: 'x', muscle: 'chest', equipment: 'barbell' }).ok, false);
   assert.equal(makeCustom({ name: 'Thing', muscle: 'nope', equipment: 'barbell' }).ok, false);
   assert.equal(cat.findExact('Bænkpres').id, 'bench-press');
-  assert.equal(cat.findExact('landmine press'), null);
+  assert.equal(cat.findExact('viking press'), null);
 });

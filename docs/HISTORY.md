@@ -605,3 +605,18 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Muscles this week: when a group is behind, "Add 3 sets" puts its main lift into the running workout (or ask the Coach how to fit it in)
 - [x] Progress: your month as a picture (sessions, volume, records, biggest moves, bodyweight, cardio) to share or save
 - [x] Home-screen shortcut: Report a bug or idea
+
+## 1.51.0: the app understands which exercise you mean, a full gym's library, motion-blur orb, thinking text, quicker voice
+
+- [x] The library is a full gym now: 156 exercises (was 68), with the machines, cables, Smith and plate-loaded variations (machine preacher curl, reverse pec deck, chest-supported row, pendulum squat, rope pushdown, hip thrust machine, ab crunch machine, …) in English and Danish
+- [x] Names are matched word by word and forgive the usual mishearings ("preacher kill", "hammer girls", "lateral rays", "cable flies"); a kit word you add or leave out costs a little, a word that isn't in the name rules it out; an exercise in today's workout wins a close call ("preacher curl" is the machine preacher curl you're doing)
+- [x] Bug: a name the app didn't know put the set on the exercise you were on (a machine preacher curl logged as a hammer curl). Now it asks: the nearest one, the one you're on, or "Add …" (it becomes your own exercise and the set goes on it). The same for the AI fallback
+- [x] Saying a name moves to that exercise (added if it isn't in the workout) and logs there; without a name it's the exercise you're on. "Next set was only nine reps", "only 9 reps", "sættet var kun 9" log the planned set with those reps
+- [x] Bug: "preacher curl 30 kg 10 reps" was read as a records question ("pr…")
+- [x] Weight steps removed from Settings: the app uses a full gym's steps (bars and machines 2.5 kg, dumbbells 2 kg)
+- [x] Spoken replies start sooner: the first sentence's voice is made while the reply is still being written, so it plays the moment the answer is in
+- [x] 30 Gemini voices (was 10), the most natural first
+- [x] Voice commands you undo right away are noted as likely mix-ups and go along with bug reports
+- [x] The orb's flight has motion blur (stretched along its path, a little soft at speed) and a soft light trail; the landing pushes the box a little more
+- [x] Thinking: the message box says what it's doing ("Thinking…", "Reading your log…", "Looking at your lifts…", "Putting it together…"), each phrase blurring in letter by letter along a colour gradient
+- [x] Status bar: under a scrolled page the blur used to re-saturate the colour below the bar (a bluer band on blue themes); now the colour sits over the blur and matches exactly

@@ -8,7 +8,6 @@ import { ageOf } from '../profile.js';
 import { dateKey } from '../body.js';
 import { VERSION } from '../version.js';
 import { LIMITS } from '../workout.js';
-import { STEP_GROUPS, STEP_CHOICES } from '../progression.js';
 import { addMemories, isRoutineImport } from '../coach.js';
 import { haptic } from '../haptics.js';
 import { I } from './icons.js';
@@ -59,33 +58,6 @@ function speechStatus() {
   if (!lastSpeech.error) return t('speech.instant');
   const why = lastSpeech.error === 'nokey' ? t('speech.why.nokey') : lastSpeech.error === 'quota' ? t('speech.why.quota') : lastSpeech.error === 'busy' ? t('speech.why.busy') : t('speech.why.error', { code: lastSpeech.error });
   return t('speech.device', { why });
-}
-
-// Weight steps: how far − and + move for each kind of kit (and how big the suggested jumps are)
-const STEP_DEFAULT = { barbell: 2.5, dumbbell: 2, machine: 2.5 };
-function stepsSummary() {
-  const { t } = state;
-  const s = state.settings.kgSteps || {};
-  return STEP_GROUPS.map(g => `${t('steps.' + g)} ${num(s[g] || STEP_DEFAULT[g], state.lang, 2)} kg`).join(' · ');
-}
-function stepsSheet() {
-  const { t } = state;
-  openSheet(el => {
-    const paint = () => {
-      const s = state.settings.kgSteps || {};
-      el.innerHTML = `<div class="sbody"><h2>${t('steps.title')}</h2><p class="lead">${t('steps.lead')}</p>
-        ${STEP_GROUPS.map(g => `<div class="field"><label>${t('steps.' + g)}<small> · ${t('steps.' + g + 'Sub')}</small></label><div class="opts">${STEP_CHOICES.map(v => `<button class="chip" data-step="${g}" data-v="${v}" aria-pressed="${(s[g] || STEP_DEFAULT[g]) === v}">${num(v, state.lang, 2)} kg</button>`).join('')}</div></div>`).join('')}
-        ${state.settings.unit === 'lb' ? `<p class="snote">${t('steps.lbNote')}</p>` : ''}</div>`;
-    };
-    paint();
-    el.addEventListener('click', e => {
-      const b = e.target.closest('[data-step]');
-      if (!b) return;
-      haptic('tap');
-      setSettings({ kgSteps: { ...(state.settings.kgSteps || {}), [b.dataset.step]: Number(b.dataset.v) } });
-      paint();
-    });
-  }, { label: t('steps.title') });
 }
 
 function profileRow() {
@@ -173,7 +145,6 @@ export function renderSettings(root) {
     <div class="sgroup"><h2>${t('settings.workout')}</h2><div class="slist solid">
       <div class="srow"><span class="l"><strong>${t('settings.rest')}</strong><small>${t('settings.restSub')}</small></span>
         <div class="stepper"><button class="step" data-act="rest-default" data-d="-15" aria-label="−15 s" ${s.restSec <= LIMITS.restMin ? 'disabled' : ''}>−</button><b>${t('seconds', { n: s.restSec })}</b><button class="step" data-act="rest-default" data-d="15" aria-label="+15 s" ${s.restSec >= LIMITS.restMax ? 'disabled' : ''}>+</button></div></div>
-      <button class="srow" data-act="kg-steps"><span class="l"><strong>${t('steps.title')}</strong><small>${esc(stepsSummary())}</small></span>${I.fwd}</button>
       <div class="srow"><span class="l"><strong>${t('settings.autoAdvance')}</strong><small>${t('settings.autoAdvanceSub')}</small></span>
         <button class="toggle" role="switch" aria-checked="${s.autoAdvance}" aria-label="${t('settings.autoAdvance')}" data-act="toggle" data-key="autoAdvance"></button></div>
       <div class="srow"><span class="l"><strong>${t('settings.autoWarmup')}</strong><small>${t('settings.autoWarmupSub')}</small></span>
@@ -283,7 +254,6 @@ export function initSettings(actions, root) {
       renderSettings(root);
     },
     set: el => { setSettings({ [el.dataset.key]: el.dataset.v }); haptic('tap'); },
-    'kg-steps': () => { haptic('tap'); stepsSheet(); },
     memory: () => { haptic('tap'); memorySheet(); },
     report: () => { haptic('tap'); openReport(); },
     'rest-alerts': async () => {

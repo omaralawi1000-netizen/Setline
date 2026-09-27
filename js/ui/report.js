@@ -21,6 +21,13 @@ const saveReports = list => save(KEY, sanitizeReports(list));
 let heard = [];
 export function noteHeard(text) { const t = String(text || '').trim(); if (t) heard = [...heard, t.slice(0, 160)].slice(-5); }
 
+// voice commands you undid right away (it heard or did the wrong thing), kept across reloads
+const MIX = 'setline.mixups';
+export function noteMixup({ heard, did, type }) {
+  const list = load(MIX);
+  save(MIX, [...list, { at: Date.now(), heard: String(heard || '').slice(0, 160), did: String(did || '').replace(/<[^>]+>/g, '').slice(0, 120), type: String(type || '') }].slice(-15));
+}
+
 // errors, kept across reloads (the last 12)
 let errToast = false;
 export function installErrorLog() {
@@ -45,6 +52,7 @@ function context() {
     device: `${android ? `Android ${android}` : navigator.platform || ''}${chrome ? ` · Chrome ${chrome}` : ''} · ${innerWidth}×${innerHeight}${matchMedia('(display-mode: standalone)').matches ? ' · installed' : ''}`,
     settings: `lang ${s.lang}, voice ${s.voiceLang}, mic ${s.micMode}, spoken ${s.spoken}, theme ${s.accent}, glass ${s.glass}, motion ${s.motion}`,
     heard: [...heard],
+    mixups: load(MIX).slice(-8),
     errors: load(ERRS).slice(-6)
   };
 }
@@ -73,7 +81,7 @@ export function openReport({ kind = 'bug', text = '' } = {}) {
       el.innerHTML = `<div class="sbody"><h2>${t('report.title')}</h2><p class="lead">${t('report.lead')}</p>
         <div class="opts rkinds">${KINDS.map(x => `<button class="chip" data-rk="${x}" aria-pressed="${x === k}">${t('report.kind.' + x)}</button>`).join('')}</div>
         <textarea class="brief solid" data-rtext rows="5" maxlength="2000" placeholder="${esc(t('report.ph.' + k))}">${esc(keep)}</textarea>
-        <p class="snote">${esc(t('report.adds', { n: ctx.errors.length, h: ctx.heard.length }))}</p>
+        <p class="snote">${esc(t('report.adds', { n: ctx.errors.length, h: ctx.heard.length, m: ctx.mixups.length }))}</p>
         <div class="acts"><button class="log" data-r="send">${I.upload}<span>${t('report.sendGit')}</span></button><button class="btn2 solid" data-r="save">${t('report.later')}</button></div>
         ${list.length ? `<div class="section"><span class="label">${t('report.yours', { n: list.length })}</span><button class="textbtn" data-r="copy">${t('report.copyAll')}</button></div>
           <ul class="rlist">${list.map(r => `<li class="solid"><span class="tag sm">${t('report.kind.' + r.kind)}</span><span class="rt">${esc(r.text.split('\n')[0].slice(0, 80))}</span>

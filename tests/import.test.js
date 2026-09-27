@@ -35,7 +35,8 @@ test('the copy keeps weights, makes missing exercises, never duplicates', () => 
   assert.equal(curl.exerciseId, 'seated-leg-curl'); assert.equal(curl.reps, 10);
   assert.equal(calf.kg, null);
   assert.equal(plan.days[1].exercises.length, 1, 'no duplicates in a day');
-  assert.equal(plan.customs.filter(c => /smith/i.test(c.en)).length, 1, 'one custom shared across days');
+  assert.equal(plan.days[1].exercises[0].exerciseId, 'smith-incline-press', 'the library has it now (1.51)');
+  assert.equal(plan.customs.filter(c => /smith/i.test(c.en)).length, 0, 'no custom for it');
   assert.equal(plan.days[2].exercises[0].exerciseId, plan.days[1].exercises[0].exerciseId);
   const r = planToRoutines(plan);
   assert.equal(r[0].exercises[0].sets[0].kg, 70);

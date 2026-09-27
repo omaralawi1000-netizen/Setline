@@ -34,6 +34,7 @@ export function reportBody(r) {
   if (c.device) lines.push(`**Device** ${c.device}`);
   if (c.settings) lines.push(`**Settings** ${c.settings}`);
   if (c.heard?.length) lines.push('', '**Last things heard by voice**', ...c.heard.map(h => `- "${h}"`));
+  if (c.mixups?.length) lines.push('', '**Voice commands undone right away (likely misunderstood)**', ...c.mixups.map(x => `- heard "${x.heard}" → did: ${x.did}${x.type ? ` (${x.type})` : ''}`));
   if (c.errors?.length) lines.push('', '**Recent errors**', '```', ...c.errors.map(e => `${stamp(e.at)} ${e.msg}${e.where ? ` @ ${e.where}` : ''}`), '```');
   lines.push('', '_Sent from Setline_');
   return lines.join('\n');

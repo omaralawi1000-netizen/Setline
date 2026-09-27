@@ -365,6 +365,14 @@ export function clearVoiceRest() { try { localStorage.removeItem(QUOTA_KEY); } c
 // where in it. Set by speak(), read by speechPos().
 let track = null;
 
+// The first sentence of a reply that is still streaming in: its voice is made straight away, so
+// speaking starts the moment the answer is complete instead of a few seconds later.
+export function prefetch(first, opts) {
+  if (!first || !opts.key || opts.model === 'device' || Date.now() < quotaUntil()) return;
+  clip(first, opts).catch(() => {});
+}
+export const firstSentence = text => /^(.{12,}?[.!?…])(?=\s|$)/.exec(String(text || '').trim())?.[1] || null;
+
 export async function speak(text, opts) {
   if (!text) return;
   stop();
@@ -373,7 +381,9 @@ export async function speak(text, opts) {
   const resting = opts.model !== 'device' && Date.now() < quotaUntil();
   if (resting) lastSpeech.error = 'quota';
   if (opts.key && opts.model !== 'device' && !resting) { // 'device': the phone's own voice, no network wait
-    const parts = splitSpeech(text);
+    // the first sentence already made while the answer streamed in: it plays at once, the rest follows
+    const t = String(text).trim(), first = opts.first && t.startsWith(opts.first) && t.length - opts.first.length >= 12 ? opts.first : null;
+    const parts = first ? [first, t.slice(first.length).trim()] : splitSpeech(text);
     const jobs = parts.map(p => clip(p, opts));
     jobs.forEach(j => j.catch(() => {})); // a later piece failing is handled when we get to it
     let played = 0;

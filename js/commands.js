@@ -527,6 +527,12 @@ export function resolve(intent, snap, t, lang) {
     case 'Cancel': return cmd('cancel', { title: t('voice.cancelled'), say: '' });
     case 'Help': return cmd('info', { title: t('voice.help'), sub: ['voice.hint.log', 'voice.hint.same', 'voice.hint.add', 'voice.hint.skip', 'voice.hint.next', 'voice.hint.last'].map(k => t(k)).join(' · '), say: '' });
     case 'Ask': {
+      // a name that isn't in the library: the nearest, the one you're on, or add it (never a silent guess)
+      if (intent.reason === 'newExercise') {
+        const choices = (intent.choices || []).map(id => ({ label: name(id), intent: { ...intent.then, exerciseId: id, heard } }));
+        choices.push({ label: t('voice.addNew', { name: intent.name }), intent: { type: 'NewExercise', name: intent.name, then: intent.then } });
+        return cmd('ask', { title: t('voice.unknownExercise', { name: intent.name }), sub: t('voice.heard', { text: heard }), say: say(t('say.unknownExercise', { name: intent.name })), choices });
+      }
       if (intent.reason === 'exercise' && intent.choices?.length) {
         return cmd('ask', {
           title: t('voice.askExercise'), sub: t('voice.heard', { text: heard }), say: say(t('say.askExercise')),

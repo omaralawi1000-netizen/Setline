@@ -246,6 +246,41 @@ function syncThinking() {
   const app = document.getElementById('app');
   const on = !!document.querySelector('#s-coach .msg.ai.is-thinking') || document.getElementById('composer')?.dataset.talk === 'thinking';
   if (app && app.classList.contains('thinking') !== on) app.classList.toggle('thinking', on);
+  thinkWords(on);
+}
+
+// While it thinks, the message box says what it's doing: "Thinking", then "Reading your log…",
+// "Putting it together…". Each phrase blurs in letter by letter along a soft colour gradient and
+// blurs away for the next.
+let thinkTimer = 0, thinkN = 0;
+function thinkWords(on) {
+  const box = document.getElementById('composer');
+  if (!box) return;
+  let el = box.querySelector('.thinkline');
+  if (!on) {
+    clearInterval(thinkTimer); thinkTimer = 0;
+    if (el && !el.classList.contains('gone')) { el.classList.add('gone'); setTimeout(() => { if (el.classList.contains('gone')) el.remove(); }, 400); }
+    return;
+  }
+  if (thinkTimer) return;
+  if (!el || el.classList.contains('gone')) { el?.remove(); el = document.createElement('span'); el.className = 'thinkline'; el.setAttribute('aria-live', 'polite'); box.querySelector('input')?.after(el); }
+  const { t } = state;
+  const phrases = [t('coach.thinking'), t('coach.step1'), t('coach.step2'), t('coach.step4')];
+  thinkN = 0;
+  const show = () => {
+    const text = phrases[thinkN < phrases.length ? thinkN : 1 + ((thinkN - 1) % (phrases.length - 1))]; // then round the steps again
+    thinkN++;
+    const old = el.querySelector('.tp:not(.out)');
+    if (old) { old.classList.add('out'); setTimeout(() => old.remove(), 420); }
+    const p = document.createElement('span');
+    p.className = 'tp';
+    const chars = [...text];
+    p.innerHTML = chars.map((c, i) => `<span class="tc" style="--i:${i};--k:${Math.round((i / Math.max(1, chars.length - 1)) * 100)}%">${c === ' ' ? '&nbsp;' : esc(c)}</span>`).join('');
+    p.setAttribute('aria-label', text);
+    el.append(p);
+  };
+  show();
+  thinkTimer = setInterval(show, 1900);
 }
 
 function pulseOrb() {
@@ -509,18 +544,23 @@ export async function ask(question, { root = $('#s-coach'), voice = false } = {}
   try {
     const typer = typewriter(root, reply.id);
     const slow = 0;
+    // the voice for the first sentence is made while the rest is still being written
+    const willTalk = voice || state.settings.spoken !== 'off';
+    const ttsOpts = { key, model: ttsModelId(state.settings), alt: ttsAlt(state.settings), voice: state.settings.voice, lang, canSpeak: () => !isRecording() };
+    let first = null;
     const text = await withFallback(coachModels(state.settings), model => streamChat({
       key, model, system: systemPrompt(lang), contents: chatContents(history, context, question), signal: ctl.signal,
-      onText: full => { clearTimeout(slow); store.updateChat(reply.id, { text: full }, { quiet: true }); typer.set(full); }
+      onText: full => {
+        clearTimeout(slow); store.updateChat(reply.id, { text: full }, { quiet: true }); typer.set(full);
+        if (willTalk && !first) { const f = tts.firstSentence(speakable(hideMemoryTail(full))); if (f && f.length < speakable(hideMemoryTail(full)).length - 2) { first = f; tts.prefetch(first, ttsOpts); } }
+      }
     }), { rounds: 3, wait: 2500, alsoRetry: ['timeout'] }).finally(() => clearTimeout(slow)); // busy servers get a patient second and third go
     // the voice starts as soon as the answer is in, while the words are still appearing on screen
     const { text: saidMem, facts: all } = splitMemories(text);
     const { text: saidPlain, changes } = splitChanges(saidMem);
     const { text: saidClean, actions } = splitActions(saidPlain);
     const said = saidClean;
-    const talk = said && (voice || state.settings.spoken !== 'off')
-      ? tts.speak(speakable(said), { key, model: ttsModelId(state.settings), alt: ttsAlt(state.settings), voice: state.settings.voice, lang, canSpeak: () => !isRecording() })
-      : null;
+    const talk = said && willTalk ? tts.speak(speakable(said), { ...ttsOpts, first }) : null;
     if (talk) { speakId = reply.id; talk.finally(() => { if (speakId === reply.id) speakId = null; }); }
     await typer.drain();
     // "REMEMBER: …" lines become memories and leave the reply

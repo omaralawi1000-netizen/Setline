@@ -109,8 +109,13 @@ export const todayOrderOf = s => order(s.todayOrder, TODAY_ORDER);
 export const TODAY_PARTS = ['checkin', 'weekplan', 'plateau', 'goals', 'cardio', 'week', 'balance', 'body', 'review', 'routines'];
 
 // Gemini prebuilt voices and how they sound.
-export const VOICES = ['Achird', 'Sulafat', 'Callirrhoe', 'Puck', 'Aoede', 'Despina', 'Zubenelgenubi', 'Leda', 'Kore', 'Charon'];
-export const VOICE_FEEL = { Achird: 'friendly', Sulafat: 'warm', Callirrhoe: 'easy-going', Puck: 'upbeat', Aoede: 'breezy', Despina: 'smooth', Zubenelgenubi: 'casual', Leda: 'youthful', Kore: 'firm', Charon: 'informative' };
+// All of Gemini's voices, the most natural-sounding for a coach first
+export const VOICES = ['Achird', 'Sulafat', 'Algieba', 'Despina', 'Callirrhoe', 'Umbriel', 'Puck', 'Laomedeia', 'Sadachbia', 'Aoede', 'Zephyr', 'Autonoe', 'Iapetus', 'Erinome',
+  'Schedar', 'Achernar', 'Vindemiatrix', 'Enceladus', 'Algenib', 'Gacrux', 'Alnilam', 'Orus', 'Kore', 'Fenrir', 'Pulcherrima', 'Rasalgethi', 'Sadaltager', 'Charon', 'Zubenelgenubi', 'Leda'];
+export const VOICE_FEEL = { Achird: 'friendly', Sulafat: 'warm', Algieba: 'smooth', Despina: 'smooth', Callirrhoe: 'easy-going', Umbriel: 'easy-going', Puck: 'upbeat', Laomedeia: 'upbeat',
+  Sadachbia: 'lively', Aoede: 'breezy', Zephyr: 'bright', Autonoe: 'bright', Iapetus: 'clear', Erinome: 'clear', Schedar: 'even', Achernar: 'soft', Vindemiatrix: 'gentle', Enceladus: 'breathy',
+  Algenib: 'gravelly', Gacrux: 'mature', Alnilam: 'firm', Orus: 'firm', Kore: 'firm', Fenrir: 'excitable', Pulcherrima: 'forward', Rasalgethi: 'informative', Sadaltager: 'knowledgeable',
+  Charon: 'informative', Zubenelgenubi: 'casual', Leda: 'youthful' };
 export const DEFAULT_TTS_MODEL = 'gemini-3.8-flash-lite-tts';
 const MODEL_ID = /^[a-z0-9][a-z0-9.\-]{2,80}$/;
 

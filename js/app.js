@@ -124,7 +124,7 @@ function renderAll() {
   const glowWas = document.documentElement.dataset.glow;
   Object.assign(document.documentElement.dataset, { text: state.settings.textSize, glow: state.settings.glow, glass: state.settings.glass, dock: state.settings.dockLabels ? 'labels' : 'icons' });
   if (glowWas !== state.settings.glow) refreshChrome();
-  configureSteps(state.settings.kgSteps);
+  configureSteps(null); // the steps are the app's own now (1.51): a full gym's plates, dumbbells and stacks
   document.documentElement.toggleAttribute('data-duo', DUO.includes(state.settings.accent));
   if (document.documentElement.dataset.accent !== state.settings.accent) { document.documentElement.dataset.accent = state.settings.accent; refreshChrome(); }
   renderScreen();
@@ -172,11 +172,29 @@ function flyOrb(from, to, { duration, delay = 0, go, onland, easing, fromEl, toE
   app.append(ghost);
   const dx = to.x - from.x, dy = to.y - from.y, s0 = from.w / W;
   // one straight line, no hop: it shoots off, eases, and still has some speed left when it hits
-  const fly = go(ghost, [{ translate: '0 0', scale: s0 }, { scale: 1 + (s0 - 1) * 0.45, offset: 0.5 }, { translate: `${dx}px ${dy}px`, scale: 1 }], { duration, delay, easing, fill: 'both' });
+  const path = [{ translate: '0 0', scale: s0 }, { scale: 1 + (s0 - 1) * 0.45, offset: 0.5 }, { translate: `${dx}px ${dy}px`, scale: 1 }];
+  const fly = go(ghost, path, { duration, delay, easing, fill: 'both' });
+  // motion blur: stretched along the way it flies, most when it's fastest, and a touch soft
+  const ang = Math.atan2(dy, dx) * 180 / Math.PI, st = (x, y) => `rotate(${ang}deg) scale(${x}, ${y}) rotate(${-ang}deg)`;
+  const stretch = [{ transform: st(1, 1) }, { transform: st(1.34, 0.84), offset: 0.2 }, { transform: st(1.22, 0.9), offset: 0.55 }, { transform: st(1.06, 0.97), offset: 0.9 }, { transform: st(1, 1) }];
+  go(ghost, stretch, { duration, delay, easing: 'linear', composite: 'add' });
+  go(ghost, [{ filter: 'blur(0px)' }, { filter: 'blur(2px)', offset: 0.2 }, { filter: 'blur(0.8px)', offset: 0.6 }, { filter: 'blur(0px)', offset: 0.9 }, { filter: 'blur(0px)' }], { duration, delay, easing: 'linear' });
+  // and a soft trail of its light, a step behind
+  const echoes = [0.45, 0.22].map((o, i) => {
+    const e = document.createElement('div');
+    e.className = 'orbecho';
+    Object.assign(e.style, { left: ghost.style.left, top: ghost.style.top, width: `${W}px`, height: `${W}px` });
+    app.insertBefore(e, ghost);
+    const lag = 26 * (i + 1);
+    go(e, path, { duration, delay: delay + lag, easing, fill: 'both' });
+    go(e, stretch, { duration, delay: delay + lag, easing: 'linear', composite: 'add' });
+    go(e, [{ opacity: 0 }, { opacity: o, offset: 0.12 }, { opacity: o * 0.6, offset: 0.6 }, { opacity: 0, offset: 0.92 }, { opacity: 0 }], { duration, delay: delay + lag, easing: 'linear', fill: 'both' });
+    return e;
+  });
   const melt = { duration: duration * 0.55, delay: delay + duration * 0.3, easing: 'linear', fill: 'both' };
   go(a, [{ opacity: 1 }, { opacity: 0 }], melt);
   go(b, [{ opacity: 0 }, { opacity: 1 }], melt);
-  const done = () => { ghost.remove(); };
+  const done = () => { ghost.remove(); echoes.forEach(e => e.remove()); };
   fly.addEventListener('cancel', done);
   fly.onfinish = () => { done(); onland?.(); };
   return ghost;
@@ -192,7 +210,7 @@ function impact(orbEl, vx = 0, vy = 1) {
     { scale: sq(0.8, 1.2) }, { scale: sq(1.08, 0.94), offset: 0.3 }, { scale: sq(0.97, 1.02), offset: 0.6 },
     { scale: '1 1' }], { duration: 520, easing: 'cubic-bezier(.25,.6,.35,1)' });
   // the box takes the hit: pushed the way the orb was going, then it springs back
-  const n = Math.hypot(vx, vy) || 1, px = (vx / n) * 4, py = (vy / n) * 4 + 1;
+  const n = Math.hypot(vx, vy) || 1, px = (vx / n) * 6, py = (vy / n) * 6 + 1.5;
   $('#composer')?.animate([{ translate: '0 0', scale: 1 }, { translate: `${px}px ${py}px`, scale: 0.985, offset: 0.16 }, { translate: `${-px * 0.35}px ${-py * 0.35}px`, scale: 1.004, offset: 0.44 },
     { translate: `${px * 0.1}px ${py * 0.1}px`, offset: 0.7 }, { translate: '0 0', scale: 1 }], { duration: 540, easing: 'cubic-bezier(.25,.6,.35,1)' });
   const btn = orbEl.closest('.corb'), box = $('#composer');

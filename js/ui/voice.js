@@ -6,7 +6,7 @@ import { state } from '../store.js';
 import * as mic from '../voice.js';
 import * as tts from '../tts.js';
 import { transcribe, buildPrompt } from '../stt.js';
-import { quickReport, noteHeard } from './report.js';
+import { quickReport, noteHeard, noteMixup } from './report.js';
 import { parse } from '../parser.js';
 import { resolve, AUTO_MS } from '../commands.js';
 import { translator } from '../i18n.js';
@@ -17,7 +17,8 @@ import { unlockAudio } from '../audio.js';
 import { haptic } from '../haptics.js';
 import { $, esc } from './dom.js';
 import { I } from './icons.js';
-import { hideToast } from './toast.js';
+import { hideToast, toast } from './toast.js';
+import { makeCustom } from '../catalog.js';
 import { aiCommand, withFallback } from '../ai.js';
 import { openMealSheet } from './meal.js';
 import { foodTargets } from './food.js';
@@ -651,6 +652,23 @@ async function aiFallback(text, parsed, { typed }) {
 let confirmHook = () => false;
 export const onConfirmWord = fn => { confirmHook = fn; };
 
+// A spoken name that isn't in the library becomes your own exercise: the kit from its words
+// ("machine", "cable", …), the muscle from the nearest known lift ("… curl" → biceps).
+async function newExerciseFrom(rawName) {
+  const nameTxt = String(rawName || '').trim().replace(/^./, c => c.toUpperCase());
+  const have = state.catalog.findExact(nameTxt);
+  if (have) return have.id;
+  const low = nameTxt.toLowerCase();
+  const equipment = /machine|maskine/.test(low) ? 'machine' : /cable|kabel|rope/.test(low) ? 'cable' : /smith/.test(low) ? 'smith' : /dumbbell|håndvægt/.test(low) ? 'dumbbell' : /ez/.test(low) ? 'ezbar' : /kettlebell/.test(low) ? 'kettlebell' : /barbell|stang/.test(low) ? 'barbell' : 'machine';
+  let muscle = 'chest';
+  for (const w of low.split(/\s+/).reverse()) { const hit = state.catalog.rank(w)[0]; if (hit?.s >= 50) { muscle = hit.e.muscles[0]; break; } }
+  const r = makeCustom({ name: nameTxt, muscle, equipment });
+  if (!r.ok) return null;
+  await store.addCustomExercise(r.exercise);
+  toast({ title: esc(state.t('voice.added', { name: r.exercise.en })) });
+  return r.exercise.id;
+}
+
 function present(intent, { typed = false } = {}) {
   if (intent.type === 'Confirm') {
     if (card.cmd?.kind === 'confirm' && !card.committed) { const c = card.cmd; if (v.open) closeVoice(); commitConfirmed(c); return; }
@@ -860,6 +878,8 @@ function undoCard() {
   const cmd = card.cmd;
   if (!cmd) return;
   haptic('tap');
+  // undoing what the voice just did usually means it got you wrong: kept for a bug report
+  if (cmd.intent?.heard) noteMixup({ heard: cmd.intent.heard, did: [cmd.title, cmd.value].filter(Boolean).join(' · '), type: cmd.intent.type });
   if (!card.committed) {
     clearTimeout(card.timer);
     card.committed = true;
@@ -884,7 +904,7 @@ function undoCard() {
 
 // ---------- wiring ----------
 
-function onCardClick(e) {
+async function onCardClick(e) {
   const b = e.target.closest('[data-c]');
   if (!b) return;
   const k = b.dataset.c;
@@ -898,6 +918,11 @@ function onCardClick(e) {
     if (!ch) return;
     haptic('tap');
     dismissCard({ keepPending: false });
+    if (ch.intent.type === 'NewExercise') { // a new exercise in your library, then the set goes on it
+      const id = await newExerciseFrom(ch.intent.name);
+      if (id) return present({ ...ch.intent.then, exerciseId: id, heard: cmd.intent?.heard || '', lang: cmd.lang });
+      return;
+    }
     if (ch.intent.type === 'PickExercise') { // the full list, then the set goes on the one you pick
       const then = ch.intent.then;
       return openPicker({ onPick: id => present({ ...then, exerciseId: id, heard: cmd.intent?.heard || '', lang: cmd.lang }) });

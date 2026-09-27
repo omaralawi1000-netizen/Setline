@@ -48,7 +48,10 @@ test('SSE parsing keeps the unfinished tail', () => {
 test('AI intents are validated strictly', () => {
   assert.deepEqual(validateAI({ type: 'LogSet', kg: 82.5, reps: 8 }, ctx), { type: 'LogSet', kg: 82.5, reps: 8, count: 1, exerciseId: null });
   assert.equal(validateAI({ type: 'LogSet', kg: 82.5, reps: 8, exercise: 'Bænkpres' }, ctx).exerciseId, 'bench-press');
-  assert.equal(validateAI({ type: 'LogSet', kg: 82.5, reps: 8, exercise: 'Zumba' }, ctx), null, 'unknown exercise');
+  const z = validateAI({ type: 'LogSet', kg: 82.5, reps: 8, exercise: 'Zumba' }, ctx);
+  assert.equal(z.type, 'Ask', 'unknown exercise: asked, never guessed');
+  assert.equal(z.reason, 'newExercise');
+  assert.deepEqual(z.then, { type: 'LogSet', kg: 82.5, reps: 8, count: 1 });
   assert.equal(validateAI({ type: 'LogSet', kg: 82.5 }, ctx), null, 'missing reps');
   assert.equal(validateAI({ type: 'LogSet', kg: 2000, reps: 5 }, ctx), null, 'out of range');
   assert.equal(validateAI({ type: 'LogSet', kg: 80, reps: 7.5 }, ctx), null, 'fractional reps');

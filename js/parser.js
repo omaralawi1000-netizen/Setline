@@ -419,7 +419,11 @@ function handsWords(text, ctx) {
   return null;
 }
 // "done, 7", "done 7 reps", "got 7", "I did 7", "færdig, 7", "fik 7" → "7 reps"
-const gotReps = text => String(text || '').replace(/^\s*(?:set )?(?:done|finished|got|i got|did|i did|made|færdig|fik|jeg fik|lavede|jeg lavede)[\s,.:!-]+(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty)(?:\s*(?:reps?|gentagelser|rep))?[.!]?\s*$/i, '$1 reps');
+// "next set was only nine reps", "that set was 9", "only 9 reps", "sættet var kun 9": the planned set, with those reps
+const setWasReps = text => String(text || '').replace(/^\s*(?:(?:the|this|my|next|current|sættet)\s+)?(?:set\s+)?(?:was|is|went|var|blev)?\s*(?:only|just|kun|bare)\s+(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty)(?:\s*(?:reps?|gentagelser|rep))?[.!]?\s*$/i, '$1 reps')
+  .replace(/^\s*(?:(?:the|this|my|next|current)\s+)?set\s+(?:was|went)\s+(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty)(?:\s*(?:reps?|rep))?[.!]?\s*$/i, '$1 reps')
+  .replace(/^\s*sættet\s+(?:var|blev)\s+(?:kun\s+)?(\d{1,3}|en|to|tre|fire|fem|seks|syv|otte|ni|ti|elleve|tolv)(?:\s*gentagelser)?[.!]?\s*$/i, '$1 gentagelser');
+const gotReps = text => setWasReps(text).replace(/^\s*(?:set )?(?:done|finished|got|i got|did|i did|made|færdig|fik|jeg fik|lavede|jeg lavede)[\s,.:!-]+(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty)(?:\s*(?:reps?|gentagelser|rep))?[.!]?\s*$/i, '$1 reps');
 
 // ---------- food, water and targets ----------
 
@@ -556,6 +560,27 @@ export function parseBatch(text, ctx = {}) {
   return null;
 }
 
+// Words around a set that aren't a known exercise and aren't the usual talk around one.
+const COMMON = new Set(('today again now please just then also yesterday right okay like this that next last first second third more less heavy easy felt only were was great good done ' +
+  'finished into onto here there both each side sides arms legs weight weights plates plate warm warmup working work top back down drop another ' +
+  'idag igen bare også lige sidste næste første anden tredje mere mindre tungt tung godt kun over under begge vægt vægten plader opvarmning arbejdssæt').split(' '));
+const nameish = w => !!w && w.length >= 4 && !COMMON.has(w) && /^[a-zæøå-]+$/.test(w);
+const titled = ws => ws.join(' ').replace(/^./, c => c.toUpperCase());
+function unknownName(words, best) {
+  if (best) {
+    // a word right before or after the name that's part of it: "zottman" curl
+    const before = [], after = [];
+    for (let i = best.i - 1; i >= 0 && nameish(words[i]); i--) before.unshift(words[i]);
+    for (let i = best.i + best.len; i < words.length && nameish(words[i]); i++) after.push(words[i]);
+    if (!before.length && !after.length) return null;
+    return titled([...before, ...words.slice(best.i, best.i + best.len), ...after]);
+  }
+  // no exercise at all, but words that sound like a name
+  const run = [];
+  for (const w of words) { if (nameish(w)) run.push(w); else if (run.length) break; }
+  return run.length ? titled(run) : null;
+}
+
 // Word order doesn't matter: "tricep pushdowns with two sets and 50 kilograms for eight reps",
 // "two sets of tricep pushdowns at 50 kilos for 8", "rope pushdown 25 kg 12 reps 3 sets".
 // Finds the sets, the weight, the reps and the exercise wherever they are.
@@ -594,12 +619,19 @@ function slots(text, ctx, base) {
       const run = words.slice(i, i + len);
       if (run.some(x => !x)) continue;
       const hit = matchExercise(run.join(' '), ctx);
-      if (hit?.exerciseId && hit.score >= (len >= 2 ? 35 : 50) && (!best || hit.score + len * 4 > best.v)) best = { id: hit.exerciseId, v: hit.score + len * 4 };
+      if (hit?.exerciseId && hit.score >= (len >= 2 ? 35 : 50) && (!best || hit.score + len * 4 > best.v)) best = { id: hit.exerciseId, v: hit.score + len * 4, i, len };
     }
   }
   const exerciseId = best?.id || null;
   const bw = exerciseId && ctx.catalog?.get(exerciseId)?.equipment === 'bodyweight';
   if (kg == null && !bw) return null;
+  // a name we don't know ("zottman curl", or one misheard past recognition): never put the set on
+  // another exercise, ask: the nearest one, the one you're on, or add it as a new exercise
+  const unknown = unknownName(words, best);
+  if (unknown && ctx.catalog) {
+    const choices = [...new Set([best?.id, ctx.current?.exerciseId].filter(Boolean))];
+    return { type: 'Ask', reason: 'newExercise', name: unknown, choices, then: { type: 'LogSet', kg: kg ?? 0, reps, count: Math.max(1, Math.min(10, count || 1)) }, lang: base.lang, heard: base.heard };
+  }
   return { type: 'LogSet', kg: kg ?? 0, reps, count: Math.max(1, Math.min(10, count || 1)), ...(exerciseId ? { exerciseId } : {}), lang: base.lang, heard: base.heard, slots: true };
 }
 
@@ -733,8 +765,8 @@ function parseOne(text, ctx = {}) {
       /hvor mange (sæt|flere sæt)|sæt (tilbage|mangler|igen)|hvor mange (mangler|er der tilbage)/.test(s)) {
     return out('Query', { what: 'setsLeft' });
   }
-  if ((m = R(/^(whats |what is |what s |tell me )?(my )?(pr|p r|personal record|personal best|record|best|max)( on| for| in| at)?( the)?( ?(.*))?$/, s)) ||
-      (m = R(/^(hvad er )?(min |mit |mine )?(rekord|pr|personlige rekord|bedste|max)( i| på| til| for)?( ?(.*))?$/, s))) {
+  if ((m = R(/^(whats |what is |what s |tell me )?(my )?(pr|p r|personal record|personal best|record|best|max)( on| for| in| at)?( the)?( (.*))?$/, s)) ||
+      (m = R(/^(hvad er )?(min |mit |mine )?(rekord|pr|personlige rekord|bedste|max)( i| på| til| for)?( (.*))?$/, s))) {
     const phrase = (m[7] ?? m[6] ?? '').trim();
     const hit = phrase ? exercise(phrase) : null;
     if (phrase && !hit?.exerciseId) { if (hit?.choices) return out('Ask', { reason: 'exercise', choices: hit.choices, then: { type: 'Query', what: 'pr' } }); }

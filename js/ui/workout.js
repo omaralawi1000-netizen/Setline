@@ -18,10 +18,11 @@ import { openSheet, closeTop } from './sheet.js';
 import { openPicker } from './picker.js';
 import { startCardsHTML, workoutTitle } from './today.js';
 import { renderLiveCardio } from './cardio.js';
-import { suggest, userStep } from '../progression.js';
+import { suggest, gridFor } from '../progression.js';
 
 // the − / + step for the exercise in front of you (Settings → Workout → Weight steps)
-const curStep = () => { const w = state.active; const ex = w?.exercises[w.current]; return userStep(ex && state.catalog.get(ex.exerciseId)); };
+// the − / + step: what that kind of kit goes up in at a full gym (bars and machines 2.5 kg, dumbbells 2 kg)
+const curStep = () => { const w = state.active; const ex = w?.exercises[w.current]; return gridFor(ex && state.catalog.get(ex.exerciseId)); };
 import { usualMinutes, timeStatus } from '../insights.js';
 import { handsFreeOn, hfPillHTML, toggleHandsFree, announceWarmup } from './handsfree.js';
 import { goalAimHTML } from './goals.js';

@@ -193,7 +193,8 @@ export function validateAI(raw, ctx) {
       const kg = num(raw.kg, 0, LIMITS.kgMax), reps = int(raw.reps, 1, LIMITS.repsMax);
       if (kg == null || reps == null) return null;
       const ex = exercise();
-      if (ex === null) return null;
+      // a name the library doesn't have: ask (nearest, the one you're on, or add it), never guess
+      if (ex === null) return { type: 'Ask', reason: 'newExercise', name: String(raw.exercise).trim().slice(0, 60).replace(/^./, c => c.toUpperCase()), choices: ctx.current?.exerciseId ? [ctx.current.exerciseId] : [], then: { type: 'LogSet', kg, reps, count: int(raw.count, 1, 10) ?? 1 } };
       return { type: t, kg, reps, count: int(raw.count, 1, 10) ?? 1, exerciseId: ex ?? null };
     }
     case 'RepeatLast': return { type: t, count: int(raw.count, 1, 10) ?? 1 };

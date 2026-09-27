@@ -2649,3 +2649,31 @@ html[data-glass=liquid] .app.compact:not(.is-sub):not(.voice):not(.kb) .edge.eb{
 /* Progress: the month as a picture */
 .recapbtn{width:100%;margin:0 0 14px}
 .recapimg{display:block;width:100%;border-radius:22px;margin:4px 0 14px;box-shadow:0 12px 40px rgba(0,0,0,.4)}
+
+/* ======================= 1.51 ======================= */
+/* status bar seam: the blur used to sit on top of the colour below the status bar and re-saturate it
+   (a bluer band under a blue theme's bar). Blur first, the exact bar colour over it. */
+.edge::after{z-index:0}
+.edge::before{z-index:1}
+/* the orb's light trail while it flies */
+.orbecho{position:absolute;z-index:7;pointer-events:none;border-radius:50%;opacity:0;background:radial-gradient(circle,rgba(var(--a-rgb),.75) 0,rgba(var(--v-rgb),.35) 45%,transparent 70%);will-change:transform,translate,scale,opacity}
+@media (prefers-reduced-motion: reduce){ .orbecho{display:none} }
+html[data-motion=off] .orbecho{display:none}
+/* thinking, in the message box: each phrase blurs in letter by letter along a soft colour gradient,
+   a sheen passes over it, and it blurs away for the next */
+.thinkline{position:absolute;left:58px;right:52px;top:0;bottom:0;display:flex;align-items:center;pointer-events:none;overflow:hidden;font-size:16px;font-weight:650;white-space:nowrap}
+.thinkline .tp{position:absolute;left:0;display:inline-flex}
+.thinkline .tc{display:inline-block;color:color-mix(in srgb,var(--accent-hi,var(--accent)) calc(100% - var(--k)),var(--accent2,var(--violet,var(--accent))) var(--k));opacity:0;filter:blur(6px);transform:translateY(.3em);
+  animation:thinkin var(--m-slow) var(--e-out) forwards;animation-delay:calc(var(--i) * 22ms)}
+.thinkline .tp.out .tc{animation:thinkout var(--m-base) var(--e-in) forwards;animation-delay:calc(var(--i) * 8ms)}
+@keyframes thinkin{to{opacity:.95;filter:blur(0);transform:none}}
+@keyframes thinkout{from{opacity:.95;filter:blur(0);transform:none}to{opacity:0;filter:blur(5px);transform:translateY(-.25em)}}
+/* once in, a soft brightness wave runs along the letters (opacity only) */
+.thinkline .tp:not(.out) .tc{animation:thinkin var(--m-slow) var(--e-out) forwards,thinkwave var(--m-think) var(--e-soft) infinite;animation-delay:calc(var(--i) * 22ms),calc(var(--m-slow) + var(--i) * 45ms)}
+@keyframes thinkwave{0%,100%{opacity:.95}50%{opacity:.45}}
+.thinkline.gone{opacity:0;transition:opacity var(--m-base) var(--e-out)}
+.app.thinking .composer input::placeholder{color:transparent}
+@media (prefers-reduced-motion: reduce){ .thinkline .tc{animation:none;opacity:.95;filter:none;transform:none} .thinkline .tp.out{display:none} }
+html[data-motion=off] .thinkline .tc{animation:none;opacity:.95;filter:none;transform:none}
+html[data-motion=off] .thinkline .tp.out{display:none}
+.composer > .thinkline{z-index:2;position:absolute}
