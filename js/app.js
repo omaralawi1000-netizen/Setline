@@ -118,14 +118,20 @@ function renderMini() {
   el.innerHTML = `<span class="dot"></span><span class="l"><strong>${esc(cur ? state.catalog.name(cur.exerciseId, state.lang) : state.t('workout.emptyTitle'))}</strong><span data-elapsed>${clock(elapsedSec(w))}</span></span><span class="go">${I.up}</span>`;
 }
 
+// The page's settings live as attributes on <html>, which every themed style keys on: written only when
+// they change (rewriting them on every render made the phone re-check the styles of the whole page,
+// many times a second while a voice command or a workout start redrew)
+const rootSet = (k, v) => { const d = document.documentElement.dataset; if (d[k] !== v) d[k] = v; };
 function renderAll() {
-  document.documentElement.lang = state.lang;
-  document.documentElement.dataset.motion = state.settings.motion;
-  const glowWas = document.documentElement.dataset.glow;
-  Object.assign(document.documentElement.dataset, { text: state.settings.textSize, glow: state.settings.glow, glass: state.settings.glass, dock: state.settings.dockLabels ? 'labels' : 'icons' });
+  const html = document.documentElement;
+  if (html.lang !== state.lang) html.lang = state.lang;
+  rootSet('motion', state.settings.motion);
+  const glowWas = html.dataset.glow;
+  rootSet('text', state.settings.textSize); rootSet('glow', state.settings.glow); rootSet('glass', state.settings.glass); rootSet('dock', state.settings.dockLabels ? 'labels' : 'icons');
   if (glowWas !== state.settings.glow) refreshChrome();
   configureSteps(null); // the steps are the app's own now (1.51): a full gym's plates, dumbbells and stacks
-  document.documentElement.toggleAttribute('data-duo', DUO.includes(state.settings.accent));
+  const duo = DUO.includes(state.settings.accent);
+  if (html.hasAttribute('data-duo') !== duo) html.toggleAttribute('data-duo', duo);
   if (document.documentElement.dataset.accent !== state.settings.accent) { document.documentElement.dataset.accent = state.settings.accent; refreshChrome(); }
   renderScreen();
   animateFigures($('#s-' + view.screen));

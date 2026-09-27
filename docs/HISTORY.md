@@ -659,3 +659,10 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] No restarts: the line being written used to be redrawn about 20 times a second, restarting the fade of every word still settling; now only new words are added (a line is redrawn only when its shape changes, like a word turning bold)
 - [x] Lighter on the phone: settled words drop their animation, and words no longer each ask for their own GPU layer
 - [x] No jump at the end: the report flag's place beside the reply is kept free while it streams, so the text doesn't re-wrap when the reply finishes
+
+## 1.54.3: bug hunt: less work per frame
+
+- [x] Swept every screen's buttons (114 taps) and the voice logging flows: no errors
+- [x] Every render rewrote the theme attributes on the page root (motion, glow, glass, text size, dock, two-tone) even when nothing changed, making the phone re-check the styles of the whole page many times a second while a voice command or a workout start redrew. Now written only when they change (voice result: 38 → 22 layouts, 105 → 35 ms)
+- [x] Count-up numbers (Today, Progress, Food) rewrote their text every frame even when the digits hadn't changed; each write lays the page out again. Now only when they change
+- [x] The rest timer and the cardio clock rewrote their text 4 times a second (the clock's tick) for a value that changes once a second; the cardio GPS map was redrawn 4 times in a row every 5 s. Now once (set logged: 9 → 5 layouts)

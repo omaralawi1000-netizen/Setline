@@ -341,8 +341,11 @@ export function tickWorkout(root, now) {
   if (st !== 'running') return;
   const left = W.restRemaining(w.rest, now);
   driveRing(slot, w, now);
-  $('#rtime', slot).textContent = mss(left);
-  $('#ring', slot).classList.toggle('hot', left <= 3);
+  // (the clock ticks 4× a second; the text only changes once a second, and each write lays the page out)
+  const rt = $('#rtime', slot), txt = mss(left);
+  if (rt.textContent !== txt) rt.textContent = txt;
+  const ring = $('#ring', slot);
+  if (ring.classList.contains('hot') !== left <= 3) ring.classList.toggle('hot', left <= 3);
 }
 
 // Update only the stepper inputs (draft changes), so focus and animations survive.

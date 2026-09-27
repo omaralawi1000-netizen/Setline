@@ -207,7 +207,8 @@ function countBetween(el, from, to, ms = 900) {
   const t0 = performance.now(), ease = k => 1 - Math.pow(1 - k, 3);
   const step = now => {
     const k = Math.min(1, (now - t0) / ms);
-    el.textContent = nf().format(Math.round(from + (to - from) * ease(k)));
+    const v = nf().format(Math.round(from + (to - from) * ease(k)));
+    if (el.textContent !== v) el.textContent = v;
     if (k < 1) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);

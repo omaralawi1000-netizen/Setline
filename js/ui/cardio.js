@@ -172,8 +172,11 @@ export function tickCardio(root) {
   const a = state.activeCardio;
   if (!a) return;
   const sec = cardioElapsed(a);
+  // the clock ticks 4× a second: only a new second changes anything (and the map is redrawn once
+  // every 5 s, not 4 times in a row)
   const c = root.querySelector('#cclock');
-  if (c) c.textContent = durTxt(sec);
+  if (c && c._sec === sec) return;
+  if (c) { c._sec = sec; c.textContent = durTxt(sec); }
   if (a.gps?.on && sec % 5 === 0) paintGps();
   const arc = root.querySelector('#carc');
   if (arc && !a.pausedAt) arc.style.strokeDashoffset = C * (1 - (sec % 60 || (sec ? 60 : 0)) / 60);
