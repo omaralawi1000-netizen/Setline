@@ -18,7 +18,7 @@ When sources disagree, the higher one wins:
 9. existing code
 10. `docs/HISTORY.md` and `docs/decisions/`: history, never current truth
 
-**Omar doesn't want to give permission for each change.** He says what he wants; you build it, check it and ship it. Ask first only when it matters: you see a clearly better way than what he asked for (say it in one or two sentences, then wait), or it's risky or hard to undo (data loss, a new dependency, private data leaving the phone, a full redesign). Everything else: just do it and tell him what you did.
+**Omar doesn't want to give permission for each change.** He says what he wants; you build it, check it and ship it. Ask first only when it matters: you see a clearly better way than what he asked for (say it in one or two sentences, then wait), or it's risky or hard to undo (data loss, a new dependency, private data leaving the phone, a full redesign). Everything else: just do it and tell him what you did. Tool permissions are pre-approved in `.claude/settings.json` (edits, shell, web, GitHub); never ask him to approve routine steps, and don't remove those permissions.
 
 ## 2. Classify every task
 
