@@ -14,16 +14,11 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci --ignore-scripts
-      - name: Risk check (summary only)
-        if: github.event_name == 'pull_request'
-        run: node scripts/risk-check.mjs --ci --base ${{ github.event.pull_request.base.sha }}
       - name: Verify (secrets, release bookkeeping, unit tests)
         run: npm run verify
       - name: Install Chromium

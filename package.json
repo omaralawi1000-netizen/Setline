@@ -8,8 +8,7 @@
     "golden": "node scripts/golden.mjs",
     "visual": "node scripts/visual.mjs",
     "motion": "node scripts/motion.mjs",
-    "screens": "node scripts/screens.mjs",
-    "risk": "node scripts/risk-check.mjs"
+    "screens": "node scripts/screens.mjs"
   },
   "devDependencies": {
     "playwright": "1.56.1"

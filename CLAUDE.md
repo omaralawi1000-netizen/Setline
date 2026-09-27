@@ -1,9 +1,7 @@
 # Setline: Claude Code notes
 
-Read `AGENTS.md` first: it is the workflow for every AI on this repo, and it points to `SPEC.md`, `PLAN.md`, `docs/DESIGN_SYSTEM.md` and `docs/SECURITY_MODEL.md`. Nothing product-related lives in this file.
+Follow `AGENTS.md`. It's short on purpose; don't read more than the task needs.
 
-Claude-specific:
-- Cloud sessions run `.claude/hooks/session-start.sh`, which installs Playwright for the check scripts (Chromium is pre-installed in the cloud image).
-- The `frontend-design` skill is for REDESIGN mode only (see `docs/DESIGN_SYSTEM.md`). For polish, follow the design system.
-- Superpowers, if installed, is for class C, D and E tasks only (`AGENTS.md` §2).
-- Keep chat replies short. End code tasks with the report in `AGENTS.md` §5.
+- Cloud sessions run `.claude/hooks/session-start.sh`, which installs Playwright for the check scripts.
+- For design and animation work, follow `docs/DESIGN_SYSTEM.md`. The `frontend-design` skill is only for a full redesign Omar asks for.
+- Keep chat replies short.
