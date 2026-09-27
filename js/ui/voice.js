@@ -30,7 +30,8 @@ import { isQuestion, isPlanRequest, isNoise } from '../coach.js';
 import { startCardioSession, finishSheet as cardioFinishSheet } from './cardio.js';
 import { dateKey } from '../body.js';
 import { planFor } from './routine.js';
-import { orbPulse } from './fx.js';
+import { orbPulse, orbShake, orbSpark, orbStreak } from './fx.js';
+import { livePRSets } from '../pr.js';
 import { ask as askCoach, ensureModels } from './coach.js';
 import { cmdModels } from '../settings.js';
 import { createEndpointer, looksUnfinished } from '../endpoint.js';
@@ -48,7 +49,7 @@ const v = {
   mode: 'full',   // 'mini' = the orb floating above the dock, 'full' = the voice screen
   open: false, phase: 'idle', toggle: false, typing: false,
   press: null, token: 0, closing: null, popWaiting: 0,
-  raf: 0, lvl: 0, hist: new Float32Array(64), histAt: 0
+  raf: 0, lvl: 0, lo: 0, hi: 0, hist: new Float32Array(64), histAt: 0
 };
 const card = { cmd: null, timer: 0, hideTimer: 0, committed: false, undoOp: null };
 
@@ -151,6 +152,8 @@ function paintStatic() {
 }
 
 function setPhase(phase) {
+  // didn't get it: the orb shakes its head
+  if (phase === 'error' && v.phase !== 'error') orbShake(v.mode === 'mini' ? el.oorb : el.orb);
   v.phase = phase;
   el.layer.dataset.phase = phase;
   const t = state.t;
@@ -186,6 +189,7 @@ function landOrb(src, after) {
   syncOrb(src, dockOrb());
   app.classList.add('orbland');
   app.classList.remove('orbaway');
+  orbPulse('pulse-land'); // the dock takes it with a small settle
   after?.();
   requestAnimationFrame(() => requestAnimationFrame(() => app.classList.remove('orbland')));
 }
@@ -196,6 +200,7 @@ function flyOrb(open, fromEl = null) {
   const from = fromEl || document.querySelector('#dock .orbbtn .orb');
   const w = el.orbwrap;
   if (!from || reduced()) { w.style.transform = ''; return; }
+  const was = w.getBoundingClientRect();          // where it is now, for the trail home
   const current = getComputedStyle(w).transform;
   w.style.transition = 'none';
   w.style.transform = 'none';
@@ -212,6 +217,21 @@ function flyOrb(open, fromEl = null) {
   void w.offsetWidth;
   w.style.transition = '';
   w.style.transform = open ? '' : far;
+  const dock = { x: mid(a).x, y: mid(a).y - dockShift };
+  trail(el.layer, el.stage, open ? dock : mid(was), open ? mid(b) : dock, w);
+}
+
+// The orb flying between the dock and the voice screen leaves a soft trail of light, timed to its
+// own transition (the same trail as the Coach's orb, in the layer it flies in, just under it).
+const mid = r => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+function trail(layer, before, from, to, node) {
+  const cs = getComputedStyle(node), L = layer.getBoundingClientRect();
+  const props = cs.transitionProperty.split(',').map(s => s.trim()), i = Math.max(0, props.indexOf('transform'));
+  const pick = s => { const l = s.split(/,(?![^(]*\))/); return (l[i] ?? l[0]).trim(); };
+  const duration = parseFloat(pick(cs.transitionDuration)) * 1000;
+  if (!duration) return;
+  const at = p => ({ x: p.x - L.left, y: p.y - L.top });
+  orbStreak(layer, at(from), at(to), { duration, easing: pick(cs.transitionTimingFunction), size: 50, lag: 80, before });
 }
 
 // ---------- mini mode: the orb lifts out of the dock ----------
@@ -220,6 +240,7 @@ function flyMini(open) {
   const from = document.querySelector('#dock .orbbtn .orb');
   const w = el.owrap;
   if (!from || reduced()) { w.style.transform = ''; return; }
+  const was = el.oorb.getBoundingClientRect();
   const current = getComputedStyle(w).transform;
   w.style.transition = 'none';
   w.style.transform = 'none';
@@ -233,6 +254,8 @@ function flyMini(open) {
   void w.offsetWidth;
   w.style.transition = open ? '' : 'transform .5s cubic-bezier(.3,.7,.2,1)';
   w.style.transform = open ? '' : far;
+  const dock = { x: mid(a).x, y: mid(a).y - dockShift };
+  trail(el.mini, w, open ? dock : mid(was), open ? mid(b) : dock, w);
 }
 
 function pushVoiceEntry() {
@@ -399,6 +422,13 @@ function startLoop() {
     }
     if (reduced()) return;
     const l = v.lvl;
+    // the body of the voice swells the orb's core, its edge (s, t, k) lights the rim
+    const b = listening ? mic.bands() : { low: 0, high: 0 };
+    v.lo += (b.low - v.lo) * (b.low > v.lo ? 0.4 : 0.12);
+    v.hi += (b.high - v.hi) * (b.high > v.hi ? 0.55 : 0.18);
+    const fq = v.mode === 'mini' ? el.oorb : el.orb;
+    fq.style.setProperty('--lo', v.lo.toFixed(3));
+    fq.style.setProperty('--hi', v.hi.toFixed(3));
     // alive, not mechanical: a slow breath, and a soft squash and stretch that follows the voice
     const breath = v.phase === 'thinking' ? 0 : 0.012 * Math.sin(now / 700);
     const sx = 1 + breath + l * 0.16 + l * 0.05 * Math.sin(now / 95);
@@ -704,6 +734,7 @@ function showError(titleKey, subKey, opts = {}) {
   v.toggle = false;
   mic.cancel();
   if (v.open) setPhase('error');
+  else orbShake(dockOrb());
   haptic('error');
   const sub = (subKey ? t(subKey) : '') + (opts.code ? ` (${opts.code})` : '');
   if (v.open && v.mode === 'mini') setTimeout(() => { if (v.open && v.mode === 'mini') closeVoice(); }, 250);
@@ -821,10 +852,33 @@ async function commitNow() {
   if (card.cmd === cmd) card.hideTimer = setTimeout(() => { if (card.cmd === cmd) dismissCard(); }, 2600);
 }
 
+// The set a command just logged, if it logged one.
+function loggedSet(before, after) {
+  if (!after) return null;
+  const had = new Set();
+  for (const e of before?.exercises || []) for (const s of e.sets) if (s.done) had.add(s.id);
+  for (const e of after.exercises) for (const s of e.sets) if (s.done && !had.has(s.id)) return s.id;
+  return null;
+}
+
+// A set logged by voice: a spark leaves the dock orb and lands on its row (gold for a record, and the
+// orb flares gold). Anything else, or a row you can't see: the orb's ring.
+function sparkTo(id) {
+  const pr = !!id && livePRSets(state.prs, state.active).has(id);
+  orbPulse(pr ? 'pulse-warm' : 'pulse');
+  if (!id || v.open) return;
+  // (the page may still be drawing the row, or changing to the workout)
+  const find = (tries = 0) => {
+    const row = document.querySelector(`#s-workout.on #sets [data-id="${id}"]`);
+    if (row) orbSpark(dockOrb(), row.querySelector('.ck') || row, { warm: pr });
+    else if (tries < 4) setTimeout(() => find(tries + 1), 120);
+  };
+  requestAnimationFrame(() => find());
+}
+
 async function execute(run, cmd) {
   if (!run) return true;
   haptic('success');
-  orbPulse();
   if (run.op === 'update') {
     const before = state.active;
     let next;
@@ -833,8 +887,10 @@ async function execute(run, cmd) {
     if (next) card.undoOp = { op: 'undo', before };
     if (run.nav) nav.go(run.nav);
     if (run.done) speak(run.done, cmd.lang);
+    sparkTo(loggedSet(before, state.active));
     return true;
   }
+  orbPulse();
   if (run.op === 'start') {
     store.startWorkout(run.template);
     card.undoOp = { op: 'discardStart', id: state.active?.id };
@@ -1113,5 +1169,5 @@ export function initVoice(n) {
   store.subscribe(reason => { if (reason === 'settings' && v.open) paintStatic(); });
 }
 
-export const orbHTML = () => `<button class="orbbtn" aria-label="${esc(state.t('voice.talk'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span></button>`;
+export const orbHTML = () => `<button class="orbbtn" aria-label="${esc(state.t('voice.talk'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span><span class="orest" aria-hidden="true"><i><b></b></i><i><b></b></i></span></button>`;
 export const isVoiceOpen = () => v.open;

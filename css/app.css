@@ -2659,10 +2659,6 @@ html[data-glass=liquid] .app.compact:not(.is-sub):not(.voice):not(.kb) .edge.eb{
    (a bluer band under a blue theme's bar). Blur first, the exact bar colour over it. */
 .edge::after{z-index:0}
 .edge::before{z-index:1}
-/* the orb's light trail while it flies */
-.orbecho{position:absolute;z-index:7;pointer-events:none;border-radius:50%;opacity:0;background:radial-gradient(circle,rgba(var(--a-rgb),.75) 0,rgba(var(--v-rgb),.35) 45%,transparent 70%);will-change:transform,translate,scale,opacity}
-@media (prefers-reduced-motion: reduce){ .orbecho{display:none} }
-html[data-motion=off] .orbecho{display:none}
 /* thinking, in the message box: each phrase blurs in letter by letter along a soft colour gradient,
    a sheen passes over it, and it blurs away for the next */
 .thinkline{position:absolute;left:58px;right:52px;top:0;bottom:0;display:flex;align-items:center;pointer-events:none;overflow:hidden;font-size:16px;font-weight:650;white-space:nowrap}
@@ -2715,3 +2711,69 @@ html[data-motion=off] .bub .w{animation:none;will-change:auto}
 .qrnote{width:100%;height:46px;border-radius:14px;padding:0 14px;background:rgba(255,255,255,.05);border:1px solid var(--line);font-size:15px;color:inherit;outline:none}
 .qrgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
 .intent.flagged{grid-template-columns:36px 1fr auto auto;column-gap:6px}
+
+/* ======================= 1.54: the orb, polished ======================= */
+/* its trail while it flies: the orb stays sharp and leaves a soft comet of its own light behind it,
+   brightest under the orb, fading and narrowing towards the tail (see orbStreak) */
+.orbstreak{position:absolute;z-index:7;pointer-events:none;transform-origin:0 50%;opacity:0;will-change:transform,opacity;
+  background:radial-gradient(farthest-side at 100% 50%,rgba(255,255,255,.6),rgba(255,255,255,0) 30%),
+    radial-gradient(farthest-side at 100% 50%,rgba(var(--a-rgb),.9),rgba(var(--v-rgb),.5) 45%,rgba(var(--v-rgb),0))}
+/* a voice-logged set: the spark on its way from the orb to the row */
+.orbspark{position:absolute;z-index:30;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;pointer-events:none;opacity:0;will-change:translate,scale,opacity;
+  background:radial-gradient(circle,#fff 0,var(--accent-hi) 30%,rgba(var(--a-rgb),.55) 55%,rgba(var(--a-rgb),0) 72%)}
+.orbspark.warm{background:radial-gradient(circle,#fff 0,#FFE9CC 30%,rgba(255,194,122,.6) 55%,rgba(255,194,122,0) 72%)}
+
+/* the dock orb answers: it settles when it flies home, flares gold for a record, glows "go" when a rest
+   is over */
+.orbbtn.pulse-land .orb{animation:orbsettle var(--m-slow) var(--e-spring)}
+.orbbtn.pulse-land::after{animation:orbringsoft calc(var(--m-slow) * 1.4) var(--e-out)}
+@keyframes orbsettle{0%{scale:.88}45%{scale:1.05}100%{scale:1}}
+@keyframes orbringsoft{from{opacity:.5;transform:scale(.95)}to{opacity:0;transform:scale(1.55)}}
+.orbbtn.pulse-warm::after{border-color:rgba(255,217,168,.95);animation:orbring calc(var(--m-slow) * 2.2) var(--e-out)}
+.orbbtn.pulse-warm .orb{animation:orbprpop calc(var(--m-slow) * 1.6) var(--e-spring)}
+.orbbtn.pulse-warm .orb::before{background:radial-gradient(closest-side,rgba(255,217,168,.85),rgba(255,170,90,.35) 55%,transparent);animation:orbglow calc(var(--m-slow) * 3) var(--e-out)}
+#dock .orbbtn.pulse-warm .orb .core::after{inset:0;width:auto;rotate:none;background:radial-gradient(circle,rgba(255,233,204,.95),rgba(255,190,120,.45) 50%,transparent 75%);transform:none;animation:orbgold calc(var(--m-slow) * 3) var(--e-out)}
+@keyframes orbprpop{0%{scale:1}25%{scale:1.16}100%{scale:1}}
+@keyframes orbglow{0%{opacity:0;scale:.7}22%{opacity:1;scale:1.12}100%{opacity:0;scale:1.35}}
+@keyframes orbgold{0%{opacity:0}18%{opacity:.95}100%{opacity:0}}
+.orbbtn.pulse-go::after{animation:orbring calc(var(--m-slow) * 2) var(--e-out)}
+.orbbtn.pulse-go .orb{animation:orbprpop calc(var(--m-slow) * 1.4) var(--e-spring)}
+.orbbtn.pulse-go .orb::before{animation:orbglow calc(var(--m-slow) * 2.4) var(--e-out)}
+
+/* now and then a glint of light crosses the dock orb */
+#dock .orbbtn .orb .core::after{content:"";position:absolute;top:-50%;bottom:-50%;left:-60%;width:60%;pointer-events:none;opacity:0;rotate:20deg;
+  background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.42) 50%,rgba(255,255,255,0));animation:orbglint calc(var(--m-drift) * 2) linear calc(var(--m-drift) * .6) infinite}
+@keyframes orbglint{0%{transform:translateX(0);opacity:0}1%{opacity:1}6%{opacity:1}7%{transform:translateX(370%);opacity:0}100%{transform:translateX(370%);opacity:0}}
+
+/* the rest, kept by the dock orb: a thin ring that drains to the end of it (two halves turning) */
+.orest{position:absolute;inset:4px;border-radius:50%;pointer-events:none;opacity:0;transition:opacity var(--m-base) var(--e-out)}
+.orest.on{opacity:1}
+.orest::before{content:"";position:absolute;inset:0;border-radius:50%;border:2.5px solid rgba(var(--a-rgb),.13)}
+.orest i{position:absolute;inset:0;clip-path:inset(0 0 0 50%)}
+.orest b{position:absolute;inset:0;border-radius:50%;border:2.5px solid var(--accent);clip-path:inset(0 0 0 50%);will-change:rotate}
+.orest i + i,.orest i + i b{clip-path:inset(0 50% 0 0)}
+
+/* didn't get it: the orb shakes its head */
+#app .orb.shake{animation:orbshake calc(var(--m-slow) * 1.2) var(--e-out)}
+@keyframes orbshake{0%,100%{translate:0 0}14%{translate:calc(var(--s) * -.07) 0}32%{translate:calc(var(--s) * .055) 0}50%{translate:calc(var(--s) * -.035) 0}68%{translate:calc(var(--s) * .018) 0}84%{translate:calc(var(--s) * -.008) 0}}
+
+/* listening: the body of your voice swells the core, its edge (s, t, k) lights the rim */
+.orb.big .core b:nth-child(3),.orb.lift .core b:nth-child(3){scale:calc(1 + var(--lo, 0) * .9);opacity:calc(.5 + var(--lo, 0) * .45)}
+.orb.big::after,.orb.lift::after{content:"";position:absolute;inset:-2px;border-radius:50%;pointer-events:none;border:2px solid rgba(255,255,255,.8);
+  box-shadow:0 0 14px rgba(var(--a-rgb),.8),inset 0 0 10px rgba(var(--a-rgb),.6);opacity:calc(var(--hi, 0) * .9);transform:scale(calc(1 + var(--hi, 0) * .05))}
+
+/* thinking: a slow swirl inside the orb */
+.vlayer[data-phase=thinking] .orb .core,.ofloat[data-phase=thinking] .orb .core{animation:breathe calc(var(--m-drift) * .75) var(--e-soft) infinite,orbswirl calc(var(--m-think) * 1.5) linear infinite}
+.app.thinking .composer .corb .orb .core{animation:orbwork calc(var(--m-think) * 1.1) var(--e-soft) infinite,orbswirl calc(var(--m-think) * 1.5) linear infinite}
+@keyframes orbswirl{to{rotate:360deg}}
+
+@media (prefers-reduced-motion: reduce){
+  .orbstreak,.orbspark{display:none}
+  #dock .orbbtn .orb .core::after,#app .orb.shake{animation:none}
+  .orbbtn:is(.pulse-land,.pulse-warm,.pulse-go) .orb,.orbbtn:is(.pulse-land,.pulse-warm,.pulse-go) .orb::before,.orbbtn:is(.pulse-land,.pulse-warm,.pulse-go) .orb .core::after,.orbbtn:is(.pulse-land,.pulse-warm,.pulse-go)::after{animation:none}
+  .vlayer[data-phase=thinking] .orb .core,.ofloat[data-phase=thinking] .orb .core,.app.thinking .composer .corb .orb .core{animation:none}
+  .orb.big::after,.orb.lift::after{transform:none}
+}
+html[data-motion=off] :is(.orbstreak,.orbspark){display:none}
+html[data-motion=off] #dock .orbbtn .orb .core::after,html[data-motion=off] #app .orb.shake{animation:none}
+html[data-motion=off] :is(.vlayer[data-phase=thinking] .orb .core,.ofloat[data-phase=thinking] .orb .core,.app.thinking .composer .corb .orb .core){animation:none}

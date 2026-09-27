@@ -9,7 +9,7 @@ import { haptic } from '../haptics.js';
 import { esc, $ } from './dom.js';
 import { I } from './icons.js';
 import { toast } from './toast.js';
-import { burst } from './fx.js';
+import { burst, orbPulse } from './fx.js';
 import { openPlates } from './plates.js';
 import { warmupsFor } from '../warmup.js';
 import { chime } from '../audio.js';
@@ -509,7 +509,7 @@ function doLog(kg, reps) {
   requestAnimationFrame(() => {
     const ck = document.querySelector(`#sets [data-id="${set.id}"] .ck`);
     burst(ck, { warm: pr, count: pr ? 26 : 10, spread: pr ? 90 : 48 });
-    if (pr) { document.querySelector(`#sets [data-id="${set.id}"]`)?.classList.add('prflash'); celebrate(exName(ex.exerciseId), setText(kg, reps)); }
+    if (pr) { document.querySelector(`#sets [data-id="${set.id}"]`)?.classList.add('prflash'); celebrate(exName(ex.exerciseId), setText(kg, reps)); orbPulse('pulse-warm'); }
   });
   toast({
     title: `${pr ? `<span class="tag sm">${t('workout.pr')}</span> ` : ''}${esc(exName(ex.exerciseId))} <span class="v">${esc(setText(kg, reps))}</span>`,

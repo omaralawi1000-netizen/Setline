@@ -28,7 +28,7 @@ import { initBody } from './ui/body.js';
 import { initRoutine, setRoutineNav, renderRoutine, editRoutine, editRoutineFrom, programsSheet, startRoutine, planFor } from './ui/routine.js';
 import { setHistoryFilter } from './ui/history.js';
 import { renderProgress, renderExercise, setRange } from './ui/progress.js';
-import { countAll, burst } from './ui/fx.js';
+import { countAll, burst, orbStreak, orbPulse } from './ui/fx.js';
 import { initPress } from './ui/press.js';
 import { initChrome, refreshChrome } from './ui/chrome.js';
 import { openCustomize } from './ui/customize.js';
@@ -174,27 +174,19 @@ function flyOrb(from, to, { duration, delay = 0, go, onland, easing, fromEl, toE
   // one straight line, no hop: it shoots off, eases, and still has some speed left when it hits
   const path = [{ translate: '0 0', scale: s0 }, { scale: 1 + (s0 - 1) * 0.45, offset: 0.5 }, { translate: `${dx}px ${dy}px`, scale: 1 }];
   const fly = go(ghost, path, { duration, delay, easing, fill: 'both' });
-  // motion blur: stretched along the way it flies, most when it's fastest, and a touch soft
+  // the orb stays sharp (a blur only made it look out of focus): the speed is in the light it leaves
+  // behind, and in a barely-there stretch along the way it flies while it's fastest
   const ang = Math.atan2(dy, dx) * 180 / Math.PI, st = (x, y) => `rotate(${ang}deg) scale(${x}, ${y}) rotate(${-ang}deg)`;
-  const stretch = [{ transform: st(1, 1) }, { transform: st(1.34, 0.84), offset: 0.2 }, { transform: st(1.22, 0.9), offset: 0.55 }, { transform: st(1.06, 0.97), offset: 0.9 }, { transform: st(1, 1) }];
-  go(ghost, stretch, { duration, delay, easing: 'linear', composite: 'add' });
-  go(ghost, [{ filter: 'blur(0px)' }, { filter: 'blur(2px)', offset: 0.2 }, { filter: 'blur(0.8px)', offset: 0.6 }, { filter: 'blur(0px)', offset: 0.9 }, { filter: 'blur(0px)' }], { duration, delay, easing: 'linear' });
-  // and a soft trail of its light, a step behind
-  const echoes = [0.45, 0.22].map((o, i) => {
-    const e = document.createElement('div');
-    e.className = 'orbecho';
-    Object.assign(e.style, { left: ghost.style.left, top: ghost.style.top, width: `${W}px`, height: `${W}px` });
-    app.insertBefore(e, ghost);
-    const lag = 26 * (i + 1);
-    go(e, path, { duration, delay: delay + lag, easing, fill: 'both' });
-    go(e, stretch, { duration, delay: delay + lag, easing: 'linear', composite: 'add' });
-    go(e, [{ opacity: 0 }, { opacity: o, offset: 0.12 }, { opacity: o * 0.6, offset: 0.6 }, { opacity: 0, offset: 0.92 }, { opacity: 0 }], { duration, delay: delay + lag, easing: 'linear', fill: 'both' });
-    return e;
-  });
-  const melt = { duration: duration * 0.55, delay: delay + duration * 0.3, easing: 'linear', fill: 'both' };
-  go(a, [{ opacity: 1 }, { opacity: 0 }], melt);
-  go(b, [{ opacity: 0 }, { opacity: 1 }], melt);
-  const done = () => { ghost.remove(); echoes.forEach(e => e.remove()); };
+  go(ghost, [{ transform: st(1, 1) }, { transform: st(1.07, 0.95), offset: 0.2 }, { transform: st(1.03, 0.98), offset: 0.6 }, { transform: st(1, 1), offset: 0.9 }, { transform: st(1, 1) }],
+    { duration, delay, easing: 'linear' });
+  orbStreak(app, from, to, { duration, delay, easing, size: Math.min(from.w, to.w), lag: duration * 0.28, go, before: ghost, z: '8' });
+  // its glow comes up while it travels and settles as it lands
+  go(a, [{ opacity: 0 }, { opacity: 0.8, offset: 0.35 }, { opacity: 0 }], { duration, delay, easing: 'linear', pseudoElement: '::before' });
+  go(b, [{ opacity: 0 }, { opacity: 0.8, offset: 0.35 }, { opacity: 0 }], { duration, delay, easing: 'linear', pseudoElement: '::before' });
+  // the new look fades in over the old one, which stays solid under it (fading both let the page
+  // show through the orb halfway)
+  go(b, [{ opacity: 0 }, { opacity: 1 }], { duration: duration * 0.55, delay: delay + duration * 0.3, easing: 'linear', fill: 'both' });
+  const done = () => ghost.remove();
   fly.addEventListener('cancel', done);
   fly.onfinish = () => { done(); onland?.(); };
   return ghost;
@@ -283,8 +275,7 @@ function coachMorph(open, under) {
     const flying = corb && dockOrb && flyOrb(relRect(corb), layRect(dockOrb), { duration: 420, delay: 40, easing: 'cubic-bezier(.3,.62,.5,.95)', go, fromEl: corb, toEl: dockOrb, onland: () => {
       hold?.cancel();
       app.classList.remove('orbtravel');
-      orb.classList.remove('pulse'); void orb.offsetWidth; orb.classList.add('pulse');
-      setTimeout(() => orb.classList.remove('pulse'), 900);
+      orbPulse('pulse-land');
       haptic('land');
     } });
     if (flying) { app.classList.add('orbtravel'); hold = go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 700, fill: 'forwards' }); }
@@ -754,6 +745,7 @@ function tick() {
     if (view.screen === 'workout' && !state.active) tickCardio($('#s-workout'));
   }
   const w = state.active;
+  syncOrbRest(w);
   if (!w) return;
   const now = Date.now();
   const txt = clock(elapsedSec(w, now));
@@ -761,6 +753,32 @@ function tick() {
   restBell(w, now);
   if (view.screen === 'workout') tickWorkout($('#s-workout'), now);
 }
+// The dock orb keeps the rest: a thin ring around it drains to the end of the rest, and the orb
+// gives a "go" pulse when it's over. The ring is two halves turning behind two windows, so only
+// transform moves, in one continuous motion (started again only when the end moves).
+let orbRest = 0;
+function syncOrbRest(w = state.active, now = Date.now()) {
+  const ring = $('#dock .orest');
+  if (!ring) return;
+  const r = w?.rest, running = !!r && now < r.endsAt;
+  const total = running ? Math.max(1, r.endsAt - r.startedAt) : 1, half = total / 2, gone = running ? total - (r.endsAt - now) : 0;
+  const [right, left] = ring.querySelectorAll('b');
+  // without motion it steps with the clock instead
+  if (running && stillMotion()) { const a = (360 * gone) / total; right.style.rotate = `${Math.min(a, 180)}deg`; left.style.rotate = `${Math.max(a - 180, 0)}deg`; }
+  const key = running ? r.endsAt : 0;
+  if (key === orbRest && ring.classList.contains('on') === running) return;
+  const was = orbRest;
+  orbRest = key;
+  ring.getAnimations({ subtree: true }).forEach(a => a.cancel());
+  ring.classList.toggle('on', running);
+  if (!running) { if (was && r && now - r.endsAt < 2000) orbPulse('pulse-go'); return; }
+  if (stillMotion()) return;
+  right.style.rotate = left.style.rotate = '';
+  const turn = [{ rotate: '0deg' }, { rotate: '180deg' }];
+  right.animate(turn, { duration: half, delay: -gone, easing: 'linear', fill: 'both' });
+  left.animate(turn, { duration: half, delay: half - gone, easing: 'linear', fill: 'both' });
+}
+
 function startClock() { if (!ticker) ticker = setInterval(tick, 250); tick(); }
 function stopClock() { clearInterval(ticker); ticker = 0; }
 document.addEventListener('visibilitychange', () => {

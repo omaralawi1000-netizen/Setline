@@ -634,3 +634,17 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Dictation in the gym: the recording is cleaned before it's sent (rumble and bass filtered out, the noise before and after the words cut, the level evened out, 16 kHz mono); silence isn't sent at all; the accurate speech model (Whisper large-v3) is the default now (everyone moved over once); the "not speech" filter is less eager, so quiet words in noise aren't dropped
 - [x] Coach replies: the newest words blur in and rise a touch as they arrive at a steady pace, so the reply has a soft, blurred leading edge that settles behind it (only the last few words are ever moving)
 - [x] One-tap reports right where it went wrong: a flag on the voice result card (undoes it and asks what went wrong) and under every Coach reply; what was heard, what it did or answered, filled in; one tap on "Misheard me", "Wrong exercise", "Wrong numbers", "Too slow", "Didn't get me", … sends it
+
+## 1.54.0: the orb, polished
+
+- [x] The orb's flight between the bar and the Coach's message box: no more blur or heavy stretch (it looked out of focus). The orb stays sharp and leaves a soft comet of its own light behind it, longest when it's fastest and drawn back into it as it lands; the glow around it rises in flight and settles on landing; a barely-there stretch at top speed
+- [x] Fixed a seam through the flying orb: its two looks both faded halfway, so the dark disc behind the dock orb showed through. The new look now fades in over the old one
+- [x] The voice screen's orb (and the small floating one) leaves the same trail flying up and back into the bar; the bar takes it home with a small settle
+- [x] Rest on the dock orb: a thin ring drains to the end of the rest (two halves turning, transform only), and the orb glows "go" when it's over
+- [x] A set logged by voice sends a spark from the dock orb to its row, which bursts on its check (gold for a record)
+- [x] Records: a gold flare on the dock orb (gold ring, gold wash in the core, sparks), for voice and tapped sets
+- [x] Didn't understand: the orb shakes its head (voice screen, floating orb, or the dock orb when the card shows)
+- [x] Thinking: a slow swirl turns inside the orb (voice screen, floating orb, message box)
+- [x] Listening: the body of your voice (90–500 Hz) swells the orb's core, the sharp sounds (2–6 kHz) light its rim
+- [x] Now and then a soft glint of light crosses the dock orb
+- [x] All of it transform/opacity only, with a reduced-motion fallback
