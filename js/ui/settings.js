@@ -3,6 +3,7 @@ import { state, setSettings, resetAll } from '../store.js';
 import { makeBackup } from '../backup.js';
 import { driveGroupHTML, driveActions, setDriveRender, confirmImport } from './drive.js';
 import { openOnboarding } from './onboard.js';
+import { openReport } from './report.js';
 import { ageOf } from '../profile.js';
 import { dateKey } from '../body.js';
 import { VERSION } from '../version.js';
@@ -145,6 +146,7 @@ export function renderSettings(root) {
     </header>
     <h1 class="h1">${t('settings.title')}</h1>
     ${profileRow()}
+    <div class="slist solid memlink"><button class="srow" data-act="report"><span class="l"><strong>${t('report.row')}</strong><small>${t('report.rowSub')}</small></span>${I.fwd}</button></div>
     <div class="slist solid memlink"><button class="srow" data-act="memory"><span class="l"><strong>${t('memory.title')}</strong><small>${esc([s.coachBrief ? t('brief.has') : '', t('memory.sub', { n: (s.memories || []).length })].filter(Boolean).join(' · '))}</small></span>${I.fwd}</button></div>
 
     <div class="sgroup"><h2>${t('settings.general')}</h2><div class="slist solid">
@@ -156,7 +158,6 @@ export function renderSettings(root) {
     <div class="sgroup"><h2>${t('settings.voice')}</h2><div class="slist solid">
       <div class="srow"><span class="l"><strong>${t('settings.voiceLang')}</strong></span>${seg('voiceLang', ['auto', 'da', 'en'], [t('lang.auto'), t('lang.da'), t('lang.en')])}</div>
       <div class="srow"><span class="l"><strong>${t('settings.spoken')}</strong></span>${seg('spoken', ['off', 'minimal', 'full'], [t('spoken.off'), t('spoken.minimal'), t('spoken.full')])}</div>
-      <div class="srow"><span class="l"><strong>${t('set.brain')}</strong><small>${esc(t(s.coachBrain === 'smart' ? 'set.brainSmart' : 'set.brainFast', { model: (s.coachBrain === 'smart' ? s.coachPro : s.coachModel) || '' }))}</small></span>${seg('coachBrain', ['fast', 'smart'], [t('set.brain.fast'), t('set.brain.smart')])}</div>
       <div class="srow"><span class="l"><strong>${t('settings.ttsQuality')}</strong><small>${t('settings.ttsQualitySub')}</small></span>${seg('ttsQuality', ['instant', 'natural', 'fast'], [t('tts.instant'), t('tts.natural'), t('tts.fast')])}</div>
       <div class="srow"><span class="l"><strong>${t('settings.voiceName')}</strong><small id="speechstat">${esc(speechStatus())}</small></span>
         <span class="stepper"><select class="select" data-set="voice" aria-label="${t('settings.voiceName')}">${VOICES.map(n => `<option value="${n}" ${n === s.voice ? 'selected' : ''}>${n} · ${t('feel.' + VOICE_FEEL[n])}</option>`).join('')}</select>
@@ -284,6 +285,7 @@ export function initSettings(actions, root) {
     set: el => { setSettings({ [el.dataset.key]: el.dataset.v }); haptic('tap'); },
     'kg-steps': () => { haptic('tap'); stepsSheet(); },
     memory: () => { haptic('tap'); memorySheet(); },
+    report: () => { haptic('tap'); openReport(); },
     'rest-alerts': async () => {
       const { t } = state;
       if (state.settings.restAlerts) { setSettings({ restAlerts: false }); return; }

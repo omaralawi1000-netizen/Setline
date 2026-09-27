@@ -23,7 +23,7 @@ import { stalledLifts } from '../plateau.js';
 import { isRoutineImport } from '../coach.js';
 import { monthly } from './bodyscreen.js';
 import { pinHTML, kgReps } from './pins.js';
-import { nextTargets } from '../review.js';
+import { nextTargets, lighterToday } from '../review.js';
 
 const MIC = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.6 11.5a6.4 6.4 0 0 0 12.8 0M12 18v3"/></svg>';
 const C = 157.08; // ring r=25
@@ -57,8 +57,18 @@ function upNextHTML({ more = false } = {}) {
       <p>${t('today.exercisesAbout', { n: r.exercises.length, min: estimateMinutes(r) })}</p>
       ${nextHTML(r) || `<p class="exnames">${esc(names.slice(0, 4).join(' · '))}${names.length > 4 ? ` · +${names.length - 4}` : ''}</p>`}
       <button class="log" data-act="start-routine" data-id="${esc(r.id)}">${I.play}<span>${t('today.start')}</span></button>
+      ${k === 0 || k == null ? easyHTML(r) : ''}
       ${getKey('groq') ? `<p class="sayhint">${MIC}${esc(t('today.orSay', { text: `start ${routineName(r, lang).toLowerCase()}` }))}</p>` : ''}
     </div>`;
+}
+
+// A lighter session offered (never forced) after a short night, a low-energy morning or a hard sport day.
+function easyHTML(r) {
+  const { t } = state;
+  const y = dayOf(dateKey(Date.now() - DAY), state.routines, state.settings.dayPlan);
+  const why = lighterToday({ checkin: state.daily.find(d => d.date === dateKey()), yesterday: y.label ? y : null });
+  if (!why) return '';
+  return `<div class="upeasy"><span>${esc(t('easy.' + why.why, { h: why.h, what: why.what }))}</span><button class="chip sm" data-act="start-easy" data-id="${esc(r.id)}">${t('easy.go')}</button></div>`;
 }
 
 // Next time's targets on Up next, worked out from the last sessions ("Bench press 82.5 × 8 ↑").
@@ -202,7 +212,10 @@ export function balanceHTML({ always = false } = {}) {
   const b = muscleBalance(state.history, state.catalog);
   const note = b.behind ? t('balance.behind', { group: t('group.' + b.behind.group), n: b.behind.sets, target: b.behind.target })
     : b.total ? t('balance.ok') : t('balance.none');
-  return `<div class="mbal solid"><div class="rhead"><span class="label">${t('balance.title')}</span><span class="mnote${b.behind ? ' warn' : ''}">${esc(note)}</span></div>
+  // behind on a group: top it up with three sets, added to the workout that's running (or ask how to fit it in)
+  const add = b.behind ? (state.active ? `<button class="chip sm" data-act="topup" data-group="${esc(b.behind.group)}">${I.plus}<span>${esc(t('balance.add', { group: t('group.' + b.behind.group).toLowerCase() }))}</span></button>`
+    : getKey('google') ? `<button class="chip sm" data-act="topup-ask" data-group="${esc(b.behind.group)}">${I.chat}<span>${esc(t('balance.ask'))}</span></button>` : '') : '';
+  return `<div class="mbal solid"><div class="rhead"><span class="label">${t('balance.title')}</span><span class="mnote${b.behind ? ' warn' : ''}">${esc(note)}</span></div>${add ? `<div class="mtop">${add}</div>` : ''}
     <div class="mrows">${b.rows.map((r, i) => `<div class="mrow${b.behind?.group === r.group ? ' behind' : ''}${r.pct >= 1 ? ' full' : ''}" style="--i:${i}"><span>${esc(t('group.' + r.group))}</span><i><b style="transform:scaleX(${r.pct.toFixed(3)})"></b></i><em>${num(r.sets, state.lang, r.sets % 1 ? 1 : 0)}<small>/${r.target}</small></em></div>`).join('')}</div>
   </div>`;
 }

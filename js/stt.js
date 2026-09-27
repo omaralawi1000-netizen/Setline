@@ -9,8 +9,26 @@ export function buildPrompt({ current = null, recent = [], catalog }) {
   const add = id => { const e = catalog?.get(id); if (e) for (const n of [e.da, e.en]) if (n && !names.includes(n)) names.push(n); };
   if (current) add(current);
   for (const id of recent) { if (names.length >= 12) break; add(id); }
-  const sample = 'Bænkpres 82,5 kilo 8 gentagelser. Bench press 80 kg for 8. Samme igen. Læg 2,5 til. Skip rest.';
-  return (names.length ? names.join(', ') + '. ' : '') + sample;
+  return (names.length ? names.join(', ') + '. ' : '') + SAMPLE;
+}
+// The sample uses numbers nobody lifts, so that when Whisper, given silence or gym noise, simply
+// repeats its prompt back (it does), the echo can be told apart from a real set and dropped.
+const SAMPLE = 'Bænkpres 37,5 kilo 11 gentagelser. Bench press 142.5 kg for 3. Samme igen. Læg 2,5 til. Skip rest.';
+const norm = s => String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9æøå]+/g, ' ').trim();
+const ECHO = [/\b37 5 kilo 11\b/, /\b142 5 kg for 3\b/, /\bskip rest\b.*\bsamme igen\b|\bsamme igen\b.*\blæg 2 5 til\b/];
+// true when a piece of the transcript is the prompt coming back: a sample sentence, or the list of names
+export function isEcho(text, prompt = '') {
+  const t = norm(text);
+  if (!t) return false;
+  if (ECHO.some(r => r.test(t))) return true;
+  const names = norm(String(prompt).split(SAMPLE)[0]);
+  return !!names && t.length >= 8 && names.includes(t) && /\s/.test(t);
+}
+// Whisper sometimes says the same sentence twice ("Bench 80 for 8. Bench 80 for 8.")
+export function dedupeSentences(text) {
+  const parts = String(text || '').split(/(?<=[.!?])\s+/), out = [];
+  for (const p of parts) if (!out.length || norm(out[out.length - 1]) !== norm(p)) out.push(p);
+  return out.join(' ');
 }
 
 // Whisper "hears" things in silence and noise: subtitle credits and sign-offs it learned from
@@ -22,14 +40,16 @@ const JUNK = [
 ];
 export const isJunk = text => JUNK.some(r => r.test(text));
 const SPOKEN = { danish: 'da', english: 'en' };
-export function cleanTranscript(data) {
+export function cleanTranscript(data, prompt = '') {
   if (!data || typeof data.text !== 'string') return null;
   const segs = Array.isArray(data.segments) ? data.segments : null;
   let text = segs
-    ? segs.filter(g => !(g.no_speech_prob > 0.6 && g.avg_logprob < -0.7) && !(g.compression_ratio > 2.4) && !isJunk(g.text || '')).map(g => String(g.text || '').trim()).join(' ')
+    ? segs.filter(g => !(g.no_speech_prob > 0.6 && g.avg_logprob < -0.7) && !(g.compression_ratio > 2.4) && !isJunk(g.text || '') && !isEcho(g.text, prompt)).map(g => String(g.text || '').trim()).join(' ')
     : data.text;
-  text = text.replace(/\s+/g, ' ').trim();
-  if (isJunk(text)) text = '';
+  // sentence by sentence too: one segment can hold the echo and more
+  text = String(text).split(/(?<=[.!?])\s+/).filter(x => !isEcho(x, prompt)).join(' ');
+  text = dedupeSentences(text.replace(/\s+/g, ' ').trim());
+  if (isJunk(text) || isEcho(text, prompt)) text = '';
   const lang = String(data.language || '').toLowerCase();
   return { text, lang: SPOKEN[lang] || (lang.length === 2 ? lang : lang ? 'other' : '') };
 }
@@ -58,7 +78,7 @@ async function once(blob, { key, model, language, prompt }) {
   if (res.status === 401 || res.status === 403) throw new SttError('badkey', res.status);
   if (res.status === 429) throw new SttError('busy', res.status);
   if (!res.ok) throw new SttError('failed', res.status);
-  const out = cleanTranscript(await res.json().catch(() => null));
+  const out = cleanTranscript(await res.json().catch(() => null), prompt);
   if (!out) throw new SttError('failed', res.status);
   return out;
 }

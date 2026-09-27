@@ -29,7 +29,7 @@ export const DEFAULTS = Object.freeze({
   weeklyGoal: 3,       // workouts per week, Today ring
   cmdModel: '',        // Flash-Lite text model for command fallback (picked on key test)
   coachModel: '',      // Flash text model for the Coach
-  coachBrain: 'fast',  // fast: the newest Flash (quick, and thinks a little) | smart: the newest Pro (slower, deepest)
+  coachBrain: 'fast',  // the newest Flash (quick, and thinks a little)
   cmdOverride: '',
   coachOverride: '',
   cmdAlt: '',          // runner-up models, tried on 503/429/404
@@ -138,7 +138,7 @@ export function sanitize(input) {
   if (ACCENTS.includes(input.accent)) s.accent = input.accent;
   else if (OLD_ACCENT[input.accent]) s.accent = OLD_ACCENT[input.accent];
   if (typeof input.proChecked === 'boolean') s.proChecked = input.proChecked;
-  if (['fast', 'smart'].includes(input.coachBrain)) s.coachBrain = input.coachBrain;
+  // the Pro choice was taken out of Settings (1.50): chats always use the quick model
   if (['today', 'workout', 'food', 'coach'].includes(input.startTab)) s.startTab = input.startTab;
   if (['small', 'normal', 'large'].includes(input.textSize)) s.textSize = input.textSize;
   if (['on', 'soft', 'off'].includes(input.glow)) s.glow = input.glow;

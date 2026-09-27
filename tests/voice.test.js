@@ -27,7 +27,7 @@ test('TTS model: preferred name if listed, else newest stable flash-lite tts', (
 test('STT prompt has current and recent exercises in both languages', () => {
   const p = buildPrompt({ current: 'bench-press', recent: ['deadlift', 'bench-press'], catalog: createCatalog() });
   assert.match(p, /^Bænkpres, Bench press, Dødløft, Deadlift\. /);
-  assert.match(p, /Bænkpres 82,5 kilo 8 gentagelser\. Bench press 80 kg for 8\./);
+  assert.match(p, /Bænkpres 37,5 kilo 11 gentagelser\. Bench press 142.5 kg for 3\./);
   assert.ok(p.length < 600);
 });
 

@@ -580,3 +580,19 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Smooth haptics: single short pulses, no buzzing trains
 - [x] Orb jump-in: the message box is already there when the orb arrives (it used to still be sliding up), the orb shrinks mostly on the way in, and the squash is gentler
 - [x] Status bar gradient only just below the bar; the navigation bar's blur halo a little stronger
+
+## 1.50.0: silence isn't a set, a seamless orb, calm reply text, the status bar everywhere, bug reports, five new helpers
+
+- [x] Bug: saying nothing (or gym noise) could log "Bænkpres 82,5 kilo 8 gentagelser": Whisper, given silence, repeats the example in its prompt. The example now uses numbers nobody lifts, anything that comes back as the prompt is dropped, and a sentence heard twice counts once
+- [x] Bug: a sheet that redraws itself (Customize, memories, weight steps, food) jumped back to the top on every tap
+- [x] Settings: the Pro "Coach brain" choice is gone; chats always use the quick model
+- [x] The orb's flight: the stand-in carries both looks (the bar's orb and the message box's orb) and melts from one into the other on the way, landing at exactly the box orb's size, so nothing swaps when it hits; it still has some speed when it arrives
+- [x] Reply text: words fade in at a steady pace, a few at a time (no blur or colour sweep across whole paragraphs)
+- [x] Status bar: matches the Coach's background, the voice screen and open sheets too (it used to be the page colour or near-black there)
+- [x] The navigation bar: a fuller, wider gradient blur around it
+- [x] Report a bug or idea (Settings, the home-screen shortcut, or say/type "bug: …", "idea: …", "note for Claude: …" anywhere): kept on the phone and sent as a GitHub issue on the app's repository, with the version, screen, phone, the last things heard by voice and recent errors. Errors the app hits are kept (the last 12) and offer a Report button once
+- [x] A timer between warm-up sets (45 s, 75 s before the first working set) that says what's next
+- [x] Up next offers "Go lighter" after a short night, a low-energy morning or a sport day yesterday
+- [x] Muscles this week: when a group is behind, "Add 3 sets" puts its main lift into the running workout (or ask the Coach how to fit it in)
+- [x] Progress: your month as a picture (sessions, volume, records, biggest moves, bodyweight, cardio) to share or save
+- [x] Home-screen shortcut: Report a bug or idea

@@ -2385,7 +2385,8 @@ html[data-motion=off] .cglow::after,html[data-motion=off] .aura .clouds i{animat
 
 /* ======================= 1.43: the orb travels, the light follows the voice ======================= */
 /* the orb's stand-in on its way between the bar and the message box */
-.orbghost{position:absolute;z-index:8;margin:0;pointer-events:none;will-change:transform,translate,scale}
+.orbghost{position:absolute;z-index:8;margin:0;pointer-events:none;will-change:translate,scale}
+.orbghost > .orb{will-change:opacity}
 .app.orbtravel .corb .orb{opacity:0!important;animation:none!important}
 /* when the orb flies in, the box comes up to meet it and the orb lands with its pulse of light
    (no separate scale-in) */
@@ -2618,3 +2619,33 @@ html[data-glass=liquid] .app.compact:not(.is-sub):not(.voice):not(.kb) .edge.eb{
 .prcel strong{font-size:14.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @keyframes prcel{0%{opacity:0;transform:translate(-50%,-24px) scale(.9)}12%{opacity:1;transform:translate(-50%,0) scale(1.04)}20%{transform:translate(-50%,0) scale(1)}82%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-14px) scale(.96)}}
 @media (prefers-reduced-motion: reduce){ .prcel{animation:prcelfade var(--m-think) linear both} @keyframes prcelfade{0%,100%{opacity:0}10%,85%{opacity:1}} .prcel{transform:translateX(-50%)} }
+
+/* ======================= 1.50 ======================= */
+/* reply words: a light fade per word, flowing in at a steady pace (the blur and colour sweep across
+   whole paragraphs read as lag on the phone) */
+.bub .w{display:inline;animation:wordfade var(--m-slow) var(--e-out) both}
+@keyframes wordfade{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion: reduce){ .bub .w{animation:none} }
+html[data-motion=off] .bub .w{animation:none}
+/* the navigation bar: a fuller gradient blur around it, wide and soft, darkest right behind the bar */
+html[data-glass=liquid] .edge.eb{left:0;right:0;bottom:0;height:calc(var(--dock-bottom) + var(--dock-h) + 64px)}
+html[data-glass=liquid] .edge.eb::before{opacity:1;background:radial-gradient(ellipse 50% 70% at 50% 70%,color-mix(in srgb,var(--bg) 86%,transparent) 0,color-mix(in srgb,var(--bg) 70%,transparent) 45%,color-mix(in srgb,var(--bg) 30%,transparent) 72%,transparent 100%)}
+html[data-glass=liquid] .edge.eb::after{-webkit-backdrop-filter:blur(14px) saturate(140%);backdrop-filter:blur(14px) saturate(140%);
+  -webkit-mask-image:radial-gradient(ellipse 50% 68% at 50% 70%,#000 45%,transparent 100%);mask-image:radial-gradient(ellipse 50% 68% at 50% 70%,#000 45%,transparent 100%)}
+html[data-glass=liquid] .app.compact:not(.is-sub):not(.voice):not(.kb) .edge.eb{left:calc(50% - 150px);right:calc(50% - 150px)}
+/* reports */
+.rkinds{margin:4px 0 12px}
+.rlist{list-style:none;margin:0 0 12px;padding:0;display:flex;flex-direction:column;gap:8px}
+.rlist li{display:flex;align-items:center;gap:10px;padding:10px 8px 10px 12px;border-radius:16px}
+.rlist .rt{flex:1;min-width:0;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rlist .rsent{color:var(--accent);display:grid;place-items:center}
+.rlist .rsent svg{width:18px;height:18px}
+/* Up next: a lighter session offered */
+.upeasy{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:13px;color:var(--muted);line-height:1.35}
+.upeasy span{flex:1}
+.upeasy .chip{flex:none}
+.mbal .mtop{display:flex;justify-content:flex-end;margin:-2px 0 8px}
+.mbal .mtop .chip svg{width:14px;height:14px}
+/* Progress: the month as a picture */
+.recapbtn{width:100%;margin:0 0 14px}
+.recapimg{display:block;width:100%;border-radius:22px;margin:4px 0 14px;box-shadow:0 12px 40px rgba(0,0,0,.4)}

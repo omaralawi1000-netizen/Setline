@@ -148,9 +148,9 @@ function sendFly(root) {
   setTimeout(done, 950);
 }
 
-// Streamed words don't appear in lumps: each word blurs in, lit by the accent, and settles.
+// Streamed words don't appear in lumps: they flow in at a steady pace, each fading in.
 // The text on screen glides after what has arrived, faster the further behind it is.
-const WORD_MS = 850; // the same as --m-word: a word is left alone only once its blur-in has finished
+const WORD_MS = 460; // the same as --m-slow: a word is left alone only once its fade-in has finished
 // Words are wrapped so each can blur in on its own clock (a negative delay says how far along it is).
 function wordify(el, births, start, now) {
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
@@ -211,9 +211,9 @@ function typewriter(root, id) {
   const births = [], st = {};
   const done = () => (shown >= words.length);
   const step = now => {
-    if (!done() && now - last > 66) { // new words every ~4 frames: each word fades in on its own clock, so this stays smooth and the thread isn't rebuilt every frame
+    if (!done() && now - last > 48) { // a few words every ~3 frames, a steady flow: a big chunk from the model never lands as a block
       last = now;
-      shown = Math.min(words.length, shown + Math.max(2, Math.ceil((words.length - shown) / 6)));
+      shown = Math.min(words.length, shown + Math.min(4, Math.max(1, Math.ceil((words.length - shown) / 12))));
       const bub = root.querySelector(`[data-id="${id}"] .bub`);
       if (bub) {
         const msg = bub.closest('.msg');

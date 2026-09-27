@@ -68,3 +68,13 @@ export function weekBehind(history, goal, now = Date.now(), restDays = 0) {
   if (need > daysLeft || (need === daysLeft && daysLeft <= 4)) return { done, goal, need, daysLeft: Math.max(0, daysLeft), lost: need > daysLeft, week: start };
   return null;
 }
+
+// A lighter session worth offering today: a short night, low energy in the morning check-in, or a
+// hard sport day (wrestling, a match) yesterday. Only a suggestion; the session starts as planned
+// unless you pick it.
+export function lighterToday({ checkin = null, yesterday = null } = {}) {
+  if (checkin?.sleepH != null && checkin.sleepH < 6) return { why: 'sleep', h: checkin.sleepH };
+  if (checkin?.energy != null && checkin.energy <= 2) return { why: 'energy' };
+  if (yesterday?.label) return { why: 'sport', what: yesterday.label };
+  return null;
+}

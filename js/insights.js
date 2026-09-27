@@ -138,3 +138,12 @@ export function repeatTemplate(w) {
       .filter(ex => ex.sets.length)
   };
 }
+
+// The lift to top up a group with: the one you do most for it (primary muscle), else a staple.
+const STAPLE = { chest: 'bench-press', back: 'barbell-row', shoulders: 'overhead-press', arms: 'barbell-curl', legs: 'back-squat', core: 'plank' };
+export function topUpExercise(group, usage = {}, catalog) {
+  const mine = Object.entries(usage).filter(([id]) => GROUPS[group]?.includes(catalog?.get?.(id)?.muscles?.[0])).sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (mine) return mine;
+  if (catalog?.get?.(STAPLE[group])) return STAPLE[group];
+  return catalog?.all?.find(e => GROUPS[group]?.includes(e.muscles?.[0]))?.id || null;
+}

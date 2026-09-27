@@ -70,6 +70,10 @@ export function openSheet(render, { onClose = null, label = '' } = {}) {
     const box = document.createElement('div');
     box.className = swap ? 'sin swap' : 'sin'; // new content in the same sheet fades in
     el.append(box);
+    // a sheet that redraws itself (a toggle, a removed row) keeps its place instead of jumping to the top
+    let y = 0;
+    box.addEventListener('scroll', e => { if (e.target.classList?.contains('sbody')) y = e.target.scrollTop; }, { capture: true, passive: true });
+    new MutationObserver(() => { const b = box.querySelector(':scope > .sbody'); if (b && y && b.scrollTop !== y) b.scrollTop = y; }).observe(box, { childList: true });
     fn(box, api);
     const f = box.querySelector('[autofocus]');
     if (f) setTimeout(() => f.focus({ preventScroll: true }), 60);

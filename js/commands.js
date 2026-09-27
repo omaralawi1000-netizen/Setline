@@ -486,6 +486,7 @@ export function resolve(intent, snap, t, lang) {
       if (local) return mealCommand(local, intent.slot, heard);
       return cmd('auto', { title: t('meal.estimating'), value: intent.text, sub: t('voice.heard', { text: heard }), say: '', run: { op: 'meal-ai', text: intent.text, slot: intent.slot || null } });
     }
+    case 'Report': return cmd('auto', { title: t('report.saved'), value: intent.text || t('report.kind.' + intent.kind), sub: '', say: '', run: { op: 'report', kind: intent.kind, text: intent.text } });
     case 'RepeatMeal': {
       // yesterday's meal, eaten again: logged in that meal's slot, with Undo
       const y = (snap.nutrition || []).find(n => n.date === dateKey(snap.now - 86_400_000));

@@ -39,6 +39,7 @@ export function renderProgress(root) {
     <h1 class="h1">${t('progress.title')}</h1>
     ${none ? `<div class="empty solid"><div class="emptyglyph">${I.chart}</div><h2>${t('progress.empty')}</h2><p>${t('progress.emptySub')}</p>
       <button class="log" data-act="go" data-to="workout">${t('progress.startFirst')}</button></div>` : `
+    <button class="btn2 soft recapbtn" data-act="recap">${I.image}<span>${t('recap.open')}</span></button>
     <div class="seg hseg" role="group">${[4, 12, 52].map(n => `<button data-prange="${n}" aria-pressed="${range === n}">${t('progress.weeks', { n })}</button>`).join('')}</div>
 
     <div class="chartcard solid">

@@ -6,6 +6,7 @@
 //   workoutExerciseIds: [...], routines: [{id, name, names}], restRunning: bool
 // }
 // Intent shapes are shared with the AI fallback (phase 3).
+import { reportIntent } from './reports.js';
 import { parseGoalDate } from './goals.js';
 import { parseCheckin } from './checkin.js';
 import { normalize } from './catalog.js';
@@ -13,7 +14,7 @@ import { lbToKg, round } from './units.js';
 import { CARDIO_TYPES } from './cardio.js';
 import { parseMealLocal } from './fooddb.js';
 
-export const INTENTS = ['LogSet', 'LogSetNo', 'LogSets', 'LogBatch', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'RepeatMeal', 'LogWater', 'SetTarget', 'CheckIn', 'LogRel', 'SetGoal', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
+export const INTENTS = ['LogSet', 'LogSetNo', 'LogSets', 'LogBatch', 'LogCardio', 'StartCardio', 'LogBodyweight', 'LogProtein', 'LogMeal', 'RepeatMeal', 'Report', 'LogWater', 'SetTarget', 'CheckIn', 'LogRel', 'SetGoal', 'RepeatLast', 'AdjustLast', 'EditLast', 'DeleteLast', 'Undo', 'NextExercise', 'PrevExercise',
   'AddWarmup', 'WarmupDone', 'AddExercise', 'SwapExercise', 'StartRoutine', 'StartEmpty', 'Finish', 'Discard', 'StartRest', 'AdjustRest', 'SkipRest',
   'AdjustNext', 'Confirm', 'Query', 'Cancel', 'Help', 'Ask', 'Unknown'];
 
@@ -367,6 +368,8 @@ export function parse(text, ctx = {}) {
   const batch = parseBatch(text, ctx);
   if (batch) return batch;
   const said = String(text || '').trim();
+  const rep = reportIntent(said); // "bug: …", "idea: …": a report for the developer
+  if (rep) return { ...rep, heard: said };
   const pre = foodAndWater(said, ctx); // water, calorie targets
   if (pre) return pre;
   const again = repeatMeal(said); // "same as yesterday's lunch"

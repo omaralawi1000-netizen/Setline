@@ -6,6 +6,7 @@ import { state } from '../store.js';
 import * as mic from '../voice.js';
 import * as tts from '../tts.js';
 import { transcribe, buildPrompt } from '../stt.js';
+import { quickReport, noteHeard } from './report.js';
 import { parse } from '../parser.js';
 import { resolve, AUTO_MS } from '../commands.js';
 import { translator } from '../i18n.js';
@@ -550,6 +551,7 @@ function showWords(text) {
 export function handleText(text, { typed = false } = {}) {
   text = String(text || '').trim();
   if (!text) return;
+  if (!typed) noteHeard(text); // kept for a bug report
   if (card.cmd && !card.committed && card.cmd.kind === 'auto') commitNow(); // a new command lands the previous one
   if (v.open) showWords(text);
   const intent = parse(text, parseCtx());
@@ -563,7 +565,7 @@ export function handleText(text, { typed = false } = {}) {
 }
 
 // The Coach box: a clear command (food, a set, water, targets…) is done, not discussed.
-const DO_TYPES = new Set(['LogSet', 'LogSets', 'LogBatch', 'LogRel', 'AdjustNext', 'LogMeal', 'RepeatMeal', 'LogWater', 'SetTarget', 'LogBodyweight', 'LogProtein', 'LogCardio', 'StartCardio', 'StartRoutine', 'CheckIn', 'AddWarmup', 'WarmupDone', 'SetGoal']);
+const DO_TYPES = new Set(['LogSet', 'LogSets', 'LogBatch', 'LogRel', 'AdjustNext', 'LogMeal', 'RepeatMeal', 'Report', 'LogWater', 'SetTarget', 'LogBodyweight', 'LogProtein', 'LogCardio', 'StartCardio', 'StartRoutine', 'CheckIn', 'AddWarmup', 'WarmupDone', 'SetGoal']);
 export function actOnText(text) {
   text = String(text || '').trim();
   if (!text || /\?\s*$/.test(text) || isQuestion(text)) return null;
@@ -835,6 +837,7 @@ async function execute(run, cmd) {
   if (run.op === 'goal') { addGoal(run.goal); return true; }
   if (run.op === 'checkin') { const r = await store.saveCheckin(run.patch); card.undoOp = { op: 'checkin', prev: r.prev }; return true; }
   if (run.op === 'meal') { dismissCard(); if (v.open) await closeVoice(); openMealSheet({ text: run.text }); return false; }
+  if (run.op === 'report') { dismissCard(); if (v.open) await closeVoice(); quickReport(run.kind, run.text); return false; }
   if (run.op === 'meal-log') { const ms = await store.logMeals(run.meals); card.undoOp = { op: 'meals-del', ids: ms.map(m => m.id) }; return true; }
   if (run.op === 'water') { await store.logWater(run.ml); card.undoOp = { op: 'water', ml: run.ml }; return true; }
   if (run.op === 'targets') { store.setSettings({ foodTargets: run.targets }); card.undoOp = { op: 'targets', prev: state.settings.foodTargets ?? null, was: run.prev }; return true; }

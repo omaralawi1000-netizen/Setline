@@ -15,19 +15,30 @@ export function edgeColor() {
   root.style.setProperty('--edge', out);
   return out;
 }
+let bgCache = '';
+const bgHex = () => (bgCache ||= (() => { const c = hex(getComputedStyle(document.documentElement).getPropertyValue('--bg')) || [13, 15, 21]; return '#' + c.map(v => v.toString(16).padStart(2, '0')).join(''); })());
+// a colour seen through a layer of `rgb` at `alpha` (the voice layer, a sheet's scrim)
+export function through(c, rgb, alpha) {
+  const base = hex(c) || [13, 15, 21];
+  return '#' + base.map((v, i) => Math.round(v * (1 - alpha) + rgb[i] * alpha).toString(16).padStart(2, '0')).join('');
+}
 // worked out once per theme: reading computed styles forces a style pass, and this ran on every class change
 let edgeCache = '';
 const edge = () => (edgeCache ||= edgeColor());
 let repaint = () => {};
-export const refreshChrome = () => { edgeCache = ''; repaint(); };
+export const refreshChrome = () => { edgeCache = ''; bgCache = ''; repaint(); };
 
 export function initChrome() {
   const app = document.getElementById('app');
   const metas = () => document.querySelectorAll('meta[name=theme-color]');
   let color = '';
   const paint = () => {
-    const dim = app.classList.contains('voice') || !!app.querySelector(':scope > .scrim.show');
-    const next = dim ? DIM : edge();
+    // under the voice layer or a sheet's scrim the status bar takes the colour the top of the page
+    // really has there (the page's edge seen through that layer), so there's no band at the seam
+    const voice = app.classList.contains('voice'), scrim = !!app.querySelector(':scope > .scrim.show');
+    const coach = app.classList.contains('coaching') && !app.classList.contains('is-sub');
+    const top = coach ? bgHex() : edge(); // the Coach's own background has no glow at the top
+    const next = voice ? through(top, [9, 10, 15], 0.62) : scrim ? through(top, [5, 6, 10], 0.55) : top;
     if (next !== color) { color = next; for (const m of metas()) m.setAttribute('content', next); }
   };
   new MutationObserver(paint).observe(app, { attributes: true, attributeFilter: ['class'], childList: true, subtree: false });

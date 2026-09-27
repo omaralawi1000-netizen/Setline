@@ -74,7 +74,7 @@ export function checkWeek(now = Date.now()) {
   if (cur?.kind === 'behind' && cur.id !== 'behind-' + monday) dropPin({ gone: false });
   else if (cur && cur.kind !== 'behind' && now - (cur.at || 0) > 7 * DAY) dropPin({ gone: false });
   if (!s.weeklyGoal || new Date(now).getDay() === 1) return; // Monday: the week has only begun
-  const b = weekBehind(state.history, s.weeklyGoal, now, offDaysLeft(now));
+  const b = weekBehind([...state.history, ...state.cardio.filter(c => c.durationSec >= 1200)], s.weeklyGoal, now, offDaysLeft(now)) /* counted like the week ring: 20+ min cardio counts */;
   const pin = state.settings.coachPin;
   if (!b) { if (pin?.kind === 'behind') dropPin({ gone: false }); return; }
   if (pin && pin.kind !== 'behind') return; // a session note is more useful; one note at a time

@@ -90,8 +90,16 @@ export function completeWarmup(w, exIndex, setId, now = Date.now()) {
   if (!s) return w;
   s.done = !s.done;
   s.completedAt = s.done ? now : null;
+  // a short timer between warm-ups (a bit longer before the first working set); it says what's next
+  if (s.done) {
+    const ex = next.exercises[exIndex];
+    const more = ex.sets.find(x => x.type === 'warmup' && !x.done), work = ex.sets.find(x => x.type !== 'warmup' && !x.done);
+    const upNext = more || work;
+    if (upNext) next.rest = { ...makeRest(now, more ? WARMUP_REST.between : WARMUP_REST.last), warmup: true, cue: { kg: upNext.kg, reps: upNext.reps, warm: !!more } };
+  }
   return next;
 }
+export const WARMUP_REST = { between: 45, last: 75 };
 
 // Log a set: fills the first planned set of the exercise, otherwise appends. Starts rest.
 export function logSet(w, exIndex, { kg, reps }, now = Date.now(), restSec = 90) {

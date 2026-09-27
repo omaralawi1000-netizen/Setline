@@ -267,6 +267,7 @@ function restNext(w) {
   const { t } = state;
   const ex = w.exercises[w.current];
   if (!ex) return '';
+  if (w.rest?.warmup && w.rest.cue) return t(w.rest.cue.warm ? 'warmup.cueNext' : 'warmup.cueWork', { set: w.rest.cue.kg != null ? setText(w.rest.cue.kg, w.rest.cue.reps) : String(w.rest.cue.reps ?? '') });
   if (!ex.sets.some(s => s.done) && Number.isInteger(w.advancedFrom)) return t('workout.nextUp', { name: exName(ex.exerciseId) });
   const nextEx = w.exercises[w.current + 1];
   if (W.firstPlannedIndex(ex) === -1 && ex.sets.length && nextEx) return t('workout.nextUp', { name: exName(nextEx.exerciseId) });
@@ -708,7 +709,12 @@ export function restBell(w, now = Date.now()) {
   if (now >= r.endsAt && bell.rang !== r.endsAt && now - r.endsAt < 2000) {
     bell.rang = r.endsAt;
     if (state.settings.restSound) chime('end');
-    try { navigator.vibrate?.([260, 110, 260, 110, 420]); } catch {} // a real buzz, even with light haptics off
+    try { navigator.vibrate?.([140, 120, 140]); } catch {} // felt even with light haptics off, two clean taps
+    // after a warm-up: say what's next ("Next warm-up: 60 × 5", "First working set: 100 × 5")
+    if (r.warmup && r.cue && state.settings.spoken !== 'off') {
+      const text = state.t(r.cue.warm ? 'warmup.cueNext' : 'warmup.cueWork', { set: r.cue.kg != null ? setText(r.cue.kg, r.cue.reps) : String(r.cue.reps ?? '') });
+      import('./voice.js').then(v => v.speakCue?.(text)).catch(() => {});
+    }
   }
 }
 

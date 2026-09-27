@@ -2,7 +2,7 @@
 import * as store from './store.js';
 import { configureSteps } from './progression.js';
 import { state } from './store.js';
-import { elapsedSec, nextSetNumber, restFor as restSecFor } from './workout.js';
+import { elapsedSec, nextSetNumber, restFor as restSecFor, addExercise, lastSession } from './workout.js';
 import { clock } from './format.js';
 import { setHapticsGate, haptic } from './haptics.js';
 import { keepAwake } from './wakelock.js';
@@ -16,13 +16,16 @@ import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav, autoW
 import { markFinished, renderHistory, renderDetail } from './ui/history.js';
 import { renderSettings, initSettings } from './ui/settings.js';
 import { DUO } from './settings.js';
+import { installErrorLog, openReport } from './ui/report.js';
+import { openRecap } from './ui/recap.js';
+installErrorLog(); // errors are kept (the last few) so a bug report can carry them
 import { afterSession, checkWeek, dropPin } from './ui/pins.js';
 import { initVoice, orbHTML, voiceHandlePop, closeVoice, isVoiceOpen, openVoice } from './ui/voice.js';
 import { renderYou } from './ui/you.js';
 import { renderCoach, initCoach, ask as askCoach, ensureModels, weeklyCheckin, markWeeklySeen, sessionDebrief, markDebriefSeen } from './ui/coach.js';
 import { initCardio, setCardioNav, tickCardio, renderCardioDetail, syncGps, startCardioSession, pickTypeSheet } from './ui/cardio.js';
 import { initBody } from './ui/body.js';
-import { initRoutine, setRoutineNav, renderRoutine, editRoutine, editRoutineFrom, programsSheet, startRoutine } from './ui/routine.js';
+import { initRoutine, setRoutineNav, renderRoutine, editRoutine, editRoutineFrom, programsSheet, startRoutine, planFor } from './ui/routine.js';
 import { setHistoryFilter } from './ui/history.js';
 import { renderProgress, renderExercise, setRange } from './ui/progress.js';
 import { countAll, burst } from './ui/fx.js';
@@ -42,7 +45,7 @@ import { initGoals } from './ui/goals.js';
 import { cardioElapsed, cardioName } from './cardio.js';
 import { weekStart } from './stats.js';
 import { nextRoutine, routineFromWorkout } from './routines.js';
-import { repeatTemplate } from './insights.js';
+import { repeatTemplate, topUpExercise } from './insights.js';
 import { animateFigures } from './ui/figure.js';
 
 const TABS = ['today', 'workout', 'food', 'you', 'coach'];
@@ -146,22 +149,36 @@ function settleCoachFx() { const c = coachFx; coachFx = null; c?.(); }
 // the top and settling at its new size. A stand-in flies while the real orbs at both ends stay hidden.
 const relRect = el => { const a = app.getBoundingClientRect(), r = el.getBoundingClientRect(); return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height / 2, w: r.width }; };
 const layRect = el => { let x = el.offsetWidth / 2, y = el.offsetHeight / 2; for (let n = el; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; } return { x, y, w: el.offsetWidth }; };
-function flyOrb(from, to, { duration, delay = 0, go, onland, easing }) {
-  const src = $('#dock .orbbtn .orb'), base = src?.offsetWidth || 60;
-  if (!src || !from.w || !to.w || Math.hypot(to.x - from.x, to.y - from.y) < 4) return null;
-  const ghost = src.cloneNode(true);
-  ghost.className = 'orb orbghost';
+// The stand-in carries both looks, the orb it leaves and the orb it becomes, and melts from one
+// into the other on the way, so at the end it is exactly the orb in its new place: nothing swaps.
+function flyOrb(from, to, { duration, delay = 0, go, onland, easing, fromEl, toEl }) {
+  if (!from.w || !to.w || !fromEl || !toEl || Math.hypot(to.x - from.x, to.y - from.y) < 4) return null;
+  const W = to.w;
+  const ghost = document.createElement('div');
+  ghost.className = 'orbghost';
   ghost.setAttribute('aria-hidden', 'true');
-  Object.assign(ghost.style, { left: `${from.x - base / 2}px`, top: `${from.y - base / 2}px` });
+  Object.assign(ghost.style, { left: `${from.x - W / 2}px`, top: `${from.y - W / 2}px`, width: `${W}px`, height: `${W}px` });
+  const look = (el, w) => {
+    const c = el.cloneNode(true), n = el.offsetWidth || w;
+    c.className = 'orb';
+    c.removeAttribute('style');
+    c.style.setProperty('--s', `${n}px`);
+    Object.assign(c.style, { position: 'absolute', left: `${(W - n) / 2}px`, top: `${(W - n) / 2}px`, transform: `scale(${W / n})`, margin: '0' });
+    return c;
+  };
+  const a = look(fromEl, from.w), b = look(toEl, to.w);
+  b.style.opacity = '0';
+  ghost.append(a, b);
   app.append(ghost);
-  const dx = to.x - from.x, dy = to.y - from.y, s0 = from.w / base, s1 = to.w / base;
-  // one straight line, no hop: it shoots off at once and slows just before it arrives, then hits
-  // it shrinks to the box's size mostly on the way in, so it doesn't look like it deflates at the start
-  const a = go(ghost, [{ translate: '0 0', scale: s0 }, { scale: s0 + (s1 - s0) * 0.4, offset: 0.55 },
-    { translate: `${dx}px ${dy}px`, scale: s1 }], { duration, delay, easing, fill: 'both' });
+  const dx = to.x - from.x, dy = to.y - from.y, s0 = from.w / W;
+  // one straight line, no hop: it shoots off, eases, and still has some speed left when it hits
+  const fly = go(ghost, [{ translate: '0 0', scale: s0 }, { scale: 1 + (s0 - 1) * 0.45, offset: 0.5 }, { translate: `${dx}px ${dy}px`, scale: 1 }], { duration, delay, easing, fill: 'both' });
+  const melt = { duration: duration * 0.55, delay: delay + duration * 0.3, easing: 'linear', fill: 'both' };
+  go(a, [{ opacity: 1 }, { opacity: 0 }], melt);
+  go(b, [{ opacity: 0 }, { opacity: 1 }], melt);
   const done = () => { ghost.remove(); };
-  a.addEventListener('cancel', done);
-  a.onfinish = () => { done(); onland?.(); };
+  fly.addEventListener('cancel', done);
+  fly.onfinish = () => { done(); onland?.(); };
   return ghost;
 }
 
@@ -208,7 +225,7 @@ function coachMorph(open, under) {
     let flying = null;
     queueMicrotask(() => {
       const corb = $('#composer .corb .orb');
-      flying = from && corb && flyOrb(from, layRect(corb), { duration: 330, easing: 'cubic-bezier(.18,.82,.32,1)', go, onland: () => { app.classList.remove('orbtravel'); const to = layRect(corb); impact(corb, to.x - from.x, to.y - from.y); } });
+      flying = from && corb && flyOrb(from, layRect(corb), { duration: 360, easing: 'cubic-bezier(.22,.62,.55,.93)', go, fromEl: dockOrb, toEl: corb, onland: () => { app.classList.remove('orbtravel'); const to = layRect(corb); impact(corb, to.x - from.x, to.y - from.y); } });
       if (flying) { app.classList.add('orbtravel', 'orbflown'); go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 900, fill: 'forwards' }); return; }
       go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
       setTimeout(() => haptic('land'), 560);
@@ -245,7 +262,7 @@ function coachMorph(open, under) {
     // the orb leaves the message box and flies home into the bar, which takes it with a small pulse
     const corb = $('#composer .corb .orb');
     let hold = null;
-    const flying = corb && dockOrb && flyOrb(relRect(corb), layRect(dockOrb), { duration: 420, delay: 40, easing: 'cubic-bezier(.3,.7,.3,1)', go, onland: () => {
+    const flying = corb && dockOrb && flyOrb(relRect(corb), layRect(dockOrb), { duration: 420, delay: 40, easing: 'cubic-bezier(.3,.62,.5,.95)', go, fromEl: corb, toEl: dockOrb, onland: () => {
       hold?.cancel();
       app.classList.remove('orbtravel');
       orb.classList.remove('pulse'); void orb.offsetWidth; orb.classList.add('pulse');
@@ -429,6 +446,25 @@ Object.assign(actions, {
   customize: () => openCustomize(),
   detail: el => pushSub('detail', { detailId: el.dataset.id, detailKind: el.dataset.kind || 'workout' }),
   'start-routine': el => { growSource(el.closest('.upcoming')); startRoutine(el.dataset.id); },
+  // a muscle group behind this week: three sets of its main lift go into the running workout
+  topup: el => {
+    const g = el.dataset.group, id = topUpExercise(g, state.usage, state.catalog);
+    if (!id || !state.active) return;
+    const last = lastSession(state.history, id), s = last?.sets?.[0];
+    const reps = s?.reps || 10, kg = s?.kg ?? null;
+    store.update(w => addExercise(w, id, [{ kg, reps }, { kg, reps }, { kg, reps }]), { undo: 'add', reason: 'add' });
+    haptic('success');
+    toast({ title: esc(state.t('balance.added', { name: state.catalog.name(id, state.lang) })), action: state.t('common.undo'), onAction: () => store.undo() });
+  },
+  recap: () => { haptic('tap'); openRecap(); },
+  'topup-ask': el => { go('coach'); askCoach(state.t('balance.askQ', { group: state.t('group.' + el.dataset.group).toLowerCase() })); },
+  // the lighter session Up next offers: about 10 % lighter, one set fewer per lift
+  'start-easy': el => {
+    const r = state.routines.find(x => x.id === el.dataset.id);
+    if (!r || state.active || state.activeCardio) return;
+    growSource(el.closest('.upcoming'));
+    store.startWorkout(planFor(r), { easy: true }); haptic('success'); go('workout');
+  },
   'save-routine': el => {
     const w = state.history.find(x => x.id === el.dataset.id);
     if (!w) return;
@@ -590,7 +626,7 @@ function scheduleRestAlert() {
   clearTimeout(restTimer);
   restFor = r.endsAt;
   const w = state.active, ex = w?.exercises[w.current];
-  const pn = plannedNext(w), exName = ex ? state.catalog.name(ex.exerciseId, state.lang) : '';
+  const pn = r.warmup ? null : plannedNext(w), exName = ex ? state.catalog.name(ex.exerciseId, state.lang) : '';
   const msg = { type: 'rest', endsAt: r.endsAt, live: state.settings.restLive !== false, liveTitle: state.t('workout.restLive'), title: state.t('workout.restDone'), body: ex ? `${exName} · ${state.t('workout.setNext', { n: nextSetNumber(ex) })}${pn ? ` · ${pn.label}` : ''}` : '',
     // the lock screen's buttons: log that set without opening the app, or 15 s more
     next: pn ? { exId: pn.exId, setId: pn.setId, kg: pn.kg, reps: pn.reps } : null, logLabel: pn ? state.t('alerts.log', { set: pn.label }) : '', addLabel: state.t('alerts.add15'),
@@ -802,6 +838,7 @@ function shortcut() {
   } else if (to === 'talk') setTimeout(openVoice, 250);
   else if (to === 'scan') setTimeout(openScanner, 250);
   else if (to === 'meal') setTimeout(() => openMealSheet(), 250);
+  else if (to === 'report') setTimeout(() => openReport(), 250);
 }
 
 // "Set up these routines" in the brief: the Coach copies the routine written there
