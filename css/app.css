@@ -2783,3 +2783,33 @@ html[data-motion=off] :is(.vlayer[data-phase=thinking] .orb .core,.ofloat[data-p
 /* while a reply streams, the report flag's place beside it is kept free, so the text doesn't re-wrap
    the moment the reply finishes and the flag appears */
 .msg.ai.is-streaming:not(.is-thinking)::after{content:"";flex:none;width:28px}
+
+/* ======================= 1.54.4 ======================= */
+/* Progress: a chart drawing itself only lays out its own card, not the whole page, on every frame */
+.chartcard{contain:layout paint}
+/* the bar charts as boxes (see barChart): same look as the SVG ones, growing on the GPU */
+.chart.hbars{position:relative;width:100%;height:auto}
+.chart.hbars .bar-r{position:absolute;display:block;transform-origin:50% 100%;background:linear-gradient(to bottom,var(--accent),color-mix(in srgb,var(--accent) 55%,transparent))}
+.chart.hbars.blue .bar-r{background:linear-gradient(to bottom,#5B86FF,color-mix(in srgb,#3E5FCC 55%,transparent))}
+.chart.hbars .base{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.08)}
+.chart.hbars .ax{position:absolute;left:0;bottom:0;font-size:10px;line-height:1;fill:none;color:var(--dim);font-weight:700;font-family:var(--font)}
+.chart.hbars .ax.ax-end{left:auto;right:0}
+.screen.enter .chart.hbars .bar-r,.chart.hbars.draw .bar-r{will-change:transform}
+@media (prefers-reduced-motion: reduce){ .chart .bar-r{animation:none} }
+html[data-motion=off] .chart .bar-r{animation:none}
+/* the line chart: the line and its area stay SVG, its dots and the record's halo are boxes over it */
+.chart.hline{position:relative;width:100%}
+.chart.hline > svg{display:block;width:100%;height:auto;overflow:visible}
+.chart.hline .dot,.chart.hline .halo{position:absolute;display:block;aspect-ratio:1;border-radius:50%;background:var(--accent);transform-origin:50% 50%}
+.chart.hline .dot.warm{background:#FFD9A8}
+.chart.hline .halo{background:#FFD9A8}
+/* the live dot (Up next, the workout mini bar, listening): its ring grows and fades on the GPU. It used
+   to animate a shadow, which repainted on every frame for as long as a workout ran, on every tab */
+.upcoming .live i,.minibar .dot,.vlayer[data-phase=listening] .live i{animation:none;position:relative}
+.upcoming .live i::after,.minibar .dot::after,.vlayer[data-phase=listening] .live i::after{content:"";position:absolute;inset:0;border-radius:50%;background:rgba(var(--a-rgb),.6);pointer-events:none;animation:micring calc(var(--m-slow) * 3) var(--e-out) infinite}
+@keyframes micring{from{transform:scale(1);opacity:.9}70%,to{transform:scale(3.25);opacity:0}}
+.upcoming .live.paused i::after,.minibar .dot.paused::after{animation:none;opacity:0}
+@media (prefers-reduced-motion: reduce){ .upcoming .live i::after,.minibar .dot::after,.vlayer[data-phase=listening] .live i::after{animation:none;opacity:0} }
+html[data-motion=off] :is(.upcoming .live i,.minibar .dot,.vlayer[data-phase=listening] .live i)::after{animation:none;opacity:0}
+/* a moving exercise figure only lays out itself */
+svg.fig[data-move]{contain:layout paint}

@@ -46,7 +46,7 @@ import { cardioElapsed, cardioName } from './cardio.js';
 import { weekStart } from './stats.js';
 import { nextRoutine, routineFromWorkout } from './routines.js';
 import { repeatTemplate, topUpExercise } from './insights.js';
-import { animateFigures } from './ui/figure.js';
+import { animateFigures, pauseHiddenFigures } from './ui/figure.js';
 
 const TABS = ['today', 'workout', 'food', 'you', 'coach'];
 const SUB = ['history', 'detail', 'settings', 'routine', 'progress', 'exercise', 'body'];
@@ -135,6 +135,7 @@ function renderAll() {
   if (document.documentElement.dataset.accent !== state.settings.accent) { document.documentElement.dataset.accent = state.settings.accent; refreshChrome(); }
   renderScreen();
   animateFigures($('#s-' + view.screen));
+  pauseHiddenFigures();
   renderDock();
   renderMini();
   // numbers count up the first time a screen is shown, not on every change

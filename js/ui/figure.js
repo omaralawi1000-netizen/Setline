@@ -36,3 +36,12 @@ export function animateFigures(root) {
     }
   }
 }
+
+// A figure keeps moving only where you can see it: on the screen that's showing or in a sheet. (On a
+// screen you've left it went on for as long as the workout ran, laying the page out every frame.)
+export function pauseHiddenFigures() {
+  for (const svg of document.querySelectorAll('svg.fig[data-going]')) {
+    const on = !!svg.closest('.screen.on, .sheet');
+    for (const a of svg.getAnimations({ subtree: true })) if (on ? a.playState === 'paused' : a.playState === 'running') on ? a.play() : a.pause();
+  }
+}
