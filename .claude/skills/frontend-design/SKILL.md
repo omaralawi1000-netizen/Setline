@@ -4,7 +4,7 @@ description: Guidance for distinctive, intentional visual design when building n
 license: Complete terms in LICENSE.txt
 ---
 
-Setline's design direction in SPEC.md is locked (#0D0F15 base, lavender #C6BBFA, Manrope, quiet themes violet, slate, sage, sand, clay, mono). Use this skill to improve execution, never to pick a new aesthetic.
+Setline's design direction in SPEC.md is locked (#0D0F15 base, lavender #C6BBFA, Manrope, quiet themes violet, slate, sage, sand, clay, mono). Use this skill only in REDESIGN mode, when Omar has explicitly asked for a new look (see docs/DESIGN_SYSTEM.md). For everyday polish, follow docs/DESIGN_SYSTEM.md instead and never pick a new aesthetic.
 
 # Frontend Design
 
