@@ -16,6 +16,7 @@ const SHELL = [
   'data/exercises.js',
   'js/ai.js',
   'js/app.js',
+  'js/appedit.js',
   'js/audio.js',
   'js/backup.js',
   'js/body.js',

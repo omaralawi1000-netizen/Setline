@@ -581,6 +581,15 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Orb jump-in: the message box is already there when the orb arrives (it used to still be sliding up), the orb shrinks mostly on the way in, and the squash is gentler
 - [x] Status bar gradient only just below the bar; the navigation bar's blur halo a little stronger
 
+## 1.49.1: stabilization, offline repair, safer handoff
+
+- [x] Offline cold-start bug: `js/appedit.js` is now included in the service-worker app shell, so the Coach's app-edit dependency is available when the PWA starts without a network connection
+- [x] Regression guard: tests now crawl Setline's static production module graph from `js/app.js` and fail if a production module is missing from the offline shell
+- [x] IndexedDB recovery: a blocked database open clears the cached rejected promise so a later attempt can retry cleanly instead of requiring a reload
+- [x] CI: GitHub Actions runs `npm test` automatically on pull requests and on pushes to main
+- [x] Codex handoff: concise `AGENTS.md` points Codex to the same `PLAN.md`, `SPEC.md`, test, screenshot and motion rules already used by the project
+- No product scope, visual direction, Coach behavior, workout logic or animation design changed in this patch
+
 ## 1.50.0: silence isn't a set, a seamless orb, calm reply text, the status bar everywhere, bug reports, five new helpers
 
 - [x] Bug: saying nothing (or gym noise) could log "Bænkpres 82,5 kilo 8 gentagelser": Whisper, given silence, repeats the example in its prompt. The example now uses numbers nobody lifts, anything that comes back as the prompt is dropped, and a sentence heard twice counts once
