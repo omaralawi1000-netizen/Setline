@@ -1,5 +1,5 @@
 // Workout screen: steppers, log set, previous performance, set list, rest ring, sheets.
-import { state, update, undo, finish, discard } from '../store.js';
+import { state, update, undo, finish, discard, saveRoutine } from '../store.js';
 import * as W from '../workout.js';
 import { bestsFrom, livePRSets } from '../pr.js';
 import { stepWeight, parseNumber, fromDisplay } from '../units.js';
@@ -27,6 +27,8 @@ import { usualMinutes, timeStatus } from '../insights.js';
 import { handsFreeOn, hfPillHTML, toggleHandsFree, announceWarmup } from './handsfree.js';
 import { goalAimHTML } from './goals.js';
 import { figureHTML } from './figure.js';
+import { sortable, GRIP } from './sortable.js';
+import { routineName } from '../routines.js';
 
 const C = 157.08; // ring circumference, r=25
 const REST_LINGER = 4000; // keep the card up after rest ends
@@ -580,9 +582,11 @@ function overviewSheet() {
       if (!w) return closeTop();
       el.querySelector('.sbody')?.remove();
       el.insertAdjacentHTML('beforeend', `<div class="sbody"><div class="shead"><h2>${t('workout.exercises')}</h2></div>
-        <ul class="plist">${w.exercises.map((ex, k) => {
+        ${w.exercises.length > 1 ? `<p class="sorthint">${t('sort.hint')}</p>` : ''}
+        <ul class="plist sortlist">${w.exercises.map((ex, k) => {
           const done = ex.sets.filter(s => s.done).length;
-          return `<li><div class="prow${k === w.current ? ' cur' : ''}">
+          return `<li class="sortrow"><div class="prow${k === w.current ? ' cur' : ''}">
+            <span class="grip" data-grip aria-label="${esc(t('routine.drag'))}">${GRIP}</span>
             <span class="n">${k + 1}</span>
             <button class="l" data-k="pick" data-i="${k}" style="text-align:left"><strong>${esc(exName(ex.exerciseId))}</strong><small>${t('workout.setsDone', { done, total: Math.max(done, ex.sets.length) })}</small></button>
             <button class="plus" data-k="rm" data-i="${k}" aria-label="${t('workout.remove')}">${I.close}</button>
@@ -591,6 +595,18 @@ function overviewSheet() {
         <div class="acts"><button class="btn2 solid" data-k="add">${I.plus}<span>${t('workout.addExercise')}</span></button></div></div>`);
     };
     paint();
+    // put the exercises in the order you'll do them: drag the pull tab (or hold a row)
+    sortable(el, { item: '.sortrow', handle: '[data-grip]', onMove: (from, to) => {
+      update(w => W.moveExercise(w, from, to), { undo: 'move', reason: 'move' });
+      paint();
+      // from a routine: offer to keep this order for next time
+      const w = state.active, r = w?.routineId && state.routines.find(x => x.id === w.routineId);
+      if (r) toast({ title: esc(t('sort.moved')), action: t('sort.keep'), ms: 6000, onAction: async () => {
+        const pos = id => { const i = state.active?.exercises.findIndex(e => e.exerciseId === id) ?? -1; return i < 0 ? 999 : i; };
+        await saveRoutine({ ...r, exercises: [...r.exercises].sort((a, b) => pos(a.exerciseId) - pos(b.exerciseId)) });
+        haptic('success'); toast({ title: esc(t('sort.kept', { name: routineName(r, state.lang) })) });
+      } });
+    } });
     el.addEventListener('click', e => {
       const b = e.target.closest('[data-k]');
       if (!b) return;

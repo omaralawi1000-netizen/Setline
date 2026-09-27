@@ -75,6 +75,7 @@ export const DEFAULTS = Object.freeze({
   foodHide: [],        // Food tab parts turned off (Customize)
   foodOrder: [],       // Food tab sections, in your order
   todayOrder: [],      // Today cards, in your order
+  settingsOrder: [],   // Settings sections, in your order (pull tabs)
   quickAdd: null,      // {kind: 'protein'|'kcal', values: [a, b, c]}
   kgSteps: null,       // {barbell, dumbbell, machine}: the − / + step in kg
   coachBrief: '',      // who you are and how to coach you, in your own words (the Coach follows it)
@@ -106,6 +107,8 @@ const order = (list, all) => {
 };
 export const foodOrderOf = s => order(s.foodOrder, FOOD_ORDER);
 export const todayOrderOf = s => order(s.todayOrder, TODAY_ORDER);
+export const SETTINGS_ORDER = ['general', 'voice', 'keys', 'workout', 'goals', 'feel', 'drive', 'advanced', 'data'];
+export const settingsOrderOf = s => order(s.settingsOrder, SETTINGS_ORDER);
 export const TODAY_PARTS = ['checkin', 'weekplan', 'plateau', 'goals', 'cardio', 'week', 'balance', 'body', 'review', 'routines'];
 
 // Gemini prebuilt voices and how they sound.
@@ -157,6 +160,7 @@ export function sanitize(input) {
   s.foodTargets = sanitizeTargets(input.foodTargets);
   if (Array.isArray(input.foodOrder)) s.foodOrder = order(input.foodOrder, FOOD_ORDER);
   if (Array.isArray(input.todayOrder)) s.todayOrder = order(input.todayOrder, TODAY_ORDER);
+  if (Array.isArray(input.settingsOrder)) s.settingsOrder = order(input.settingsOrder, SETTINGS_ORDER);
   if (input.quickAdd) s.quickAdd = sanitizeQuick(input.quickAdd);
   s.kgSteps = sanitizeSteps(input.kgSteps);
   s.memories = sanitizeMemories(input.memories);

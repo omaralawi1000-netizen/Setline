@@ -12,6 +12,7 @@ import { I } from './icons.js';
 import { toast } from './toast.js';
 import { openSheet, closeTop } from './sheet.js';
 import { openPicker } from './picker.js';
+import { sortable, GRIP } from './sortable.js';
 
 let nav = { go: () => {}, openRoutine: () => {}, back: () => {} };
 export const setRoutineNav = n => { nav = n; };
@@ -149,8 +150,9 @@ export function renderRoutine(root) {
     <input class="rname" id="rname" value="${esc(R.routineName(d, lang))}" placeholder="${esc(t('routine.namePh'))}" maxlength="${R.LIMITS.name}" autocomplete="off" aria-label="${t('routine.name')}">
     <p class="sub">${t('routine.exercises', { n: d.exercises.length })} · ${t('min', { n: R.estimateMinutes(d) })}</p>
     <div class="dayopts">${[-1, 1, 2, 3, 4, 5, 6, 0].map(v => `<button class="chip" data-r="day" data-v="${v}" aria-pressed="${(R.routineDay(d) ?? -1) === v}">${v === -1 ? t('plan.anyDay') : esc(new Intl.DateTimeFormat(lang === 'da' ? 'da-DK' : 'en-GB', { weekday: 'short' }).format(new Date(2026, 8, 27 + v)).replace('.', ''))}</button>`).join('')}</div>
+    ${d.exercises.length > 1 ? `<p class="sorthint">${t('sort.hint')}</p>` : ''}
     <ol class="redit" id="redit">${d.exercises.map((e, i) => `<li class="reitem solid" data-i="${i}">
-        <span class="grip" data-grip aria-label="${t('routine.drag')}"><svg class="i" viewBox="0 0 24 24"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg></span>
+        <span class="grip" data-grip aria-label="${t('routine.drag')}">${GRIP}</span>
         <div class="rei"><strong>${esc(state.catalog.name(e.exerciseId, lang))}</strong>
           <div class="rsr">
             <span class="ms"><button data-r="sets" data-d="-1" data-i="${i}" aria-label="−">−</button><b>${e.sets.length}</b><small>${t('routine.sets')}</small><button data-r="sets" data-d="1" data-i="${i}" aria-label="+">+</button></span>
@@ -241,49 +243,8 @@ export function initRoutine(root) {
     }
   });
 
-  // drag to reorder by the grip
-  let drag = null;
-  root.addEventListener('pointerdown', e => {
-    const grip = e.target.closest('[data-grip]');
-    if (!grip) return;
-    e.preventDefault();
-    const li = grip.closest('.reitem');
-    const items = [...root.querySelectorAll('.reitem')];
-    const rects = items.map(x => x.getBoundingClientRect());
-    drag = { li, items, rects, from: Number(li.dataset.i), to: Number(li.dataset.i), y: e.clientY, id: e.pointerId };
-    grip.setPointerCapture(e.pointerId);
-    li.classList.add('lifted');
-    haptic('tap');
-  });
-  root.addEventListener('pointermove', e => {
-    if (!drag || e.pointerId !== drag.id) return;
-    const dy = e.clientY - drag.y;
-    drag.li.style.transform = `translateY(${dy}px) scale(1.02)`;
-    const r = drag.rects[drag.from];
-    const center = r.top + r.height / 2 + dy;
-    let to = drag.from;
-    drag.rects.forEach((q, k) => { if (k < drag.from && center < q.top + q.height / 2) to = Math.min(to, k); if (k > drag.from && center > q.top + q.height / 2) to = Math.max(to, k); });
-    if (to !== drag.to) {
-      drag.to = to;
-      const h = r.height + 8;
-      drag.items.forEach((x, k) => {
-        if (x === drag.li) return;
-        const shift = drag.from < to && k > drag.from && k <= to ? -h : drag.from > to && k < drag.from && k >= to ? h : 0;
-        x.style.transform = shift ? `translateY(${shift}px)` : '';
-      });
-      haptic('tap');
-    }
-  });
-  const end = e => {
-    if (!drag || (e.pointerId !== undefined && e.pointerId !== drag.id)) return;
-    const d = drag;
-    drag = null;
-    readName(root);
-    if (d.to !== d.from) ui.draft = R.moveRoutineExercise(ui.draft, d.from, d.to);
-    renderRoutine(root);
-  };
-  root.addEventListener('pointerup', end);
-  root.addEventListener('pointercancel', end);
+  // drag to reorder: the pull tab, or hold a row
+  sortable(root, { item: '.reitem', handle: '[data-grip]', onMove: (from, to) => { readName(root); ui.draft = R.moveRoutineExercise(ui.draft, from, to); renderRoutine(root); } });
 }
 
 export const hasDraft = () => !!ui.draft;
