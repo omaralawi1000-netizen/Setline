@@ -47,7 +47,8 @@ export function countUp(el, to, { ms = 900, format = v => Math.round(v).toLocale
   const ease = t => 1 - Math.pow(1 - t, 3);
   const step = now => {
     const k = Math.min(1, (now - t0) / ms);
-    el.textContent = format(to * ease(k));
+    const s = format(to * ease(k));
+    if (el.textContent !== s) el.textContent = s; // (only when the digits change: each write lays the page out again)
     if (k < 1) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);

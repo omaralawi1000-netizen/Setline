@@ -3,25 +3,26 @@ import { esc } from './dom.js';
 
 let gid = 0;
 
-// Bars: values [{v, label?, hot?}] → SVG. Bars grow from the baseline one after another.
+// Bars: values [{v, label?, hot?}] → the same picture the SVG version drew, as plain boxes: bars
+// growing inside an SVG made the phone lay the chart out again on every frame, while a box's
+// transform runs on the GPU. They grow from the baseline one after another. Geometry is in the old
+// viewBox units, as percentages of the chart.
 export function barChart(values, { h = 120, w = 340, color = 'lav', fmt = v => String(v), axis = [] } = {}) {
   const n = values.length;
   if (!n) return '';
   const max = Math.max(1, ...values.map(x => x.v));
-  const gap = 6, bw = (w - gap * (n - 1)) / n;
-  const id = `b${++gid}`;
+  const gap = 6, bw = (w - gap * (n - 1)) / n, H = h + 18;
+  const pc = (a, b) => `${((a / b) * 100).toFixed(3)}%`;
   const bars = values.map((x, i) => {
     const bh = x.v ? Math.max(3, (x.v / max) * (h - 18)) : 2;
-    const xPos = i * (bw + gap);
-    return `<rect class="bar-r${x.hot ? ' hot' : ''}${x.v ? '' : ' zero'}" style="--i:${i}" x="${xPos.toFixed(1)}" y="${(h - bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="${Math.min(6, bw / 2).toFixed(1)}" fill="url(#${id})"><title>${esc(x.label || '')} ${esc(fmt(x.v))}</title></rect>`;
+    const tip = `${x.label || ''} ${fmt(x.v)}`.trim();
+    return `<i class="bar-r${x.hot ? ' hot' : ''}${x.v ? '' : ' zero'}" title="${esc(tip)}" style="--i:${i};left:${pc(i * (bw + gap), w)};width:${pc(bw, w)};bottom:${pc(18, H)};height:${pc(bh, H)};border-radius:${Math.min(6, bw / 2).toFixed(1)}px"></i>`;
   }).join('');
-  const stops = color === 'blue' ? ['#5B86FF', '#3E5FCC'] : ['var(--accent)', 'var(--accent)'];
-  return `<svg class="chart bars" viewBox="0 0 ${w} ${h + 18}" preserveAspectRatio="none" role="img">
-    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:${stops[0]}"/><stop offset="1" style="stop-color:${stops[1]}" stop-opacity=".55"/></linearGradient></defs>
-    <line class="base" x1="0" x2="${w}" y1="${h + .5}" y2="${h + .5}"/>
+  return `<div class="chart bars hbars${color === 'blue' ? ' blue' : ''}" style="aspect-ratio:${w} / ${H}" role="img" aria-label="${esc(values.map(x => `${x.label || ''} ${fmt(x.v)}`.trim()).join(', '))}">
+    <b class="base" style="bottom:${pc(17.5, H)}"></b>
     ${bars}
-    ${axis.map(a => `<text class="ax" x="${a.x === 'end' ? w : 0}" y="${h + 14}" text-anchor="${a.x === 'end' ? 'end' : 'start'}">${esc(a.text)}</text>`).join('')}
-  </svg>`;
+    ${axis.map(a => { const side = a.x === 'end' ? 'ax ax-end' : 'ax'; return `<span class="${side}">${esc(a.text)}</span>`; }).join('')}
+  </div>`;
 }
 
 // Line with area and dots: points [{t, v}] → SVG that draws itself in.
@@ -46,8 +47,12 @@ export function lineChart(points, { h = 150, w = 340, pad = 12, dots = true, war
   const id = `l${++gid}`;
   const last = pts[pts.length - 1];
   const area = `${d} L${last[0].toFixed(1)} ${h} L${pts[0][0].toFixed(1)} ${h} Z`;
-  const dotEls = dots ? pts.map(([x, y], i) => `<circle class="dot" style="--i:${i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${i === pts.length - 1 ? 4.5 : 2.6}"${i === pts.length - 1 && warmLast ? ' fill="#FFD9A8"' : ''}><title>${esc(fmt(points[i].v))}</title></circle>`).join('') : '';
-  return `<svg class="chart line" viewBox="0 0 ${w} ${h}" role="img">
+  // the dots and the record's halo pop and pulse, so they're boxes over the line (a transform inside an
+  // SVG lays the whole chart out again on every frame; a box's runs on the GPU)
+  const at = (x, y, r) => `left:${((x - r) / w * 100).toFixed(3)}%;top:${((y - r) / h * 100).toFixed(3)}%;width:${(2 * r / w * 100).toFixed(3)}%`;
+  const dotEls = dots ? pts.map(([x, y], i) => `<i class="dot${i === pts.length - 1 && warmLast ? ' warm' : ''}" title="${esc(fmt(points[i].v))}" style="--i:${i};${at(x, y, i === pts.length - 1 ? 4.5 : 2.6)}"></i>`).join('') : '';
+  return `<div class="chart line hline" role="img">
+  <svg viewBox="0 0 ${w} ${h}" aria-hidden="true">
     <defs>
       <linearGradient id="${id}f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--accent)" stop-opacity=".3"/><stop offset="1" style="stop-color:var(--accent)" stop-opacity="0"/></linearGradient>
       <linearGradient id="${id}s" x1="0" y1="0" x2="1" y2="0"><stop offset="0" style="stop-color:var(--accent)"/><stop offset="1" style="stop-color:var(--accent)"/></linearGradient>
@@ -56,7 +61,7 @@ export function lineChart(points, { h = 150, w = 340, pad = 12, dots = true, war
     <path class="area" d="${area}" fill="url(#${id}f)"/>
     <path class="stroke" d="${d}" pathLength="1" fill="none" stroke="url(#${id}s)" stroke-width="2.6" stroke-linecap="round"/>
     ${scatter ? scatter.map(p => `<circle class="raw" cx="${tx(p.t).toFixed(1)}" cy="${ty(p.v).toFixed(1)}" r="2.2"/>`).join('') : ''}
-    ${dotEls}
-    ${warmLast ? `<circle class="halo" cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="10" fill="#FFD9A8"/>` : ''}
-  </svg>`;
+  </svg>
+  ${warmLast ? `<i class="halo" style="${at(last[0], last[1], 10)}"></i>` : ''}${dotEls}
+  </div>`;
 }

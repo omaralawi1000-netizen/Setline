@@ -652,3 +652,24 @@ Your feedback over the last day says the look and motion started going downhill 
 ## 1.54.1: typed messages glide into the chat
 
 - [x] Sending a typed message: the words lift out of the box exactly where they were typed and rise as a bubble on a soft curve (up a touch ahead of across), slowing into place without a bounce, and no longer squashed at the start. Its landing spot is measured again every frame, so the keyboard going down, the thread redrawing or scrolling mid-flight can't make it land beside its place and jump; the real message takes over in the same frame
+
+## 1.54.2: Coach replies flow in smoothly
+
+- [x] Pace: one word at a time at a steady rate (14–70 words a second) that eases up or down with how much of the reply has arrived, instead of bursts of up to four words whenever a chunk landed and a dead stop in the pauses
+- [x] No restarts: the line being written used to be redrawn about 20 times a second, restarting the fade of every word still settling; now only new words are added (a line is redrawn only when its shape changes, like a word turning bold)
+- [x] Lighter on the phone: settled words drop their animation, and words no longer each ask for their own GPU layer
+- [x] No jump at the end: the report flag's place beside the reply is kept free while it streams, so the text doesn't re-wrap when the reply finishes
+
+## 1.54.3: bug hunt: less work per frame
+
+- [x] Swept every screen's buttons (114 taps) and the voice logging flows: no errors
+- [x] Every render rewrote the theme attributes on the page root (motion, glow, glass, text size, dock, two-tone) even when nothing changed, making the phone re-check the styles of the whole page many times a second while a voice command or a workout start redrew. Now written only when they change (voice result: 38 → 22 layouts, 105 → 35 ms)
+- [x] Count-up numbers (Today, Progress, Food) rewrote their text every frame even when the digits hadn't changed; each write lays the page out again. Now only when they change
+- [x] The rest timer and the cardio clock rewrote their text 4 times a second (the clock's tick) for a value that changes once a second; the cardio GPS map was redrawn 4 times in a row every 5 s. Now once (set logged: 9 → 5 layouts)
+
+## 1.54.4: Progress and workout start, lighter; nothing runs in the background
+
+- [x] Progress: the bar charts are drawn as plain boxes (same look) so their grow-in runs on the GPU; bars growing inside an SVG made the phone lay the chart out again on every frame. The line chart's dots and the record halo are boxes over the line for the same reason. Chart cards only lay out themselves (Progress layout time ~65 → ~45 ms in the test)
+- [x] A workout's moving exercise figure kept animating on the workout screen after you'd left it, laying the page out every frame for as long as the workout ran; figures now move only on the screen that's showing
+- [x] The live dot (Up next, the workout mini bar, listening) pulsed by animating a shadow, repainting every frame on every tab during a workout; it's a ring that grows and fades on the GPU now
+- [x] Sitting on Today with a workout running: 76 layouts and 171 paints in 2 s before, 2 and 6 now
