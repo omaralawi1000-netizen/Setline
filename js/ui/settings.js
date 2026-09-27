@@ -4,6 +4,7 @@ import { makeBackup } from '../backup.js';
 import { driveGroupHTML, driveActions, setDriveRender, confirmImport } from './drive.js';
 import { openOnboarding } from './onboard.js';
 import { openReport } from './report.js';
+import { sortable, GRIP } from './sortable.js';
 import { ageOf } from '../profile.js';
 import { dateKey } from '../body.js';
 import { VERSION } from '../version.js';
@@ -16,7 +17,7 @@ import { openSheet, closeTop } from './sheet.js';
 import { esc } from './dom.js';
 import { num } from '../format.js';
 import { getKey, setKey, mask } from '../keys.js';
-import { VOICES, VOICE_FEEL, DEFAULT_TTS_MODEL, ttsModelId, ttsAlt } from '../settings.js';
+import { VOICES, VOICE_FEEL, DEFAULT_TTS_MODEL, ttsModelId, ttsAlt, settingsOrderOf } from '../settings.js';
 import { testGroqKey } from '../stt.js';
 import { listModels, pickTtsModel, speak, lastSpeech, onSpeaking, lastClipWav, clearVoiceRest } from '../tts.js';
 import { unlockAudio } from '../audio.js';
@@ -110,24 +111,22 @@ function memorySheet() {
   }, { label: t('memory.title') });
 }
 
+// A section's heading gets its pull tab, and the section its key (for dragging it into place).
+function withTab(k, html) {
+  if (!html) return '';
+  return html.replace(/^\s*<div class="sgroup"[^>]*>\s*<h2>([^]*?)<\/h2>/, (_, h) => `<div class="sgroup" data-sec="${k}"><h2 class="sghead"><span>${h}</span><span class="grip sgrip" data-sgrip role="button" aria-label="${esc(state.t('sort.moveSection'))}">${GRIP}</span></h2>`);
+}
+
 export function renderSettings(root) {
   const { t, settings: s } = state;
-  root.innerHTML = `<header class="top">
-      <button class="iconbtn" data-act="back" aria-label="${t('common.back')}">${I.back}</button>
-      <div class="ttl"><strong>${t('settings.title')}</strong></div><span class="spacer"></span>
-    </header>
-    <h1 class="h1">${t('settings.title')}</h1>
-    ${profileRow()}
-    <div class="slist solid memlink"><button class="srow" data-act="report"><span class="l"><strong>${t('report.row')}</strong><small>${t('report.rowSub')}</small></span>${I.fwd}</button></div>
-    <div class="slist solid memlink"><button class="srow" data-act="memory"><span class="l"><strong>${t('memory.title')}</strong><small>${esc([s.coachBrief ? t('brief.has') : '', t('memory.sub', { n: (s.memories || []).length })].filter(Boolean).join(' · '))}</small></span>${I.fwd}</button></div>
-
-    <div class="sgroup"><h2>${t('settings.general')}</h2><div class="slist solid">
+  // the sections, in your order: each has a pull tab to drag it up or down
+  const sec = {
+    general: () => `<div class="sgroup"><h2>${t('settings.general')}</h2><div class="slist solid">
       <div class="srow"><span class="l"><strong>${t('settings.language')}</strong></span>${seg('lang', ['auto', 'da', 'en'], [t('lang.auto'), t('lang.da'), t('lang.en')])}</div>
       <div class="srow"><span class="l"><strong>${t('settings.units')}</strong></span>${seg('unit', ['kg', 'lb'], [t('unit.kg'), t('unit.lb')])}</div>
       <button class="srow" data-act="customize"><span class="l"><strong>${t('cust.title')}</strong><small>${t('look.settingsSub')}</small></span>${I.fwd}</button>
-    </div></div>
-
-    <div class="sgroup"><h2>${t('settings.voice')}</h2><div class="slist solid">
+    </div></div>`,
+    voice: () => `<div class="sgroup"><h2>${t('settings.voice')}</h2><div class="slist solid">
       <div class="srow"><span class="l"><strong>${t('settings.voiceLang')}</strong></span>${seg('voiceLang', ['auto', 'da', 'en'], [t('lang.auto'), t('lang.da'), t('lang.en')])}</div>
       <div class="srow"><span class="l"><strong>${t('settings.spoken')}</strong></span>${seg('spoken', ['off', 'minimal', 'full'], [t('spoken.off'), t('spoken.minimal'), t('spoken.full')])}</div>
       <div class="srow"><span class="l"><strong>${t('settings.ttsQuality')}</strong><small>${t('settings.ttsQualitySub')}</small></span>${seg('ttsQuality', ['instant', 'natural', 'fast'], [t('tts.instant'), t('tts.natural'), t('tts.fast')])}</div>
@@ -135,14 +134,12 @@ export function renderSettings(root) {
         <span class="stepper"><select class="select" data-set="voice" aria-label="${t('settings.voiceName')}">${VOICES.map(n => `<option value="${n}" ${n === s.voice ? 'selected' : ''}>${n} · ${t('feel.' + VOICE_FEEL[n])}</option>`).join('')}</select>
         <button class="chip" data-act="preview-voice">${t('settings.preview')}</button></span></div>
       <button class="srow" data-act="save-reply"><span class="l"><strong>${t('settings.saveReply')}</strong><small>${t('settings.saveReplySub')}</small></span>${I.download.replace('class="i"', 'class="i" style="width:20px;height:20px;color:var(--accent)"')}</button>
-    </div></div>
-
-    <div class="sgroup"><h2>${t('settings.keys')}</h2><div class="slist solid">
+    </div></div>`,
+    keys: () => `<div class="sgroup"><h2>${t('settings.keys')}</h2><div class="slist solid">
       ${keyRow('groq')}
       ${keyRow('google')}
-    </div><p class="snote">${t('settings.privacy')}</p></div>
-
-    <div class="sgroup"><h2>${t('settings.workout')}</h2><div class="slist solid">
+    </div><p class="snote">${t('settings.privacy')}</p></div>`,
+    workout: () => `<div class="sgroup"><h2>${t('settings.workout')}</h2><div class="slist solid">
       <div class="srow"><span class="l"><strong>${t('settings.rest')}</strong><small>${t('settings.restSub')}</small></span>
         <div class="stepper"><button class="step" data-act="rest-default" data-d="-15" aria-label="−15 s" ${s.restSec <= LIMITS.restMin ? 'disabled' : ''}>−</button><b>${t('seconds', { n: s.restSec })}</b><button class="step" data-act="rest-default" data-d="15" aria-label="+15 s" ${s.restSec >= LIMITS.restMax ? 'disabled' : ''}>+</button></div></div>
       <div class="srow"><span class="l"><strong>${t('settings.autoAdvance')}</strong><small>${t('settings.autoAdvanceSub')}</small></span>
@@ -159,28 +156,24 @@ export function renderSettings(root) {
         <button class="toggle" role="switch" aria-checked="${s.readiness}" aria-label="${t('settings.readiness')}" data-act="toggle" data-key="readiness"></button></div>
       <div class="srow"><span class="l"><strong>${t('settings.suggestions')}</strong><small>${t('settings.suggestionsSub')}</small></span>
         <button class="toggle" role="switch" aria-checked="${s.suggestions}" aria-label="${t('settings.suggestions')}" data-act="toggle" data-key="suggestions"></button></div>
-    </div></div>
-
-    <div class="sgroup"><h2>${t('settings.goals')}</h2><div class="slist solid">
+    </div></div>`,
+    goals: () => `<div class="sgroup"><h2>${t('settings.goals')}</h2><div class="slist solid">
       <div class="srow"><span class="l"><strong>${t('settings.cardioGoal')}</strong><small>${t('settings.cardioGoalSub')}</small></span>
         <div class="stepper"><button class="step" data-act="num" data-key="cardioGoal" data-d="-15" aria-label="−15" ${s.cardioGoal <= 30 ? 'disabled' : ''}>−</button><b>${s.cardioGoal}</b><button class="step" data-act="num" data-key="cardioGoal" data-d="15" aria-label="+15" ${s.cardioGoal >= 900 ? 'disabled' : ''}>+</button></div></div>
       <div class="srow"><span class="l"><strong>${t('settings.protein')}</strong><small>${t('settings.proteinSub')}</small></span>
         <div class="stepper"><button class="step" data-act="num" data-key="proteinPerKg" data-d="-0.2" aria-label="−0.2" ${s.proteinPerKg <= 1.2 ? 'disabled' : ''}>−</button><b>${num(s.proteinPerKg, state.lang, 1)}</b><button class="step" data-act="num" data-key="proteinPerKg" data-d="0.2" aria-label="+0.2" ${s.proteinPerKg >= 2.6 ? 'disabled' : ''}>+</button></div></div>
       <div class="srow"><span class="l"><strong>${t('settings.weeklyGoal')}</strong><small>${t('settings.weeklyGoalSub')}</small></span>
         <div class="stepper"><button class="step" data-act="goal" data-d="-1" aria-label="−1" ${s.weeklyGoal <= 1 ? 'disabled' : ''}>−</button><b>${s.weeklyGoal}</b><button class="step" data-act="goal" data-d="1" aria-label="+1" ${s.weeklyGoal >= 7 ? 'disabled' : ''}>+</button></div></div>
-    </div></div>
-
-    <div class="sgroup"><h2>${t('settings.feel')}</h2><div class="slist solid">
+    </div></div>`,
+    feel: () => `<div class="sgroup"><h2>${t('settings.feel')}</h2><div class="slist solid">
       <div class="srow"><span class="l"><strong>${t('settings.haptics')}</strong><small>${t('settings.hapticsSub')}</small></span>
         <button class="toggle" role="switch" aria-checked="${s.haptics}" aria-label="${t('settings.haptics')}" data-act="toggle-haptics"></button></div>
       <div class="srow"><span class="l"><strong>${t('settings.fullscreen')}</strong><small>${t('settings.fullscreenSub')}</small></span>
         <button class="toggle" role="switch" aria-checked="${s.fullscreen}" aria-label="${t('settings.fullscreen')}" data-act="toggle" data-key="fullscreen"></button></div>
       <div class="srow"><span class="l"><strong>${t('settings.motion')}</strong></span>${seg('motion', ['auto', 'on', 'off'], [t('settings.motion.auto'), t('settings.motion.on'), t('settings.motion.off')])}</div>
-    </div></div>
-
-    ${driveGroupHTML()}
-
-    <div class="sgroup"><h2>${t('settings.advanced')}</h2><div class="slist solid">
+    </div></div>`,
+    drive: () => driveGroupHTML(),
+    advanced: () => `<div class="sgroup"><h2>${t('settings.advanced')}</h2><div class="slist solid">
       <div class="srow"><span class="l"><strong>${t('settings.sttModel')}</strong></span>${seg('stt', ['fast', 'accurate'], [t('stt.fast'), t('stt.accurate')])}</div>
       <div class="srow"><span class="l"><strong>${t('settings.coachModel')}</strong><small>${esc(t('settings.modelUsing', { id: s.coachOverride || s.coachModel }))}</small></span></div>
       <div class="keyedit"><input data-set="coachOverride" value="${esc(s.coachOverride)}" placeholder="${esc(s.coachModel || FALLBACK_MODELS.coach)}" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="${t('settings.coachModel')}"></div>
@@ -188,14 +181,24 @@ export function renderSettings(root) {
       <div class="keyedit"><input data-set="cmdOverride" value="${esc(s.cmdOverride)}" placeholder="${esc(s.cmdModel || FALLBACK_MODELS.command)}" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="${t('settings.cmdModel')}"></div>
       <div class="srow"><span class="l"><strong>${t('settings.ttsModel')}</strong><small>${esc(t('settings.ttsModelSub', { id: s.ttsOverride || s.ttsModel }))}</small></span></div>
       <div class="keyedit"><input data-set="ttsOverride" value="${esc(s.ttsOverride)}" placeholder="${esc(s.ttsModel || DEFAULT_TTS_MODEL)}" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="${t('settings.ttsOverride')}"></div>
-    </div></div>
-
-    <div class="sgroup"><h2>${t('settings.data')}</h2><div class="slist solid">
+    </div></div>`,
+    data: () => `<div class="sgroup"><h2>${t('settings.data')}</h2><div class="slist solid">
       <button class="srow" data-act="backup-export"><span class="l"><strong>${t('backup.export')}</strong><small>${t('backup.exportSub')}</small></span>${I.download.replace('class="i"', 'class="i" style="width:20px;height:20px;color:var(--accent)"')}</button>
       <button class="srow" data-act="backup-import"><span class="l"><strong>${t('backup.import')}</strong><small>${t('backup.importSub')}</small></span>${I.upload.replace('class="i"', 'class="i" style="width:20px;height:20px;color:var(--accent)"')}</button>
       <input type="file" id="backupfile" accept="application/json,.json" hidden>
       <button class="srow danger" data-act="reset"><span class="l"><strong>${t('settings.reset')}</strong><small>${t('settings.resetSub')}</small></span>${I.trash.replace('class="i"', 'class="i" style="width:20px;height:20px;color:var(--danger)"')}</button>
-    </div></div>
+    </div></div>`
+  };
+  root.innerHTML = `<header class="top">
+      <button class="iconbtn" data-act="back" aria-label="${t('common.back')}">${I.back}</button>
+      <div class="ttl"><strong>${t('settings.title')}</strong></div><span class="spacer"></span>
+    </header>
+    <h1 class="h1">${t('settings.title')}</h1>
+    ${profileRow()}
+    <div class="slist solid memlink"><button class="srow" data-act="report"><span class="l"><strong>${t('report.row')}</strong><small>${t('report.rowSub')}</small></span>${I.fwd}</button></div>
+    <div class="slist solid memlink"><button class="srow" data-act="memory"><span class="l"><strong>${t('memory.title')}</strong><small>${esc([s.coachBrief ? t('brief.has') : '', t('memory.sub', { n: (s.memories || []).length })].filter(Boolean).join(' · '))}</small></span>${I.fwd}</button></div>
+
+    ${settingsOrderOf(s).map(k => withTab(k, sec[k]())).join('\n')}
     <p class="version">${esc(t('settings.version', { v: VERSION }))}</p>`;
 }
 
@@ -231,6 +234,13 @@ async function importFile(file) {
 }
 
 export function initSettings(actions, root) {
+  // sections in your order: drag one by its pull tab
+  sortable(root, { item: '.sgroup', handle: '[data-sgrip]', hold: false, onMove: (from, to) => {
+    const keys = [...root.querySelectorAll(':scope > .sgroup[data-sec]')].map(x => x.dataset.sec);
+    const [k] = keys.splice(from, 1);
+    keys.splice(to, 0, k);
+    setSettings({ settingsOrder: keys });
+  } });
   root.addEventListener('change', e => { if (e.target.id === 'backupfile' && e.target.files?.[0]) { importFile(e.target.files[0]); e.target.value = ''; } });
   onSpeaking(on => { if (!on) { const el = root.querySelector('#speechstat'); if (el) el.textContent = speechStatus(); } });
   root.addEventListener('change', e => {

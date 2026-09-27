@@ -170,6 +170,19 @@ export function removeExercise(w, exIndex) {
   return next;
 }
 
+// Move an exercise to another place in the workout; the one you're on stays the one you're on.
+export function moveExercise(w, from, to) {
+  const n = w.exercises.length;
+  if (from === to || from < 0 || to < 0 || from >= n || to >= n) return w;
+  const next = clone(w);
+  const cur = next.exercises[next.current]?.id;
+  const [ex] = next.exercises.splice(from, 1);
+  next.exercises.splice(to, 0, ex);
+  next.current = Math.max(0, next.exercises.findIndex(e => e.id === cur));
+  delete next.advancedFrom;
+  return next;
+}
+
 export function setCurrent(w, exIndex) {
   if (!w.exercises.length) return w;
   const i = Math.max(0, Math.min(exIndex, w.exercises.length - 1));

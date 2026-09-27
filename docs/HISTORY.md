@@ -620,3 +620,10 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] The orb's flight has motion blur (stretched along its path, a little soft at speed) and a soft light trail; the landing pushes the box a little more
 - [x] Thinking: the message box says what it's doing ("Thinking…", "Reading your log…", "Looking at your lifts…", "Putting it together…"), each phrase blurring in letter by letter along a colour gradient
 - [x] Status bar: under a scrolled page the blur used to re-saturate the colour below the bar (a bluer band on blue themes); now the colour sits over the blur and matches exactly
+
+## 1.52.0: drag to reorder your program, your workout and Settings
+
+- [x] One drag-to-reorder for the whole app: grab a row's pull tab (or hold the row still for a moment) and drag; the row lifts, the others slide aside, the list scrolls by itself at the top and bottom edges, and the row settles into its slot (transform only, a tick per slot)
+- [x] Routines: reorder exercises in the routine editor ("put the chest machine press after the preacher curl"), with a hint above the list
+- [x] A running workout: Exercises sheet rows have pull tabs; the exercise you're on stays current, and when the workout came from a routine, "Keep for next time" saves that order to the routine
+- [x] Settings: every section has a pull tab on its heading; drag sections into your own order (kept in settings)
