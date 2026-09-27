@@ -134,5 +134,6 @@ export function renderDetail(root, id) {
     ${dateKey(w.startedAt) === dateKey() ? driveNudgeHTML() : ''}
     ${w.exercises.length ? `<button class="log again" data-act="repeat-workout" data-id="${esc(w.id)}">${I.play}<span>${t('history.again')}</span></button>
     <p class="hint">${t('history.againSub')}</p>
-    ${(!w.routineId || !state.routines.some(r => r.id === w.routineId)) && !state.routines.some(r => r.fromWorkout === w.id) ? `<button class="btn2 solid wide saveas" data-act="save-routine" data-id="${esc(w.id)}">${I.plus}<span>${t('history.saveRoutine')}</span></button>` : ''}` : ''}`;
+    ${(!w.routineId || !state.routines.some(r => r.id === w.routineId)) && !state.routines.some(r => r.fromWorkout === w.id) ? `<button class="btn2 solid wide saveas" data-act="save-routine" data-id="${esc(w.id)}">${I.plus}<span>${t('history.saveRoutine')}</span></button>` : ''}` : ''}
+    <button class="btn2 solid wide danger delw" data-act="delete-workout" data-id="${esc(w.id)}">${I.trash}<span>${t('history.delete')}</span></button>`;
 }

@@ -2813,3 +2813,9 @@ html[data-motion=off] .chart .bar-r{animation:none}
 html[data-motion=off] :is(.upcoming .live i,.minibar .dot,.vlayer[data-phase=listening] .live i)::after{animation:none;opacity:0}
 /* a moving exercise figure only lays out itself */
 svg.fig[data-move]{contain:layout paint}
+
+/* ======================= 1.55: seamless landings ======================= */
+/* the orb glides to a stop in the dock: only a faint ring of light, no squash or bounce */
+.orbbtn.pulse-land .orb{animation:none}
+.orbbtn.pulse-land::after{animation:orbringsoft calc(var(--m-slow) * 1.6) var(--e-out)}
+.btn2.delw{width:100%;margin:10px 0 8px}

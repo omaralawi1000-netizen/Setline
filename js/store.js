@@ -6,7 +6,7 @@ import { starterRoutines } from './routines.js';
 import { loadSettings, saveSettings, sanitize, SETTINGS_KEY } from './settings.js';
 import { resolveLang, translator } from './i18n.js';
 import { createWorkout, finishWorkout, doneSetCount, learnedRest } from './workout.js';
-import { applyWorkout } from './pr.js';
+import { applyWorkout, rebuild } from './pr.js';
 import { clearKeys } from './keys.js';
 import { startCardio, pauseCardio, resumeCardio, finishCardio, cardioRecords } from './cardio.js';
 import { upsertBodyweight, addProtein, dateKey } from './body.js';
@@ -169,6 +169,45 @@ export async function discard() {
   state.undo = [];
   await persistActive();
   emit('discard');
+}
+
+// ---- deleting a finished workout (and putting it back) ----
+// The records are worked out again from what's left, so a record set in the deleted workout goes back
+// to whichever workout holds it now, and each workout's "new records" list stays true.
+async function reHistory(history) {
+  const { records, byWorkout } = rebuild(history);
+  const changed = history.filter(w => JSON.stringify(w.prs || []) !== JSON.stringify(byWorkout[w.id] || []));
+  const next = history.map(w => (changed.includes(w) ? { ...w, prs: byWorkout[w.id] || [] } : w));
+  return { records, next, changed: next.filter(w => changed.some(c => c.id === w.id)) };
+}
+export async function deleteWorkout(id) {
+  const gone = state.history.find(w => w.id === id);
+  if (!gone) return null;
+  const { records, next, changed } = await reHistory(state.history.filter(w => w.id !== id));
+  await db.tx(['workouts', 'prs'], 'readwrite', s => {
+    s.workouts.delete(id);
+    s.prs.clear();
+    for (const r of records) s.prs.put(r);
+    for (const w of changed) s.workouts.put(w);
+  });
+  state.history = next;
+  state.prs = records;
+  computeUsage();
+  emit('history');
+  return gone;
+}
+export async function restoreWorkout(w) {
+  if (!w || state.history.some(x => x.id === w.id)) return;
+  const { records, next, changed } = await reHistory([w, ...state.history].sort((a, b) => b.startedAt - a.startedAt));
+  await db.tx(['workouts', 'prs'], 'readwrite', s => {
+    s.prs.clear();
+    for (const r of records) s.prs.put(r);
+    for (const x of next) if (x.id === w.id || changed.some(c => c.id === x.id)) s.workouts.put(x);
+  });
+  state.history = next;
+  state.prs = records;
+  computeUsage();
+  emit('history');
 }
 
 // ---- cardio ----

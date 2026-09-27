@@ -9,7 +9,7 @@ import { keepAwake } from './wakelock.js';
 import { $, esc } from './ui/dom.js';
 import { I, TAB_ICONS } from './ui/icons.js';
 import { toast } from './ui/toast.js';
-import { handlePop } from './ui/sheet.js';
+import { handlePop, openSheet, closeTop } from './ui/sheet.js';
 import { renderToday, currentStall } from './ui/today.js';
 import { applyPlateauFix } from './plateau.js';
 import { renderWorkout, initWorkout, tickWorkout, syncNums, setWorkoutNav, autoWarmup, restBell, plannedNext, logFromAway, restFromAway } from './ui/workout.js';
@@ -199,22 +199,11 @@ function flyOrb(from, to, { duration, delay = 0, go, onland, easing, fromEl, toE
   return ghost;
 }
 
-// The orb hits the message box: it squashes on impact and wobbles back to round, the box gives a
-// little under it, a ring of light rings out and the phone taps.
-function impact(orbEl, vx = 0, vy = 1) {
+// The orb arrives in the message box: it glides to a stop exactly in its place (no squash, no
+// wobble, the box doesn't move), and a soft light spreads through the box as it settles; one light tap.
+function impact() {
   haptic('land');
-  // squashed along the way it was travelling, then it wobbles back to round
-  const side = Math.abs(vx) > Math.abs(vy), sq = (a, b) => (side ? `${a} ${b}` : `${b} ${a}`);
-  orbEl.animate([
-    { scale: sq(0.8, 1.2) }, { scale: sq(1.08, 0.94), offset: 0.3 }, { scale: sq(0.97, 1.02), offset: 0.6 },
-    { scale: '1 1' }], { duration: 520, easing: 'cubic-bezier(.25,.6,.35,1)' });
-  // the box takes the hit: pushed the way the orb was going, then it springs back
-  const n = Math.hypot(vx, vy) || 1, px = (vx / n) * 6, py = (vy / n) * 6 + 1.5;
-  $('#composer')?.animate([{ translate: '0 0', scale: 1 }, { translate: `${px}px ${py}px`, scale: 0.985, offset: 0.16 }, { translate: `${-px * 0.35}px ${-py * 0.35}px`, scale: 1.004, offset: 0.44 },
-    { translate: `${px * 0.1}px ${py * 0.1}px`, offset: 0.7 }, { translate: '0 0', scale: 1 }], { duration: 540, easing: 'cubic-bezier(.25,.6,.35,1)' });
-  const btn = orbEl.closest('.corb'), box = $('#composer');
-  if (btn) { btn.classList.remove('impact'); void btn.offsetWidth; btn.classList.add('impact'); setTimeout(() => btn.classList.remove('impact'), 800); }
-  // the impact spreads into the box: a soft light from where the orb hit runs along it and fades
+  const box = $('#composer');
   if (box) { box.classList.remove('hit'); void box.offsetWidth; box.classList.add('hit'); setTimeout(() => box.classList.remove('hit'), 1000); }
 }
 
@@ -242,7 +231,7 @@ function coachMorph(open, under) {
     let flying = null;
     queueMicrotask(() => {
       const corb = $('#composer .corb .orb');
-      flying = from && corb && flyOrb(from, layRect(corb), { duration: 360, easing: 'cubic-bezier(.22,.62,.55,.93)', go, fromEl: dockOrb, toEl: corb, onland: () => { app.classList.remove('orbtravel'); const to = layRect(corb); impact(corb, to.x - from.x, to.y - from.y); } });
+      flying = from && corb && flyOrb(from, layRect(corb), { duration: 440, easing: 'cubic-bezier(.2,.75,.2,1)', go, fromEl: dockOrb, toEl: corb, onland: () => { app.classList.remove('orbtravel'); impact(); } });
       if (flying) { app.classList.add('orbtravel', 'orbflown'); go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 900, fill: 'forwards' }); return; }
       go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
       setTimeout(() => haptic('land'), 560);
@@ -279,7 +268,7 @@ function coachMorph(open, under) {
     // the orb leaves the message box and flies home into the bar, which takes it with a small pulse
     const corb = $('#composer .corb .orb');
     let hold = null;
-    const flying = corb && dockOrb && flyOrb(relRect(corb), layRect(dockOrb), { duration: 420, delay: 40, easing: 'cubic-bezier(.3,.62,.5,.95)', go, fromEl: corb, toEl: dockOrb, onland: () => {
+    const flying = corb && dockOrb && flyOrb(relRect(corb), layRect(dockOrb), { duration: 460, delay: 40, easing: 'cubic-bezier(.25,.75,.2,1)', go, fromEl: corb, toEl: dockOrb, onland: () => {
       hold?.cancel();
       app.classList.remove('orbtravel');
       orbPulse('pulse-land');
@@ -486,6 +475,24 @@ Object.assign(actions, {
     if (!w) return;
     haptic('tap');
     editRoutineFrom(routineFromWorkout(w, w.name || '')); // an empty workout has no name yet: you give it one
+  },
+  // delete a finished workout: asked once, then gone with an Undo (its records are worked out again)
+  'delete-workout': el => {
+    const id = el.dataset.id, { t } = state;
+    haptic('tap');
+    openSheet(sh => {
+      sh.insertAdjacentHTML('beforeend', `<h2>${t('history.deleteTitle')}</h2><p class="lead">${t('history.deleteBody')}</p>
+        <div class="acts"><button class="btn2 solid danger" data-d="yes">${I.trash}<span>${t('common.delete')}</span></button><button class="btn2 solid" data-d="no">${t('common.cancel')}</button></div>`);
+      sh.querySelector('[data-d=no]').onclick = () => closeTop();
+      sh.querySelector('[data-d=yes]').onclick = async () => {
+        await closeTop();
+        const gone = await store.deleteWorkout(id);
+        if (!gone) return;
+        haptic('success');
+        history.back();
+        toast({ title: esc(t('history.deleted')), action: t('common.undo'), onAction: () => { store.restoreWorkout(gone); haptic('tap'); } });
+      };
+    });
   },
   'repeat-workout': el => {
     const w = state.history.find(x => x.id === el.dataset.id);

@@ -673,3 +673,8 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] A workout's moving exercise figure kept animating on the workout screen after you'd left it, laying the page out every frame for as long as the workout ran; figures now move only on the screen that's showing
 - [x] The live dot (Up next, the workout mini bar, listening) pulsed by animating a shadow, repainting every frame on every tab during a workout; it's a ring that grows and fades on the GPU now
 - [x] Sitting on Today with a workout running: 76 layouts and 171 paints in 2 s before, 2 and 6 now
+
+## 1.55.0: seamless orb landings, delete workouts
+
+- [x] The orb no longer hits the message box: no squash, wobble, box push or shake. It decelerates to a stop exactly in its place (the landing frames match the resting orb), a soft light spreads through the box, one light haptic. Closing glides it home the same way; the bar takes it with a faint ring instead of a squash-and-settle
+- [x] Delete a finished workout from its page: a confirm sheet, then it's gone with an Undo. Records are rebuilt from the remaining history in one transaction, so a record the deleted workout held moves back to whichever workout holds it now
