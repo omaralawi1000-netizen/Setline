@@ -24,4 +24,4 @@ How Setline looks and moves, for every AI and every tool. The brand values (colo
 1. `npm run visual`: compares the main screens (fixed clock, seed data, reduced motion) with `visual/baseline/`. Every CHANGED picture must be intended and explained in the report; `visual/diff/` shows where it moved.
 2. `node scripts/screens.mjs`: full screenshot tour (onboarding, rest timer, voice screen) in `screenshots/`. Look at the pictures, check them against SPEC.md §2, fix issues before reporting.
 3. Motion changed: `npm run motion`, compare `motion/sheets/` with `motion/previous/`. Fix anything that got worse (more layout work, lower fps, broken frames). The cloud machine has no GPU, so judge by comparison, not by the absolute marks.
-4. Baselines change only with `npm run visual -- --approve`, and only after Omar approved the new look. Never approve to make a check pass.
+4. Baselines change only with `npm run visual -- --approve`, when the change is the one Omar asked for. Never approve to hide an unintended change.

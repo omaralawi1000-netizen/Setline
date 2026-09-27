@@ -18,7 +18,7 @@ When sources disagree, the higher one wins:
 9. existing code
 10. `docs/HISTORY.md` and `docs/decisions/`: history, never current truth
 
-If Omar's request conflicts with SPEC.md on something expensive to undo (architecture, storage, a new dependency, the design direction), say so in one sentence and ask before building.
+**Omar doesn't want to give permission for each change.** He says what he wants; you build it, check it and ship it. Ask first only when it matters: you see a clearly better way than what he asked for (say it in one or two sentences, then wait), or it's risky or hard to undo (data loss, a new dependency, private data leaving the phone, a full redesign). Everything else: just do it and tell him what you did.
 
 ## 2. Classify every task
 
@@ -30,7 +30,7 @@ Pick a class before you start. Before you report, run `npm run risk`: it reads t
 | B local | a parser bug, a state bug, one broken animation | reproduce → find the cause → failing test first → smallest fix → checks |
 | C feature | a new workout behaviour, a new Coach ability | short written plan (5–10 lines, in chat) → build → tests → checks |
 | D sensitive | keys, Coach actions, backup/import, Drive, storage, mic, service worker, dependencies | read `docs/SECURITY_MODEL.md` first → plan with the risks named → build → checks → security gate |
-| E structural | storage schema, navigation model, redesign, anything touching 12+ app files | options and trade-offs → Omar decides → `docs/decisions/NNN-*.md` → plan → build in steps, each verified |
+| E structural | storage schema, navigation model, redesign, anything touching 12+ app files | pick the best option yourself (ask Omar only per §1) → `docs/decisions/NNN-*.md` → plan → build in steps, each verified |
 
 Superpowers (if installed) is for C, D and E only. For A and B, don't run brainstorming or planning skills even if they offer themselves; B may use systematic debugging.
 
@@ -43,8 +43,7 @@ Superpowers (if installed) is for C, D and E only. For A and B, don't run brains
 - AI output never runs directly. Every Coach action goes: parse → allow-list (`SETTABLE`, `PAGES`, plan forms) → validate values → apply with Undo. Finish, discard and delete always need Omar's confirmation, including when the Coach asks for them.
 - Every `${…}` that ends up in HTML goes through `esc()`, unless it is a number or a fixed i18n/icon string.
 - Keep the `data-act` / `data-k` / `#s-<screen>` hooks. The golden flows and screenshot scripts drive the app through them. If a change must move one, update `scripts/` in the same change.
-- Push to the working branch. Merging to `main` (which deploys to GitHub Pages) is Omar's call.
-- After every update, open a pull request from the working branch to `main` (or update the open one) so Omar can merge it, and watch it until it's merged: fix failing checks and answer review comments. Anything important (risky, breaking, needs his decision, a check that can't pass) is told to Omar before, not after.
+- Ship without waiting for Omar: once every required check passes, push the working branch and then `main` (which deploys to GitHub Pages): fetch `main`, merge it into the branch if it moved, re-run the checks, push. No pull request to approve. If a required check can't pass, don't ship: fix it, or tell Omar what's blocking.
 - If something is blocked (a provider refuses browser calls, a tool can't run in the cloud session), stop and say so. Don't invent workarounds.
 
 ## 4. Checks: evidence beats confidence
@@ -55,7 +54,7 @@ Never certify your own work by re-reading it. Proof comes from something indepen
 |---|---|---|
 | `npm run verify` | no secrets, version/PLAN/HISTORY in sync, every unit test passes | every code change |
 | `npm run golden` | real-browser journeys: workout survives a killed tab and lands in history, the app opens offline, every tab opens without errors | class C+, and anything touching the service worker, storage or the workout loop |
-| `npm run visual` | the main screens still match the approved pictures | any UI change. Explain every CHANGED picture; baselines change only with `-- --approve` after Omar approved the look |
+| `npm run visual` | the main screens still match the approved pictures | any UI change. Explain every CHANGED picture; approve it yourself (`-- --approve`) when the change is the one that was asked for, never to hide an unintended change |
 | `npm run motion` | frames, jank and layout work of every animation | any motion change. Judge against `motion/previous/`, not the absolute PASS/FAIL marks (the cloud machine has no GPU) |
 | security gate | the checklist in `docs/SECURITY_MODEL.md` §5, answered line by line | class D and E |
 | device check | the steps in `docs/DEVICE_CHECKLIST.md`, done by Omar on his phone | mic, audio, TTS, service worker, install/update, notifications, haptics, Drive |
