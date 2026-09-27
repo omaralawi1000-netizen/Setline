@@ -648,3 +648,7 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Listening: the body of your voice (90–500 Hz) swells the orb's core, the sharp sounds (2–6 kHz) light its rim
 - [x] Now and then a soft glint of light crosses the dock orb
 - [x] All of it transform/opacity only, with a reduced-motion fallback
+
+## 1.54.1: typed messages glide into the chat
+
+- [x] Sending a typed message: the words lift out of the box exactly where they were typed and rise as a bubble on a soft curve (up a touch ahead of across), slowing into place without a bounce, and no longer squashed at the start. Its landing spot is measured again every frame, so the keyboard going down, the thread redrawing or scrolling mid-flight can't make it land beside its place and jump; the real message takes over in the same frame

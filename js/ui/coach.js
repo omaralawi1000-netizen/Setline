@@ -26,6 +26,7 @@ import { openSheet, closeTop } from './sheet.js';
 import { toast } from './toast.js';
 import { pinHTML } from './pins.js';
 import { openQuickReport, FLAG } from './report.js';
+import { token } from './fx.js';
 
 let nav = { openSettings: () => {} };
 let inflight = null; // {ctl, id}
@@ -118,37 +119,57 @@ function sendStart(input, text, root) {
   ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
   return { text: text.trim(), x: r.left + parseFloat(cs.paddingLeft || 0), y: r.top + r.height / 2, w: Math.min(r.width, ctx.measureText(text).width), at: performance.now(), scroll: root?.scrollTop ?? 0 };
 }
+// The words stay exactly where you typed them and lift off as a bubble. Its landing place is measured
+// again on every frame, so the keyboard going down, the thread redrawing or scrolling mid-flight can't
+// make it land beside its spot and jump: it always settles exactly onto the real message, which then
+// takes over in the same frame. It rises a touch ahead of sliding across, so it travels on a soft curve.
 function sendFly(root) {
   const p = pendingSend;
   pendingSend = null;
-  const msg = [...root.querySelectorAll('.msg.me.sending')].pop(), bub = msg?.querySelector('.bub'), app = document.getElementById('app');
+  const spot = () => { const m = [...root.querySelectorAll('.msg.me.sending')].pop(); return m && { m, b: m.querySelector('.bub') }; };
+  const first = spot(), app = document.getElementById('app');
   const reveal = () => { sending = null; for (const m of root.querySelectorAll('.msg.me.sending')) m.classList.remove('sending'); };
-  if (!bub || !app || stillMotion() || performance.now() - p.at > 800) return reveal();
-  // a stand-in flies (the thread may re-render meanwhile); the real bubble shows when it lands
+  if (!first?.b || !app || stillMotion() || performance.now() - p.at > 800) return reveal();
   sending = p;
-  const a = app.getBoundingClientRect(), m = msg.getBoundingClientRect(), b = bub.getBoundingClientRect(), pad = parseFloat(getComputedStyle(bub).paddingLeft || 0);
+  const A = app.getBoundingClientRect(), m0 = first.m.getBoundingClientRect(), b0 = first.b.getBoundingClientRect();
+  const pad = parseFloat(getComputedStyle(first.b).paddingLeft || 0);
   const ghost = document.createElement('div');
   ghost.className = 'msg me seen sendghost';
   ghost.setAttribute('aria-hidden', 'true');
-  Object.assign(ghost.style, { left: `${m.left - a.left}px`, top: `${m.top - a.top}px`, width: `${m.width}px` });
-  ghost.append(bub.cloneNode(true));
+  ghost.style.width = `${m0.width}px`;
+  ghost.append(first.b.cloneNode(true));
   app.append(ghost);
-  const dx = p.x - (b.left + pad), dy = p.y - (b.top + b.height / 2);
-  // a one-line message starts at the text's own width; longer ones unfold as they rise
-  const s0 = Math.max(0.6, Math.min(1, (p.w + pad * 2) / b.width));
-  const spring = 'cubic-bezier(.2,1.18,.32,1)';
-  // the bubble lifts off where the words were typed, swells a touch as it rises and settles into place
-  const fly = ghost.firstChild.animate([
-    { transform: `translate(${dx}px, ${dy}px) scale(${s0})`, opacity: 0.9 },
-    { transform: `translate(${dx * 0.1}px, ${dy * 0.1}px) scale(1.03)`, opacity: 1, offset: 0.62 },
-    { transform: 'translate(0, 0) scale(1)', opacity: 1 }], { duration: 560, easing: spring, fill: 'both' });
+  // where the message row would sit for its text to be exactly where the typed text was (fixed on screen)
+  const sx = m0.left - A.left + (p.x - (b0.left + pad)), sy = m0.top - A.top + (p.y - (b0.top + b0.height / 2));
+  // a one-line message starts at the text's own width and opens out as it rises
+  const s0 = Math.max(0.86, Math.min(1, (p.w + pad * 2) / b0.width));
+  const ease = w => t => 1 - (1 + w * t) * Math.exp(-w * t); // a spring that settles without bouncing
+  const ey = ease(9), ex = ease(7), es = ease(8);
+  const dur = token('--m-slow') * 1.25, t0 = performance.now();
+  let last = { x: sx, y: sy }, raf = 0, over = false;
+  const done = () => {
+    if (over) return;
+    over = true;
+    cancelAnimationFrame(raf);
+    reveal();
+    ghost.remove();
+  };
+  const frame = now => {
+    const t = Math.min(1, (now - t0) / dur), s = spot();
+    if (s?.m) { const r = s.m.getBoundingClientRect(); last = { x: r.left - A.left, y: r.top - A.top }; }
+    const x = sx + (last.x - sx) * (t < 1 ? ex(t) : 1), y = sy + (last.y - sy) * (t < 1 ? ey(t) : 1);
+    const k = s0 + (1 - s0) * (t < 1 ? es(t) : 1);
+    ghost.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+    ghost.firstChild.style.transform = `scale(${k.toFixed(4)})`;
+    if (t >= 1 || !s) return done();
+    raf = requestAnimationFrame(frame);
+  };
+  frame(t0);
   // …and the conversation above makes room for it by gliding up, instead of jumping
   const moved = root.scrollTop - (p.scroll || 0), thread = root.querySelector('#thread');
-  if (thread && moved > 2) thread.animate([{ transform: `translateY(${moved}px)` }, { transform: 'none' }], { duration: 520, easing: spring });
-  $('#composer .csend')?.animate([{ scale: 1 }, { scale: 0.86, offset: 0.3 }, { scale: 1 }], { duration: 360, easing: 'cubic-bezier(.3,1.4,.5,1)' });
-  const done = () => { reveal(); requestAnimationFrame(() => ghost.remove()); };
-  fly.onfinish = done;
-  setTimeout(done, 950);
+  if (thread && moved > 2) thread.animate([{ transform: `translateY(${moved}px)` }, { transform: 'none' }], { duration: dur, easing: token('--e-out') });
+  $('#composer .csend')?.animate([{ scale: 1 }, { scale: 0.86, offset: 0.3 }, { scale: 1 }], { duration: token('--m-base'), easing: token('--e-spring') });
+  setTimeout(done, dur + 400); // (no frames while the page is hidden)
 }
 
 // Streamed words don't appear in lumps: they flow in at a steady pace, each fading in.

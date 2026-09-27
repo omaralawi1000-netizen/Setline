@@ -2415,7 +2415,8 @@ html[data-motion=off] .orbghost{display:none}
 /* a message on its way up from the message box (see sendFly): hidden for the frame before it flies */
 .msg.me.sending{opacity:0}
 .msg.me .bub{transform-origin:0 50%}
-.sendghost{position:absolute;z-index:7;pointer-events:none;animation:none!important;margin:0}
+.sendghost{position:absolute;left:0;top:0;z-index:7;pointer-events:none;animation:none!important;margin:0;will-change:transform}
+.sendghost > .bub{will-change:transform}
 /* the week strip: a long single word ("Wrestling") breaks onto the second line instead of being cut off */
 .wpday .wr{overflow-wrap:anywhere;-webkit-hyphens:auto;hyphens:auto}
 
