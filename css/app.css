@@ -2628,7 +2628,7 @@ html[data-glass=liquid] .app.compact:not(.is-sub):not(.voice):not(.kb) .edge.eb{
 @keyframes wordfade{from{opacity:0}to{opacity:1}}
 /* 1.53: the words that have just arrived blur in and rise a touch; with the steady pace only the
    last few are ever moving, so the reply has a soft, blurred leading edge that settles behind it */
-.bub .w{will-change:opacity,transform,filter;animation:wordrise var(--m-slow) var(--e-out) both}
+.bub .w{animation:wordrise var(--m-slow) var(--e-out) both}
 @keyframes wordrise{0%{opacity:0;filter:blur(5px);transform:translateY(.28em)}55%{opacity:.85;filter:blur(1.2px)}100%{opacity:1;filter:blur(0);transform:none}}
 @media (prefers-reduced-motion: reduce){ .bub .w{animation:none} }
 html[data-motion=off] .bub .w{animation:none}
@@ -2778,3 +2778,8 @@ html[data-motion=off] .bub .w{animation:none;will-change:auto}
 html[data-motion=off] :is(.orbstreak,.orbspark){display:none}
 html[data-motion=off] #dock .orbbtn .orb .core::after,html[data-motion=off] #app .orb.shake{animation:none}
 html[data-motion=off] :is(.vlayer[data-phase=thinking] .orb .core,.ofloat[data-phase=thinking] .orb .core,.app.thinking .composer .corb .orb .core){animation:none}
+
+/* ======================= 1.54.2: replies flow in ======================= */
+/* while a reply streams, the report flag's place beside it is kept free, so the text doesn't re-wrap
+   the moment the reply finishes and the flag appears */
+.msg.ai.is-streaming:not(.is-thinking)::after{content:"";flex:none;width:28px}

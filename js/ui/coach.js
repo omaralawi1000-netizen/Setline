@@ -190,6 +190,7 @@ function wordify(el, births, start, now) {
       const age = now - births[i];
       const w = document.createElement('span');
       w.textContent = part;
+      w._wd = true;
       if (age < WORD_MS) { w.className = 'w'; w.style.animationDelay = `${-age}ms`; }
       frag.append(w);
       i++;
@@ -209,35 +210,74 @@ function place(bub, el) {
   bub.append(el);
   return el;
 }
-// Streaming, cheaply: lines that are finished are drawn once and left alone; only the line still
-// being written is redrawn on each step (it used to rebuild the whole reply every few frames).
+// Brings what's on screen (a) up to date with a freshly drawn line (b) without touching what's already
+// there: words already showing (and still fading in) are kept as they are, only new words are added.
+// Where the two differ in shape (a word turned bold, a line became a list), the rest is redrawn.
+function merge(a, b) {
+  const an = [...a.childNodes], bn = [...b.childNodes];
+  let i = 0;
+  for (; i < bn.length; i++) {
+    const x = an[i], y = bn[i];
+    if (!x) break;
+    if (x.nodeType === 3 && y.nodeType === 3) { if (x.nodeValue !== y.nodeValue) x.nodeValue = y.nodeValue; continue; }
+    if (x.nodeType === 1 && y.nodeType === 1 && x.tagName === y.tagName && !!x._wd === !!y._wd) {
+      if (x._wd) { if (x.textContent !== y.textContent) x.replaceWith(y); } // a word that was cut off mid-way grew
+      else merge(x, y);
+      continue;
+    }
+    break;
+  }
+  for (const n of an.slice(i)) n.remove();
+  if (i < bn.length) a.append(...bn.slice(i));
+}
+// Streaming, cheaply and without restarts: lines that are finished are left alone, and the line still
+// being written only gains its new words (it used to be redrawn on every step, restarting the fade of
+// every word still settling).
 function wordsHTML(bub, text, births, now, st) {
   if (bub._st !== st) { bub.innerHTML = ''; bub._st = st; Object.assign(st, { n: 0, w: 0, live: null, liveUl: null }); }
   const lines = hideMemoryTail(text).split('\n'), tail = lines.pop();
   const drop = () => { st.live?.remove(); if (st.liveUl && !st.liveUl.children.length) st.liveUl.remove(); st.live = st.liveUl = null; };
+  // the line on screen takes the new drawing of itself, if it has the same shape
+  const keep = el => {
+    const src = el.tagName === 'UL' && st.live?.tagName === 'LI' ? el.firstElementChild : el;
+    if (!st.live?.isConnected || st.live.tagName !== src.tagName) return false;
+    merge(st.live, src);
+    return true;
+  };
   while (st.n < lines.length) {
-    drop();
     const el = lines[st.n].trim() && lineBlock(lines[st.n]);
-    if (el) { st.w += wordify(el, births, st.w, now); place(bub, el); }
+    if (el) st.w += wordify(el, births, st.w, now);
+    if (!(el && keep(el))) { drop(); if (el) place(bub, el); }
+    st.live = st.liveUl = null; // finished: left alone from now on
     st.n++;
   }
-  drop();
   const el = tail.trim() && lineBlock(tail);
-  if (el) {
-    wordify(el, births, st.w, now);
-    const newUl = el.tagName === 'UL' && bub.lastElementChild?.tagName !== 'UL';
-    st.live = place(bub, el);
-    if (newUl) st.liveUl = el;
-  }
+  if (!el) return drop();
+  wordify(el, births, st.w, now);
+  if (keep(el)) return;
+  drop();
+  const newUl = el.tagName === 'UL' && bub.lastElementChild?.tagName !== 'UL';
+  st.live = place(bub, el);
+  if (newUl) st.liveUl = el;
 }
 function typewriter(root, id) {
-  let words = [], shown = 0, raf = 0, last = 0, waiters = [];
+  let words = [], shown = 0, raf = 0, last = 0, rate = 16, acc = 0, waiters = [];
   const births = [], st = {};
   const done = () => (shown >= words.length);
   const step = now => {
-    if (!done() && now - last > 48) { // a few words every ~3 frames, a steady flow: a big chunk from the model never lands as a block
-      last = now;
-      shown = Math.min(words.length, shown + Math.min(4, Math.max(1, Math.ceil((words.length - shown) / 12))));
+    // one word at a time at a steady pace (words a second) that eases up or down with how much has
+    // arrived and is still to show, so a big chunk from the model never lands as a burst and a pause
+    // in the stream doesn't stop it dead
+    const dt = last ? Math.min(64, now - last) : 16;
+    last = now;
+    const pending = words.length - shown;
+    const target = Math.max(14, Math.min(70, pending / 0.9));
+    rate += (target - rate) * Math.min(1, dt / 300);
+    acc = Math.min(acc + (rate * dt) / 1000, pending);
+    const n = Math.floor(acc);
+    if (n > 0) {
+      acc -= n;
+      shown += n;
       const bub = root.querySelector(`[data-id="${id}"] .bub`);
       if (bub) {
         const msg = bub.closest('.msg');
@@ -252,6 +292,7 @@ function typewriter(root, id) {
     if (done()) {
       // let the last words finish settling before anything re-renders the bubble
       raf = 0;
+      last = 0;
       setTimeout(() => { if (done()) waiters.splice(0).forEach(r => r()); }, WORD_MS);
       return;
     }
@@ -259,7 +300,8 @@ function typewriter(root, id) {
   };
   return {
     set(t) { words = t.match(/\S+\s*/g) || []; if (!raf) raf = requestAnimationFrame(step); },
-    drain: () => (done() && !raf ? new Promise(r => setTimeout(r, WORD_MS)) : Promise.race([new Promise(r => waiters.push(r)), new Promise(r => setTimeout(r, 4000))]))
+    // (a safety net in case frames stop, sized to what's still to show at the fastest pace)
+    drain: () => (done() && !raf ? new Promise(r => setTimeout(r, WORD_MS)) : Promise.race([new Promise(r => waiters.push(r)), new Promise(r => setTimeout(r, 3000 + ((words.length - shown) / 40) * 1000))]))
   };
 }
 
@@ -753,6 +795,9 @@ export function initCoach(n) {
     haptic('tap');
     ask(q, { root });
   });
+  // a word that has settled drops its animation (it's already at rest), so a long line doesn't keep
+  // dozens of them alive
+  root.addEventListener('animationend', e => { if (e.animationName === 'wordrise' && e.target._wd) e.target.style.animation = 'none'; });
   root.addEventListener('click', e => {
     const b = e.target.closest('[data-coach]');
     if (!b) return;

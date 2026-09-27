@@ -652,3 +652,10 @@ Your feedback over the last day says the look and motion started going downhill 
 ## 1.54.1: typed messages glide into the chat
 
 - [x] Sending a typed message: the words lift out of the box exactly where they were typed and rise as a bubble on a soft curve (up a touch ahead of across), slowing into place without a bounce, and no longer squashed at the start. Its landing spot is measured again every frame, so the keyboard going down, the thread redrawing or scrolling mid-flight can't make it land beside its place and jump; the real message takes over in the same frame
+
+## 1.54.2: Coach replies flow in smoothly
+
+- [x] Pace: one word at a time at a steady rate (14–70 words a second) that eases up or down with how much of the reply has arrived, instead of bursts of up to four words whenever a chunk landed and a dead stop in the pauses
+- [x] No restarts: the line being written used to be redrawn about 20 times a second, restarting the fade of every word still settling; now only new words are added (a line is redrawn only when its shape changes, like a word turning bold)
+- [x] Lighter on the phone: settled words drop their animation, and words no longer each ask for their own GPU layer
+- [x] No jump at the end: the report flag's place beside the reply is kept free while it streams, so the text doesn't re-wrap when the reply finishes
