@@ -10,9 +10,28 @@ export function audioContext() {
   return ctx;
 }
 
-export function unlockAudio() {
+// Android gives the phone's audio to a page while its AudioContext runs: your music stays paused
+// until the page lets go. So the context runs only while something records or plays (hold/letGo),
+// and is suspended a moment after the last one ends, and the music comes straight back.
+const holds = new Set();
+let idle = 0;
+export function hold(tag) {
+  holds.add(tag);
+  clearTimeout(idle);
   const c = audioContext();
   if (c && c.state === 'suspended') c.resume().catch(() => {});
+}
+export function letGo(tag, ms = 600) {
+  holds.delete(tag);
+  if (holds.size) return;
+  clearTimeout(idle);
+  idle = setTimeout(() => { if (!holds.size && ctx?.state === 'running') ctx.suspend().catch(() => {}); }, ms);
+}
+export const audioBusy = () => holds.size > 0;
+
+export function unlockAudio() {
+  const c = audioContext();
+  if (c && c.state === 'suspended') { hold('unlock'); letGo('unlock', 1500); }
   // Android only lets a page talk after it has spoken once inside a tap: a silent word does that
   if (!primed && globalThis.speechSynthesis) {
     primed = true;
@@ -24,7 +43,8 @@ export function unlockAudio() {
 export function chime(kind = 'end') {
   const c = audioContext();
   if (!c) return;
-  if (c.state === 'suspended') c.resume().catch(() => {});
+  hold('chime');
+  letGo('chime', kind === 'tick' ? 400 : 1600); // released once the bell has rung out
   const t0 = c.currentTime + 0.02;
   const out = c.createGain();
   out.gain.value = kind === 'tick' ? 0.18 : 0.55;

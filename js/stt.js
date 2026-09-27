@@ -1,4 +1,5 @@
 // Groq speech-to-text. The recording is sent only here and never stored.
+import { prepareAudio } from './audioprep.js';
 export const GROQ_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
 export const GROQ_MODELS = 'https://api.groq.com/openai/v1/models';
 const TIMEOUT = 6000;
@@ -44,7 +45,7 @@ export function cleanTranscript(data, prompt = '') {
   if (!data || typeof data.text !== 'string') return null;
   const segs = Array.isArray(data.segments) ? data.segments : null;
   let text = segs
-    ? segs.filter(g => !(g.no_speech_prob > 0.6 && g.avg_logprob < -0.7) && !(g.compression_ratio > 2.4) && !isJunk(g.text || '') && !isEcho(g.text, prompt)).map(g => String(g.text || '').trim()).join(' ')
+    ? segs.filter(g => !(g.no_speech_prob > 0.7 && g.avg_logprob < -0.9) && !(g.compression_ratio > 2.4) && !isJunk(g.text || '') && !isEcho(g.text, prompt)).map(g => String(g.text || '').trim()).join(' ')
     : data.text;
   // sentence by sentence too: one segment can hold the echo and more
   text = String(text).split(/(?<=[.!?])\s+/).filter(x => !isEcho(x, prompt)).join(' ');
@@ -95,6 +96,10 @@ async function heard(blob, opts) {
 export async function transcribe(blob, opts) {
   if (!opts.key) throw new SttError('nokey');
   if (navigator.onLine === false) throw new SttError('offline');
+  // cleaned for the gym first: rumble out, the noise around your words cut, level evened out
+  const prep = await prepareAudio(blob);
+  if (prep.silent) return ''; // nothing was said: nothing to mishear
+  blob = prep.blob;
   try {
     return await heard(blob, opts);
   } catch (e) {

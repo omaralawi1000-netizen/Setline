@@ -6,7 +6,7 @@ import { state } from '../store.js';
 import * as mic from '../voice.js';
 import * as tts from '../tts.js';
 import { transcribe, buildPrompt } from '../stt.js';
-import { quickReport, noteHeard, noteMixup } from './report.js';
+import { quickReport, noteHeard, noteMixup, openQuickReport, FLAG } from './report.js';
 import { parse } from '../parser.js';
 import { resolve, AUTO_MS } from '../commands.js';
 import { translator } from '../i18n.js';
@@ -760,12 +760,15 @@ function showCard(cmd) {
   const chips = cmd.kind === 'ask' && cmd.choices?.length
     ? `<div class="cchips">${cmd.choices.map((ch, i) => `<button class="chip" data-c="choice" data-i="${i}">${esc(ch.label)}</button>`).join('')}</div>` : '';
   const value = cmd.value ? ` <span class="v">${esc(cmd.value)}</span>` : '';
+  // got it wrong? one tap: it's undone and reported, with what was heard and what it did
+  const flag = cmd.intent?.heard && ['auto', 'error', 'ask', 'confirm', 'info'].includes(cmd.kind) ? `<button class="cflag" data-c="report" aria-label="${esc(t('qr.wrong'))}">${FLAG}</button>` : '';
   const html = `<div class="ic ${cmd.icon || 'check'}">${ICON[cmd.icon] || I.check}</div>
     <div class="ctext"><b>${esc(cmd.title)}${value}</b>${cmd.sub ? `<small>${esc(cmd.sub)}</small>` : ''}</div>
-    ${actions}${chips}<span class="bar"></span>`;
+    ${flag}${actions}${chips}<span class="bar"></span>`;
   const shown = c.classList.contains('show');
   el.layer.classList.toggle('carded', v.open);
   c.dataset.kind = cmd.kind;
+  c.classList.toggle('flagged', !!flag);
   c.classList.remove('done', 'counting');
   if (shown && !reduced()) {
     c.classList.add('swap');
@@ -910,6 +913,12 @@ async function onCardClick(e) {
   const k = b.dataset.c;
   const cmd = card.cmd;
   if (k === 'undo') return undoCard();
+  if (k === 'report') {
+    const heard = cmd?.intent?.heard || '', did = [cmd?.title, cmd?.value].filter(Boolean).join(' · ');
+    if (cmd?.kind === 'auto') undoCard(); else dismissCard({ keepPending: false });
+    if (v.open) closeVoice();
+    return openQuickReport({ source: 'voice', heard, did });
+  }
   if (k === 'close') return dismissCard();
   if (k === 'cancel') { haptic('tap'); return dismissCard({ keepPending: false }); }
   if (k === 'confirm') { b.disabled = true; card.committed = false; return commitConfirmed(cmd); }

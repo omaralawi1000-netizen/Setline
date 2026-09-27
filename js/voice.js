@@ -1,6 +1,6 @@
 // Microphone capture: MediaRecorder (webm/opus, mono) with a live level from a Web Audio analyser.
 // The stream is released on stop, on cancel and whenever the page hides.
-import { audioContext } from './audio.js';
+import { audioContext, hold, letGo } from './audio.js';
 
 export const MAX_MS = 60_000; // room to stop and think mid-sentence
 
@@ -39,7 +39,7 @@ export async function start({ onMaxed, maxMs = MAX_MS } = {}) {
       r.analyser.smoothingTimeConstant = 0.2;
       r.source.connect(r.analyser);
       r.buf = new Float32Array(r.analyser.fftSize);
-      if (ac.state !== 'running') ac.resume().catch(() => {});
+      hold('mic');
     } catch { r.analyser = null; }
   }
   recorder.start(250);
@@ -65,6 +65,7 @@ function release(r) {
   clearTimeout(r.timer);
   try { r.source?.disconnect(); } catch {}
   for (const tr of r.stream.getTracks()) tr.stop();
+  letGo('mic'); // the music comes back as soon as the mic closes
 }
 
 // Stop and return {blob, ms, peak}. The mic is closed before this resolves.

@@ -4,7 +4,7 @@
 import { state, subscribe } from '../store.js';
 import * as W from '../workout.js';
 import { pendingWarmup } from '../warmup.js';
-import { audioContext, unlockAudio } from '../audio.js';
+import { audioContext, unlockAudio, hold, letGo } from '../audio.js';
 import { createVad, toWav } from '../vad.js';
 import { transcribe, buildPrompt } from '../stt.js';
 import { sttModelId } from '../settings.js';
@@ -48,7 +48,7 @@ async function open() {
     return paint();
   }
   if (!hf.want) { hf.stream.getTracks().forEach(t => t.stop()); hf.stream = null; return; }
-  if (ac.state !== 'running') ac.resume().catch(() => {});
+  hold('handsfree'); // hands-free listens all the time: the context stays on until it's switched off
   hf.src = ac.createMediaStreamSource(hf.stream);
   hf.node = new AudioWorkletNode(ac, 'setline-tap');
   hf.sink = ac.createGain();
@@ -68,6 +68,7 @@ function close() {
   if (hf.node) hf.node.port.onmessage = null;
   hf.stream?.getTracks().forEach(t => t.stop());
   Object.assign(hf, { on: false, stream: null, src: null, node: null, sink: null, vad: null });
+  letGo('handsfree');
 }
 
 export function stopHandsFree({ user = false } = {}) {

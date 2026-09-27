@@ -2623,8 +2623,12 @@ html[data-glass=liquid] .app.compact:not(.is-sub):not(.voice):not(.kb) .edge.eb{
 /* ======================= 1.50 ======================= */
 /* reply words: a light fade per word, flowing in at a steady pace (the blur and colour sweep across
    whole paragraphs read as lag on the phone) */
-.bub .w{display:inline;animation:wordfade var(--m-slow) var(--e-out) both}
+.bub .w{display:inline-block;animation:wordfade var(--m-slow) var(--e-out) both}
 @keyframes wordfade{from{opacity:0}to{opacity:1}}
+/* 1.53: the words that have just arrived blur in and rise a touch; with the steady pace only the
+   last few are ever moving, so the reply has a soft, blurred leading edge that settles behind it */
+.bub .w{will-change:opacity,transform,filter;animation:wordrise var(--m-slow) var(--e-out) both}
+@keyframes wordrise{0%{opacity:0;filter:blur(5px);transform:translateY(.28em)}55%{opacity:.85;filter:blur(1.2px)}100%{opacity:1;filter:blur(0);transform:none}}
 @media (prefers-reduced-motion: reduce){ .bub .w{animation:none} }
 html[data-motion=off] .bub .w{animation:none}
 /* the navigation bar: a fuller gradient blur around it, wide and soft, darkest right behind the bar */
@@ -2697,3 +2701,17 @@ html[data-motion=off] .thinkline .tp.out{display:none}
 .screen.sorting .sgroup:not(.lifted) .slist{pointer-events:none}
 @media (prefers-reduced-motion: reduce){ .sortrow.shifting,.reitem.shifting,.sgroup.shifting,.sortrow.settling,.reitem.settling,.sgroup.settling{transition:none!important} }
 html[data-motion=off] .sortrow.shifting,html[data-motion=off] .reitem.shifting,html[data-motion=off] .sgroup.shifting,html[data-motion=off] .sortrow.settling,html[data-motion=off] .reitem.settling,html[data-motion=off] .sgroup.settling{transition:none!important}
+@media (prefers-reduced-motion: reduce){ .bub .w{animation:none;will-change:auto} }
+html[data-motion=off] .bub .w{animation:none;will-change:auto}
+/* one-tap report: the flag on the voice card and under a Coach reply, and its sheet */
+.cflag{flex:none;width:34px;height:34px;border-radius:12px;display:grid;place-items:center;color:var(--dim)}
+.cflag svg,.mflag svg{width:17px;height:17px}
+.cflag:active,.mflag:active{color:var(--accent);transform:scale(.9)}
+.mflag{align-self:flex-start;margin:2px 0 0 -4px;width:32px;height:28px;border-radius:10px;display:grid;place-items:center;color:var(--dim);opacity:.6}
+.msg.ai:has(> .dochips) .mflag{margin-top:6px}
+.qrctx{border-radius:18px;padding:12px 14px;margin:6px 0 12px;display:flex;flex-direction:column;gap:8px}
+.qrctx p{margin:0;display:flex;flex-direction:column;gap:2px;font-size:14px}
+.qrctx small{font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--dim)}
+.qrnote{width:100%;height:46px;border-radius:14px;padding:0 14px;background:rgba(255,255,255,.05);border:1px solid var(--line);font-size:15px;color:inherit;outline:none}
+.qrgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+.intent.flagged{grid-template-columns:36px 1fr auto auto;column-gap:6px}

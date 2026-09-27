@@ -22,7 +22,8 @@ export const DEFAULTS = Object.freeze({
   voiceV: 2,           // bumped when the default voice changes
   ttsQuality: 'natural', // natural (Gemini Flash TTS) | fast (Flash-Lite TTS) | instant (the phone's own voice)
   ttsV: 2,             // bumped when the default voice engine changes
-  stt: 'fast',         // fast | accurate
+  sttV: 2,
+  stt: 'accurate',     // accurate (Whisper large-v3: far better in a loud gym and in Danish) | fast (turbo)
   ttsModel: '',        // Flash TTS, picked from the model list on key test
   ttsLite: '',         // Flash-Lite TTS
   ttsOverride: '',     // manual model id
@@ -198,7 +199,7 @@ export function sanitize(input) {
   // 1.22: replies speak at once with the phone's voice unless you pick Natural again after that
   // 1.34: the Gemini voice is the default again; a choice made after that is kept
   if (['instant', 'natural', 'fast'].includes(input.ttsQuality) && input.ttsV === 2) s.ttsQuality = input.ttsQuality;
-  if (['fast', 'accurate'].includes(input.stt)) s.stt = input.stt;
+  if (['fast', 'accurate'].includes(input.stt) && input.sttV === 2) s.stt = input.stt; // (1.53: everyone moves to accurate once)
   for (const k of ['ttsModel', 'ttsLite', 'ttsOverride', 'cmdModel', 'coachModel', 'cmdOverride', 'coachOverride', 'cmdAlt', 'coachAlt', 'coachPro']) if (typeof input[k] === 'string' && (input[k] === '' || MODEL_ID.test(input[k].trim()))) s[k] = input[k].trim();
   return s;
 }
