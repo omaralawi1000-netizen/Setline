@@ -44,7 +44,7 @@ Superpowers (if installed) is for C, D and E only. For A and B, don't run brains
 - Every `${…}` that ends up in HTML goes through `esc()`, unless it is a number or a fixed i18n/icon string.
 - Keep the `data-act` / `data-k` / `#s-<screen>` hooks. The golden flows and screenshot scripts drive the app through them. If a change must move one, update `scripts/` in the same change.
 - Push to the working branch. Merging to `main` (which deploys to GitHub Pages) is Omar's call.
-- After every update, open a pull request from the working branch to `main` (or update the open one) so Omar can merge it. Anything important (risky, breaking, needs his decision, a check that can't pass) is told to Omar before, not after.
+- After every update, open a pull request from the working branch to `main` (or update the open one) so Omar can merge it, and watch it until it's merged: fix failing checks and answer review comments. Anything important (risky, breaking, needs his decision, a check that can't pass) is told to Omar before, not after.
 - If something is blocked (a provider refuses browser calls, a tool can't run in the cloud session), stop and say so. Don't invent workarounds.
 
 ## 4. Checks: evidence beats confidence

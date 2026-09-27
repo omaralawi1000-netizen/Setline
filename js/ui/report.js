@@ -9,7 +9,7 @@ import { haptic } from '../haptics.js';
 import { esc } from './dom.js';
 import { I } from './icons.js';
 import { toast } from './toast.js';
-import { openSheet } from './sheet.js';
+import { openSheet, closeTop } from './sheet.js';
 
 const KEY = 'setline.reports', ERRS = 'setline.errors';
 const load = (k, fallback = []) => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? fallback; } catch { return fallback; } };
@@ -114,4 +114,33 @@ export function openReport({ kind = 'bug', text = '' } = {}) {
       }
     });
   }, { label: t('report.title') });
+}
+
+// ---------- one-tap report, right where it went wrong ----------
+// From the voice card ("Wrong?") or under a Coach reply (the flag): what was heard and what happened
+// are already filled in; one tap on what went wrong sends it.
+export const FLAG = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4m0 0h10.5l-1.6 3.8L15.5 12H5"/></svg>';
+const REASONS = { voice: ['misheard', 'wrongEx', 'wrongNum', 'slow', 'other'], coach: ['misunderstood', 'wrongAnswer', 'slow', 'other'] };
+export function openQuickReport({ source = 'voice', heard = '', did = '', reply = '' } = {}) {
+  const { t } = state;
+  if (source === 'coach' && heard) noteMixup({ heard, did: 'Coach reply', type: 'coach' });
+  openSheet(el => {
+    el.innerHTML = `<div class="sbody"><h2>${t('qr.title')}</h2>
+      <div class="qrctx solid">${heard ? `<p><small>${esc(t(source === 'coach' ? 'qr.you' : 'qr.heard'))}</small><span>“${esc(heard)}”</span></p>` : ''}${did ? `<p><small>${esc(t('qr.did'))}</small><span>${esc(did)}</span></p>` : ''}${reply ? `<p><small>${esc(t('qr.reply'))}</small><span>${esc(reply.slice(0, 220))}${reply.length > 220 ? '…' : ''}</span></p>` : ''}</div>
+      <input class="qrnote" data-qnote maxlength="400" autocomplete="off" placeholder="${esc(t('qr.note'))}">
+      <p class="snote">${esc(t('qr.pick'))}</p>
+      <div class="qrgrid">${REASONS[source].map(k => `<button class="btn2 solid" data-q="${k}">${esc(t('qr.r.' + k))}</button>`).join('')}</div></div>`;
+    el.addEventListener('click', e => {
+      const b = e.target.closest('[data-q]');
+      if (!b) return;
+      const note = el.querySelector('[data-qnote]')?.value.trim();
+      const text = [`${t('qr.r.' + b.dataset.q)} (${source === 'coach' ? 'Coach' : 'voice'})`, heard && `${source === 'coach' ? 'I asked' : 'Heard'}: "${heard}"`, did && `It did: ${did}`, reply && `Reply: ${reply.slice(0, 300)}${reply.length > 300 ? '…' : ''}`, note && `Note: ${note}`].filter(Boolean).join('\n');
+      const r = makeReport({ kind: 'bug', text, context: context() });
+      saveReports([...loadReports(), r]);
+      haptic('success');
+      send(r);
+      closeTop();
+      toast({ title: esc(t('qr.sent')) });
+    });
+  }, { label: t('qr.title') });
 }

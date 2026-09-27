@@ -627,3 +627,10 @@ Your feedback over the last day says the look and motion started going downhill 
 - [x] Routines: reorder exercises in the routine editor ("put the chest machine press after the preacher curl"), with a hint above the list
 - [x] A running workout: Exercises sheet rows have pull tabs; the exercise you're on stays current, and when the workout came from a routine, "Keep for next time" saves that order to the routine
 - [x] Settings: every section has a pull tab on its heading; drag sections into your own order (kept in settings)
+
+## 1.53.0: music comes straight back, clearer dictation in a loud gym, a softer reply stream, one-tap reports
+
+- [x] Bug: after talking to the orb, music took long to come back in the headphones: the app's audio engine stayed on after recording, a spoken reply or a chime, and Android keeps other apps paused while it runs. It now runs only while the mic records or something plays, and switches off 0.6 s after
+- [x] Dictation in the gym: the recording is cleaned before it's sent (rumble and bass filtered out, the noise before and after the words cut, the level evened out, 16 kHz mono); silence isn't sent at all; the accurate speech model (Whisper large-v3) is the default now (everyone moved over once); the "not speech" filter is less eager, so quiet words in noise aren't dropped
+- [x] Coach replies: the newest words blur in and rise a touch as they arrive at a steady pace, so the reply has a soft, blurred leading edge that settles behind it (only the last few words are ever moving)
+- [x] One-tap reports right where it went wrong: a flag on the voice result card (undoes it and asks what went wrong) and under every Coach reply; what was heard, what it did or answered, filled in; one tap on "Misheard me", "Wrong exercise", "Wrong numbers", "Too slow", "Didn't get me", … sends it

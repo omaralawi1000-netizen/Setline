@@ -1,6 +1,6 @@
 // Spoken replies: Gemini TTS (24 kHz 16-bit PCM) played through Web Audio, cached in IndexedDB.
 // Falls back to speechSynthesis. Never blocks the UI; never speaks while the mic is open.
-import { audioContext } from './audio.js';
+import { audioContext, hold, letGo } from './audio.js';
 import * as db from './db.js';
 
 const API = 'https://generativelanguage.googleapis.com/v1beta';
@@ -237,11 +237,12 @@ function playPcm({ pcm, rate }, mine, text = '') {
     source.onended = () => {
       setTimeout(() => { try { source.disconnect(); hp.disconnect(); gain.disconnect(); } catch {} }, 200);
       if (current?.source === source) { current = null; emit(false); }
+      letGo('voice', 900); // (a moment's grace: the next sentence may follow)
       res();
     };
     current = { source, gain, until: performance.now() + audio.duration * 1000 + 1500, env: envelope(samples, realRate), ac, dur: audio.duration };
     emit(true);
-    if (ac.state === 'suspended') ac.resume().catch(() => {});
+    hold('voice');
     source.start();
     current.t0 = ac.currentTime;
   });

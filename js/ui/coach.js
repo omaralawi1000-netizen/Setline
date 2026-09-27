@@ -25,6 +25,7 @@ import { I } from './icons.js';
 import { openSheet, closeTop } from './sheet.js';
 import { toast } from './toast.js';
 import { pinHTML } from './pins.js';
+import { openQuickReport, FLAG } from './report.js';
 
 let nav = { openSettings: () => {} };
 let inflight = null; // {ctl, id}
@@ -59,7 +60,9 @@ function bubble(m) {
   // offers taken ("Do it" chips tapped), each with its own Undo, then the offers still open
   const acted = (m.acted || []).map(a => (a.failed ? `<p class="chgfail">${esc(a.done[0])}</p>` : note(a.done, a.undone, a.key))).join('');
   const offers = m.actions?.length && !m.streaming ? `<div class="dochips">${m.actions.map((a, i) => `<button class="dochip" data-coach="act" data-id="${esc(m.id)}" data-i="${i}" style="--i:${i}"><span class="dox">${I.check}</span><span>${esc(a.label)}</span></button>`).join('')}</div>` : '';
-  return `<li class="msg ai${m.streaming ? ' is-streaming' : ''}${m.streaming && !m.text ? ' is-thinking' : ''}${m.weekly || m.debrief ? ' weekly' : ''}" data-id="${m.id}"><div class="bub">${head}${dhead}${m.text ? formatAnswer(hideMemoryTail(m.text)) : thinkingHTML(m)}${kept}${changed}${acted}</div>${offers}</li>`;
+  // didn't get you, or got it wrong: the flag reports it in one tap
+  const flag = !m.streaming && m.text ? `<button class="mflag" data-coach="report" data-id="${esc(m.id)}" aria-label="${esc(t('qr.wrong'))}">${FLAG}</button>` : '';
+  return `<li class="msg ai${m.streaming ? ' is-streaming' : ''}${m.streaming && !m.text ? ' is-thinking' : ''}${m.weekly || m.debrief ? ' weekly' : ''}" data-id="${m.id}"><div class="bub">${head}${dhead}${m.text ? formatAnswer(hideMemoryTail(m.text)) : thinkingHTML(m)}${kept}${changed}${acted}</div>${offers}${flag}</li>`;
 }
 
 function planCard(m) {
@@ -735,6 +738,13 @@ export function initCoach(n) {
     const k = b.dataset.coach;
     if (k === 'ask' || k === 'retry') { haptic('tap'); ask(b.dataset.q, { root }); }
     if (k === 'undo-change') { undoChange(b.dataset.id, b.dataset.key || b.dataset.id); return; }
+    if (k === 'report') {
+      const i = state.chat.findIndex(x => x.id === b.dataset.id), m = state.chat[i];
+      const q = [...state.chat.slice(0, i)].reverse().find(x => x.role === 'user');
+      haptic('tap');
+      openQuickReport({ source: 'coach', heard: q?.text || '', reply: m?.text || '' });
+      return;
+    }
     if (k === 'act') { b.disabled = true; b.classList.add('going'); runAction(b.dataset.id, Number(b.dataset.i) || 0); return; }
     else if (k === 'saveplan') { b.closest('.pacts')?.querySelectorAll('button').forEach(x => { x.disabled = true; }); savePlan(b.dataset.id, b.dataset.mode); }
     else if (k === 'settings') nav.openSettings();
