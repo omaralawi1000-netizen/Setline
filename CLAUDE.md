@@ -10,9 +10,8 @@ Follow `AGENTS.md`. It's short on purpose; don't read more than the task needs.
 
 ## Motion & performance rules
 
-The budget from 1.60 (the phone ran out of GPU memory mid-transition before it). `tests/motion-rules.test.js` enforces the first two; the golden flows `voice-to-coach` and `chat-stream` enforce the rest of the voice and chat rules.
+The budget from 1.60 (the phone ran out of GPU memory mid-transition before it). `tests/motion-rules.test.js` enforces the first; the golden flows `voice-to-coach` and `chat-stream` enforce the rest of the voice and chat rules.
 - Animate only `transform` and `opacity` (transitions, keyframes and `el.animate`). The one exception is SVG `stroke-dashoffset` on the rings and exercise figures.
-- `backdrop-filter` only on the dock (`.dcap`, `.obub`) and the Coach's message box, blur ≤ 16px, and solid (no blur) while `.app.moving` is on. Everything else is a solid tint.
 - Glows and background lights are static gradients; animate only their opacity or scale.
 - One animation frame: anything that draws every frame subscribes to `onFrame` / `nextFrame` in `js/ui/frame.js` (it stops when nothing is subscribed or the page is hidden). No other rAF loops. Never write a value every frame to a property that has a CSS transition (it restarts each frame).
 - Canvas: DPR ≤ 2, never resized in the loop, sprites pre-drawn once (no per-dot gradients or `shadowBlur`).

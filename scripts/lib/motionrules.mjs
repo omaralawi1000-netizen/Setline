@@ -1,8 +1,7 @@
 // Motion & performance rules, checked (see CLAUDE.md). Run by tests/motion-rules.test.js and by
 //   node scripts/lib/motionrules.mjs          (prints every violation)
 // 1. CSS transitions and @keyframes animate only transform (incl. translate/scale/rotate) and opacity.
-// 2. backdrop-filter only on the two small static glass surfaces (the dock's .dcap/.obub and the
-//    Coach's message box), at most 16px of blur. `none` is always fine.
+// 2. (backdrop-filter rule removed by Omar's decision: blur is allowed anywhere.)
 // 3. Element.animate() keyframes in the app's JS animate only transform/opacity.
 // (`visibility` is allowed in keyframes: it switches, it isn't interpolated or repainted per frame.)
 // The one exception: small SVG progress rings and check marks draw their stroke (stroke-dashoffset on
@@ -67,11 +66,6 @@ export function checkCss(css, file = 'css') {
     for (const [p, v] of decls(r.body)) {
       if (p === 'transition' || p === 'transition-property') {
         for (const t of transitionProps(v)) if (!ALLOWED.has(t) && !(t === 'stroke-dashoffset' && r.selector.includes('.fg'))) bad.push(`${file}: ${r.selector} transitions ${t}`);
-      }
-      if ((p === 'backdrop-filter' || p === '-webkit-backdrop-filter') && !/^none\b/.test(v)) {
-        if (!GLASS.test(' ' + r.selector)) bad.push(`${file}: ${r.selector} has backdrop-filter (only the dock and the message box may)`);
-        const blur = /blur\(\s*([\d.]+)px/.exec(v);
-        if (blur && +blur[1] > 16) bad.push(`${file}: ${r.selector} blurs ${blur[1]}px (16px at most)`);
       }
     }
   }
