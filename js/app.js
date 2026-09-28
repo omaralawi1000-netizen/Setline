@@ -249,8 +249,6 @@ function coachMorph(open, under) {
       setTimeout(() => haptic('land'), 560);
     });
     const last = go(bloom, [{ scale: 0.1, opacity: 0 }, { scale: 0.55, opacity: 1, offset: 0.3 }, { scale: 1.5, opacity: 0 }], { duration: 820, easing: 'cubic-bezier(.33,.1,.25,1)' });
-    // a ring of light ripples out of the orb with the bloom
-    go(aura.querySelector('.wave'), [{ transform: 'translate(-50%, -50%) scale(.35)', opacity: 0 }, { opacity: 1, offset: 0.15 }, { transform: 'translate(-50%, -50%) scale(7)', opacity: 0 }], { duration: 900, easing: 'cubic-bezier(.2,.7,.2,1)' });
     // held (fill both) until everything settles together: an animation ending on its own mid-way let
     // the page underneath show through for a frame or two on the phone
     go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: 560, delay: 90, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'both' });

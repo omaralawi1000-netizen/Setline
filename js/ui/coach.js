@@ -167,8 +167,17 @@ function sendFly(root) {
   };
   frame(t0);
   // …and the conversation above makes room for it by gliding up, instead of jumping
-  const moved = root.scrollTop - (p.scroll || 0), thread = root.querySelector('#thread');
-  if (thread && moved > 2) thread.animate([{ transform: `translateY(${moved}px)` }, { transform: 'none' }], { duration: dur, easing: token('--e-out') });
+  // (only the messages on screen move: lifting the whole thread, however long, onto its own layer made
+  // the phone draw it afresh, and it showed nothing at all for a moment)
+  const moved = root.scrollTop - (p.scroll || 0);
+  if (moved > 2) {
+    const view = root.getBoundingClientRect();
+    for (const m of root.querySelectorAll('#thread > .msg:not(.sending)')) {
+      const r = m.getBoundingClientRect();
+      if (r.bottom < view.top - moved || r.top > view.bottom) continue;
+      m.animate([{ transform: `translateY(${moved}px)` }, { transform: 'none' }], { duration: dur, easing: token('--e-out') });
+    }
+  }
   $('#composer .csend')?.animate([{ scale: 1 }, { scale: 0.86, offset: 0.3 }, { scale: 1 }], { duration: token('--m-base'), easing: token('--e-spring') });
   setTimeout(done, dur + 400); // (no frames while the page is hidden)
 }
@@ -329,7 +338,7 @@ function syncThinkOrb() {
   orbCtl?.destroy();
   orbCtl = null;
   orbCanvas = c;
-  if (c) orbCtl = thinkOrb(c, { size: 32, state: orbState, label: orbLabel || state.t('coach.thinking') });
+  if (c) orbCtl = thinkOrb(c, { size: 64, state: orbState, label: orbLabel || state.t('coach.thinking') });
 }
 
 // While it thinks, the message box says what it's doing: "Thinking", then "Reading your log…",

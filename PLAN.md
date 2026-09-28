@@ -1,6 +1,6 @@
 # Setline plan
 
-All five phases from SPEC.md section 7 are done. Work now happens as fixes and polish the user asks for. The current version is in `js/version.js` (1.57.0). The release log, including releases that were later undone, is in `docs/HISTORY.md`; read it only when you need the story behind something.
+All five phases from SPEC.md section 7 are done. Work now happens as fixes and polish the user asks for. The current version is in `js/version.js` (1.57.1). The release log, including releases that were later undone, is in `docs/HISTORY.md`; read it only when you need the story behind something.
 
 ## What's in the app now
 

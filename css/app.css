@@ -2203,9 +2203,6 @@ html[data-dock=icons] .dock .tab span{display:none}
 @keyframes enterglide{from{opacity:.7;transform:translateY(8px)}}
 
 /* ======================= 1.37: the Coach opens and thinks beautifully ======================= */
-/* opening: a thin ring of light ripples out of the orb with the bloom */
-.aura .wave{position:absolute;left:var(--ax);top:var(--ay);width:120px;height:120px;border-radius:50%;opacity:0;transform:translate(-50%,-50%);will-change:transform,opacity;
-  box-shadow:0 0 0 1.5px rgba(var(--a-rgb),.75),0 0 24px 4px rgba(var(--v-rgb),.45),inset 0 0 18px 2px rgba(var(--a-rgb),.35)}
 /* the conversation arrives: header first, then the last messages one after another, each from a little lower */
 .app.coach-in #s-coach .msg{animation:coachmsg .55s cubic-bezier(.2,.8,.2,1) both}
 .app.coach-in #s-coach .msg:nth-last-child(1){animation-delay:.34s}
@@ -2704,7 +2701,7 @@ html[data-motion=off] .bub .w{animation:none;will-change:auto}
 .cflag{flex:none;width:34px;height:34px;border-radius:12px;display:grid;place-items:center;color:var(--dim)}
 .cflag svg,.mflag svg{width:17px;height:17px}
 .cflag:active,.mflag:active{color:var(--accent);transform:scale(.9)}
-.mflag{align-self:flex-start;margin:2px 0 0 -4px;width:32px;height:28px;border-radius:10px;display:grid;place-items:center;color:var(--dim);opacity:.6}
+.mflag{flex:none;align-self:flex-start;margin:2px 0 0 -4px;width:32px;height:28px;border-radius:10px;display:grid;place-items:center;color:var(--dim);opacity:.6}
 .msg.ai:has(> .dochips) .mflag{margin-top:6px}
 .qrctx{border-radius:18px;padding:12px 14px;margin:6px 0 12px;display:flex;flex-direction:column;gap:8px}
 .qrctx p{margin:0;display:flex;flex-direction:column;gap:2px;font-size:14px}
@@ -2912,3 +2909,19 @@ html[data-motion=off] .vglow{transition:none}
 @media (prefers-reduced-motion: reduce){ .beam{animation:none;opacity:1} .beam :is(.bm-rot,.bm-fix){animation:none} }
 html[data-motion=off] .beam{animation:none;opacity:1}
 html[data-motion=off] .beam :is(.bm-rot,.bm-fix){animation:none}
+
+/* ======================= 1.57.1: a calmer floating orb ======================= */
+/* The orb floats low, where the dock was: the dock steps aside (nothing left behind in it), the page
+   dims properly behind what you're saying, and the words sit in one tidy column above the orb: what
+   it's doing just over it, your words above that, at most three lines, the newest at the bottom. */
+.ofloat{--ob:calc(var(--dock-bottom) + 20px)}
+.app.voice-mini .dock{opacity:0;transform:translateY(24px);transition:opacity var(--m-base) var(--e-out),transform var(--m-slow) var(--e-out)}
+.oscrim{background:linear-gradient(to top,rgba(8,9,14,.95) 0%,rgba(8,9,14,.9) 38%,rgba(8,9,14,.62) 58%,rgba(8,9,14,.18) 78%,rgba(8,9,14,0))}
+.owrap{bottom:var(--ob)}
+.opull{bottom:calc(var(--ob) + 140px)}
+.obubble{bottom:calc(var(--ob) + 178px);display:flex;flex-direction:column-reverse;align-items:center}
+.ostatus{flex:none;max-width:100%}
+.osay{margin:0 0 12px;font-size:21px;line-height:1.3;max-height:calc(3 * 1.3em);overflow:hidden;min-height:0;
+  -webkit-mask-image:linear-gradient(to bottom,transparent,#fff 1.1em);mask-image:linear-gradient(to bottom,transparent,#fff 1.1em)}
+.osay:not(.over){-webkit-mask-image:none;mask-image:none}
+.osay:empty{margin:0}

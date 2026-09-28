@@ -281,6 +281,7 @@ export function openMini() {
   v.open = true;
   v.mode = 'mini';
   el.osay.innerHTML = '';
+  el.osay.classList.remove('over');
   el.owrap.style.translate = '';
   el.opull.style.opacity = '';
   el.opull.querySelector('span').textContent = state.t('voice.pullUp');
@@ -359,6 +360,7 @@ export function closeVoice({ fromPop = false } = {}) {
     el.oorb.style.transform = '';
     el.owrap.style.translate = '';
     flyMini(false);
+    document.getElementById('app').classList.remove('voice-mini'); // the dock comes back for the orb to land in
     let landed = false;
     const land = e => {
       if (landed || v.open || (e && e.propertyName !== 'transform')) return;
@@ -588,6 +590,13 @@ function cancelRec() {
 function showWords(text) {
   const words = text.split(/\s+/).filter(Boolean);
   (v.mode === 'mini' ? el.osay : el.say).innerHTML = words.map((w, i) => `<span class="w" style="animation-delay:${Math.min(i, 14) * 38}ms">${esc(w)}</span>`).join(' ');
+  if (v.mode === 'mini') fitSay();
+}
+// The floating orb's words keep to three lines: a longer sentence shows its end, fading out at the top.
+function fitSay() {
+  const o = el.osay;
+  o.scrollTop = o.scrollHeight;
+  o.classList.toggle('over', o.scrollHeight > o.clientHeight + 1);
 }
 
 export function handleText(text, { typed = false } = {}) {
@@ -1010,6 +1019,7 @@ async function onCardClick(e) {
     dismissCard({ keepPending: false });
     if (!v.open) openMini();
     el.osay.textContent = v.carry;
+    fitSay();
     el.say.textContent = v.carry;
     v.toggle = true;
     return startRec();
