@@ -26,7 +26,7 @@
   .frost{-webkit-backdrop-filter:none;backdrop-filter:none;background:color-mix(in srgb,var(--bg) 92%,transparent)}
 }
 /* under the frost everything holds still, and nothing else is blurred on top of it */
-.app.frosted .screen:not(#s-coach),.app.frosted .screen:not(#s-coach) *,.app.frosted .dock *,.app.frosted .ambient i{animation-play-state:paused!important}
+.app.frozen .screen:not(#s-coach),.app.frozen .screen:not(#s-coach) *,.app.frozen .dock *,.app.frozen .ambient i{animation-play-state:paused!important}
 .app.frosted :is(.dcap,.obub,.composer.glass,.minibar){-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
 .app.frosted :is(.dcap,.obub){background:#111923}
 .app.frosted .composer.glass{background:color-mix(in srgb,var(--bg) 94%,#1c2430)}
@@ -50,7 +50,6 @@
 #app:not(.compact) .dock .orbbtn:active,#app:not(.compact) .dock .orbbtn.pressing{transform:none}
 #app .dock .orbbtn #orb{transition:transform var(--m-tap) var(--e-out)}
 #app .dock .orbbtn.pressing #orb{transform:scale(var(--press,1.08))}
-html.holding,html.holding body{overscroll-behavior:none}
 
 /* ---------- the chat sheet ---------- */
 #app #s-coach{top:calc(var(--safe-top) + 10px);padding-top:6px;border-radius:28px 28px 0 0;transition:none!important;opacity:1!important;visibility:hidden;
@@ -78,7 +77,7 @@ html.holding,html.holding body{overscroll-behavior:none}
 .vq .wave i{opacity:1}
 .vlabel{font-size:14px;font-weight:700;color:var(--muted);letter-spacing:-.005em}
 .vup{top:calc(-1 * var(--r) - 44px);opacity:0;transition:opacity calc(160ms * var(--slowmo,1)) var(--e-out)}
-.vflow.m-quick .vup{opacity:calc(.55 + var(--p,0) * .45)}
+.vflow.m-quick .vup{opacity:calc(.55 + var(--p,0) * .45);animation:rmfade calc(160ms * var(--slowmo,1)) var(--e-out) calc(140ms * var(--slowmo,1)) both}
 .vflow.m-quick .vup{transform:translateY(calc(var(--p,0) * -6px));transition:none}
 .vlow{top:calc(var(--r) + 70px);opacity:0;transition:opacity calc(160ms * var(--slowmo,1)) var(--e-out)}
 .vflow.on .vlow{opacity:1;transition-delay:calc(140ms * var(--slowmo,1))}
@@ -100,10 +99,10 @@ html.holding,html.holding body{overscroll-behavior:none}
 .rvtext textarea{flex:1;min-height:80px;width:100%;resize:none;background:transparent;border:0;outline:none;color:var(--ink);
   font:inherit;font-size:27px;line-height:1.25;font-weight:700;letter-spacing:-.02em}
 .rvtext textarea::placeholder{color:var(--dim)}
-.rvshim{position:absolute;left:0;top:4px;font-size:22px;font-weight:700;color:var(--muted);overflow:hidden;opacity:0;pointer-events:none;transition:opacity calc(120ms * var(--slowmo,1)) var(--e-out)}
+.rvshim{position:absolute;left:0;top:4px;font-size:22px;font-weight:700;color:var(--muted);overflow:hidden;opacity:0;pointer-events:none}
 .rvshim::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);transform:translateX(-100%);animation:shimmer 1.2s linear infinite}
 @keyframes shimmer{to{transform:translateX(100%)}}
-.rvtext.busy .rvshim{opacity:1}
+.rvtext.busy .rvshim{opacity:1;transition:opacity calc(120ms * var(--slowmo,1)) var(--e-out)} /* (gone at once when the words arrive: never both) */
 .rvtext.busy textarea::placeholder{color:transparent}
 .rvhints{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -20px 12px;padding:0 20px;
   -webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 36px),transparent)}
@@ -144,3 +143,27 @@ html.holding,html.holding body{overscroll-behavior:none}
 /* the empty Coach's picture of the orb (the one real orb is in the message box) */
 .coachhero .orbmark{display:block;width:64px;height:64px;margin:0 auto 14px;border-radius:50%;
   background:radial-gradient(circle at 50% 58%,var(--orb1),var(--orb2) 46%,var(--orb3));box-shadow:inset 0 0 0 1px rgba(var(--a-rgb),.5)}
+
+/* the frost's fallback (?tune=1 → frostStatic): the page under it is blurred once with a filter (never
+   animated) and only the tint over it fades; no backdrop-filter at all */
+.frost-static .frost{-webkit-backdrop-filter:none;backdrop-filter:none}
+.frost-static .app.frosted .screen.under,.frost-static .app.frosted .screen.on:not(#s-coach){filter:blur(var(--frost-blur,20px)) saturate(var(--frost-sat,170%)) brightness(var(--frost-bright,.85))}
+
+/* moved by a spring (inline transforms each frame): their own layer only while they move, so the
+   phone slides a finished picture instead of repainting them; dropped again the moment they rest */
+.app.sheetmoving #s-coach,.app.sheetmoving .composer,.orbfly.on,.vflow.rvmoving .rv,.flytext{will-change:transform}
+
+/* no mic: one line in place of the labels, and let go types instead */
+.vflow.blocked .vup,.vflow.blocked .wave{opacity:0!important}
+
+/* reduced motion (the phone's setting, or Motion: Off): nothing travels, things cross-fade in 150 ms */
+@keyframes rmfade{from{opacity:0}}
+@media (prefers-reduced-motion:reduce){
+  html:not([data-motion=on]) #app.chatsheet #s-coach,html:not([data-motion=on]) #app.chatsheet .composer,
+  html:not([data-motion=on]) .vflow.on .vq,html:not([data-motion=on]) .vflow.m-review .rv{animation:rmfade .15s linear both!important}
+  html:not([data-motion=on]) #app.rmout #s-coach,html:not([data-motion=on]) #app.rmout .composer{opacity:0!important;transition:opacity .15s linear!important}
+}
+html[data-motion=off] #app.chatsheet #s-coach,html[data-motion=off] #app.chatsheet .composer,
+html[data-motion=off] .vflow.on .vq,html[data-motion=off] .vflow.m-review .rv{animation:rmfade .15s linear both!important}
+html[data-motion=off] #app.rmout #s-coach,html[data-motion=off] #app.rmout .composer{opacity:0!important;transition:opacity .15s linear!important}
+html[data-motion=off] .frost,html[data-motion=off] .app.frosted .frost{transition:opacity .15s linear,visibility 0s linear .15s!important}

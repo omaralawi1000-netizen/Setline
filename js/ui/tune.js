@@ -7,7 +7,7 @@ import { DEFAULTS, M, setValue, reset, setSlowmo, slowmo, applyCss, onTune } fro
 
 const RANGES = {
   frostBlur: [0, 40, 1], frostSat: [100, 250, 5], frostBright: [0.5, 1.2, 0.01], tintTop: [0, 1, 0.01], tintBottom: [0, 1, 0.01],
-  grain: [0, 0.15, 0.005], frostFadeMs: [60, 600, 10], holdMs: [120, 500, 10], tapSlopPx: [2, 30, 1], lockPx: [30, 200, 5],
+  grain: [0, 0.15, 0.005], frostFadeMs: [60, 600, 10], frostStatic: [0, 1, 1], holdMs: [120, 500, 10], tapSlopPx: [2, 30, 1], lockPx: [30, 200, 5],
   cancelPx: [30, 200, 5], follow: [0, 1, 0.05], orbRestPct: [25, 70, 1], pressScale: [1, 1.3, 0.01], reviewScale: [0.3, 1, 0.05],
   reviewHeightPct: [60, 96, 1], stiffness: [40, 600, 5], damping: [5, 60, 0.5]
 };

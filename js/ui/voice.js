@@ -201,7 +201,8 @@ const dockOrb = () => document.querySelector('#dock .orbbtn .orb');
 // ---------- the review sheet's own spring (its top edge) ----------
 const reviewTop = () => viewSize().H * (1 - M.reviewHeightPct / 100);
 let rv0 = 1; // where it started from (for its opening stretch)
-const rvSpring = spring({ y: 0 }, { onUpdate: ({ y }) => {
+const rvSpring = spring({ y: 0 }, { onRest: () => el.layer.classList.remove('rvmoving'), onUpdate: ({ y }) => {
+  if (!el.layer.classList.contains('rvmoving') && rvSpring?.running) el.layer.classList.add('rvmoving');
   const k = rv0 > 0 ? Math.max(0, Math.min(1, 1 - y / rv0)) : 1;
   el.review.style.transform = `translate3d(0, ${y.toFixed(1)}px, 0) scaleX(${(0.92 + 0.08 * k).toFixed(4)})`;
 } });
@@ -232,10 +233,10 @@ function enterQuick() {
   v.open = true;
   v.mode = 'quick';
   v.fingerDy = 0;
+  flyOrb(quickOrb, { size: BIG }); // (measured where it is first, before anything else changes)
   paintStatic();
   showLayer('quick');
   for (const x of el.status.children) { x.textContent = ''; } // (fresh: nothing to fade from)
-  flyOrb(quickOrb, { size: BIG });
   dockBtn()?.classList.remove('pressing');
   if (v.blocked) el.layer.classList.add('blocked');
   setPhase(mic.isRecording() ? 'listening' : v.blocked ? 'error' : 'opening');
@@ -253,7 +254,6 @@ function enterReview({ from = 'quick', live = false } = {}) {
   const { H } = viewSize();
   v.open = true;
   v.mode = 'review';
-  v.sink = 'review';
   v.autoSend = live;
   v.edited = false;
   el.text.value = '';
@@ -680,7 +680,7 @@ function reviewToChat(text) {
       fly.innerHTML = `<div class="bub"></div>`;
       const b = fly.firstChild;
       b.textContent = bub.textContent;
-      Object.assign(b.style, { boxSizing: 'border-box', width: `${to.width}px`, padding: cs.padding, borderRadius: cs.borderRadius, font: cs.font, letterSpacing: cs.letterSpacing, color: cs.color, background: 'transparent' });
+      Object.assign(b.style, { boxSizing: 'border-box', width: `${to.width}px`, padding: cs.padding, borderRadius: cs.borderRadius, fontFamily: cs.fontFamily, fontSize: cs.fontSize, fontWeight: cs.fontWeight, lineHeight: cs.lineHeight, letterSpacing: cs.letterSpacing, color: cs.color, background: 'transparent', whiteSpace: to.height < parseFloat(cs.lineHeight) * 1.8 + parseFloat(cs.paddingTop) * 2 ? 'nowrap' : 'normal', position: 'relative' });
       const bg = document.createElement('span');
       Object.assign(bg.style, { position: 'absolute', inset: '0', borderRadius: cs.borderRadius, background: cs.background, opacity: '0' });
       fly.prepend(bg);
@@ -1140,8 +1140,8 @@ function holdUp(e) {
 // ---------- the dock orb: hold to talk (js/ui/holdtalk.js) ----------
 let hold = null;
 function pressStart() {
+  dockBtn()?.classList.add('pressing'); // the orb grows under the finger in this same frame
   unlockAudio();
-  dockBtn()?.classList.add('pressing');
   v.pressing = true;
   v.blocked = false;
   v.sink = 'send';
@@ -1172,7 +1172,6 @@ export function initVoice(n) {
   el.layer.inert = true;
   hold = createHoldTalk({
     canStart: () => !v.open && !chatMoving() && orbHome() === 'dock',
-    state: s => { const down = s === 'pressing' || s === 'quick' || (s === 'review' && !!hold?.holding); document.documentElement.classList.toggle('holding', down); },
     vibrate: ms => { try { navigator.vibrate?.(ms); } catch {} },
     press: pressStart,
     tap: pressTap,
@@ -1180,8 +1179,8 @@ export function initVoice(n) {
     follow: quickFollow,
     review: () => enterReview({ from: 'quick' }),
     send: quickSend,
-    reviewRelease: () => { document.documentElement.classList.remove('holding'); if (mic.isRecording() || v.phase === 'opening') finishRec(); },
-    reviewInterrupt: () => { document.documentElement.classList.remove('holding'); cancelRec(); },
+    reviewRelease: () => { if (mic.isRecording() || v.phase === 'opening') finishRec(); },
+    reviewInterrupt: () => cancelRec(),
     reviewSend: sendReview,
     cancel: cancelHold
   });

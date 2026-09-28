@@ -31,8 +31,8 @@ import { renderProgress, renderExercise, setRange } from './ui/progress.js';
 import { countAll, burst, orbPulse, moving } from './ui/fx.js';
 import { syncBeams } from './ui/beam.js';
 import { startDotOrbs } from './ui/dotorb.js';
-import { theOrb, seatOrb, orbHome, openChat, closeChat, chatUnder, onLand } from './ui/stage.js';
-import { showPending } from './ui/coach.js';
+import { seatOrb, orbHome, openChat, closeChat, chatUnder, onLand, warmStage } from './ui/stage.js';
+import { showPending, nearEnd } from './ui/coach.js';
 import { applyCss } from './motion.config.js';
 import { initTune } from './ui/tune.js';
 import { initPerf } from './ui/perf.js';
@@ -427,6 +427,10 @@ initChrome();
 startDotOrbs();
 initPerf(); // ?perf=1: a tiny frame meter in the corner (dev only)
 initTune(); // ?tune=1: the motion and frost values as sliders (dev only)
+// sizes the moves need, read once now while nothing moves (not in the first frame of a transition)
+setTimeout(() => { warmStage(); const c = $('#s-coach'); if (c) nearEnd(c); }, 400);
+// the chat is drawn once while nothing happens, so the first time it opens it only slides (no building)
+setTimeout(() => { const c = $('#s-coach'); if (c && !c.childElementCount && view.screen !== 'coach') { renderCoach(c); c.scrollTop = c.scrollHeight; } }, 1500);
 app.addEventListener('dockopen', () => renderDock());
 initHandsFree();
 initBodyScreen($('#s-body'));

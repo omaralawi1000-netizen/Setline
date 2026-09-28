@@ -22,6 +22,42 @@ const countWorkouts = page => page.evaluate(() => new Promise((resolve, reject) 
 }));
 const doneSets = page => page.locator('#s-workout .set.done:not(.warm)').count();
 
+// A page ready for the dock orb: keys (stand-ins), mocked speech-to-text and Coach, a chat with a few
+// messages (so the chat scrolls), the buzz recorded, and the orb's centre.
+async function holdRig(browser, base, opts = {}) {
+  const { context, page, errors } = await newPage(browser, base, opts);
+  await mockServices(page, { heard: 'How is my bench going?' });
+  let stt = 0;
+  page.on('request', r => { if (/api\.groq\.com/.test(r.url())) stt++; });
+  await page.addInitScript(k => {
+    localStorage.setItem('setline.keys', JSON.stringify(k));
+    window.__vib = [];
+    Object.defineProperty(Navigator.prototype, 'vibrate', { configurable: true, value: ms => { window.__vib.push(ms); return true; } });
+  }, STAND_IN);
+  await page.goto(base + '?seed=1');
+  await onScreen(page, 'today');
+  const users = await page.evaluate(async () => {
+    const s = await import('./js/store.js');
+    window.__s = s;
+    s.setSettings({ spoken: 'off', weeklyCheckin: false });
+    for (let i = 0; i < 6; i++) { s.addChat('user', `Question ${i + 1} about my plan?`); s.addChat('model', 'Keep the same plan this week, add a set of rows on Thursday and sleep a little more before the heavy day.'); }
+    return s.state.chat.filter(m => m.role === 'user').length;
+  });
+  await settle(page, 1200);
+  const o = await page.locator('#dock .orbbtn').boundingBox();
+  return { context, page, users, x: o.x + o.width / 2, y: o.y + o.height / 2, stt: () => stt, done: async () => { await context.close(); return errors; } };
+}
+// exactly one orb element and one frost layer in the page, at every frame
+function oneOfEach(rec) {
+  const all = between(rec, 'down', 'end');
+  if (!all.length) throw new Error('no frames were recorded');
+  const orbs = all.filter(x => x.orbEls !== 1), frosts = all.filter(x => x.frosts !== 1);
+  if (orbs.length) throw new Error(`${orbs.length} frame(s) with ${orbs[0].orbEls} orb elements in the page`);
+  if (frosts.length) throw new Error(`${frosts.length} frame(s) with ${frosts[0].frosts} frost layers`);
+  const two = all.filter(x => x.orbs > 1);
+  if (two.length) throw new Error(`${two.length} frame(s) with ${two[0].orbs} orbs on screen`);
+}
+
 async function startRoutine(page) {
   await page.click('#dock .tab[data-to=today]');
   await onScreen(page, 'today');
@@ -88,49 +124,139 @@ const FLOWS = {
     return errors.filter(e => !/offline|network|fetch/i.test(e));
   },
 
-  // Hold the orb → talk → release → the question goes to the Coach. One listening UI (the sheet),
-  // one orb on screen at every frame, the sheet's top bar and controls there from open to handoff,
-  // and Home never shows on the way from the sheet into the chat.
-  'voice-to-coach': async (browser, base) => {
-    const { context, page, errors } = await newPage(browser, base);
-    await mockServices(page);
-    await page.addInitScript(k => { localStorage.setItem('setline.keys', JSON.stringify(k)); }, STAND_IN);
-    await page.goto(base + '?seed=1');
-    await onScreen(page, 'today');
-    await page.evaluate(async () => { const s = await import('./js/store.js'); s.setSettings({ spoken: 'off' }); });
-    await settle(page, 1000);
+  // The dock orb, hold to talk (js/ui/holdtalk.js). Every flow checks, at every frame: exactly one orb
+  // element and exactly one frost layer in the page.
+  'tap-chat': async (browser, base) => {
+    const t = await holdRig(browser, base);
+    const { page, x, y } = t;
+    // opened once before and left scrolled up
+    await page.mouse.move(x, y); await page.mouse.down(); await page.waitForTimeout(90); await page.mouse.up();
+    await onScreen(page, 'coach');
+    await page.waitForFunction(() => !document.getElementById('app').classList.contains('sheetmoving'), null, { timeout: 5000 });
+    await page.evaluate(() => { document.getElementById('s-coach').scrollTop = 0; });
+    await page.goBack();
+    await page.waitForFunction(() => !document.getElementById('app').classList.contains('chatsheet'), null, { timeout: 5000 });
+    await settle(page, 300);
     await installSampler(page);
-    const orb = await page.locator('#dock .orbbtn').boundingBox();
-    await page.mouse.move(orb.x + orb.width / 2, orb.y + orb.height / 2);
     await mark(page, 'down');
-    await page.mouse.down();
-    await page.waitForSelector('#voice.on', { timeout: 4000 });
-    await mark(page, 'open');
-    if (await page.locator('#ofloat:not([hidden])').count()) throw new Error('the floating orb over Home showed (a second listening UI)');
-    await page.waitForSelector('#voice[data-phase=listening]', { timeout: 6000 });
-    await settle(page, 1500);
-    await mark(page, 'release');
-    await page.mouse.up();
-    await onScreen(page, 'coach', 10000);
-    await page.waitForSelector('#voice[hidden]', { state: 'attached', timeout: 6000 });
-    await settle(page, 700);
+    await page.mouse.move(x, y); await page.mouse.down(); await page.waitForTimeout(90); await page.mouse.up();
+    await onScreen(page, 'coach');
+    await page.waitForFunction(() => !document.getElementById('app').classList.contains('sheetmoving'), null, { timeout: 5000 });
+    await settle(page, 300);
+    const r = await page.evaluate(() => { const a = document.getElementById('app').dataset, c = document.getElementById('s-coach'); return { start: +a.chatStart, max: +a.chatMax, now: Math.round(c.scrollTop), end: Math.round(c.scrollHeight - c.clientHeight), home: document.getElementById('orb').parentElement.className, frosted: document.getElementById('app').classList.contains('frosted') }; });
+    if (Math.abs(r.start - r.max) > 1) throw new Error(`the chat started moving at scrollTop ${r.start}, not its end (${r.max})`);
+    if (Math.abs(r.now - r.start) > 1) throw new Error(`the chat scrolled after it arrived (${r.start} → ${r.now})`);
+    if (!/corb/.test(r.home)) throw new Error(`the orb didn't land in the message box (it's in ${r.home})`);
+    if (!r.frosted) throw new Error('the page under the chat is not frosted');
+    await page.goBack();
+    await onScreen(page, 'today');
+    await page.waitForFunction(() => !document.getElementById('app').classList.contains('chatsheet'), null, { timeout: 5000 });
+    const back = await page.evaluate(() => ({ home: document.getElementById('orb').parentElement.className, frosted: document.getElementById('app').classList.contains('frosted') }));
+    if (!/orbbtn/.test(back.home) || back.frosted) throw new Error(`after Back: orb in ${back.home}, frosted ${back.frosted}`);
     await mark(page, 'end');
-    const rec = await samples(page);
-    const all = between(rec, 'down', 'end');
-    const two = all.filter(x => x.orbs > 1);
-    if (two.length) throw new Error(`${two.length} frame(s) with ${Math.max(...two.map(x => x.orbs))} orbs on screen (${two[0].orbIds})`);
-    const openAt = rec.marks.find(m => m.name === 'open').t;
-    const handoff = all.find(x => x.handoff)?.t;
-    if (!handoff) throw new Error('the sheet never handed over to the Coach');
-    const session = all.filter(x => x.t > openAt + 600 && x.t < handoff);
-    const gone = session.filter(x => !x.chrome);
-    if (gone.length) throw new Error(`the sheet's top bar or controls were missing in ${gone.length} of ${session.length} frames (${gone[0].why})`);
-    const home = all.filter(x => x.t >= handoff && x.home);
-    if (home.length) throw new Error(`Home showed in ${home.length} frame(s) on the way to the Coach`);
-    const users = await page.locator('#s-coach .msg.me').count();
-    if (users !== 1) throw new Error(`expected the question once in the chat, found ${users}`);
-    await context.close();
-    return errors;
+    oneOfEach(await samples(page));
+    return t.done();
+  },
+
+  'hold-send': async (browser, base) => {
+    const t = await holdRig(browser, base);
+    const { page, x, y } = t;
+    await installSampler(page);
+    await mark(page, 'down');
+    await page.mouse.move(x, y); await page.mouse.down();
+    await page.waitForSelector('#voice.m-quick[data-phase=listening]', { timeout: 6000 });
+    await settle(page, 1200);
+    await page.mouse.up();
+    await onScreen(page, 'coach', 6000);
+    await page.waitForFunction(() => { const m = [...window.__s.state.chat].reverse().find(x => x.role === 'model' && x.q); return m && m.streaming === false; }, null, { timeout: 15000 });
+    await settle(page, 600);
+    await mark(page, 'end');
+    const r = await page.evaluate(n => ({ users: window.__s.state.chat.filter(m => m.role === 'user').length - n, shown: document.querySelectorAll('#s-coach .msg.me:not(.pending)').length, vib: window.__vib }), t.users);
+    if (r.users !== 1) throw new Error(`releasing sent ${r.users} messages (expected exactly one)`);
+    if (t.stt() !== 1) throw new Error(`speech-to-text ran ${t.stt()} times`);
+    if (!r.vib?.includes(8)) throw new Error('no small buzz when the hold began');
+    oneOfEach(await samples(page));
+    return t.done();
+  },
+
+  'hold-review': async (browser, base) => {
+    const t = await holdRig(browser, base);
+    const { page, x, y } = t;
+    await installSampler(page);
+    await mark(page, 'down');
+    await page.mouse.move(x, y); await page.mouse.down();
+    await page.waitForSelector('#voice.m-quick[data-phase=listening]', { timeout: 6000 });
+    await settle(page, 700);
+    await page.mouse.move(x, y - 100, { steps: 6 });
+    await page.waitForSelector('#voice.m-review', { timeout: 3000 });
+    await settle(page, 900);
+    await page.mouse.up();
+    await page.waitForFunction(() => document.getElementById('vtext').value.trim().length > 0, null, { timeout: 8000 });
+    await settle(page, 1500); // nothing may be sent while you read it over
+    const before = await page.evaluate(n => window.__s.state.chat.filter(m => m.role === 'user').length - n, t.users);
+    if (before !== 0) throw new Error('the review sheet sent before Send was tapped');
+    const vib = await page.evaluate(() => window.__vib);
+    if (!vib?.includes(12)) throw new Error('no buzz when the review sheet locked');
+    await page.click('#vsend');
+    await onScreen(page, 'coach', 6000);
+    await page.waitForSelector('#voice[hidden]', { state: 'attached', timeout: 6000 });
+    await settle(page, 400);
+    await mark(page, 'end');
+    const users = await page.evaluate(n => window.__s.state.chat.filter(m => m.role === 'user').length - n, t.users);
+    if (users !== 1) throw new Error(`Send sent ${users} messages (expected exactly one)`);
+    oneOfEach(await samples(page));
+    return t.done();
+  },
+
+  // Reduced motion: nothing travels (150 ms fades), but every flow still works and ends in place.
+  'reduced-motion': async (browser, base) => {
+    const t = await holdRig(browser, base, { reducedMotion: 'reduce' });
+    const { page, x, y } = t;
+    await installSampler(page);
+    await mark(page, 'down');
+    await page.mouse.move(x, y); await page.mouse.down(); await page.waitForTimeout(90); await page.mouse.up();
+    await onScreen(page, 'coach');
+    await settle(page, 400);
+    if (!/corb/.test(await page.evaluate(() => document.getElementById('orb').parentElement.className))) throw new Error('reduced motion: the orb is not in the message box');
+    await page.goBack();
+    await onScreen(page, 'today');
+    await settle(page, 400);
+    await page.mouse.move(x, y); await page.mouse.down();
+    await page.waitForSelector('#voice.m-quick[data-phase=listening]', { timeout: 6000 });
+    await settle(page, 1000);
+    await page.mouse.up();
+    await onScreen(page, 'coach', 6000);
+    await page.waitForFunction(() => { const m = [...window.__s.state.chat].reverse().find(x => x.role === 'model' && x.q); return m && m.streaming === false; }, null, { timeout: 15000 });
+    await mark(page, 'end');
+    const users = await page.evaluate(n => window.__s.state.chat.filter(m => m.role === 'user').length - n, t.users);
+    if (users !== 1) throw new Error(`reduced motion: releasing sent ${users} messages`);
+    oneOfEach(await samples(page));
+    return t.done();
+  },
+
+  'hold-cancel': async (browser, base) => {
+    for (const how of ['drag', 'pointercancel']) {
+      const t = await holdRig(browser, base);
+      const { page, x, y } = t;
+      await installSampler(page);
+      await mark(page, 'down');
+      await page.mouse.move(x, y); await page.mouse.down();
+      await page.waitForSelector('#voice.m-quick', { timeout: 6000 });
+      await settle(page, 700);
+      if (how === 'drag') await page.mouse.move(x, y + 90, { steps: 4 });
+      else await page.dispatchEvent('#dock .orbbtn', 'pointercancel', { pointerId: 1, bubbles: true });
+      await settle(page, 800);
+      await page.mouse.up();
+      await settle(page, 600);
+      await mark(page, 'end');
+      const r = await page.evaluate(n => ({ users: window.__s.state.chat.filter(m => m.role === 'user').length - n, home: document.getElementById('orb').parentElement.className, frosted: document.getElementById('app').classList.contains('frosted'), coach: document.getElementById('s-coach').classList.contains('on'), rec: document.getElementById('voice').dataset.phase }), t.users);
+      if (r.users || t.stt() || r.coach) throw new Error(`${how}: something was sent (${r.users} messages, ${t.stt()} transcriptions, chat ${r.coach})`);
+      if (!/orbbtn/.test(r.home) || r.frosted) throw new Error(`${how}: orb in ${r.home}, frosted ${r.frosted} (should be back home, unfrosted)`);
+      oneOfEach(await samples(page));
+      const errs = await t.done();
+      if (errs.length) return errs;
+    }
+    return [];
   },
 
   // A streamed reply is one message node from its first word to its last: the messages already there

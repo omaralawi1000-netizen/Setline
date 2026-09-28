@@ -10,6 +10,7 @@ export const DEFAULTS = {
   tintBottom: 0.60,       // … to bottom
   grain: 0.035,           // the noise tile's opacity
   frostFadeMs: 220,
+  frostStatic: 0,         // 1: the fallback (Home blurred once with a filter, only the tint fades)
   // hold to talk
   holdMs: 250,            // held this long: it's a hold (shorter, and still: a tap)
   tapSlopPx: 10,
@@ -68,4 +69,5 @@ export function applyCss(root = document.documentElement) {
   s.setProperty('--frost-ms', `${Math.round(M.frostFadeMs * slowmo)}ms`);
   s.setProperty('--slowmo', String(slowmo));
   s.setProperty('--press', String(M.pressScale));
+  root.classList.toggle('frost-static', M.frostStatic >= 0.5);
 }

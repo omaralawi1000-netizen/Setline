@@ -18,9 +18,12 @@ const $ = s => document.querySelector(s);
 // ---------- geometry ----------
 // the page's size and a slot's centre from layout (transforms ignored: where it rests, not where it
 // is mid-move); read before anything moves in a frame
+// (measured at start-up and on resize, never for the first time in the middle of a move)
 let size = null;
-addEventListener('resize', () => { size = null; });
-export const viewSize = () => (size ||= { W: app().clientWidth, H: app().clientHeight });
+const measure = () => { size = { W: app().clientWidth, H: app().clientHeight }; };
+addEventListener('resize', measure);
+export const viewSize = () => size || (measure(), size);
+export const warmStage = () => { measure(); theOrb(); };
 export function restCentre(el) {
   const a = app();
   let x = el.offsetWidth / 2, y = el.offsetHeight / 2;
@@ -33,10 +36,16 @@ function visualCentre(el) {
 }
 
 // ---------- the frost ----------
+let freezeTimer = 0;
 export function frost(on) {
   const a = app();
   if (a.classList.contains('frosted') === on) return;
   a.classList.toggle('frosted', on);
+  // what's under it stops moving once the frost is up and the moves have settled (pausing every
+  // animation on the page restyles all of it: done while nothing moves, not in a move's first frame)
+  clearTimeout(freezeTimer);
+  if (on) freezeTimer = setTimeout(() => { if (a.classList.contains('frosted')) a.classList.add('frozen'); }, 520);
+  else a.classList.remove('frozen');
   // the page under it can't be touched (it's frozen: see flow.css)
   for (const s of document.querySelectorAll('.screen.on:not(#s-coach), .screen.under')) s.inert = on;
 }
@@ -166,11 +175,11 @@ export function openChat({ from = 'dock' } = {}) {
   const a = app(), mine = ++sheetSeq;
   const wasShowing = a.classList.contains('chatsheet');
   a.classList.add('chatsheet', 'sheetmoving');
+  a.classList.remove('rmout');
   frost(true);
   chat.open = true;
   chat.moving = true;
   if (!wasShowing) sheetSpring.set({ y: viewSize().H });
-  prepareChat();
   // one frame for the sheet's layout, then measure and move (nothing forces a layout mid-move)
   return new Promise(res => nextFrame(() => {
     if (mine !== sheetSeq) return res(false);
@@ -198,12 +207,17 @@ export function closeChat({ instant = false } = {}) {
   frost(false);
   const H = viewSize().H;
   if (instant || reducedMotion()) {
-    sheetSpring.set({ y: H });
     seatOrb('dock');
-    a.classList.remove('chatsheet', 'sheetmoving');
-    chat.moving = false;
-    paintSheet(0);
-    return Promise.resolve(true);
+    const done = () => {
+      if (mine !== sheetSeq) return;
+      a.classList.remove('chatsheet', 'sheetmoving', 'rmout');
+      chat.moving = false;
+      sheetSpring.set({ y: 0 });
+      paintSheet(0);
+    };
+    if (instant) { done(); return Promise.resolve(true); }
+    a.classList.add('rmout'); // reduced motion: it fades (150 ms) where it is
+    return new Promise(res => setTimeout(() => { done(); res(true); }, 160));
   }
   const orbGoes = flyOrbTo('dock', { size: 60 });
   return Promise.all([sheetSpring.to({ y: H }), orbGoes]).then(([, landed]) => {

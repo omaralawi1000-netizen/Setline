@@ -349,7 +349,7 @@ function wordsHTML(bub, text, births, now, st) {
 // Whether the thread sits at (or within 80 px of) its end: measured once, then kept up to date by its
 // scroll events (which come when it's laid out anyway), so a frame that adds words never has to lay
 // the page out before writing to it. Only then does the answer keep the thread scrolled to its end.
-function nearEnd(root) {
+export function nearEnd(root) {
   if (!root._end) {
     const at = () => root.scrollHeight - root.clientHeight - root.scrollTop < 80;
     root._end = { v: at() };
