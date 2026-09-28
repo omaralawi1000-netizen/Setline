@@ -104,12 +104,13 @@ export function checkJs(src, file = 'js') {
 
 export function checkAll(root) {
   const bad = [];
-  for (const f of readdirSync(join(root, 'css')).filter(n => n.endsWith('.css')).map(n => `css/${n}`)) bad.push(...checkCss(readFileSync(join(root, f), 'utf8'), f));
-  // exactly one frost layer: one element in the page, one rule giving it its blur
-  const html = readFileSync(join(root, 'index.html'), 'utf8');
-  const layers = (html.match(/class="frost\b/g) || []).length;
-  if (layers !== 1) bad.push(`index.html: ${layers} frost layers (there must be exactly one)`);
   const walk = d => readdirSync(join(root, d)).flatMap(n => { const p = join(d, n); return statSync(join(root, p)).isDirectory() ? walk(p) : p.endsWith('.js') ? [p] : []; });
+  for (const f of readdirSync(join(root, 'css')).filter(n => n.endsWith('.css')).map(n => `css/${n}`)) bad.push(...checkCss(readFileSync(join(root, f), 'utf8'), f));
+  // exactly one frost layer: made (on demand) in one place, js/ui/stage.js, and never in the page's HTML
+  const html = readFileSync(join(root, 'index.html'), 'utf8');
+  if (/class="frost\b/.test(html)) bad.push('index.html: a static frost layer (it is made on demand by js/ui/stage.js)');
+  const makers = walk('js').filter(f => /className\s*=\s*'frost'/.test(readFileSync(join(root, f), 'utf8')));
+  if (makers.length !== 1 || makers[0] !== 'js/ui/stage.js') bad.push(`frost layers are made in ${makers.join(', ') || 'nothing'} (only js/ui/stage.js may make the one)`);
   for (const f of walk('js')) bad.push(...checkJs(readFileSync(join(root, f), 'utf8'), f));
   return bad;
 }

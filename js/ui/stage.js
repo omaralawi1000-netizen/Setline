@@ -11,6 +11,7 @@
 import { spring, reducedMotion } from './spring.js';
 import { refitOrb, setOrb } from './dotorb.js';
 import { nextFrame } from './frame.js';
+import { M, slowmo } from '../motion.config.js';
 
 const app = () => document.getElementById('app');
 const $ = s => document.querySelector(s);
@@ -36,11 +37,29 @@ function visualCentre(el) {
 }
 
 // ---------- the frost ----------
-let freezeTimer = 0;
+// The layer exists only while it shows: made when the frost comes up, removed once it has faded.
+let freezeTimer = 0, frostEl = null, frostGone = 0;
+function frostNode() {
+  if (!frostEl) {
+    frostEl = document.createElement('div');
+    frostEl.className = 'frost';
+    frostEl.id = 'frost';
+    frostEl.setAttribute('aria-hidden', 'true');
+    frostEl.innerHTML = '<i></i>';
+  }
+  if (!frostEl.isConnected) { const d = document.getElementById('dock'); if (d) d.after(frostEl); else app().append(frostEl); }
+  return frostEl;
+}
 export function frost(on) {
   const a = app();
   if (a.classList.contains('frosted') === on) return;
   a.classList.toggle('frosted', on);
+  clearTimeout(frostGone);
+  if (on) { const f = frostNode(); nextFrame(() => { if (a.classList.contains('frosted')) f.classList.add('on'); }); }
+  else if (frostEl) {
+    frostEl.classList.remove('on');
+    frostGone = setTimeout(() => { if (!a.classList.contains('frosted')) frostEl.remove(); }, (M.frostFadeMs + 80) * slowmo);
+  }
   // what's under it stops moving once the frost is up and the moves have settled (pausing every
   // animation on the page restyles all of it: done while nothing moves, not in a move's first frame)
   clearTimeout(freezeTimer);
@@ -74,11 +93,10 @@ export function theOrb() {
   orbEl.id = 'orb';
   orbEl.setAttribute('aria-hidden', 'true');
   orbEl.innerHTML = '<span class="olight"></span><i class="core"><b></b><b></b><b></b></i>';
-  flyEl = document.createElement('div');
+  flyEl = document.createElement('div'); // (in the page only while the orb is in the air)
   flyEl.className = 'orbfly';
   flyEl.id = 'orbfly';
   flyEl.setAttribute('aria-hidden', 'true');
-  app().append(flyEl);
   return orbEl;
 }
 export const slots = { dock: () => $('#dock .orbbtn'), composer: () => $('#composer .corb') };
@@ -96,6 +114,7 @@ export function seatOrb(name = home) {
   if (o.parentElement !== s) s.append(o);
   flyEl.style.transform = '';
   flyEl.classList.remove('on');
+  flyEl.remove();
   refitOrb(o);
   setOrb(o, null); // it works out what it's doing from where it sits again
   return true;
@@ -112,6 +131,7 @@ function lift(want) {
   const c = o.isConnected ? visualCentre(o) : { x: viewSize().W / 2, y: viewSize().H, w: 60 };
   F = Math.round(Math.max(c.w || 60, want || 0));
   o.style.setProperty('--s', `${F}px`);
+  if (!flyEl.isConnected) app().append(flyEl);
   flyEl.append(o);
   flyEl.classList.add('on');
   refitOrb(o, F);
@@ -220,11 +240,19 @@ export function closeChat({ instant = false } = {}) {
     return new Promise(res => setTimeout(() => { done(); res(true); }, 160));
   }
   const orbGoes = flyOrbTo('dock', { size: 60 });
-  return Promise.all([sheetSpring.to({ y: H }), orbGoes]).then(([, landed]) => {
-    if (mine !== sheetSeq) return false;
-    a.classList.remove('chatsheet', 'sheetmoving');
+  // however the close goes (reversed half-way, interrupted), it always ends tidy: at the latest a
+  // moment after it should have finished, nothing of the chat is left over the page
+  const tidy = () => {
+    if (mine !== sheetSeq || chat.open) return;
+    a.classList.remove('chatsheet', 'sheetmoving', 'rmout');
     chat.moving = false;
     paintSheet(0);
+    if (orbHome() === 'flying') seatOrb('dock');
+  };
+  setTimeout(tidy, 800 * slowmo);
+  return Promise.all([sheetSpring.to({ y: H }), orbGoes]).then(([, landed]) => {
+    if (mine !== sheetSeq) return false;
+    tidy();
     if (landed) dockHook?.();
     return true;
   });

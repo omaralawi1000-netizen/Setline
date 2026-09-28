@@ -32,7 +32,7 @@ import { countAll, burst, orbPulse, moving } from './ui/fx.js';
 import { syncBeams } from './ui/beam.js';
 import { startDotOrbs } from './ui/dotorb.js';
 import { seatOrb, orbHome, openChat, closeChat, chatUnder, onLand, warmStage } from './ui/stage.js';
-import { showPending, nearEnd } from './ui/coach.js';
+import { nearEnd } from './ui/coach.js';
 import { applyCss } from './motion.config.js';
 import { initTune } from './ui/tune.js';
 import { initPerf } from './ui/perf.js';
@@ -442,15 +442,6 @@ initSettings(actions, $('#s-settings'));
 setWorkoutNav({ go, showDetail });
 initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings'), openCoach: () => go('coach'),
   closeCoach: () => closeCoach(),
-  // released in quick mode: the Coach rises over the frost at once, your message shimmering at its end
-  openCoachSheet: ({ from = 'flier', pending = false } = {}) => {
-    if (view.screen === 'coach') return false;
-    coachFrom = view.screen;
-    history.pushState({ screen: 'coach', from: coachFrom }, '');
-    show('coach', { via: from });
-    if (pending) showPending();
-    return true;
-  },
   // sent from the review sheet: the Coach goes in place underneath it, taking over its history entry
   coachUnder: () => {
     if (view.screen === 'coach' || !history.state?.voice) return false;
@@ -461,7 +452,6 @@ initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () 
   },
   landInBox: () => impact() });
 onLand({ composer: () => impact(), dock: () => orbPulse('pulse-land') });
-$('#frost')?.addEventListener('click', () => { if (view.screen === 'coach') closeCoach(); }); // the frosted page above the chat
 initCoach({ openSettings: () => pushSub('settings'), closeCoach: () => closeCoach(), go: name => go(name, { quiet: true }), open: name => pushSub(name) });
 setCardioNav({ go, showDetail });
 initCardio();

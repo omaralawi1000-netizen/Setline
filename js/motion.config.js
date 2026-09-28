@@ -3,13 +3,13 @@
 // the flag the defaults below are what runs. Copy the panel's values back here to make them stick.
 export const DEFAULTS = {
   // the frost: one full-screen layer, its blur never animates (only the layer's opacity does)
-  frostBlur: 20,          // px
-  frostSat: 170,          // %
-  frostBright: 0.85,
-  tintTop: 0.40,          // theme background over the frost, top …
-  tintBottom: 0.60,       // … to bottom
+  frostBlur: 12,          // px (light: the page behind stays recognisable)
+  frostSat: 150,          // %
+  frostBright: 1,
+  tintTop: 0.35,          // theme background over the frost, top …
+  tintBottom: 0.35,       // … to bottom
   grain: 0.035,           // the noise tile's opacity
-  frostFadeMs: 220,
+  frostFadeMs: 200,
   frostStatic: 0,         // 1: the fallback (Home blurred once with a filter, only the tint fades)
   // hold to talk
   holdMs: 250,            // held this long: it's a hold (shorter, and still: a tap)

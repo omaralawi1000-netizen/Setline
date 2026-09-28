@@ -659,45 +659,24 @@ function openPage(page) {
   if (PAGES[page] === 'tab') nav.go?.(page); else nav.open?.(page);
 }
 
-// Your message the moment you let go of the orb: a bubble at the end of the thread that shimmers
-// until the words are in (then the real message takes its place, in the same spot).
-export function showPending() {
-  const ol = $('#thread');
-  if (!ol) return false;
-  ol.querySelector(':scope > .pending')?.remove();
-  const li = document.createElement('li');
-  li.className = 'msg me pending seen';
-  li.setAttribute('aria-hidden', 'true');
-  li.innerHTML = '<div class="bub"></div>';
-  ol.append(li);
-  return true;
-}
-export function dropPending() { $('#thread > .pending')?.remove(); }
-function fillPending(id) {
-  const p = $('#thread > .pending');
-  if (!p) return;
-  p.remove();
-  $(`#thread [data-id="${id}"]`)?.classList.add('seen', 'fillin');
-}
-
 // Ask the coach. Used by the composer, the example chips, and voice questions.
 export async function ask(question, { root = $('#s-coach'), voice = false } = {}) {
   question = String(question || '').trim();
   if (!question) return;
   // "yes" / "do it" with an offer on screen: that's the answer to it
   const offer = isAffirm(question) && topAction();
-  if (offer) { runAction(offer, 0); fillPending(store.addChat('user', question).id); return; }
+  if (offer) { runAction(offer, 0); store.addChat('user', question); return; }
   // "I had 2 eggs", "bench 80 for 8", "set my calories to 2400": done straight away (with Undo), not discussed
   const did = actOnText(question);
   if (did) {
-    fillPending(store.addChat('user', question).id);
+    store.addChat('user', question);
     store.addChat('model', state.t(did === 'LogMeal' ? 'coach.didFood' : 'coach.did'), { persist: true });
     return;
   }
   inflight?.ctl.abort();
   const lang = /[æøå]|\b(hvad|hvordan|jeg|min|mit|skal|træning)\b/i.test(question) ? 'da' : state.lang;
   const history = state.chat.filter(m => !m.error);
-  fillPending(store.addChat('user', question).id);
+  store.addChat('user', question);
   const reply = store.addChat('model', '', { streaming: true, q: question });
   const key = getKey('google');
   if (!key) { store.updateChat(reply.id, { streaming: false, error: 'nokey' }, { persist: true }); return; }

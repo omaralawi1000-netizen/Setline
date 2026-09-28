@@ -155,3 +155,21 @@ test('a second finger is ignored, and so are taps while a transition runs', () =
   busy = false;
   assert.equal(b.m.down({ x: 1, y: 1 }), true);
 });
+
+test('reset always goes back to idle, from any state, without firing anything', () => {
+  for (const to of ['pressing', 'quick', 'review']) {
+    const r = rig();
+    r.m.down({ x: 100, y: 800 });
+    if (to !== 'pressing') r.wait(300);
+    if (to === 'review') r.m.move({ x: 100, y: 700 });
+    assert.equal(r.m.state, to);
+    const before = r.calls.length;
+    r.m.reset();
+    assert.equal(r.m.state, 'idle');
+    assert.deepEqual(r.calls.slice(before).map(c => c[0]).filter(n => n !== 'state'), []);
+    r.wait(1000);
+    r.m.up({ x: 100, y: 800 });
+    assert.equal(r.count('send') + r.count('tap'), 0);
+    assert.equal(r.m.down({ x: 1, y: 1 }), true); // ready for the next press
+  }
+});

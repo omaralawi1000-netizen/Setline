@@ -13,7 +13,7 @@ import { translator } from '../i18n.js';
 import { getKey } from '../keys.js';
 import { sttModelId, ttsModelId, ttsAlt } from '../settings.js';
 import { firstPlannedIndex, lastDoneIndex, restRemaining, suggestNext, lastSession } from '../workout.js';
-import { unlockAudio } from '../audio.js';
+import { unlockAudio, resumeAudio } from '../audio.js';
 import { haptic } from '../haptics.js';
 import { $, esc } from './dom.js';
 import { I } from './icons.js';
@@ -32,13 +32,14 @@ import { dateKey } from '../body.js';
 import { planFor } from './routine.js';
 import { orbPulse, orbShake, orbSpark, moving, token } from './fx.js';
 import { setOrb } from './dotorb.js';
-import { theOrb, frost, flyOrb, flyOrbTo, orbGesture, orbSettleGesture, orbPos, onOrbMove, orbHome, viewSize, chatMoving, revealChat } from './stage.js';
+import { theOrb, frost, flyOrb, flyOrbTo, orbGesture, orbSettleGesture, orbPos, onOrbMove, orbHome, seatOrb, viewSize, chatMoving, revealChat } from './stage.js';
+import { perfNote } from './perf.js';
 import { spring } from './spring.js';
 import { createHoldTalk } from './holdtalk.js';
 import { M, slowmo } from '../motion.config.js';
 import { onFrame, nextFrame } from './frame.js';
 import { livePRSets } from '../pr.js';
-import { ask as askCoach, ensureModels, dropPending } from './coach.js';
+import { ask as askCoach, ensureModels } from './coach.js';
 import { cmdModels } from '../settings.js';
 import { createEndpointer, looksUnfinished } from '../endpoint.js';
 
@@ -56,7 +57,7 @@ const v = {
   open: false, phase: 'idle', toggle: false, typing: false,
   press: null, token: 0, closing: null, popWaiting: 0,
   raf: null, lvl: 0, hist: new Float32Array(64), histAt: 0, closeSeq: 0,
-  mode: '', sink: 'send', autoSend: false, pressing: false, blocked: false, optimistic: false, edited: false
+  mode: '', autoSend: false, pressing: false, blocked: false, failed: false, edited: false, watchdog: 0, micError: ''
 };
 const card = { cmd: null, timer: 0, hideTimer: 0, committed: false, undoOp: null };
 
@@ -109,19 +110,20 @@ function build() {
   layer.className = 'vflow';
   layer.innerHTML = `
     <section class="rv" id="vreview" role="dialog">
-      <header class="rvtop"><button class="iconbtn" data-v="discard">${I.close}</button><span class="chip" id="vlang"></span></header>
+      <header class="rvtop"><button class="iconbtn" data-v="discard">${I.close}</button><div class="live" id="vpill"><i></i><span class="xs"><span class="on"></span><span></span></span></div><span class="chip" id="vlang"></span></header>
       <div class="rvspace"></div>
-      <div class="rvtext" id="vtextbox"><textarea id="vtext" rows="2" enterkeyhint="send" autocapitalize="sentences" autocomplete="off" spellcheck="false"></textarea><span class="rvshim" id="vshim"></span></div>
+      <div class="rvtext" id="vtextbox"><textarea id="vtext" rows="2" readonly enterkeyhint="send" autocapitalize="sentences" autocomplete="off" spellcheck="false"></textarea><span class="rvshim" id="vshim"></span></div>
       <div class="rvhints" id="vhints"></div>
       <div class="rvbar"><button class="rvmic" id="vmic">${micIcon}</button><button class="rvsend" id="vsend">${I.fwd}<span></span></button></div>
     </section>
     <div class="vq" id="vq">
       <p class="vlabel vup" id="vup"></p>
       <div class="wave" id="vwave" aria-hidden="true">${'<i></i>'.repeat(BARS)}</div>
-      <p class="vlabel vlow" id="vlow"><span class="xs"><span class="on"></span><span></span></span></p>
+      <p class="vlabel vstat" id="vstat"><span class="xs"><span class="on"></span><span></span></span></p>
+      <p class="vlabel vlow" id="vlow"></p>
     </div>`;
   Object.assign(el, {
-    layer, vq: $('#vq'), up: $('#vup'), status: $('#vlow .xs'), low: $('#vlow'), wave: $('#vwave'), bars: [...$('#vwave').children],
+    layer, vq: $('#vq'), up: $('#vup'), status: $('#vstat .xs'), stat: $('#vstat'), pill: $('#vpill .xs'), low: $('#vlow'), wave: $('#vwave'), bars: [...$('#vwave').children],
     review: $('#vreview'), lang: $('#vlang'), text: $('#vtext'), textbox: $('#vtextbox'), shim: $('#vshim'), hints: $('#vhints'),
     mic: $('#vmic'), send: $('#vsend'), card: $('#intent'), orb: theOrb()
   });
@@ -147,9 +149,10 @@ function paintStatic() {
   el.review.setAttribute('aria-label', t('voice.talk'));
   el.review.querySelector('[data-v=discard]').setAttribute('aria-label', t('voice.discard'));
   el.lang.textContent = t(`voice.lang.${state.settings.voiceLang}`);
-  el.text.placeholder = t('voice.typePh');
+  el.text.setAttribute('aria-label', t('voice.typePh'));
   el.shim.textContent = t('voice.transcribing');
   el.up.textContent = t('voice.swipeUp');
+  el.low.textContent = t('voice.release');
   el.mic.setAttribute('aria-label', t('voice.recordMore'));
   el.send.querySelector('span').textContent = t('voice.send');
   const hints = state.active
@@ -157,6 +160,7 @@ function paintStatic() {
     : ['voice.hint.start', 'voice.hint.log', 'voice.hint.last'];
   el.hints.innerHTML = `<button class="kbd" data-v="type">${keyboardIcon}${t('voice.type')}</button>` +
     hints.map(k => `<button data-v="hint">${esc(t(k))}</button>`).join('');
+  el.hints.scrollLeft = 0; // (the row always starts at its first chip)
 }
 
 function setPhase(phase) {
@@ -170,11 +174,16 @@ function setPhase(phase) {
 // the label under the waveform says what's happening, in the words of the mode you're in
 function paintLabel() {
   const t = state.t, p = v.phase;
+  // quick mode: what the mic is doing, under the waveform ("Release to send" is its own line under that)
   let k = '';
-  if (v.blocked) k = 'voice.micBlocked';
+  if (v.failed) k = 'voice.micFailed';
+  else if (v.blocked) k = 'voice.micBlocked';
   else if (p === 'opening') k = 'voice.opening';
-  else if (p === 'listening') k = v.mode === 'quick' ? 'voice.release' : el.layer.dataset.pause === 'wait' ? 'voice.takeTime' : 'voice.listening';
+  else if (p === 'listening') k = el.layer.dataset.pause === 'wait' ? 'voice.takeTime' : 'voice.listening';
   crossLabel(el.status, k ? t(k) : '');
+  // the review sheet: the old voice screen's status pill
+  const pill = v.failed ? 'voice.micFailed' : { idle: 'voice.ready', opening: 'voice.opening', listening: 'voice.listening', thinking: 'voice.thinking', result: 'voice.ready', error: 'voice.ready' }[p] || 'voice.ready';
+  crossLabel(el.pill, t(pill));
 }
 const reviewText = () => el.text.value.trim();
 function syncSend() {
@@ -226,21 +235,24 @@ function enterQuick() {
   hideToast();
   v.pressing = false;
   if (!getKey('groq') || navigator.onLine === false) {
-    hold.cancel('nokey');
+    hold.reset();
+    teardown('nokey');
     preflight();
     return;
   }
   v.open = true;
   v.mode = 'quick';
   v.fingerDy = 0;
+  v.blocked = false;
+  v.failed = false;
   flyOrb(quickOrb, { size: BIG }); // (measured where it is first, before anything else changes)
   paintStatic();
   showLayer('quick');
-  for (const x of el.status.children) { x.textContent = ''; } // (fresh: nothing to fade from)
+  for (const x of [...el.status.children, ...el.pill.children]) { x.textContent = ''; } // (fresh: nothing to fade from)
   dockBtn()?.classList.remove('pressing');
-  if (v.blocked) el.layer.classList.add('blocked');
-  setPhase(mic.isRecording() ? 'listening' : v.blocked ? 'error' : 'opening');
+  resumeAudio();
   startLoop();
+  startRec(); // the same start as the old voice sheet's hold
 }
 function quickFollow({ offset, progress }) {
   v.fingerDy = offset;
@@ -300,33 +312,57 @@ export function openVoice({ live = false } = {}) {
 }
 const chatUnderIsFree = () => !chatMoving();
 
-// Home under the voice layer can't be touched (the frost freezes it; see stage.js).
-function cover() {}
+// Every way out of the voice layer ends here (release, cancel, X, an error, Back, the app hiding): the
+// state machine goes idle, the mic stops (unless the recording is on its way to be transcribed), the
+// layer and its sheet go, the orb flies home and the frost fades. Whatever the animations do, a hard
+// reset a moment later leaves nothing behind.
+function teardown(reason, { keepRec = false, orb = 'dock', slide = true } = {}) {
+  const app = document.getElementById('app');
+  const wasReview = v.mode === 'review' || el.layer.classList.contains('m-review');
+  v.open = false;
+  v.mode = '';
+  v.press = null;
+  v.toggle = false;
+  v.autoSend = false;
+  v.blocked = false;
+  v.failed = false;
+  v.pressing = false;
+  clearTimeout(v.watchdog);
+  if (!keepRec) cancelRec();
+  hold?.reset();
+  el.text.blur();
+  el.text.readOnly = true;
+  dockBtn()?.classList.remove('pressing');
+  app.classList.remove('voice');
+  el.layer.inert = true;
+  el.layer.classList.remove('on', 'm-quick', 'blocked', 'failed', 'carded');
+  if (!app.classList.contains('chatsheet')) frost(false);
+  const seq = ++v.closeSeq;
+  const finish = () => {
+    if (seq !== v.closeSeq || v.open) return;
+    el.layer.classList.remove('m-review', 'handing', 'rvmoving');
+    el.layer.hidden = true;
+    el.text.value = '';
+    el.textbox.classList.remove('busy');
+    rvSpring.halt();
+    el.review.style.transform = '';
+    el.vq.style.transform = '';
+    for (const n of document.querySelectorAll('.flytext')) n.remove();
+    stopLoop();
+    if (orb === 'dock' && orbHome() === 'flying') seatOrb('dock');
+  };
+  if (wasReview && slide) rvSpring.to({ y: viewSize().H - reviewTop() }).then(finish);
+  else if (!wasReview) setTimeout(finish, 220 * slowmo); // (the labels fade out first)
+  if (orb === 'dock' && orbHome() !== 'dock') flyOrbTo('dock', { size: 60 }).then(landed => { if (landed && seq === v.closeSeq) orbPulse('pulse-land'); });
+  setTimeout(finish, (reduced() ? 160 : 800) * slowmo); // the hard reset
+  void reason;
+}
 
 // Close whatever the voice layer shows: the sheet slides back down, the orb flies home to the dock
 // and the frost fades. Resolves once history has settled so callers can navigate safely.
 export function closeVoice({ fromPop = false } = {}) {
   if (!v.open) return v.closing || Promise.resolve();
-  const wasReview = v.mode === 'review';
-  v.open = false;
-  v.mode = '';
-  v.token++;
-  v.press = null;
-  v.toggle = false;
-  v.autoSend = false;
-  v.blocked = false;
-  mic.cancel();
-  hold.cancel('discard');
-  el.text.blur();
-  el.layer.inert = true;
-  el.layer.classList.remove('on', 'm-quick', 'blocked');
-  document.getElementById('app').classList.remove('voice');
-  el.layer.classList.remove('carded');
-  if (!document.getElementById('app').classList.contains('chatsheet')) frost(false);
-  const seq = ++v.closeSeq;
-  if (wasReview) rvSpring.to({ y: viewSize().H - reviewTop() }).then(() => { if (seq === v.closeSeq && !v.open) { el.layer.classList.remove('m-review'); el.layer.hidden = true; } });
-  else setTimeout(() => { if (seq === v.closeSeq && !v.open) el.layer.hidden = true; }, 200 * slowmo);
-  flyOrbTo('dock', { size: 60 }).then(landed => { if (landed && seq === v.closeSeq) { stopLoop(); orbPulse('pulse-land'); } });
+  teardown('close');
   // only step back over our own entry, never past it (that would leave the app)
   if (fromPop || !history.state?.voice) return v.closing || Promise.resolve();
   v.closing = new Promise(res => { v.popWaiting++; v.popResolve = res; history.back(); }).then(() => { v.closing = null; });
@@ -414,45 +450,69 @@ function preflight() {
   return true;
 }
 
-// quiet: opened the moment a finger touches the orb (it may still turn out to be a tap): no
-// messages, no buzz; a mic that can't open only says so if it becomes a hold
-async function startRec({ quiet = false } = {}) {
+// The mic opens here, the same way for every screen (the hold, the review sheet's mic, Say it, Retry).
+async function startRec() {
   if (mic.isRecording() || v.phase === 'opening') return;
-  if (!quiet && !preflight()) return;
+  if (!preflight()) return;
   tts.stop();
   if (card.cmd) dismissCard(); // lands a pending command
   const token = ++v.token;
   setPhase('opening');
   const opening = performance.now();
+  // not listening within 4 s: say so (tap to retry), and leave a trace of why
+  clearTimeout(v.watchdog);
+  v.watchdog = setTimeout(() => { if (token === v.token && v.phase !== 'listening') micDidntStart(token, v.micError || 'timeout'); }, 4000);
   try {
     await mic.start({ onMaxed: () => finishRec() });
   } catch (e) {
     if (token !== v.token) return;
     v.toggle = false;
-    if (quiet || v.mode === 'quick') { // held with no mic: say so, and let go types instead
-      v.blocked = true;
+    v.micError = e.name2 || e.code;
+    clearTimeout(v.watchdog);
+    logMic(e.name2 || e.code);
+    if (v.mode === 'quick') { // held with no mic: say so; letting go opens the sheet to type instead
+      v.blocked = e.code === 'denied' || e.code === 'nomic';
+      if (!v.blocked) return micDidntStart(token, e.name2 || e.code);
       setPhase('error');
-      if (v.mode === 'quick') el.layer.classList.add('blocked');
+      el.layer.classList.add('blocked');
       return;
     }
     if (e.code === 'denied') return showError('voice.micDenied', 'voice.micDeniedSub', { type: true });
     if (e.code === 'nomic') return showError('voice.noMic', 'voice.micDeniedSub', { type: true });
     return showError('voice.sttFailed', 'voice.sttFailedSub', { type: true });
   }
-  if (token !== v.token || !(v.open || v.pressing || v.phase === 'thinking' || v.optimistic)) { mic.cancel(); return; }
-  if (!quiet) haptic('tap');
+  if (token !== v.token || !v.open) { mic.cancel(); clearTimeout(v.watchdog); return; }
+  if (v.mode !== 'quick') haptic('tap');
   if (v.pendingStop && performance.now() - opening > 700) {
     // released while Chrome asked for the mic: nothing useful was recorded
     v.pendingStop = false;
     mic.cancel();
+    clearTimeout(v.watchdog);
     setPhase('idle');
     showCard({ kind: 'info', icon: 'info', title: state.t('voice.micReady'), sub: state.t('voice.micReadySub'), lang: state.lang });
     return;
   }
   endpoint.reset();
   v.spec = null; v.waiting = false; setPausing('');
+  resumeAudio();
+  // "Listening" only once audio is really coming in (the recorder has data, or the meter can read it)
+  await new Promise(res => { const stop = onFrame(() => { if (token !== v.token || !mic.isRecording() || mic.flowing()) { stop(); res(); } }); });
+  if (token !== v.token || !mic.isRecording()) return;
+  clearTimeout(v.watchdog);
   setPhase('listening');
   if (v.pendingStop) { v.pendingStop = false; finishRec(); }
+}
+function logMic(why) {
+  const say = state => { const line = `mic: ${why} (permission ${state})`; console.warn(line); perfNote(line); };
+  try { navigator.permissions?.query({ name: 'microphone' }).then(p => say(p.state), () => say('unknown')); } catch { say('unknown'); }
+}
+function micDidntStart(token, why) {
+  if (token !== v.token) return;
+  logMic(why);
+  mic.cancel();
+  v.failed = true;
+  el.layer.classList.add('failed');
+  setPhase('error');
 }
 
 function sttOpts() {
@@ -501,7 +561,7 @@ async function finishRec() {
   if (intoSheet) el.textbox.classList.add('busy'); // "Transcribing…" where the words will appear
   const r = await mic.stop();
   if (!r || token !== v.token) { el.textbox.classList.remove('busy'); return; }
-  if (r.ms < 400 || (r.measured && r.peak < 0.03) || r.blob.size < 800) return showError('voice.tooShort', 'voice.tooShortSub');
+  if (r.ms < 400 || (r.measured && r.peak < 0.03) || r.blob.size < 800) return showError('voice.didntCatch', 'voice.tooShortSub'); // (an empty recording is never sent)
   let text;
   try {
     text = await transcribe(r.blob, sttOpts());
@@ -533,9 +593,10 @@ function cancelRec() {
   v.token++;
   v.toggle = false;
   v.pendingStop = false;
+  clearTimeout(v.watchdog);
   mic.cancel();
   el.textbox?.classList.remove('busy');
-  if (v.open) setPhase('idle');
+  setPhase('idle'); // (always: a phase left at "opening" once made every later start a no-op)
 }
 
 // ---------- text → intent → card ----------
@@ -599,7 +660,6 @@ export const speakCue = (text, lang = state.lang) => speak(text, lang);
 // - Anywhere else: the Coach opens and it's asked.
 async function toCoach(text) {
   dismissCard();
-  if (v.optimistic) { v.optimistic = false; askCoach(text); return; }
   if (v.open && v.mode === 'review') { await new Promise(r => setTimeout(r)); if (v.open && v.mode === 'review' && nav.coachUnder?.()) return reviewToChat(text); }
   if (v.open) await closeVoice();
   nav.go('coach');
@@ -610,34 +670,28 @@ async function toCoach(text) {
 // at once with your message shimmering at the bottom while the words are worked out; the orb shrinks
 // into the message box. If it turns out to be a command, the chat goes back down and it's done.
 function quickSend() {
-  const blocked = v.blocked;
-  v.open = false;
-  v.mode = '';
-  el.layer.classList.remove('on', 'm-quick', 'blocked');
-  el.layer.inert = true;
-  document.getElementById('app').classList.remove('voice');
-  if (blocked) { // no mic: type it instead
+  if (v.blocked) { // no mic: type it instead
     v.blocked = false;
     hold.done();
+    el.layer.classList.remove('blocked');
     enterReview({ from: 'quick' });
     startTyping();
     return;
   }
-  v.sink = 'send';
+  if (v.failed) { // the mic never started: nothing to send; the card offers to try again
+    teardown('failed');
+    showError('voice.micFailed', 'voice.micFailedSub', { retry: true, type: true });
+    return;
+  }
+  if (v.phase !== 'listening' || !mic.isRecording()) { // let go before any audio came in
+    teardown('empty');
+    showError('voice.didntCatch', 'voice.tooShortSub');
+    return;
+  }
+  // exactly what "Release to send" did: the recording is transcribed and routed (commands done,
+  // questions to the Coach); meanwhile the orb sinks back into the dock and the frost fades
   finishRec();
-  stopLoop();
-  const seq = ++v.closeSeq;
-  setTimeout(() => { if (seq === v.closeSeq && !v.open) el.layer.hidden = true; }, 200 * slowmo);
-  v.optimistic = !!nav.openCoachSheet?.({ from: 'flier', pending: true });
-  if (!v.optimistic) { frost(false); flyOrbTo('dock', { size: 60 }); }
-  hold.done();
-}
-// It was a command (or nothing usable) after all: the chat goes back down, the card shows over the page.
-function dropOptimistic() {
-  if (!v.optimistic) return;
-  v.optimistic = false;
-  dropPending();
-  nav.closeCoach?.();
+  teardown('send', { keepRec: true });
 }
 
 // Send from the review sheet.
@@ -662,6 +716,7 @@ function reviewToChat(text) {
   v.mode = '';
   v.token++;
   mic.cancel();
+  hold.reset();
   el.layer.inert = true;
   el.layer.classList.add('handing');
   el.layer.classList.remove('on', 'm-review');
@@ -704,14 +759,10 @@ function reviewToChat(text) {
       if (seq !== v.closeSeq) return;
       revealChat(); // the chat's own content fades up on the surface the sheet became
       if (mine) mine.style.visibility = '';
-      setTimeout(() => {
-        fly?.remove();
-        if (seq !== v.closeSeq) return;
-        el.layer.classList.remove('handing');
-        el.layer.hidden = true;
-        rvSpring.set({ y: 0 });
-      }, 200 * slowmo);
+      setTimeout(() => { fly?.remove(); if (seq === v.closeSeq) teardown('sent', { keepRec: true, orb: 'none', slide: false }); }, 200 * slowmo);
     });
+    // (if anything above stalls, the chat is shown and the sheet cleared anyway)
+    setTimeout(() => { if (seq !== v.closeSeq) return; revealChat(); if (mine) mine.style.visibility = ''; teardown('sent', { keepRec: true, orb: 'none', slide: false }); }, 1200 * slowmo);
     orbGoes.then(landed => { stopLoop(); if (landed) nav.landInBox?.(); });
   });
 }
@@ -780,7 +831,6 @@ async function newExerciseFrom(rawName) {
 }
 
 function present(intent, { typed = false } = {}) {
-  dropOptimistic(); // a command after all: the chat that rose for it goes back down
   if (intent.type === 'Confirm') {
     if (card.cmd?.kind === 'confirm' && !card.committed) { const c = card.cmd; if (v.open) closeVoice(); commitConfirmed(c); return; }
     if (confirmHook()) { if (v.open) closeVoice(); return; }
@@ -806,7 +856,6 @@ function present(intent, { typed = false } = {}) {
 
 function showError(titleKey, subKey, opts = {}) {
   const t = state.t;
-  dropOptimistic();
   v.toggle = false;
   mic.cancel();
   if (v.open) setPhase('error');
@@ -842,7 +891,6 @@ async function estimateMeal(cmd, intent, lang) {
 const ICON = { check: I.check, ask: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.3 9.2a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2 1-1.2 1.8v.4M12 17v.1"/></svg>', alert: I.alert, info: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 11v5.5M12 7.6v.1"/></svg>' };
 
 function showCard(cmd) {
-  if (cmd.kind !== 'wait') dropOptimistic();
   clearTimeout(card.timer);
   clearTimeout(card.hideTimer);
   hideToast();
@@ -1123,7 +1171,6 @@ function holdDown(e) {
   if (v.toggle && (mic.isRecording() || v.phase === 'opening')) { v.press = null; finishRec(); return; }
   if (v.phase === 'thinking') return;
   v.press = { t: performance.now() };
-  if (!v.autoSend) v.sink = 'review';
   startRec();
 }
 function holdUp(e) {
@@ -1141,28 +1188,19 @@ function holdUp(e) {
 let hold = null;
 function pressStart() {
   dockBtn()?.classList.add('pressing'); // the orb grows under the finger in this same frame
-  unlockAudio();
-  v.pressing = true;
-  v.blocked = false;
-  v.sink = 'send';
-  v.autoSend = false;
-  // the mic starts opening now, so the first word isn't lost (a tap lets it go again)
-  if (getKey('groq') && navigator.onLine !== false) startRec({ quiet: true });
+  unlockAudio(); // (the mic itself starts at the hold, 250 ms on, like it always did)
 }
 function pressTap() {
   dockBtn()?.classList.remove('pressing');
   v.pressing = false;
-  cancelRec();
   haptic('tap');
   nav.openCoach?.();
 }
 function cancelHold(reason, from) {
   dockBtn()?.classList.remove('pressing');
   v.pressing = false;
-  cancelRec();
   if (from === 'pressing') return;
-  if (v.open) closeVoice();
-  void reason;
+  if (v.open) teardown(reason);
 }
 
 export function initVoice(n) {
@@ -1187,6 +1225,10 @@ export function initVoice(n) {
 
   // the review sheet
   el.mic.addEventListener('pointerdown', holdDown);
+  // the words: large and still until you tap them, then editable
+  el.text.addEventListener('click', () => { if (!el.text.readOnly) return; el.text.readOnly = false; v.edited = true; el.text.focus(); });
+  // the mic didn't start: tap the line to try again
+  el.stat.addEventListener('click', () => { if (!v.failed) return; v.failed = false; el.layer.classList.remove('failed'); setPhase('idle'); startRec(); });
   el.mic.addEventListener('pointerup', holdUp);
   el.mic.addEventListener('pointercancel', () => { v.press = null; });
   el.mic.addEventListener('contextmenu', e => e.preventDefault());
@@ -1204,26 +1246,35 @@ export function initVoice(n) {
   // the dock orb: a tap opens the Coach, holding talks
   const dock = document.getElementById('dock');
   const onOrb = e => e.target.closest?.('.orbbtn');
+  let finger = null, swallowUntil = 0;
   dock.addEventListener('pointerdown', e => {
     if (!onOrb(e) || e.button > 0) return;
     e.preventDefault();
     if (!hold.down({ x: e.clientX, y: e.clientY, pointerId: e.pointerId })) return;
+    finger = e.pointerId;
     try { onOrb(e).setPointerCapture(e.pointerId); } catch {}
   });
-  // the finger's movement, read once per frame (the orb follows it there)
+  // the finger is followed on the window (so wherever it goes, and even if the capture is lost, its
+  // movement and its lifting are seen), and read once per frame (the orb follows it there)
   let pending = null;
-  dock.addEventListener('pointermove', e => {
-    if (hold.state === 'idle') return;
+  addEventListener('pointermove', e => {
+    if (e.pointerId !== finger || hold.state === 'idle') return;
     const first = !pending;
     pending = { x: e.clientX, y: e.clientY, pointerId: e.pointerId };
     if (first) nextFrame(() => { const p = pending; pending = null; if (p) hold.move(p); });
-  });
-  dock.addEventListener('pointerup', e => { if (pending) { hold.move(pending); pending = null; } hold.up({ x: e.clientX, y: e.clientY, pointerId: e.pointerId }); });
-  dock.addEventListener('pointercancel', () => { pending = null; hold.cancel('pointercancel'); });
-  dock.addEventListener('lostpointercapture', e => { if (hold.state === 'pressing' || hold.state === 'quick') hold.up({ x: e.clientX, y: e.clientY, pointerId: e.pointerId }); });
+  }, { passive: true });
+  addEventListener('pointerup', e => {
+    if (e.pointerId !== finger) return;
+    finger = null;
+    swallowUntil = performance.now() + 400; // (the click a phone makes from this touch does nothing)
+    if (pending) { hold.move(pending); pending = null; }
+    hold.up({ x: e.clientX, y: e.clientY, pointerId: e.pointerId });
+  }, true);
+  addEventListener('pointercancel', e => { if (e.pointerId !== finger) return; finger = null; pending = null; hold.cancel('pointercancel'); }, true);
+  document.addEventListener('click', e => { if (performance.now() < swallowUntil) { swallowUntil = 0; e.preventDefault(); e.stopPropagation(); } }, true);
   dock.addEventListener('contextmenu', e => { if (onOrb(e)) e.preventDefault(); });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) hold.cancel('visibility'); });
-  addEventListener('blur', () => hold.cancel('blur'));
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { finger = null; hold.cancel('visibility'); } });
+  addEventListener('blur', () => { finger = null; hold.cancel('blur'); });
 
   tts.onSpeaking(on => document.getElementById('app').classList.toggle('speaking', on));
   store.subscribe(reason => { if (reason === 'settings' && v.open) paintStatic(); });

@@ -67,6 +67,8 @@ export function createHoldTalk(fx, { cfg = M, setTimer = setTimeout, clearTimer 
     },
     // the send (or review) transition has finished: ready for the next press
     done() { if (state === 'sending' || state === 'review') toIdle(); },
+    // every exit ends here (the one teardown): back to idle, whatever state it was in, with no effects
+    reset() { toIdle(); },
     cancel(reason = 'cancel') {
       if (state === 'idle' || state === 'sending') return;
       if (state === 'review' && reason !== 'discard') {
