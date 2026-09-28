@@ -32,7 +32,7 @@ import { dateKey } from '../body.js';
 import { planFor } from './routine.js';
 import { orbPulse, orbShake, orbSpark, moving, token } from './fx.js';
 import { setOrb, handOrb } from './dotorb.js';
-import { onFrame } from './frame.js';
+import { onFrame, nextFrame } from './frame.js';
 import { livePRSets } from '../pr.js';
 import { createVoiceGlow } from './voiceglow.js';
 import { ask as askCoach, ensureModels } from './coach.js';
@@ -44,14 +44,15 @@ const WAIT_MS = 3000; // sounded unfinished: still send after this much quiet
 
 const HOLD_MS = 280;          // shorter press = tap
 const BARS = 27;
+const RM = matchMedia('(prefers-reduced-motion: reduce)'); // (a live query: asked every frame, made once)
 const reduced = () => document.documentElement.dataset.motion === 'off' ||
-  (document.documentElement.dataset.motion !== 'on' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  (document.documentElement.dataset.motion !== 'on' && RM.matches);
 
 let nav = { go: () => {}, showDetail: () => {}, openSettings: () => {} };
 const v = {
   open: false, phase: 'idle', toggle: false, typing: false,
   press: null, token: 0, closing: null, popWaiting: 0,
-  raf: 0, lvl: 0, lo: 0, hi: 0, hist: new Float32Array(64), histAt: 0
+  raf: null, lvl: 0, lo: 0, hi: 0, hist: new Float32Array(64), histAt: 0, openSeq: 0, coverTimer: 0
 };
 const card = { cmd: null, timer: 0, hideTimer: 0, committed: false, undoOp: null };
 
@@ -182,11 +183,6 @@ const dockOrb = () => document.querySelector('#dock .orbbtn .orb');
 function syncOrb(src, dst) {
   if (!src || !dst) return;
   handOrb(src, dst); // the dotted orbs: the same pose, and just as swollen or lit
-  const a = src.querySelectorAll('.core, .core b'), b = dst.querySelectorAll('.core, .core b');
-  b.forEach((d, i) => {
-    const from = a[i]?.getAnimations?.() || [], to = d.getAnimations?.() || [];
-    to.forEach((anim, j) => { if (from[j] && from[j].currentTime != null) anim.currentTime = from[j].currentTime; });
-  });
 }
 // land: the flying orb and the dock orb swap in the same frame
 function landOrb(src, after) {
@@ -249,7 +245,7 @@ export function openVoice() {
   el.say.innerHTML = '';
   setPhase('idle');
   const app = document.getElementById('app');
-  app.classList.add('voice', 'orbaway');
+  app.classList.add('voice');
   moving(700);
   el.layer.classList.remove('handoff');
   el.layer.hidden = false;
@@ -257,9 +253,17 @@ export function openVoice() {
   el.orbwrap.style.transform = '';
   el.orbwrap.style.visibility = '';
   syncOrb(dockOrb(), el.orb);
-  void el.layer.offsetWidth;
-  el.layer.classList.add('on');
-  flyOrb(true);
+  // measured and started on the next frame, when the sheet has been laid out once (no layout forced
+  // in the middle of this task); the orb waits at the dock's spot until then
+  const opening = ++v.openSeq;
+  el.orbwrap.style.visibility = 'hidden';
+  nextFrame(() => nextFrame(() => { // (one frame to lay the sheet out, then measure and move)
+    if (!v.open || v.openSeq !== opening) return;
+    el.orbwrap.style.visibility = '';
+    app.classList.add('orbaway'); // the dock's orb hands over in this same frame: one orb throughout
+    el.layer.classList.add('on');
+    flyOrb(true);
+  }));
   // once it's fully open, the page underneath stops painting (and can't be tabbed into)
   clearTimeout(v.coverTimer);
   v.coverTimer = setTimeout(() => { if (v.open) cover(true); }, reduced() ? 0 : 460);
@@ -325,6 +329,7 @@ export function voiceHandlePop() {
 
 function startLoop() {
   if (v.raf) return;
+  v.haloO = 0; v.ripO = 0;
   // on the app's one shared frame (js/ui/frame.js), with the orbs
   const tick = now => {
     const listening = v.phase === 'listening';
@@ -362,9 +367,15 @@ function startLoop() {
     const sx = 1 + breath + l * 0.07 + l * 0.025 * Math.sin(now / 95);
     const sy = 1 + breath + l * 0.09 + l * 0.025 * Math.cos(now / 110);
     el.orb.style.transform = `scale(${(1 + (sx - 1) * 0.7).toFixed(4)}, ${(1 + (sy - 1) * 0.7).toFixed(4)})`;
-    el.halo.style.opacity = String(listening ? 0.35 + l * 0.65 : v.phase === 'thinking' ? 0.5 : 0.22);
+    // eased here, not by a CSS transition (one would restart on every frame); the ring fades out
+    // over 200 ms once you let go
+    const k = 1 - Math.exp(-dt / 100);
+    v.haloO += ((listening ? 0.35 + l * 0.65 : v.phase === 'thinking' ? 0.5 : 0.22) - v.haloO) * k;
+    const rip = listening ? 0.35 + l * 0.65 : 0;
+    v.ripO = rip > v.ripO ? v.ripO + (rip - v.ripO) * k : Math.max(rip, v.ripO - dt / 200);
+    el.halo.style.opacity = v.haloO.toFixed(3);
     el.halo.style.transform = `scale(${1 + l * 0.3})`;
-    el.ripples.style.opacity = listening ? String(0.35 + l * 0.65) : '0';
+    el.ripples.style.opacity = v.ripO.toFixed(3);
     for (let i = 0; i < BARS; i++) {
       const d = Math.abs(i - (BARS - 1) / 2);
       let h;
@@ -381,7 +392,7 @@ function startLoop() {
   v.raf = onFrame(tick);
 }
 
-function stopLoop() { v.raf?.(); v.raf = 0; v.lastTick = 0; el.glowFull?.off(); }
+function stopLoop() { v.raf?.(); v.raf = null; v.lastTick = 0; el.glowFull?.off(); }
 
 // ---------- recording ----------
 
@@ -575,9 +586,12 @@ export const speakCue = (text, lang = state.lang) => speak(text, lang);
 // message box. Home never shows on the way, and there's one orb on screen throughout.
 async function toCoach(text) {
   dismissCard();
+  if (v.open) await new Promise(r => setTimeout(r)); // (the words were just read: put the chat in place in its own task)
   if (v.open && nav.coachUnder?.()) {
     askCoach(text);
-    handToCoach();
+    // the chat is put in place in this task (under the opaque sheet); the orb starts moving a frame
+    // later, when the page has been laid out, so the move itself never waits on that work
+    nextFrame(() => nextFrame(handToCoach));
     return;
   }
   if (v.open) await closeVoice();
@@ -594,14 +608,25 @@ function handToCoach() {
   mic.cancel();
   clearTimeout(v.coverTimer);
   el.input.blur();
+  stopLoop(); // no more style writes from the level loop before the orb is measured
   const app = document.getElementById('app');
   const target = document.querySelector('#composer .corb .orb');
+  const w = el.orbwrap;
+  // measured before anything changes this frame (so nothing forces a layout): from where the orb is
+  // now to the message box's orb, at its resting place (layout offsets, not mid-transition)
+  let move = null;
+  if (target && !reduced()) {
+    const a = w.getBoundingClientRect(), A = app.getBoundingClientRect();
+    let x = target.offsetWidth / 2, y = target.offsetHeight / 2;
+    for (let n = target; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }
+    const k = scaleOf(el.stage) || 1;
+    move = { dx: (A.left + x - (a.left + a.width / 2)) / k, dy: (A.top + y - (a.top + a.height / 2)) / k, sc: target.offsetWidth / (el.orb.offsetWidth || 1) };
+  }
   cover(false);                      // (the chat is the page on now)
   app.classList.remove('voice');
   app.classList.add('orbflying');    // the message box's own orb waits for this one
   el.layer.inert = true;
   el.layer.classList.add('handoff'); // the sheet, its words and controls fade; only the orb stays
-  const w = el.orbwrap;
   let done = false;
   const land = () => {
     if (done) return;
@@ -620,16 +645,9 @@ function handToCoach() {
     el.orb.style.transform = '';
     stopLoop();
   };
-  if (!target || reduced()) return setTimeout(land, reduced() ? 150 : 0);
-  // FLIP: from where the orb is now to the message box's orb (its resting place, not mid-transition)
-  const a = w.getBoundingClientRect(), A = app.getBoundingClientRect();
-  let x = target.offsetWidth / 2, y = target.offsetHeight / 2;
-  for (let n = target; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }
-  const k = scaleOf(el.stage) || 1;
-  const dx = (A.left + x - (a.left + a.width / 2)) / k, dy = (A.top + y - (a.top + a.height / 2)) / k;
-  const sc = target.offsetWidth / (el.orb.offsetWidth || 1);
+  if (!move) return setTimeout(land, reduced() ? 150 : 0);
   w.style.transition = `transform ${handMs()}ms var(--e-flip)`;
-  w.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${sc.toFixed(4)})`;
+  w.style.transform = `translate(${move.dx.toFixed(1)}px, ${move.dy.toFixed(1)}px) scale(${move.sc.toFixed(4)})`;
   w.addEventListener('transitionend', function te(e) { if (e.target === w && e.propertyName === 'transform') { w.removeEventListener('transitionend', te); land(); } });
   setTimeout(land, handMs() + 60);
 }

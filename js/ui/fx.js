@@ -1,12 +1,17 @@
 // Moments of delight: bursts, count-ups, orb pulses. Transform/opacity only; skipped with reduced motion.
+const RM = matchMedia('(prefers-reduced-motion: reduce)'); // (a live query: asked every frame, made once)
 const reduced = () => document.documentElement.dataset.motion === 'off' ||
-  (document.documentElement.dataset.motion !== 'on' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  (document.documentElement.dataset.motion !== 'on' && RM.matches);
 
-// A motion token from css/tokens.css: a duration in ms, or an easing as written.
+// A motion token from css/tokens.css: a duration in ms, or an easing as written. Read once (they
+// don't change while the app runs; reading computed style mid-animation forces a style pass).
+const tokens = new Map();
 export function token(name) {
+  if (tokens.has(name)) return tokens.get(name);
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  if (/^[\d.]+m?s$/.test(v)) return parseFloat(v) * (v.endsWith('ms') ? 1 : 1000);
-  return v || 'ease';
+  const out = /^[\d.]+m?s$/.test(v) ? parseFloat(v) * (v.endsWith('ms') ? 1 : 1000) : v || 'ease';
+  if (v) tokens.set(name, out);
+  return out;
 }
 
 // Particles flying out of an element's centre. warm = PR colours.

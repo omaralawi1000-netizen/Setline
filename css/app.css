@@ -3049,12 +3049,12 @@ html[data-motion=off] .tab.on svg.ti{animation:none!important}
 /* The soft lights behind the screens and the thinking clouds hold still: each drifting light was a
    screen-sized layer the GPU had to keep and recomposite every frame (with the orb, the glow and the
    sheet on top, that's what ran it out of memory and left tiles unpainted). Painted once, they cost
-   nothing; covered by the voice sheet or the Coach, they aren't painted at all. */
+   nothing; covered by the voice sheet, they aren't painted at all. */
 .ambient i,.aura .clouds i{animation:none!important}
 .app.voice-covered .ambient{visibility:hidden}
 
 /* the voice sheet covers Home completely once it's open; Home stops painting underneath */
-.app.voice-covered .screen.on,.app.coach-covered .screen.on:not(#s-coach){visibility:hidden}
+.app.voice-covered .screen.on{visibility:hidden}
 
 /* the border beam: no filters over its turning layers (a filter on a parent of something animating
    is re-rastered every frame); the colours are baked a touch brighter instead, and the blurred bloom
@@ -3087,6 +3087,9 @@ html[data-motion=off] .tab.on svg.ti{animation:none!important}
 .vlayer.on .ripples b:nth-child(2){animation-delay:.9s}
 .vlayer.on .ripples b:nth-child(3){animation-delay:1.8s}
 .ripples{transition:opacity var(--m-chrome) var(--e-out)}
+/* while the sheet is open the voice loop eases the halo and the rings itself (a transition on a value
+   written every frame would restart every frame); they still fade with the sheet when it closes */
+.vlayer.on .halo,.vlayer.on .ripples{transition:none}
 /* a label that changes cross-fades in place (the status pill, the hold button) */
 .xl{display:inline-grid}
 .xl > span{grid-area:1/1;white-space:nowrap;transition:opacity var(--m-label) var(--e-out)}
@@ -3109,3 +3112,29 @@ html[data-motion=off] .orbwrap{transition:none}
 .app.orbaway .orbbtn .orb{opacity:0;transition:none}
 html[data-motion=off] :is(.vlayer > *:not(.stagev):not(.vbg),.vlayer .vbg,.xl > span){transition:opacity var(--m-label) linear!important;transform:none!important}
 html[data-motion=off] .vlayer.on > *{transition-delay:0s!important}
+
+/* ---- the Coach (1.60): one node per message, words fade in by opacity ---- */
+/* streamed words stay inline (as the finished text is), so nothing re-wraps when the reply is done */
+.bub .w{display:inline;transform:none;animation:replyword var(--m-slow) var(--e-soft) both}
+@keyframes replyword{from{opacity:0}}
+@media (prefers-reduced-motion: reduce){ .bub .w{animation:none} }
+html[data-motion=off] .bub .w{animation:none}
+/* the message box's one placeholder line (the input's own is only for screen readers) */
+#composer input::placeholder{color:transparent!important}
+.composer > .thinkline{left:67px;right:52px}
+.thinkline .tp.plain{color:var(--dim);font-weight:600;animation:hintin var(--m-label) var(--e-out) both}
+.thinkline .tp.plain.out{animation:hintout var(--m-label) var(--e-out) forwards}
+@keyframes hintin{from{opacity:0}}
+@keyframes hintout{to{opacity:0}}
+.composer.talking .thinkline .tp.plain{color:color-mix(in srgb,var(--ink) 85%,transparent)}
+.composer:has(> input:not(:placeholder-shown)) > .thinkline{opacity:0}
+@media (prefers-reduced-motion: reduce){ .thinkline .tp.plain{animation:none} .thinkline .tp.plain.out{display:none} }
+html[data-motion=off] .thinkline .tp.plain{animation:none}
+html[data-motion=off] .thinkline .tp.plain.out{display:none}
+/* the Coach's offers fade in where they are (the list doesn't get shoved) */
+.dochips{animation:chipsin var(--m-base) var(--e-out) both}
+@keyframes chipsin{from{opacity:0}}
+.msg.seen > .dochips{animation:none}
+/* a row of chips that scrolls sideways fades out at the right edge instead of being cut off */
+.vlayer .hints{-webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 36px),transparent)}
+.msg.seen > .dochips.fresh{animation:chipsin var(--m-base) var(--e-out) both}

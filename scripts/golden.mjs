@@ -133,6 +133,68 @@ const FLOWS = {
     return errors;
   },
 
+  // A streamed reply is one message node from its first word to its last: the messages already there
+  // stay the same nodes (no list rebuild), the list never blanks, the reply is never drawn twice, and
+  // its width doesn't change when it finishes (so its lines can't re-wrap).
+  'chat-stream': async (browser, base) => {
+    const { context, page, errors } = await newPage(browser, base);
+    await mockServices(page, { delay: 300 });
+    await page.addInitScript(k => { localStorage.setItem('setline.keys', JSON.stringify(k)); }, STAND_IN);
+    await page.goto(base + '?seed=1');
+    await onScreen(page, 'today');
+    await page.evaluate(async () => {
+      const s = await import('./js/store.js');
+      window.__s = s;
+      s.setSettings({ spoken: 'off', weeklyCheckin: false });
+      s.addChat('user', 'How was last week?');
+      s.addChat('model', 'Four sessions and a record on the bench.');
+      for (let i = 0; i < 6; i++) { s.addChat('user', `Question ${i + 1} about my plan?`); s.addChat('model', 'Keep the same plan this week, add a set of rows on Thursday and sleep a little more before the heavy day.'); }
+      s.addChat('user', 'Nice.');
+    });
+    await settle(page, 600);
+    await page.click('#dock .orbbtn');
+    await onScreen(page, 'coach');
+    await settle(page, 1400);
+    await page.evaluate(() => {
+      window.__before = [...document.getElementById('thread').children];
+      window.__frames = [];
+      const tick = () => {
+        const ol = document.getElementById('thread');
+        const reply = window.__replyId && ol ? [...ol.querySelectorAll(`.msg[data-id="${window.__replyId}"]`)] : [];
+        const node = reply[0];
+        if (node && !window.__replyNode) window.__replyNode = node;
+        window.__frames.push({
+          kept: window.__before.every(n => n.isConnected && n.parentElement === ol),
+          listed: !!ol && ol.children.length >= window.__before.length,
+          count: reply.length, same: !node || node === window.__replyNode,
+          streaming: !!node?.classList.contains('is-streaming'), w: node?.querySelector('.bub')?.getBoundingClientRect().width || 0
+        });
+        if (window.__frames.length < 3000) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    await page.fill('#composer input', 'How is my bench going?');
+    await page.press('#composer input', 'Enter');
+    await page.waitForFunction(() => { const m = [...window.__s.state.chat].reverse().find(x => x.role === 'model' && x.q); if (m) window.__replyId = m.id; return !!m; }, null, { timeout: 5000 });
+    await page.waitForFunction(() => window.__s.state.chat.find(m => m.id === window.__replyId)?.streaming === false, null, { timeout: 15000 });
+    await settle(page, 900);
+    const r = await page.evaluate(() => ({ frames: window.__frames, gap: (s => s.scrollHeight - s.clientHeight - s.scrollTop)(document.getElementById('s-coach')), tall: (s => s.scrollHeight > s.clientHeight + 80)(document.getElementById('s-coach')), ai: document.querySelectorAll('#thread .msg.ai').length, models: window.__s.state.chat.filter(m => m.role !== 'user').length, final: document.querySelectorAll(`#thread .msg[data-id="${window.__replyId}"]`).length, sameEnd: document.querySelector(`#thread .msg[data-id="${window.__replyId}"]`) === window.__replyNode }));
+    const f = r.frames;
+    if (f.some(x => !x.kept)) throw new Error('messages already on screen were redrawn (the list was rebuilt)');
+    if (f.some(x => !x.listed)) throw new Error('the message list went blank');
+    if (f.some(x => x.count > 1) || r.final !== 1) throw new Error(`the reply was drawn ${Math.max(r.final, ...f.map(x => x.count))} times`);
+    if (f.some(x => !x.same) || !r.sameEnd) throw new Error('the streaming reply was replaced by a new node when it finished');
+    if (r.ai !== r.models) throw new Error(`${r.ai} Coach messages on screen for ${r.models} in the chat`);
+    const lastStream = [...f].reverse().find(x => x.streaming && x.w), firstDone = f.find((x, i) => i > f.indexOf(lastStream) && !x.streaming && x.w);
+    if (!lastStream || !firstDone) throw new Error('never saw the reply stream and finish');
+    if (Math.abs(lastStream.w - firstDone.w) > 0.5) throw new Error(`the reply changed width when it finished (${lastStream.w} → ${firstDone.w})`);
+    // you were at the end when you asked, so the thread followed the reply to its end
+    if (!r.tall) throw new Error('the thread is too short to scroll (the follow check needs it to)');
+    if (r.gap > 80) throw new Error(`the thread didn't follow the reply (${Math.round(r.gap)} px from the end)`);
+    await context.close();
+    return errors;
+  },
+
   // Every main tab opens without throwing.
   'tabs-open': async (browser, base) => {
     const { context, page, errors } = await newPage(browser, base);

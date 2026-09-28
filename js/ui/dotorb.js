@@ -15,8 +15,9 @@
 import { onFrame } from './frame.js';
 
 const TAU = Math.PI * 2;
+const RM = matchMedia('(prefers-reduced-motion: reduce)'); // (a live query: asked every frame, made once)
 const still = () => document.documentElement.dataset.motion === 'off' ||
-  (document.documentElement.dataset.motion !== 'on' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  (document.documentElement.dataset.motion !== 'on' && RM.matches);
 
 // ---------- colours: the theme's accent, blue and violet ----------
 function rgbOf(cs, name, fallback) {
@@ -134,33 +135,33 @@ function settle(o, want, dt) {
 // a sprite sheet; a frame is then only drawImage calls (no paths, gradients or shadows per dot).
 const DB = 8, VB = 4, SB = 3, LB = 4, SWEEP = [0, 0.35, 0.85], LOUD = [0, 0.33, 0.66, 1];
 const CELL = 24, COLS = 24; // device px per sprite cell; DB*VB*SB*LB = 384 cells in a 24 × 16 grid
-let atlas = null, atlasCtx = null, drawn = null;
-function sprite(key) { // the cell for this colour, drawn the first time it's needed
-  if (!atlas) {
-    atlas = document.createElement('canvas');
-    atlas.width = CELL * COLS; atlas.height = CELL * Math.ceil((DB * VB * SB * LB) / COLS);
-    atlasCtx = atlas.getContext('2d');
-    drawn = new Uint8Array(DB * VB * SB * LB);
-  }
-  if (!drawn[key]) {
-    drawn[key] = 1;
-    const lb = key % LB, sb = ((key / LB) | 0) % SB, vb = ((key / (LB * SB)) | 0) % VB, db = (key / (LB * SB * VB)) | 0;
-    const depth = (db + 0.5) / DB, u = (vb + 0.5) / VB, sweep = SWEEP[sb], loud = LOUD[lb];
-    const P = palette();
-    // the theme's colours across the sphere: the accent up top, turning blue, violet round the bottom
-    let c = mix(mix(P.v, P.b, u), P.a, Math.max(0, u * 1.2 - 0.25) * 0.78);
-    c = mix(c, [255, 255, 255], Math.min(1, 0.04 + 0.22 * depth ** 3 + 0.5 * sweep + 0.3 * loud * depth));
-    const a = Math.min(1, 0.07 + 0.93 * depth ** 1.7 + sweep * 0.5);
-    const x = (key % COLS) * CELL, y = ((key / COLS) | 0) * CELL;
-    atlasCtx.clearRect(x, y, CELL, CELL);
-    atlasCtx.fillStyle = `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a.toFixed(3)})`;
-    atlasCtx.beginPath();
-    atlasCtx.arc(x + CELL / 2, y + CELL / 2, CELL / 2 - 1, 0, TAU);
-    atlasCtx.fill();
-  }
-  return key;
+// (The whole sheet is drawn at once, before any frame uses it: drawing into it while frames read it
+// makes the browser flush it again and again, which was hundreds of milliseconds a frame.)
+let atlas = null, atlasCtx = null;
+function sheet() {
+  if (atlas) return atlas;
+  atlas = document.createElement('canvas');
+  atlas.width = CELL * COLS; atlas.height = CELL * Math.ceil((DB * VB * SB * LB) / COLS);
+  atlasCtx = atlas.getContext('2d');
+  for (let key = 0; key < DB * VB * SB * LB; key++) drawCell(key);
+  return atlas;
 }
-function resetSprites() { drawn?.fill(0); }
+function drawCell(key) {
+  const lb = key % LB, sb = ((key / LB) | 0) % SB, vb = ((key / (LB * SB)) | 0) % VB, db = (key / (LB * SB * VB)) | 0;
+  const depth = (db + 0.5) / DB, u = (vb + 0.5) / VB, sweep = SWEEP[sb], loud = LOUD[lb];
+  const P = palette();
+  // the theme's colours across the sphere: the accent up top, turning blue, violet round the bottom
+  let c = mix(mix(P.v, P.b, u), P.a, Math.max(0, u * 1.2 - 0.25) * 0.78);
+  c = mix(c, [255, 255, 255], Math.min(1, 0.04 + 0.22 * depth ** 3 + 0.5 * sweep + 0.3 * loud * depth));
+  const a = Math.min(1, 0.07 + 0.93 * depth ** 1.7 + sweep * 0.5);
+  const x = (key % COLS) * CELL, y = ((key / COLS) | 0) * CELL;
+  atlasCtx.clearRect(x, y, CELL, CELL);
+  atlasCtx.fillStyle = `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a.toFixed(3)})`;
+  atlasCtx.beginPath();
+  atlasCtx.arc(x + CELL / 2, y + CELL / 2, CELL / 2 - 1, 0, TAU);
+  atlasCtx.fill();
+}
+function resetSprites() { atlas = null; atlasCtx = null; }
 function paint(o, now) {
   const calm = still();
   const s = o.s;
@@ -204,11 +205,12 @@ function paint(o, now) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, box, box);
   const lb = Math.max(0, Math.min(LB - 1, Math.round((lvl + spk) * (LB - 1))));
+  const img = sheet();
   for (let key = 0; key < bk.length; key++) {
     const list = bk[key];
     if (!list.length) continue;
-    const cell = sprite(key * LB + lb), sx = (cell % COLS) * CELL, sy2 = ((cell / COLS) | 0) * CELL;
-    for (const i of list) { const r = radii[i]; ctx.drawImage(atlas, sx, sy2, CELL, CELL, xs[i] - r, ys[i] - r, r * 2, r * 2); }
+    const cell = key * LB + lb, sx = (cell % COLS) * CELL, sy2 = ((cell / COLS) | 0) * CELL;
+    for (const i of list) { const r = radii[i]; ctx.drawImage(img, sx, sy2, CELL, CELL, xs[i] - r, ys[i] - r, r * 2, r * 2); }
   }
   o.at = now;
 }
@@ -219,7 +221,10 @@ const io = 'IntersectionObserver' in window ? new IntersectionObserver(es => {
   for (const e of es) for (const o of orbs) if (o.canvas === e.target) o.seen = e.isIntersecting;
   wake();
 }) : null;
-const shown = o => o.canvas.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) ?? true;
+// whether an orb can be seen (faded or hidden by its page): asked on a quarter-second timer, outside
+// the frame, so the frame itself never forces a style pass to find out
+const shown = o => o.vis ?? true;
+setInterval(() => { if (!stop || document.hidden) return; for (const o of orbs) if (o.seen) o.vis = o.canvas.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) ?? true; }, 250);
 function frame(now, dt) {
   tick++;
   const calm = still();
@@ -262,7 +267,7 @@ export function handOrb(from, to) {
   if (!a || !to?.matches?.('.orb')) return;
   const b = mount(to);
   b.s = { ...a.s, bands: [...a.s.bands] };
-  b.seen = true;
+  b.seen = true; b.vis = true; // taking over: painted every frame from now, not when the timer next looks
   paint(b, performance.now());
   wake();
 }

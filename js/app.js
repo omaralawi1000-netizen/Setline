@@ -220,7 +220,8 @@ function impact() {
   haptic('land');
   const box = $('#composer');
   if (!box) return;
-  box.classList.remove('hit'); void box.offsetWidth; box.classList.add('hit'); setTimeout(() => box.classList.remove('hit'), 1000);
+  box.classList.remove('hit');
+  requestAnimationFrame(() => { box.classList.add('hit'); setTimeout(() => box.classList.remove('hit'), 1000); }); // (no forced layout)
   if (stillMotion()) return;
   box.animate([
     { transform: 'none' },
@@ -357,11 +358,12 @@ function show(name, { back = false, still = false } = {}) {
     const on = s.dataset.screen === name;
     const was = s.classList.contains('on');
     if (on && !was && (coachSwap || still)) {
+      // appears in place: its transition stays off until a frame has been drawn this way (no forced
+      // style pass here: this runs while the voice sheet hands over to the Coach)
       s.classList.add('instant');
       s.style.setProperty('--off-x', '0px');
       s.classList.add('on');
-      void s.offsetWidth;
-      s.classList.remove('instant');
+      requestAnimationFrame(() => requestAnimationFrame(() => s.classList.remove('instant')));
       s._counted = prev === 'coach' || still;
     } else if (on && !was) {
       s.classList.add('instant');

@@ -26,7 +26,8 @@ export function through(c, rgb, alpha) {
 let edgeCache = '';
 const edge = () => (edgeCache ||= edgeColor());
 let repaint = () => {};
-export const refreshChrome = () => { edgeCache = ''; bgCache = ''; repaint(); };
+// (both colours are worked out now, while nothing moves, not the first time the Coach opens)
+export const refreshChrome = () => { edgeCache = ''; bgCache = ''; repaint(); edge(); bgHex(); };
 
 export function initChrome() {
   const app = document.getElementById('app');
@@ -60,12 +61,16 @@ export function initChrome() {
     });
   };
   app.addEventListener('scroll', onScroll, { capture: true, passive: true });
-  // a new screen starts at its own scroll position
+  // a new screen starts at its own scroll position (measured just after the frame is drawn, when the
+  // page is laid out already, so the frame that moves the screens never waits on a layout for this)
   app.addEventListener('screenchange', () => {
-    const s = app.querySelector('.screen.on');
-    app.classList.remove('compact'); lastY = s?.scrollTop || 0;
-    app.classList.toggle('under-top', !!s && s.scrollTop > 6);
-    app.classList.toggle('under-bottom', !!s && s.scrollHeight - s.clientHeight - s.scrollTop > 6);
+    app.classList.remove('compact');
+    setTimeout(() => {
+      const s = app.querySelector('.screen.on');
+      lastY = s?.scrollTop || 0;
+      app.classList.toggle('under-top', !!s && s.scrollTop > 6);
+      app.classList.toggle('under-bottom', !!s && s.scrollHeight - s.clientHeight - s.scrollTop > 6);
+    });
   });
   // tapping the small pill opens the dock again (the orb still talks straight away)
   const dock = document.getElementById('dock');
@@ -91,5 +96,5 @@ export function initChrome() {
     else goFull(); // switched on: still inside the tap
   });
   repaint = paint;
-  paint();
+  paint(); edge(); bgHex();
 }
