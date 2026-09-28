@@ -94,7 +94,7 @@ export function renderCoach(root) {
     const body = kind === 'nokey'
       ? `<div class="empty solid"><div class="emptyglyph">${I.chat}</div><h2>${t('coach.noKey')}</h2><p>${t('coach.noKeySub')}</p>
         <button class="log" data-coach="settings"><span>${t('voice.openSettings')}</span></button></div>`
-      : `<div class="coachhero glass"><span class="orbmark" aria-hidden="true"></span>
+      : `<div class="coachhero glass"><span class="orb" aria-hidden="true"><i class="core"><b></b><b></b><b></b></i></span>
         <h2>${t('coach.empty')}</h2><p>${t('coach.emptySub')}</p>
         <div class="exq">${['coach.ex1', 'coach.ex2', 'coach.ex3'].map(k => `<button class="chip" data-coach="ask" data-q="${esc(t(k))}">${esc(t(k))}</button>`).join('')}</div></div>`;
     if (root._html !== head + body) { root.innerHTML = head + body; root._html = head + body; root._head = null; }
@@ -349,7 +349,7 @@ function wordsHTML(bub, text, births, now, st) {
 // Whether the thread sits at (or within 80 px of) its end: measured once, then kept up to date by its
 // scroll events (which come when it's laid out anyway), so a frame that adds words never has to lay
 // the page out before writing to it. Only then does the answer keep the thread scrolled to its end.
-export function nearEnd(root) {
+function nearEnd(root) {
   if (!root._end) {
     const at = () => root.scrollHeight - root.clientHeight - root.scrollTop < 80;
     root._end = { v: at() };
@@ -804,7 +804,7 @@ export function initCoach(n) {
   nav = n;
   const root = $('#s-coach');
   const composer = $('#composer');
-  composer.innerHTML = `<span class="cglow" aria-hidden="true"><i></i></span><span class="chit" aria-hidden="true"></span><button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"></button><input enterkeyhint="send" autocomplete="off" maxlength="5000"><button type="submit" class="csend">${I.fwd}</button>`;
+  composer.innerHTML = `<span class="cglow" aria-hidden="true"><i></i></span><span class="chit" aria-hidden="true"></span><button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span></button><input enterkeyhint="send" autocomplete="off" maxlength="5000"><button type="submit" class="csend">${I.fwd}</button>`;
   // The composer's orb: talk to your coach. What you say is sent when you pause, the answer is
   // spoken, then it listens again, so it's a conversation. Tap while it listens to send at once;
   // tap while it thinks or speaks (or say nothing) to end it.

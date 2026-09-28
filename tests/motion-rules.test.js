@@ -8,7 +8,7 @@ import { checkAll, checkCss, checkJs } from '../scripts/lib/motionrules.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-test('the app animates only transform and opacity, and frosts only the dock, the message box and the one frost layer', () => {
+test('the app animates only transform and opacity, and frosts only the dock and the message box', () => {
   const bad = checkAll(root);
   assert.deepEqual(bad, [], bad.join('\n'));
 });
@@ -26,12 +26,6 @@ test('the check catches what it should', () => {
   assert.equal(checkCss('.dcap{backdrop-filter:blur(12px)}').length, 0);
   assert.equal(checkCss('.composer.glass{backdrop-filter:blur(24px)}').length, 1);
   assert.equal(checkCss('@media (min-width:1px){.x{transition:color .2s}}').length, 1);
-  assert.equal(checkCss('.frost{backdrop-filter:blur(var(--frost-blur,20px)) saturate(170%)}').length, 0);
-  assert.equal(checkCss('.frost{backdrop-filter:blur(24px)}').length, 1); // the frost's blur is the one constant
-  assert.equal(checkCss('.sheet{backdrop-filter:blur(var(--frost-blur))}').length, 1); // no second full-screen blur
-  assert.equal(checkCss('.frost{transition:backdrop-filter .2s}').length, 1);
-  assert.equal(checkCss('@keyframes f{to{backdrop-filter:blur(4px)}}').length, 1);
-  assert.equal(checkCss('.x{transition:filter .2s}').length, 1);
   assert.equal(checkJs("el.animate([{ opacity: 0 }, { transform: 'none' }], { duration: 1 })").length, 0);
   assert.equal(checkJs("el.animate([{ boxShadow: 'none' }, { filter: 'blur(2px)' }], { duration: 1 })").length, 2);
 });

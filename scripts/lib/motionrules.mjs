@@ -2,9 +2,7 @@
 //   node scripts/lib/motionrules.mjs          (prints every violation)
 // 1. CSS transitions and @keyframes animate only transform (incl. translate/scale/rotate) and opacity.
 // 2. backdrop-filter only on the two small static glass surfaces (the dock's .dcap/.obub and the
-//    Coach's message box), at most 16px of blur, and on the ONE full-screen frost layer (.frost, its
-//    blur a constant from motion.config.js). `none` is always fine. A backdrop-filter or filter is
-//    never transitioned or animated (that is also rule 1: only transform and opacity move).
+//    Coach's message box), at most 16px of blur. `none` is always fine.
 // 3. Element.animate() keyframes in the app's JS animate only transform/opacity.
 // (`visibility` is allowed in keyframes: it switches, it isn't interpolated or repainted per frame.)
 // The one exception: small SVG progress rings and check marks draw their stroke (stroke-dashoffset on
@@ -18,7 +16,6 @@ const ALLOWED = new Set(['transform', 'opacity', 'translate', 'scale', 'rotate',
 const SVG_KF = new Set(['draw', 'drawline', 'ckdraw', 'ringfill', 'dringdraw']);
 const JS_OK = { 'js/ui/figure.js': new Set(['d']), 'js/ui/workout.js': new Set(['stroke-dashoffset']) };
 export const GLASS = /(^|[\s,>])(\.dcap|\.obub|\.composer|#composer)\b/;
-export const FROST = /^\s*\.frost\s*$/; // the one frost layer (its own rule, nothing else in the selector)
 
 // a small CSS walker: yields {selector, body, at} for every rule, and {keyframes, name, body}
 function* rules(css) {
@@ -72,8 +69,7 @@ export function checkCss(css, file = 'css') {
         for (const t of transitionProps(v)) if (!ALLOWED.has(t) && !(t === 'stroke-dashoffset' && r.selector.includes('.fg'))) bad.push(`${file}: ${r.selector} transitions ${t}`);
       }
       if ((p === 'backdrop-filter' || p === '-webkit-backdrop-filter') && !/^none\b/.test(v)) {
-        if (FROST.test(r.selector)) { if (!/^blur\(var\(--frost-blur/.test(v)) bad.push(`${file}: the frost's blur must be the constant --frost-blur`); continue; }
-        if (!GLASS.test(' ' + r.selector)) bad.push(`${file}: ${r.selector} has backdrop-filter (only the dock, the message box and the one .frost layer may)`);
+        if (!GLASS.test(' ' + r.selector)) bad.push(`${file}: ${r.selector} has backdrop-filter (only the dock and the message box may)`);
         const blur = /blur\(\s*([\d.]+)px/.exec(v);
         if (blur && +blur[1] > 16) bad.push(`${file}: ${r.selector} blurs ${blur[1]}px (16px at most)`);
       }
@@ -104,13 +100,8 @@ export function checkJs(src, file = 'js') {
 
 export function checkAll(root) {
   const bad = [];
+  for (const f of ['css/tokens.css', 'css/app.css']) bad.push(...checkCss(readFileSync(join(root, f), 'utf8'), f));
   const walk = d => readdirSync(join(root, d)).flatMap(n => { const p = join(d, n); return statSync(join(root, p)).isDirectory() ? walk(p) : p.endsWith('.js') ? [p] : []; });
-  for (const f of readdirSync(join(root, 'css')).filter(n => n.endsWith('.css')).map(n => `css/${n}`)) bad.push(...checkCss(readFileSync(join(root, f), 'utf8'), f));
-  // exactly one frost layer: made (on demand) in one place, js/ui/stage.js, and never in the page's HTML
-  const html = readFileSync(join(root, 'index.html'), 'utf8');
-  if (/class="frost\b/.test(html)) bad.push('index.html: a static frost layer (it is made on demand by js/ui/stage.js)');
-  const makers = walk('js').filter(f => /className\s*=\s*'frost'/.test(readFileSync(join(root, f), 'utf8')));
-  if (makers.length !== 1 || makers[0] !== 'js/ui/stage.js') bad.push(`frost layers are made in ${makers.join(', ') || 'nothing'} (only js/ui/stage.js may make the one)`);
   for (const f of walk('js')) bad.push(...checkJs(readFileSync(join(root, f), 'utf8'), f));
   return bad;
 }

@@ -736,23 +736,6 @@ Fixes the flashes, lag and half-drawn frames in the voice → Coach recording, i
 - Chat: the thread is patched, never rebuilt; the bubble a reply streams into becomes the final message (same width, no second copy, no blank list); at most one write per frame; it follows the reply only within about 80 px of the end; words fade in (no blur); one placeholder line cross-fades "Thinking…" and "Ask your coach"; the Do it chips fade in without moving the thread.
 - New golden flows: voice-to-coach (one orb per frame, Home never shows, the sheet's chrome stays) and chat-stream (message nodes keep their identity, one reply node of unchanged width).
 
-## 1.61.0: hold to talk, one frost, one continuous motion
+## 1.61.2: Revert to 1.60.0
 
-- Hold to talk is a state machine (`js/ui/holdtalk.js`: idle, pressing, quick, review, sending, cancel), tested on its own. The orb grows under your finger in the same frame and the mic starts opening at once (a tap lets it go and opens the Coach). At 250 ms: a buzz, the page frosts and the orb rises to halfway up the screen, following your finger (× 0.4). Release sends (routed as before); drag up 80 px locks the review sheet (a second buzz): it grows up out of the orb, the orb rides to its top, your words appear large and editable, Send or ×; drag down 80 px, pointercancel, leaving the app or losing focus cancels with nothing sent. No mic: "Mic blocked – tap to type".
-- One frost layer (`#frost`): blur 20 px, saturate 170 %, brightness 0.85, a 40→60 % theme tint and a pre-drawn grain tile; the blur never animates, only the layer's opacity. The page under it is inert and frozen, everything that moves is above it, nothing else blurs on top of it. `prefers-reduced-transparency`: a solid tint.
-- One orb element (`js/ui/stage.js`), flown between the dock, the voice screens and the message box with FLIP on one critically damped spring (`js/ui/spring.js`); every move can be reversed half-way.
-- The Coach is a sheet over the frosted page: laid out and at its end before it moves, it slides up while the orb flies into the message box, and back down the same way (no two screens cross-faded). Released from quick mode, it rises at once with your message shimmering until the words are in; from the review sheet, your words fly into their bubble as the sheet becomes the chat.
-- Labels swap in place (out 80 ms, then in 120 ms). Reduced motion: 150 ms fades, nothing travels.
-- Every motion and frost value in `js/motion.config.js`; `?tune=1` shows sliders (Copy values, Reset, Slow-mo ×4), alongside `?perf=1`.
-- The ported voice glow is gone (the orb's own light replaces it); the empty Coach shows a still picture of the orb (the real one is in the message box).
-
-## 1.61.1: the mic starts again, tap opens the chat, nothing left behind
-
-- The mic never started after a tap on the orb: 1.61.0 opened it on pointerdown, a tap cancelled it while it was still opening, and the cancel only reset the voice state when the screen was open, so it stayed at "opening" and every later start was skipped. The mic now starts at the hold (250 ms) as it did before, a cancel always resets, "Mic open" shows only once sound comes in, and after 4 s without it: "Mic didn't start – tap to retry" (with the reason in the console and ?perf=1). An empty recording is never sent ("Didn't catch that").
-- The AudioContext resumes on the next real user activation (a finger lifting), since a finger going down doesn't count on a phone.
-- The shared animation frame could start a second loop when something subscribed inside a frame; they multiplied every frame (with reduced motion the page froze). One frame request at a time now (`tests/frame.test.js`).
-- Tapping the orb opened the chat and closed it again: the phone's click from the tap landed on the frost, which closed the chat. The frost is never a tap target now, and the tap's click is ignored.
-- One teardown for every way out of the voice layer, and the chat's close always tidies up: no frost, orb, sheet or chat text left over the page.
-- Release sends through the old release path again (no chat rising before the words are in); the orb sinks back into the dock as the frost fades.
-- Lighter frost (12 px, 150% saturation, 35% tint), a round light behind the orb, the review sheet looks like the old voice screen (status pill, words large in the middle, editable on tap), the chip row starts at its first chip, sheets 96% opaque.
-- Golden flows now drive a real finger (touch events and the click that follows a tap) with phone-like mic latency.
+- The code is exactly 1.60.0 again: the 1.61.0 / 1.61.1 hold-to-talk rework (state machine, frost layer, review sheet, tuning panel) was unstable on the phone and is gone. The version number moved up (not back) so the phone's service worker takes the update. The database is unchanged (schema 4 throughout), so nothing logged is affected. The rework is kept on the branch backup-before-revert-1.60.0.

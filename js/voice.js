@@ -24,7 +24,7 @@ export async function start({ onMaxed, maxMs = MAX_MS } = {}) {
     stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: true, autoGainControl: true } });
   } catch (e) {
     const code = e?.name === 'NotAllowedError' || e?.name === 'SecurityError' ? 'denied' : e?.name === 'NotFoundError' ? 'nomic' : 'busy';
-    throw Object.assign(new Error(code), { code, name2: e?.name || 'Error' });
+    throw Object.assign(new Error(code), { code });
   }
   const mimeType = pickMime();
   const recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 32000 } : undefined);
@@ -46,9 +46,6 @@ export async function start({ onMaxed, maxMs = MAX_MS } = {}) {
   r.timer = setTimeout(() => onMaxed?.(), maxMs);
   rec = r;
 }
-
-// Audio is really coming in: the recorder runs and has delivered data, or the level meter can read it.
-export const flowing = () => !!rec && rec.recorder.state === 'recording' && (rec.chunks.length > 0 || (!!rec.analyser && audioContext()?.state === 'running'));
 
 // Current input level, 0..1 (RMS, shaped for display).
 export function level() {

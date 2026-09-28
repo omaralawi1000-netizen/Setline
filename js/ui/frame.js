@@ -4,26 +4,22 @@
 //
 //   const stop = onFrame((now, dt) => { … });   stop() unsubscribes
 const subs = new Set();
-let raf = 0, last = 0, inFrame = false;
+let raf = 0, last = 0;
 
 function frame(now) {
   raf = 0;
-  inFrame = true;
   const dt = last ? Math.min(0.1, (now - last) / 1000) : 1 / 60;
   last = now;
   for (const fn of [...subs]) {
     try { fn(now, dt); } catch (e) { console.error(e?.stack || e); }
   }
-  inFrame = false;
-  // exactly one frame is ever requested: one subscribed during this frame is picked up by the next one
-  // (asking for another here too used to start a second loop, and they multiplied every frame)
-  if (subs.size && document.visibilityState !== 'hidden') raf ||= requestAnimationFrame(frame);
+  if (subs.size && document.visibilityState !== 'hidden') raf = requestAnimationFrame(frame);
   else last = 0;
 }
 
 export function onFrame(fn) {
   subs.add(fn);
-  if (!raf && !inFrame && document.visibilityState !== 'hidden') raf = requestAnimationFrame(frame);
+  if (!raf && document.visibilityState !== 'hidden') raf = requestAnimationFrame(frame);
   return () => { subs.delete(fn); };
 }
 

@@ -28,14 +28,6 @@ export function letGo(tag, ms = 600) {
   idle = setTimeout(() => { if (!holds.size && ctx?.state === 'running') ctx.suspend().catch(() => {}); }, ms);
 }
 export const audioBusy = () => holds.size > 0;
-export const audioState = () => ctx?.state || 'none';
-// On a phone a finger going down isn't a user activation (Chrome only counts it when it lifts), so a
-// context asked to run from pointerdown can stay suspended. Whenever something holds the audio, the
-// next real activation (a finger lifting, a key) resumes it.
-export function resumeAudio() { const c = audioContext(); if (c && c.state !== 'running') c.resume().catch(() => {}); }
-for (const type of ['pointerup', 'touchend', 'keydown', 'click']) {
-  globalThis.addEventListener?.(type, () => { if (holds.size && ctx && ctx.state !== 'running') ctx.resume().catch(() => {}); }, { capture: true, passive: true });
-}
 
 export function unlockAudio() {
   const c = audioContext();

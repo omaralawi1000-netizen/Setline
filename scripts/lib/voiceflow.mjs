@@ -31,7 +31,7 @@ export const installSampler = page => page.evaluate(() => {
     const orbs = [...document.querySelectorAll('.orb')].filter(shown);
     const top = document.querySelector('#voice .top'), hold = document.querySelector('#vhold');
     window.__samples.push({
-      t, orbs: orbs.length, orbEls: document.querySelectorAll('.orb').length, frosts: document.querySelectorAll('.frost').length, orbIds: orbs.map(o => o.id || o.parentElement?.className || 'orb').join(','),
+      t, orbs: orbs.length, orbIds: orbs.map(o => o.id || o.parentElement?.className || 'orb').join(','),
       home: shown(document.getElementById('s-today')),
       chrome: !!top && !!hold && shown(top) && shown(hold) && +getComputedStyle(top).opacity > 0.99 && +getComputedStyle(hold).opacity > 0.5, // (dimmed while it works it out is still there)
       why: !top || !hold ? 'unmounted' : `top ${(+getComputedStyle(top).opacity).toFixed(2)} hold ${(+getComputedStyle(hold).opacity).toFixed(2)} ${document.getElementById('voice').dataset.phase}`,
