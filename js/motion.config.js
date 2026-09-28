@@ -67,4 +67,5 @@ export function applyCss(root = document.documentElement) {
   s.setProperty('--grain', String(M.grain));
   s.setProperty('--frost-ms', `${Math.round(M.frostFadeMs * slowmo)}ms`);
   s.setProperty('--slowmo', String(slowmo));
+  s.setProperty('--press', String(M.pressScale));
 }

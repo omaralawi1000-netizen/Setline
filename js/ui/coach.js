@@ -94,7 +94,7 @@ export function renderCoach(root) {
     const body = kind === 'nokey'
       ? `<div class="empty solid"><div class="emptyglyph">${I.chat}</div><h2>${t('coach.noKey')}</h2><p>${t('coach.noKeySub')}</p>
         <button class="log" data-coach="settings"><span>${t('voice.openSettings')}</span></button></div>`
-      : `<div class="coachhero glass"><span class="orb" aria-hidden="true"><i class="core"><b></b><b></b><b></b></i></span>
+      : `<div class="coachhero glass"><span class="orbmark" aria-hidden="true"></span>
         <h2>${t('coach.empty')}</h2><p>${t('coach.emptySub')}</p>
         <div class="exq">${['coach.ex1', 'coach.ex2', 'coach.ex3'].map(k => `<button class="chip" data-coach="ask" data-q="${esc(t(k))}">${esc(t(k))}</button>`).join('')}</div></div>`;
     if (root._html !== head + body) { root.innerHTML = head + body; root._html = head + body; root._head = null; }
@@ -659,24 +659,45 @@ function openPage(page) {
   if (PAGES[page] === 'tab') nav.go?.(page); else nav.open?.(page);
 }
 
+// Your message the moment you let go of the orb: a bubble at the end of the thread that shimmers
+// until the words are in (then the real message takes its place, in the same spot).
+export function showPending() {
+  const ol = $('#thread');
+  if (!ol) return false;
+  ol.querySelector(':scope > .pending')?.remove();
+  const li = document.createElement('li');
+  li.className = 'msg me pending seen';
+  li.setAttribute('aria-hidden', 'true');
+  li.innerHTML = '<div class="bub"></div>';
+  ol.append(li);
+  return true;
+}
+export function dropPending() { $('#thread > .pending')?.remove(); }
+function fillPending(id) {
+  const p = $('#thread > .pending');
+  if (!p) return;
+  p.remove();
+  $(`#thread [data-id="${id}"]`)?.classList.add('seen', 'fillin');
+}
+
 // Ask the coach. Used by the composer, the example chips, and voice questions.
 export async function ask(question, { root = $('#s-coach'), voice = false } = {}) {
   question = String(question || '').trim();
   if (!question) return;
   // "yes" / "do it" with an offer on screen: that's the answer to it
   const offer = isAffirm(question) && topAction();
-  if (offer) { runAction(offer, 0); store.addChat('user', question); return; }
+  if (offer) { runAction(offer, 0); fillPending(store.addChat('user', question).id); return; }
   // "I had 2 eggs", "bench 80 for 8", "set my calories to 2400": done straight away (with Undo), not discussed
   const did = actOnText(question);
   if (did) {
-    store.addChat('user', question);
+    fillPending(store.addChat('user', question).id);
     store.addChat('model', state.t(did === 'LogMeal' ? 'coach.didFood' : 'coach.did'), { persist: true });
     return;
   }
   inflight?.ctl.abort();
   const lang = /[æøå]|\b(hvad|hvordan|jeg|min|mit|skal|træning)\b/i.test(question) ? 'da' : state.lang;
   const history = state.chat.filter(m => !m.error);
-  store.addChat('user', question);
+  fillPending(store.addChat('user', question).id);
   const reply = store.addChat('model', '', { streaming: true, q: question });
   const key = getKey('google');
   if (!key) { store.updateChat(reply.id, { streaming: false, error: 'nokey' }, { persist: true }); return; }
@@ -804,7 +825,7 @@ export function initCoach(n) {
   nav = n;
   const root = $('#s-coach');
   const composer = $('#composer');
-  composer.innerHTML = `<span class="cglow" aria-hidden="true"><i></i></span><span class="chit" aria-hidden="true"></span><button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span></button><input enterkeyhint="send" autocomplete="off" maxlength="5000"><button type="submit" class="csend">${I.fwd}</button>`;
+  composer.innerHTML = `<span class="cglow" aria-hidden="true"><i></i></span><span class="chit" aria-hidden="true"></span><button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"></button><input enterkeyhint="send" autocomplete="off" maxlength="5000"><button type="submit" class="csend">${I.fwd}</button>`;
   // The composer's orb: talk to your coach. What you say is sent when you pause, the answer is
   // spoken, then it listens again, so it's a conversation. Tap while it listens to send at once;
   // tap while it thinks or speaks (or say nothing) to end it.

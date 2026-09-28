@@ -272,6 +272,22 @@ export function handOrb(from, to) {
   wake();
 }
 
+// The one orb moved to a slot of another size (the dock, the voice stage, the message box): its canvas
+// is redrawn for that size once, when it lifts off or lands, never while it moves.
+export function refitOrb(orb, size) {
+  const o = orb && byEl.get(orb);
+  if (!o) return;
+  size = Math.round(size || parseFloat(orb.style.getPropertyValue('--s')) || parseFloat(getComputedStyle(orb).getPropertyValue('--s')) || o.size);
+  if (Math.abs(size - o.size) < 1) return;
+  const box = Math.round(size * 1.3), off = (box - size) / 2;
+  o.canvas.width = o.canvas.height = Math.round(box * o.dpr);
+  Object.assign(o.canvas.style, { width: `${box}px`, height: `${box}px`, left: `${-off}px`, top: `${-off}px` });
+  const n = Math.round(Math.min(size > 150 ? 340 : 280, Math.max(56, size * size * 0.034)));
+  Object.assign(o, { size, box, pts: lattice(n), xs: new Float32Array(n), ys: new Float32Array(n), rs: new Float32Array(n) });
+  paint(o, performance.now());
+  wake();
+}
+
 // Every orb, as it appears; a new theme or accent recolours them.
 function scan(root) {
   if (root.nodeType !== 1) return;
