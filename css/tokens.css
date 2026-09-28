@@ -21,9 +21,6 @@
      a gentle spring only for things you press. */
   --m-press:.12s; --m-fast:.18s; --m-base:.32s; --m-slow:.46s;
   --m-word:.85s; --m-think:2.4s; --m-drift:7s;
-  /* the voice flow (1.60): press, labels, the sheet's background and chrome, the orb's move, a new word */
-  --m-tap:.08s; --m-label:.15s; --m-sheet:.22s; --m-chrome:.2s; --m-handoff:.38s; --m-flip:.42s; --m-newword:.16s; --m-sheetout:.24s;
-  --e-flip:cubic-bezier(.2,.8,.2,1);
   --e-out:cubic-bezier(.2,.8,.2,1); --e-soft:cubic-bezier(.25,.1,.25,1); --e-in:cubic-bezier(.4,0,1,1); --e-spring:cubic-bezier(.32,1.2,.5,1);
 }
 

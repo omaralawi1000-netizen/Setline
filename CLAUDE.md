@@ -7,19 +7,10 @@ Follow `AGENTS.md`. It's short on purpose; don't read more than the task needs.
 - Keep chat replies short.
 
 ## Motion & performance rules
-
-The budget from 1.60 (the phone ran out of GPU memory mid-transition before it). `tests/motion-rules.test.js` enforces the first two; the golden flows `voice-to-coach` and `chat-stream` enforce the rest of the voice and chat rules.
-- Animate only `transform` and `opacity` (transitions, keyframes and `el.animate`). The one exception is SVG `stroke-dashoffset` on the rings and exercise figures.
-- `backdrop-filter` only on the dock (`.dcap`, `.obub`) and the Coach's message box, blur ≤ 16px, and solid (no blur) while `.app.moving` is on. Everything else is a solid tint.
-- Glows and background lights are static gradients; animate only their opacity or scale.
-- One animation frame: anything that draws every frame subscribes to `onFrame` / `nextFrame` in `js/ui/frame.js` (it stops when nothing is subscribed or the page is hidden). No other rAF loops. Never write a value every frame to a property that has a CSS transition (it restarts each frame).
-- Canvas: DPR ≤ 2, never resized in the loop, sprites pre-drawn once (no per-dot gradients or `shadowBlur`).
-- `will-change` only just before an animation and removed after; no standing layers.
-- No forced layout during a transition: measure first, then write; no `void el.offsetWidth` or `getComputedStyle` in a moving frame (`token()` is cached).
-- Exactly one orb visible at a time (hand over with `handOrb`); no comet trails.
-- Home is hidden and inert while the voice sheet covers it (`.app.voice-covered`, set once the sheet is opaque and cleared before it fades); the Coach is its own screen, so Home is already off under it.
-- Chat: never rebuild the thread with `innerHTML`; patch by id, stream into the bubble that becomes the final message, at most one DOM write per frame, and scroll (`scrollTop`, never smooth `scrollIntoView`) only when within about 80 px of the end.
-- Reduced motion: 150 ms opacity cross-fades, the orb holds still.
-- Check with `npm run golden`, `npm run motion -- --only=…` and, on the phone, `?perf=1` (frame meter; `?perf=0` hides it).
-
-28 Sep 2026: reverted to 1.60.0. The hold-to-talk / frost / review-sheet rework was unstable. Don't reapply those commits; the backup tag is backup-before-revert-1.60.0.
+28 Sep 2026: Omar restored the 1.59.1 design (floating orb, pull-up voice screen, frosted glass, sea light). Fix its speed without changing how it looks. Never remove the floating orb mode, the pull-up, or the frosted look to gain speed. If a fix seems to need a visible change, ask Omar first.
+- Animate only transform and opacity. Blur values never animate; fade blurred layers with opacity.
+- Real backdrop blur only where content visibly moves behind it: the split bar/dock, the Coach message box, the floating orb's scrim over the page, and sheets over the page. Max ~4 blurred layers on screen at once. Everywhere else: a tint matched to what's behind it, so it looks the same.
+- Background motion (ambient, clouds, sea) holds still during scrolling, transitions and while any overlay, voice screen or Coach is open.
+- Exactly one orb visible at a time; no comet trails. Never cross-fade two full screens.
+- Chat: never rebuild the thread with innerHTML; one DOM node per message for its whole life; one DOM write per frame.
+- will-change only just before an animation, removed after. Canvases ≤ 2× DPR, never resized in the loop.

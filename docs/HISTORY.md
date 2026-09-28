@@ -739,3 +739,9 @@ Fixes the flashes, lag and half-drawn frames in the voice → Coach recording, i
 ## 1.61.2: Revert to 1.60.0
 
 - The code is exactly 1.60.0 again: the 1.61.0 / 1.61.1 hold-to-talk rework (state machine, frost layer, review sheet, tuning panel) was unstable on the phone and is gone. The version number moved up (not back) so the phone's service worker takes the update. The database is unchanged (schema 4 throughout), so nothing logged is affected. The rework is kept on the branch backup-before-revert-1.60.0.
+
+## 1.62.0: the 1.59.1 design is back (master fix, phase 1)
+
+- Omar chose 1.59.1's design: the floating mini orb over the page, pulling up into the full voice screen, frosted glass and the sea light. The app (index.html, css, js, sw.js, manifest, icons, SPEC.md, PLAN.md, visual baselines) is exactly 1.59.1 again (2e5ef25); the checks added since (golden flows, motion checker, `npm run motion`) are kept. The 1.60 budget test and the voice-to-coach / chat-stream golden flows describe 1.60's design, so they report without failing until phase 2 brings them up to date.
+- The database is schema 4 in both, so nothing logged changes. The version moved up so the phone takes the update. What came before is on the branch backup-before-restore-1.59.1.
+- Next (phases 2–4): make it fast without changing the look (blur audit, background holds still, one frame loop), fix the voice → Coach and chat flow bugs, then review-before-send and voice-reactive dots.

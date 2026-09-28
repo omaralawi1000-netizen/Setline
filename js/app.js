@@ -28,10 +28,9 @@ import { initBody } from './ui/body.js';
 import { initRoutine, setRoutineNav, renderRoutine, editRoutine, editRoutineFrom, programsSheet, startRoutine, planFor } from './ui/routine.js';
 import { setHistoryFilter } from './ui/history.js';
 import { renderProgress, renderExercise, setRange } from './ui/progress.js';
-import { countAll, burst, orbPulse, moving } from './ui/fx.js';
+import { countAll, burst, orbStreak, orbPulse } from './ui/fx.js';
 import { syncBeams } from './ui/beam.js';
 import { startDotOrbs, handOrb } from './ui/dotorb.js';
-import { initPerf } from './ui/perf.js';
 import { initPress } from './ui/press.js';
 import { initChrome, refreshChrome } from './ui/chrome.js';
 import { openCustomize } from './ui/customize.js';
@@ -202,6 +201,7 @@ function flyOrb(from, to, { duration, delay = 0, go, onland, easing, fromEl, toE
   const ang = Math.atan2(dy, dx) * 180 / Math.PI, st = (x, y) => `rotate(${ang}deg) scale(${x}, ${y}) rotate(${-ang}deg)`;
   go(ghost, [{ transform: st(1, 1) }, { transform: st(1.07, 0.95), offset: 0.2 }, { transform: st(1.03, 0.98), offset: 0.6 }, { transform: st(1, 1), offset: 0.9 }, { transform: st(1, 1) }],
     { duration, delay, easing: 'linear' });
+  orbStreak(app, from, to, { duration, delay, easing, size: Math.min(from.w, to.w), lag: duration * 0.28, go, before: ghost, z: '8' });
   // its glow comes up while it travels and settles as it lands
   go(a, [{ opacity: 0 }, { opacity: 0.8, offset: 0.35 }, { opacity: 0 }], { duration, delay, easing: 'linear', pseudoElement: '::before' });
   go(b, [{ opacity: 0 }, { opacity: 0.8, offset: 0.35 }, { opacity: 0 }], { duration, delay, easing: 'linear', pseudoElement: '::before' });
@@ -220,8 +220,7 @@ function impact() {
   haptic('land');
   const box = $('#composer');
   if (!box) return;
-  box.classList.remove('hit');
-  requestAnimationFrame(() => { box.classList.add('hit'); setTimeout(() => box.classList.remove('hit'), 1000); }); // (no forced layout)
+  box.classList.remove('hit'); void box.offsetWidth; box.classList.add('hit'); setTimeout(() => box.classList.remove('hit'), 1000);
   if (stillMotion()) return;
   box.animate([
     { transform: 'none' },
@@ -343,7 +342,6 @@ function growInto() {
 // Direction for the transition: tabs by position, sub screens push in from the right.
 const ORDER = { today: 0, workout: 1, food: 2, you: 3, coach: 4, history: 4, detail: 5, settings: 4, routine: 4, progress: 5, body: 4, exercise: 6 };
 function show(name, { back = false, still = false } = {}) {
-  moving(name === 'coach' || view.screen === 'coach' ? 1000 : 480); // the frosted bars go solid while the screens move
   const prev = view.screen;
   view.screen = name;
   // the Coach opening over a tab or closing back to one: the light does the moving, so the two
@@ -358,12 +356,11 @@ function show(name, { back = false, still = false } = {}) {
     const on = s.dataset.screen === name;
     const was = s.classList.contains('on');
     if (on && !was && (coachSwap || still)) {
-      // appears in place: its transition stays off until a frame has been drawn this way (no forced
-      // style pass here: this runs while the voice sheet hands over to the Coach)
       s.classList.add('instant');
       s.style.setProperty('--off-x', '0px');
       s.classList.add('on');
-      requestAnimationFrame(() => requestAnimationFrame(() => s.classList.remove('instant')));
+      void s.offsetWidth;
+      s.classList.remove('instant');
       s._counted = prev === 'coach' || still;
     } else if (on && !was) {
       s.classList.add('instant');
@@ -538,7 +535,6 @@ Object.assign(actions, {
 initPress(document);
 initChrome();
 startDotOrbs();
-initPerf(); // ?perf=1: a tiny frame meter in the corner (dev only)
 app.addEventListener('dockopen', () => renderDock());
 initHandsFree();
 initBodyScreen($('#s-body'));
@@ -548,19 +544,7 @@ setOnboardNav({ go: name => go(name), ask: q => askCoach(q) });
 initWorkout($('#s-workout'), actions);
 initSettings(actions, $('#s-settings'));
 setWorkoutNav({ go, showDetail });
-initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings'), openCoach: () => go('coach'),
-  // from the voice sheet: the Coach goes in place underneath, at once, taking over the sheet's history
-  // entry (no fly-in: the sheet's own orb flies into the message box)
-  coachUnder: () => {
-    if (!TABS.includes(view.screen) || view.screen === 'coach' || !history.state?.voice) return false;
-    coachFrom = view.screen;
-    history.replaceState({ screen: 'coach', from: coachFrom }, '');
-    show('coach', { still: true });
-    const r = $('#s-coach');
-    if (r) r.scrollTop = r.scrollHeight; // already at the bottom when the sheet lifts
-    return true;
-  },
-  landInBox: () => impact() });
+initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings'), openCoach: () => go('coach') });
 initCoach({ openSettings: () => pushSub('settings'), closeCoach: () => closeCoach(), go: name => go(name, { quiet: true }), open: name => pushSub(name) });
 setCardioNav({ go, showDetail });
 initCardio();
