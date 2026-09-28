@@ -3,3 +3,5 @@ screenshots/
 motion/
 visual/current/
 visual/diff/
+test-results/
+playwright-report/
