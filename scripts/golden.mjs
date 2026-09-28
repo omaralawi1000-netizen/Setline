@@ -5,6 +5,7 @@
 // Google Fonts. Selectors are the app's own data-act / data-k hooks: a redesign must keep them
 // (or update this file in the same change).
 import { launch, newPage, serve, settle, onScreen } from './lib/harness.mjs';
+import { STAND_IN, mockServices, installSampler, mark, samples, between } from './lib/voiceflow.mjs';
 
 const ONLY = process.argv.find(a => a.startsWith('--only='))?.slice(7).split(',').filter(Boolean);
 
@@ -85,6 +86,51 @@ const FLOWS = {
     await settle(page, 800);
     await context.close();
     return errors.filter(e => !/offline|network|fetch/i.test(e));
+  },
+
+  // Hold the orb → talk → release → the question goes to the Coach. One listening UI (the sheet),
+  // one orb on screen at every frame, the sheet's top bar and controls there from open to handoff,
+  // and Home never shows on the way from the sheet into the chat.
+  'voice-to-coach': async (browser, base) => {
+    const { context, page, errors } = await newPage(browser, base);
+    await mockServices(page);
+    await page.addInitScript(k => { localStorage.setItem('setline.keys', JSON.stringify(k)); }, STAND_IN);
+    await page.goto(base + '?seed=1');
+    await onScreen(page, 'today');
+    await page.evaluate(async () => { const s = await import('./js/store.js'); s.setSettings({ spoken: 'off' }); });
+    await settle(page, 1000);
+    await installSampler(page);
+    const orb = await page.locator('#dock .orbbtn').boundingBox();
+    await page.mouse.move(orb.x + orb.width / 2, orb.y + orb.height / 2);
+    await mark(page, 'down');
+    await page.mouse.down();
+    await page.waitForSelector('#voice.on', { timeout: 4000 });
+    await mark(page, 'open');
+    if (await page.locator('#ofloat:not([hidden])').count()) throw new Error('the floating orb over Home showed (a second listening UI)');
+    await page.waitForSelector('#voice[data-phase=listening]', { timeout: 6000 });
+    await settle(page, 1500);
+    await mark(page, 'release');
+    await page.mouse.up();
+    await onScreen(page, 'coach', 10000);
+    await page.waitForSelector('#voice[hidden]', { state: 'attached', timeout: 6000 });
+    await settle(page, 700);
+    await mark(page, 'end');
+    const rec = await samples(page);
+    const all = between(rec, 'down', 'end');
+    const two = all.filter(x => x.orbs > 1);
+    if (two.length) throw new Error(`${two.length} frame(s) with ${Math.max(...two.map(x => x.orbs))} orbs on screen (${two[0].orbIds})`);
+    const openAt = rec.marks.find(m => m.name === 'open').t;
+    const handoff = all.find(x => x.handoff)?.t;
+    if (!handoff) throw new Error('the sheet never handed over to the Coach');
+    const session = all.filter(x => x.t > openAt + 600 && x.t < handoff);
+    const gone = session.filter(x => !x.chrome);
+    if (gone.length) throw new Error(`the sheet's top bar or controls were missing in ${gone.length} of ${session.length} frames (${gone[0].why})`);
+    const home = all.filter(x => x.t >= handoff && x.home);
+    if (home.length) throw new Error(`Home showed in ${home.length} frame(s) on the way to the Coach`);
+    const users = await page.locator('#s-coach .msg.me').count();
+    if (users !== 1) throw new Error(`expected the question once in the chat, found ${users}`);
+    await context.close();
+    return errors;
   },
 
   // Every main tab opens without throwing.

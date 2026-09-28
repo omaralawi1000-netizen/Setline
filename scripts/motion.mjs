@@ -140,13 +140,13 @@ const at = {
     const o = await center(page, '#dock .orbbtn');
     await page.mouse.move(o.x, o.y);
     await page.mouse.down();
-    await page.waitForSelector('#ofloat[data-phase=listening]', { timeout: 8000 });
+    await page.waitForSelector('#voice[data-phase=listening]', { timeout: 8000 });
     await wait(page, 1200);
   },
   async thinking(page, stt) {
     await at.listening(page);
     await page.mouse.up();
-    await page.waitForSelector('#ofloat[data-phase=thinking]', { timeout: 8000 });
+    await page.waitForSelector('#voice[data-phase=thinking]', { timeout: 8000 });
     for (let i = 0; i < 100 && !stt.pending; i++) await wait(page, 50);
     if (!stt.pending) throw new Error('speech-to-text was never called');
     await wait(page, 600);
@@ -176,17 +176,17 @@ const ANIMATIONS = [
     name: 'orb-listening', group: 'voice orb',
     setup: async p => { await at.today(p); await p.evaluate(k => localStorage.setItem('setline.keys', JSON.stringify({ groq: k })), STAND_IN_KEY); },
     trigger: async p => { const o = await center(p, '#dock .orbbtn'); await p.mouse.move(o.x, o.y); await p.mouse.down(); },
-    min: 2200, fixed: true, expect: p => p.waitForSelector('#ofloat[data-phase=listening]', { timeout: 5000 })
+    min: 2200, fixed: true, expect: p => p.waitForSelector('#voice[data-phase=listening]', { timeout: 5000 })
   },
   {
     name: 'orb-processing', group: 'voice orb', setup: p => at.listening(p),
     trigger: p => p.mouse.up(), min: 1800, fixed: true,
-    expect: p => p.waitForSelector('#ofloat[data-phase=thinking]', { state: 'attached', timeout: 3000 })
+    expect: p => p.waitForSelector('#voice[data-phase=thinking]', { state: 'attached', timeout: 3000 })
   },
   {
     name: 'orb-result', group: 'voice orb', setup: (p, env) => at.thinking(p, env.stt),
     trigger: (p, env) => env.stt.release(), min: 1200, max: 4500, ignore: '#toast',
-    expect: p => p.waitForSelector('#s-workout.screen.on, .intent.show, #ofloat[data-phase=result]', { state: 'attached', timeout: 5000 })
+    expect: p => p.waitForSelector('#s-workout.screen.on, .intent.show, #voice[data-phase=result]', { state: 'attached', timeout: 5000 })
   },
 
   { name: 'tab-today-to-workout', ...tabTo('tab-today-to-workout', 'workout'), setup: p => at.today(p) },

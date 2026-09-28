@@ -30,7 +30,7 @@ import { isQuestion, isPlanRequest, isNoise } from '../coach.js';
 import { startCardioSession, finishSheet as cardioFinishSheet } from './cardio.js';
 import { dateKey } from '../body.js';
 import { planFor } from './routine.js';
-import { orbPulse, orbShake, orbSpark } from './fx.js';
+import { orbPulse, orbShake, orbSpark, moving, token } from './fx.js';
 import { setOrb, handOrb } from './dotorb.js';
 import { onFrame } from './frame.js';
 import { livePRSets } from '../pr.js';
@@ -49,7 +49,6 @@ const reduced = () => document.documentElement.dataset.motion === 'off' ||
 
 let nav = { go: () => {}, showDetail: () => {}, openSettings: () => {} };
 const v = {
-  mode: 'full',   // 'mini' = the orb floating above the dock, 'full' = the voice screen
   open: false, phase: 'idle', toggle: false, typing: false,
   press: null, token: 0, closing: null, popWaiting: 0,
   raf: 0, lvl: 0, lo: 0, hi: 0, hist: new Float32Array(64), histAt: 0
@@ -102,7 +101,7 @@ function build() {
     <div class="vbg"></div>
     <header class="top">
       <button class="iconbtn" data-v="close">${I.close}</button>
-      <div class="live" id="vstatus"><i></i><span></span></div>
+      <div class="live" id="vstatus"><i></i><span class="xl"><span class="on"></span><span></span></span></div>
       <span class="chip" id="vlang"></span>
     </header>
     <div class="stagev" id="vstage">
@@ -117,23 +116,12 @@ function build() {
       <button class="send" type="submit">${I.fwd}</button>
     </form>
     <div class="hints" id="vhints"></div>
-    <button class="hold" id="vhold"><span class="glow"></span>${micIcon}<span id="vholdtxt"></span></button>
+    <button class="hold" id="vhold"><span class="glow"></span>${micIcon}<span class="xl" id="vholdtxt"><span class="on"></span><span></span></span></button>
     <p class="holdnote" id="vnote"></p>`;
-  const mini = document.createElement('div');
-  mini.className = 'ofloat';
-  mini.id = 'ofloat';
-  mini.hidden = true;
-  mini.innerHTML = `<div class="oscrim" data-o="cancel"></div>
-    <div class="obubble"><span class="ostatus" id="ostatus"></span><p class="osay" id="osay"></p></div>
-    <div class="opull" id="opull" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M6 14.5l6-6 6 6"/></svg><span></span></div>
-    <span class="owrap" id="owrap" data-o="orb"><span class="orb lift" id="oorb"><i class="core"><b></b><b></b><b></b></i><i class="spin"></i></span><span class="oglow"></span></span>`;
-  document.getElementById('app').appendChild(mini);
-  // the voice glow (voice-glow): under everything on the voice screen, over the floating orb's scrim
+  // the voice glow: under everything on the voice screen
   el.glowFull = createVoiceGlow(layer, layer.querySelector('.vbg')?.nextSibling);
-  el.glowMini = createVoiceGlow(mini, mini.querySelector('.obubble'));
   Object.assign(el, {
-    mini, owrap: mini.querySelector('#owrap'), oorb: mini.querySelector('#oorb'), ostatus: mini.querySelector('#ostatus'), osay: mini.querySelector('#osay'), opull: mini.querySelector('#opull'),
-    layer, status: $('#vstatus span'), lang: $('#vlang'), stage: $('#vstage'), halo: $('#vhalo'), ripples: $('#vripples'),
+    layer, status: $('#vstatus .xl'), lang: $('#vlang'), stage: $('#vstage'), halo: $('#vhalo'), ripples: $('#vripples'),
     orbwrap: $('#vorbwrap'), orb: $('#vorb'), wave: $('#vwave'), bars: [...$('#vwave').children], say: $('#vsay'),
     type: $('#vtype'), input: $('#vinput'), hints: $('#vhints'), hold: $('#vhold'), holdtxt: $('#vholdtxt'), note: $('#vnote'),
     card: $('#intent'), dockOrb: null
@@ -159,20 +147,30 @@ function paintStatic() {
 
 function setPhase(phase) {
   // didn't get it: the orb shakes its head
-  if (phase === 'error' && v.phase !== 'error') orbShake(v.mode === 'mini' ? el.oorb : el.orb);
+  if (phase === 'error' && v.phase !== 'error') orbShake(el.orb);
   v.phase = phase;
   el.layer.dataset.phase = phase;
   const t = state.t;
   const status = { idle: 'voice.ready', opening: 'voice.opening', listening: 'voice.listening', thinking: 'voice.thinking', result: 'voice.ready', error: 'voice.ready' }[phase];
-  el.status.textContent = t(status);
+  crossLabel(el.status, t(status));
   const rec = phase === 'listening' || phase === 'opening';
-  el.holdtxt.textContent = t(rec ? (v.toggle ? 'voice.tapSend' : 'voice.release') : 'voice.hold');
+  crossLabel(el.holdtxt, t(rec ? (v.toggle ? 'voice.tapSend' : 'voice.release') : 'voice.hold'));
   el.note.textContent = t(rec && v.toggle ? 'voice.tapNote' : 'voice.holdNote');
   el.hold.disabled = phase === 'thinking';
   el.layer.dataset.toggle = v.toggle ? '1' : '';
-  el.mini.dataset.phase = phase;
-  el.mini.dataset.toggle = v.toggle ? '1' : '';
-  el.ostatus.textContent = t(phase === 'listening' && v.toggle ? 'voice.tapSendMini' : status);
+}
+
+// A label that changes cross-fades: the new text fades in over the old in the same spot, so the pill
+// never empties to a dot and the button never jumps.
+function crossLabel(host, text) {
+  const [a, b] = host.children, cur = a.classList.contains('on') ? a : b, next = cur === a ? b : a;
+  if (cur.textContent === text) return;
+  if (reduced() || !cur.textContent) { cur.textContent = text; next.textContent = ''; return; }
+  next.textContent = text;
+  next.classList.add('on');
+  cur.classList.remove('on');
+  clearTimeout(host._x);
+  host._x = setTimeout(() => { if (!cur.classList.contains('on')) cur.textContent = ''; }, 170);
 }
 
 const translateY = node => { const t = getComputedStyle(node).transform; return t && t !== 'none' ? new DOMMatrix(t).m42 : 0; };
@@ -225,97 +223,35 @@ function flyOrb(open, fromEl = null) {
   w.style.transform = open ? '' : far;
 }
 
-// ---------- mini mode: the orb lifts out of the dock ----------
-
-function flyMini(open) {
-  const from = document.querySelector('#dock .orbbtn .orb');
-  const w = el.owrap;
-  if (!from || reduced()) { w.style.transform = ''; return; }
-  const current = getComputedStyle(w).transform;
-  w.style.transition = 'none';
-  w.style.transform = 'none';
-  const b = el.oorb.getBoundingClientRect();
-  const a = from.getBoundingClientRect();
-  const dockShift = open ? 0 : translateY(document.getElementById('dock'));
-  const dx = a.left + a.width / 2 - (b.left + b.width / 2);
-  const dy = a.top + a.height / 2 - dockShift - (b.top + b.height / 2);
-  const far = `translate(${dx}px, ${dy}px) scale(${a.width / b.width})`;
-  w.style.transform = open ? far : (current === 'none' ? '' : current);
-  void w.offsetWidth;
-  w.style.transition = open ? '' : 'transform .5s cubic-bezier(.3,.7,.2,1)';
-  w.style.transform = open ? '' : far;
-}
-
 function pushVoiceEntry() {
   const push = () => { if (v.open && !history.state?.voice) history.pushState({ ...(history.state || {}), voice: 1 }, ''); };
   if (v.closing) v.closing.then(push); else push();
 }
 
-// Food screen's "Say it": lift the orb and start listening straight away.
+// Food screen's "Say it": open the voice sheet and start listening straight away.
 export function talkNow() {
   unlockAudio();
-  if (!v.open) openMini();
+  if (!v.open) openVoice();
   v.toggle = true;
   startRec();
 }
 
-export function openMini() {
+// The one listening UI: the sheet opens at once (the mic is still opening: its pill says so), over an
+// opaque background that fades in; the orb moves from the dock to its place (FLIP, one element);
+// the top bar, waveform and controls fade up after it and stay until the sheet closes.
+export function openVoice() {
   hideToast();
   if (v.open) return;
   v.open = true;
-  v.mode = 'mini';
-  el.osay.innerHTML = '';
-  el.osay.classList.remove('over');
-  el.owrap.style.translate = '';
-  el.opull.style.opacity = '';
-  el.opull.querySelector('span').textContent = state.t('voice.pullUp');
-  setPhase('idle');
-  document.getElementById('app').classList.add('voice-mini', 'orbaway');
-  el.mini.hidden = false;
-  syncOrb(dockOrb(), el.oorb);
-  void el.mini.offsetWidth;
-  el.mini.classList.add('on');
-  flyMini(true);
-  pushVoiceEntry();
-  startLoop();
-}
-
-// Hand the live session over to the full voice screen (recording keeps going).
-function expandFull() {
-  if (!v.open || v.mode !== 'mini') return;
-  haptic('tap');
-  const from = el.oorb;
-  v.mode = 'full';
-  v.typing = false;
-  el.layer.classList.remove('typing');
-  paintStatic();
-  el.say.innerHTML = el.osay.innerHTML;
-  document.getElementById('app').classList.add('voice');
-  el.layer.hidden = false;
-  el.layer.inert = false;
-  el.orbwrap.style.transform = '';
-  el.orbwrap.style.visibility = '';
-  syncOrb(from, el.orb);
-  void el.layer.offsetWidth;
-  el.layer.classList.add('on');
-  flyOrb(true, from);
-  setPhase(v.phase);
-  el.mini.classList.remove('on');
-  el.mini.classList.add('handoff');
-  setTimeout(() => { el.mini.hidden = true; el.mini.classList.remove('handoff'); document.getElementById('app').classList.remove('voice-mini'); el.owrap.style.translate = ''; }, 260);
-}
-
-export function openVoice() {
-  hideToast();
-  if (v.open) { if (v.mode === 'mini') expandFull(); return; }
-  v.open = true;
-  v.mode = 'full';
   v.typing = false;
   el.layer.classList.remove('typing');
   paintStatic();
   el.say.innerHTML = '';
   setPhase('idle');
-  document.getElementById('app').classList.add('voice', 'orbaway');
+  const app = document.getElementById('app');
+  app.classList.add('voice', 'orbaway');
+  moving(700);
+  el.layer.classList.remove('handoff');
   el.layer.hidden = false;
   el.layer.inert = false;
   el.orbwrap.style.transform = '';
@@ -324,10 +260,21 @@ export function openVoice() {
   void el.layer.offsetWidth;
   el.layer.classList.add('on');
   flyOrb(true);
+  // once it's fully open, the page underneath stops painting (and can't be tabbed into)
+  clearTimeout(v.coverTimer);
+  v.coverTimer = setTimeout(() => { if (v.open) cover(true); }, reduced() ? 0 : 460);
   // own history entry so Android back closes the layer; wait for a previous close to settle first
   const push = () => { if (v.open && !history.state?.voice) history.pushState({ ...(history.state || {}), voice: 1 }, ''); };
   if (v.closing) v.closing.then(push); else push();
   startLoop();
+}
+
+// Home under the open sheet: hidden (no painting) and inert while covered; shown again before the
+// sheet starts to fade.
+function cover(on) {
+  const app = document.getElementById('app');
+  app.classList.toggle('voice-covered', on);
+  for (const s of document.querySelectorAll('.screen.on')) s.inert = on;
 }
 
 // Close; resolves once history has settled so callers can navigate safely.
@@ -338,26 +285,9 @@ export function closeVoice({ fromPop = false } = {}) {
   v.press = null;
   v.toggle = false;
   mic.cancel();
-  if (v.mode === 'mini') {
-    // the orb sinks back into the dock
-    el.mini.classList.remove('on');
-    el.oorb.style.transform = '';
-    el.owrap.style.translate = '';
-    flyMini(false);
-    document.getElementById('app').classList.remove('voice-mini'); // the dock comes back for the orb to land in
-    let landed = false;
-    const land = e => {
-      if (landed || v.open || (e && e.propertyName !== 'transform')) return;
-      landed = true;
-      landOrb(el.oorb, () => { el.mini.hidden = true; document.getElementById('app').classList.remove('voice-mini'); });
-    };
-    el.owrap.addEventListener('transitionend', land);
-    setTimeout(() => { el.owrap.removeEventListener('transitionend', land); land(); }, reduced() ? 0 : 640);
-    setTimeout(() => { if (!v.open) { el.mini.hidden = true; stopLoop(); el.owrap.style.transform = ''; el.owrap.style.transition = ''; } }, 600);
-    if (fromPop || !history.state?.voice) return v.closing || Promise.resolve();
-    v.closing = new Promise(res => { v.popWaiting++; v.popResolve = res; history.back(); }).then(() => { v.closing = null; });
-    return v.closing;
-  }
+  clearTimeout(v.coverTimer);
+  cover(false); // the page comes back first, then the sheet fades off it
+  moving(700);
   el.input.blur();
   el.layer.classList.remove('on');
   el.layer.inert = true;
@@ -414,29 +344,23 @@ function startLoop() {
     // processing sweep while the words are worked out, nothing otherwise (a meter, so it keeps
     // answering the voice with reduced motion; only its breathing, flow and sweep stop)
     const b = listening ? mic.bands() : { low: 0, high: 0, rms: 0, voice: [0, 0, 0] };
-    const glow = v.mode === 'mini' ? el.glowMini : el.glowFull, quiet = v.mode === 'mini' ? el.glowFull : el.glowMini;
+    const glow = el.glowFull;
     const gsrc = { listening, processing: v.phase === 'thinking', rms: b.rms, voice: b.voice };
     glow?.step(Math.min(0.05, dt / 1000), gsrc, reduced());
-    if (quiet?.on) quiet.off();
     // the dotted orb ripples with the voice (the lows round its middle, the highs at its poles)
-    setOrb(v.mode === 'mini' ? el.oorb : el.orb, { state: !v.open ? 'idle' : listening ? 'listening' : v.phase === 'thinking' ? 'thinking' : 'idle', level: v.lvl, bands: [b.low, b.voice[1] * 3, b.high] });
+    setOrb(el.orb, { state: !v.open ? 'idle' : listening ? 'listening' : v.phase === 'thinking' ? 'thinking' : 'idle', level: v.lvl, bands: [b.low, b.voice[1] * 3, b.high] });
     if (reduced()) return;
     const l = v.lvl;
     // the body of the voice swells the orb's core, its edge (s, t, k) lights the rim
     v.lo += (b.low - v.lo) * (b.low > v.lo ? 0.4 : 0.12);
     v.hi += (b.high - v.hi) * (b.high > v.hi ? 0.55 : 0.18);
-    const fq = v.mode === 'mini' ? el.oorb : el.orb;
+    const fq = el.orb;
     fq.style.setProperty('--lo', v.lo.toFixed(3));
     fq.style.setProperty('--hi', v.hi.toFixed(3));
     // alive, not mechanical: a slow breath, and a soft squash and stretch that follows the voice
     const breath = v.phase === 'thinking' ? 0 : 0.012 * Math.sin(now / 700);
     const sx = 1 + breath + l * 0.07 + l * 0.025 * Math.sin(now / 95);
     const sy = 1 + breath + l * 0.09 + l * 0.025 * Math.cos(now / 110);
-    if (v.mode === 'mini') {
-      el.oorb.style.transform = `scale(${sx.toFixed(4)}, ${sy.toFixed(4)})`;
-      el.owrap.style.setProperty('--l', l.toFixed(3));
-      return;
-    }
     el.orb.style.transform = `scale(${(1 + (sx - 1) * 0.7).toFixed(4)}, ${(1 + (sy - 1) * 0.7).toFixed(4)})`;
     el.halo.style.opacity = String(listening ? 0.35 + l * 0.65 : v.phase === 'thinking' ? 0.5 : 0.22);
     el.halo.style.transform = `scale(${1 + l * 0.3})`;
@@ -457,7 +381,7 @@ function startLoop() {
   v.raf = onFrame(tick);
 }
 
-function stopLoop() { v.raf?.(); v.raf = 0; v.lastTick = 0; el.glowFull?.off(); el.glowMini?.off(); }
+function stopLoop() { v.raf?.(); v.raf = 0; v.lastTick = 0; el.glowFull?.off(); }
 
 // ---------- recording ----------
 
@@ -532,9 +456,8 @@ async function speculate() {
   handleText(withCarry(text));
 }
 function setPausing(k) {
-  el.mini.dataset.pause = k;
   el.layer.dataset.pause = k;
-  if (v.phase === 'listening') el.ostatus.textContent = state.t(k === 'wait' ? 'voice.takeTime' : v.toggle ? 'voice.tapSendMini' : 'voice.listening');
+  if (v.phase === 'listening') crossLabel(el.status, state.t(k === 'wait' ? 'voice.takeTime' : 'voice.listening'));
 }
 
 async function finishRec() {
@@ -573,16 +496,25 @@ function cancelRec() {
 
 // ---------- text → intent → card ----------
 
+// What you said: words already on screen stay put (one the recogniser changed is swapped in place,
+// never emptied), and only new words at the end fade up, one after another. No slot is ever blank.
 function showWords(text) {
   const words = text.split(/\s+/).filter(Boolean);
-  (v.mode === 'mini' ? el.osay : el.say).innerHTML = words.map((w, i) => `<span class="w" style="animation-delay:${Math.min(i, 14) * 38}ms">${esc(w)}</span>`).join(' ');
-  if (v.mode === 'mini') fitSay();
-}
-// The floating orb's words keep to three lines: a longer sentence shows its end, fading out at the top.
-function fitSay() {
-  const o = el.osay;
-  o.scrollTop = o.scrollHeight;
-  o.classList.toggle('over', o.scrollHeight > o.clientHeight + 1);
+  const box = el.say, have = [...box.querySelectorAll('.w')];
+  if (!have.length) box.textContent = '';
+  let i = 0;
+  for (; i < words.length && i < have.length; i++) if (have[i].textContent !== words[i]) have[i].textContent = words[i];
+  for (const w of have.slice(words.length)) { if (w.previousSibling?.nodeType === 3) w.previousSibling.remove(); w.remove(); }
+  const frag = document.createDocumentFragment();
+  for (let k = i; k < words.length; k++) {
+    if (k > 0) frag.append(' ');
+    const w = document.createElement('span');
+    w.className = 'w';
+    w.style.animationDelay = `${Math.min(k - i, 12) * 30}ms`;
+    w.textContent = words[k];
+    frag.append(w);
+  }
+  box.append(frag);
 }
 
 export function handleText(text, { typed = false } = {}) {
@@ -638,11 +570,68 @@ export function handleAmbient(text) {
 export const speakCue = (text, lang = state.lang) => speak(text, lang);
 
 // Questions land in the Coach thread; the answer is streamed there and spoken when complete.
+// From the voice sheet, the chat is put in place underneath while the sheet is still opaque (already
+// at the bottom, the question in it); then the sheet fades off it while the orb moves into the
+// message box. Home never shows on the way, and there's one orb on screen throughout.
 async function toCoach(text) {
   dismissCard();
-  if (v.open) { setPhase('result'); await new Promise(r => setTimeout(r, 380)); await closeVoice(); }
+  if (v.open && nav.coachUnder?.()) {
+    askCoach(text);
+    handToCoach();
+    return;
+  }
+  if (v.open) await closeVoice();
   nav.go('coach');
   askCoach(text);
+}
+
+const handMs = () => token('--m-handoff') || 380; // the sheet fades meanwhile (--m-sheetout)
+function handToCoach() {
+  v.open = false;
+  v.token++;
+  v.press = null;
+  v.toggle = false;
+  mic.cancel();
+  clearTimeout(v.coverTimer);
+  el.input.blur();
+  const app = document.getElementById('app');
+  const target = document.querySelector('#composer .corb .orb');
+  cover(false);                      // (the chat is the page on now)
+  app.classList.remove('voice');
+  app.classList.add('orbflying');    // the message box's own orb waits for this one
+  el.layer.inert = true;
+  el.layer.classList.add('handoff'); // the sheet, its words and controls fade; only the orb stays
+  const w = el.orbwrap;
+  let done = false;
+  const land = () => {
+    if (done) return;
+    done = true;
+    if (target) handOrb(el.orb, target); // same pose, same glow: the swap is invisible
+    w.style.visibility = 'hidden';
+    app.classList.remove('orbflying', 'orbaway');
+    nav.landInBox?.();
+    el.layer.hidden = true;
+    el.layer.classList.remove('on', 'handoff', 'carded');
+    w.style.transition = 'none';
+    w.style.transform = '';
+    void w.offsetWidth;
+    w.style.transition = '';
+    w.style.visibility = '';
+    el.orb.style.transform = '';
+    stopLoop();
+  };
+  if (!target || reduced()) return setTimeout(land, reduced() ? 150 : 0);
+  // FLIP: from where the orb is now to the message box's orb (its resting place, not mid-transition)
+  const a = w.getBoundingClientRect(), A = app.getBoundingClientRect();
+  let x = target.offsetWidth / 2, y = target.offsetHeight / 2;
+  for (let n = target; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }
+  const k = scaleOf(el.stage) || 1;
+  const dx = (A.left + x - (a.left + a.width / 2)) / k, dy = (A.top + y - (a.top + a.height / 2)) / k;
+  const sc = target.offsetWidth / (el.orb.offsetWidth || 1);
+  w.style.transition = `transform ${handMs()}ms var(--e-flip)`;
+  w.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${sc.toFixed(4)})`;
+  w.addEventListener('transitionend', function te(e) { if (e.target === w && e.propertyName === 'transform') { w.removeEventListener('transitionend', te); land(); } });
+  setTimeout(land, handMs() + 60);
 }
 
 // What the parser couldn't read goes to Flash-Lite. Never blocks local commands:
@@ -658,8 +647,9 @@ async function aiFallback(text, parsed, { typed }) {
   const lang = langFor(parsed);
   const t = tFor(lang);
   if (v.open) setPhase('thinking');
-  if (v.open && v.mode === 'mini') el.ostatus.textContent = t('voice.thinkingAi');
-  else showCard({ kind: 'wait', icon: 'info', title: t('voice.thinkingAi'), sub: t('voice.heard', { text }), lang, intent: parsed });
+  // "Working it out" only if it takes a while (600 ms); once shown, it stays long enough to read
+  let shownAt = 0;
+  const waitCard = setTimeout(() => { if (mine === aiSeq) { showCard({ kind: 'wait', icon: 'info', title: t('voice.thinkingAi'), sub: t('voice.heard', { text }), lang, intent: parsed }); shownAt = performance.now(); } }, 600);
   let intent;
   try {
     await ensureModels();
@@ -670,6 +660,8 @@ async function aiFallback(text, parsed, { typed }) {
   } catch {
     intent = null;
   }
+  clearTimeout(waitCard);
+  if (shownAt) { const left = 800 - (performance.now() - shownAt); if (left > 0) await new Promise(r => setTimeout(r, left)); }
   if (mine !== aiSeq) return; // a newer AI request superseded this one
   if (intent?.type === 'question') return toCoach(text);
   const full = intent ? { ...intent, heard: text, lang: parsed.lang } : parsed;
@@ -722,12 +714,6 @@ function present(intent, { typed = false } = {}) {
     return;
   }
   speak(cmd.say, lang);
-  if (v.open && v.mode === 'mini') {
-    setPhase(cmd.kind === 'error' ? 'error' : 'result');
-    setTimeout(() => { if (v.open && v.mode === 'mini') closeVoice(); }, 420);
-    setTimeout(() => showCard(cmd), 180);
-    return;
-  }
   showCard(cmd);
   if (v.open) {
     setPhase(cmd.kind === 'error' ? 'error' : 'result');
@@ -743,7 +729,6 @@ function showError(titleKey, subKey, opts = {}) {
   else orbShake(dockOrb());
   haptic('error');
   const sub = (subKey ? t(subKey) : '') + (opts.code ? ` (${opts.code})` : '');
-  if (v.open && v.mode === 'mini') setTimeout(() => { if (v.open && v.mode === 'mini') closeVoice(); }, 250);
   showCard({ kind: 'error', icon: 'alert', title: t(titleKey), sub, retry: !!opts.retry, settings: !!opts.settings, type: !!opts.type, local: true });
 }
 
@@ -1003,14 +988,12 @@ async function onCardClick(e) {
   if (k === 'more') {
     v.carry = cmd?.intent?.heard || '';
     dismissCard({ keepPending: false });
-    if (!v.open) openMini();
-    el.osay.textContent = v.carry;
-    fitSay();
+    if (!v.open) openVoice();
     el.say.textContent = v.carry;
     v.toggle = true;
     return startRec();
   }
-  if (k === 'retry') { dismissCard({ keepPending: false }); if (!v.open) openMini(); v.toggle = true; return startRec(); }
+  if (k === 'retry') { dismissCard({ keepPending: false }); if (!v.open) openVoice(); v.toggle = true; return startRec(); }
   if (k === 'edit') {
     const heard = cmd?.intent?.heard || '';
     dismissCard({ keepPending: false });
@@ -1062,26 +1045,6 @@ function holdUp(tapMeansToggle) {
   };
 }
 
-// Pulling the lifted orb up: it tracks the finger with a little resistance, ticks at the
-// threshold and hands over to the full screen; a quick flick up does the same.
-const PULL_AT = 110;
-function pullTo(p, e) {
-  const raw = Math.min(0, e.clientY - p.y);
-  const now = performance.now();
-  const vel = p.lastY != null ? (e.clientY - p.lastY) / Math.max(1, now - p.lastT) : 0; // px/ms, negative is up
-  p.lastY = e.clientY; p.lastT = now;
-  const band = -PULL_AT * (1 - Math.exp(raw / PULL_AT)) * 1.15; // rubber band: eases off as it goes
-  el.owrap.classList.add('drag');
-  el.owrap.style.translate = `0 ${band.toFixed(1)}px`;
-  el.opull.style.opacity = String(Math.min(1, -raw / 80));
-  if (raw < -PULL_AT || (raw < -40 && vel < -1.1)) { p.expanded = true; releasePull(); expandFull(); }
-}
-function releasePull() {
-  el.owrap.classList.remove('drag');
-  el.owrap.style.translate = '';
-  el.opull.style.opacity = '';
-}
-
 export function initVoice(n) {
   nav = n;
   build();
@@ -1117,8 +1080,6 @@ export function initVoice(n) {
     e.preventDefault();
     unlockAudio();
     try { orb.setPointerCapture(e.pointerId); } catch {}
-    // hands-free and the orb is up: touching the dock orb again sends, like tapping the floating one
-    if (v.open && v.mode === 'mini' && v.toggle && (mic.isRecording() || v.phase === 'opening')) { haptic('tap'); v.press = null; finishRec(); return; }
     // a tap opens the Coach; holding talks (the mic starts once it's clearly a hold)
     const press = v.press = { t: performance.now(), orb: true, y: e.clientY, waiting: true };
     orb.classList.add('pressing');
@@ -1127,15 +1088,9 @@ export function initVoice(n) {
       press.waiting = false;
       press.t = performance.now() - HOLD_MS; // counts as a hold from here
       haptic('success');
-      openMini();
+      openVoice(); // at once: the sheet says "Opening mic" until the stream is live
       startRec();
     }, 240);
-  });
-  // while holding: drag the orb up to open the full voice screen
-  document.getElementById('dock').addEventListener('pointermove', e => {
-    const p = v.press;
-    if (!p?.orb || !v.open || v.mode !== 'mini') return;
-    pullTo(p, e);
   });
   const orbUp = e => {
     document.querySelector('#dock .orbbtn')?.classList.remove('pressing');
@@ -1144,7 +1099,6 @@ export function initVoice(n) {
     if (p.waiting) { clearTimeout(p.timer); v.press = null; haptic('tap'); nav.openCoach?.(); return; } // a tap: the Coach
     const dt = performance.now() - p.t;
     v.press = null;
-    if (v.mode === 'mini') releasePull();
     if (p.tapMode) return; // tap mode keeps listening until the orb is tapped again
     if (dt >= HOLD_MS || p.expanded) return finishRec();
     // a quick tap: keep listening hands-free; tap the floating orb to send
@@ -1154,23 +1108,6 @@ export function initVoice(n) {
   document.getElementById('dock').addEventListener('pointerup', orbUp);
   document.getElementById('dock').addEventListener('pointercancel', () => { document.querySelector('#dock .orbbtn')?.classList.remove('pressing'); if (v.press?.orb) { const p = v.press; v.press = null; if (p.waiting) clearTimeout(p.timer); else cancelRec(); } });
   document.getElementById('dock').addEventListener('contextmenu', e => { if (e.target.closest('.orbbtn')) e.preventDefault(); });
-
-  // floating orb: tap to send (or to listen again), tap outside to cancel
-  el.mini.addEventListener('click', e => {
-    const o = e.target.closest('[data-o]')?.dataset.o;
-    if (o === 'cancel') { haptic('tap'); cancelRec(); closeVoice(); }
-    else if (o === 'orb') {
-      haptic('tap');
-      if (mic.isRecording() || v.phase === 'opening') finishRec();
-      else if (v.phase !== 'thinking') { v.toggle = true; startRec(); }
-    }
-  });
-  let drag = null;
-  el.owrap.addEventListener('pointerdown', e => { drag = { y: e.clientY, t: performance.now() }; try { el.owrap.setPointerCapture(e.pointerId); } catch {} });
-  el.owrap.addEventListener('pointermove', e => { if (drag && v.mode === 'mini') pullTo(drag, e); });
-  const dragEnd = () => { if (drag) { drag = null; releasePull(); } };
-  el.owrap.addEventListener('pointerup', dragEnd);
-  el.owrap.addEventListener('pointercancel', dragEnd);
 
   tts.onSpeaking(on => document.getElementById('app').classList.toggle('speaking', on));
   store.subscribe(reason => { if (reason === 'settings' && v.open) paintStatic(); });

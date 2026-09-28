@@ -209,14 +209,9 @@ async function main() {
       const x = orb.x + orb.width / 2, y = orb.y + orb.height / 2;
       await page.mouse.move(x, y);
       await page.mouse.down(); // hold the orb to talk: it lifts and the mic opens
-      await page.waitForSelector('#ofloat[data-phase=listening]', { timeout: 6000 });
-      await settle(page, 700);
-      await shot(page, 'voice-listening');
-      // still holding, pull up: the full voice screen
-      for (let dy = 10; dy <= 180; dy += 10) await page.mouse.move(x, y - dy);
       await page.waitForSelector('#voice[data-phase=listening]', { timeout: 6000 });
-      await settle(page, 900);
-      await shot(page, 'voice-listening-full');
+      await settle(page, 700);
+      await shot(page, 'voice-listening'); // holding opens the voice sheet straight away (1.60)
     });
     // let go without sending anything, and forget the stand-in
     await page.evaluate(() => localStorage.removeItem('setline.keys'));

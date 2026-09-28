@@ -546,7 +546,19 @@ setOnboardNav({ go: name => go(name), ask: q => askCoach(q) });
 initWorkout($('#s-workout'), actions);
 initSettings(actions, $('#s-settings'));
 setWorkoutNav({ go, showDetail });
-initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings'), openCoach: () => go('coach') });
+initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings'), openCoach: () => go('coach'),
+  // from the voice sheet: the Coach goes in place underneath, at once, taking over the sheet's history
+  // entry (no fly-in: the sheet's own orb flies into the message box)
+  coachUnder: () => {
+    if (!TABS.includes(view.screen) || view.screen === 'coach' || !history.state?.voice) return false;
+    coachFrom = view.screen;
+    history.replaceState({ screen: 'coach', from: coachFrom }, '');
+    show('coach', { still: true });
+    const r = $('#s-coach');
+    if (r) r.scrollTop = r.scrollHeight; // already at the bottom when the sheet lifts
+    return true;
+  },
+  landInBox: () => impact() });
 initCoach({ openSettings: () => pushSub('settings'), closeCoach: () => closeCoach(), go: name => go(name, { quiet: true }), open: name => pushSub(name) });
 setCardioNav({ go, showDetail });
 initCardio();

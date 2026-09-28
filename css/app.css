@@ -3064,3 +3064,48 @@ html[data-motion=off] .tab.on svg.ti{animation:none!important}
 .bm-inner{opacity:.5}
 .bm-bloom{display:none}
 .thinkline .tc{filter:none}
+
+/* ---- the voice sheet (1.60): one listening UI ---- */
+/* the dock orb gives the moment it's touched */
+.dock .orbbtn.pressing{transform:scale(.94);transition:transform var(--m-tap) var(--e-out)}
+/* an opaque background that fades in; nothing of the page shows through, nothing is blurred */
+.vlayer .vbg{background:var(--bg);opacity:0;transition:opacity var(--m-sheet) var(--e-out)}
+.vlayer.on .vbg{opacity:1}
+/* the orb moves from the dock to its place: one element, transform only */
+.orbwrap{transition:transform var(--m-flip) var(--e-flip)}
+/* the top bar, waveform and controls fade up after the orb, one after another; they stay until the
+   sheet closes */
+.vlayer > *:not(.stagev):not(.vbg){transition:opacity var(--m-chrome) var(--e-out),transform var(--m-chrome) var(--e-out)}
+.vlayer:not(.on) > *:not(.stagev):not(.vbg){opacity:0;transform:translateY(8px);transition-delay:0s}
+.vlayer.on > .top{transition-delay:.12s}
+.vlayer.on > .wave,.vlayer.on > .say{transition-delay:.16s}
+.vlayer.on > .hints{transition-delay:.2s}
+.vlayer.on > .hold{transition-delay:.24s}
+.vlayer.on > .holdnote{transition-delay:.28s}
+/* the listening rings keep going and fade out (200 ms) instead of stopping dead on release */
+.vlayer.on .ripples b{animation:ripple 2.8s var(--ease) infinite}
+.vlayer.on .ripples b:nth-child(2){animation-delay:.9s}
+.vlayer.on .ripples b:nth-child(3){animation-delay:1.8s}
+.ripples{transition:opacity var(--m-chrome) var(--e-out)}
+/* a label that changes cross-fades in place (the status pill, the hold button) */
+.xl{display:inline-grid}
+.xl > span{grid-area:1/1;white-space:nowrap;transition:opacity var(--m-label) var(--e-out)}
+.xl > span:not(.on){opacity:0}
+/* what you said: only new words fade up, a touch */
+.say .w{display:inline-block;opacity:1;transform:none;animation:newword var(--m-newword) var(--e-out) both}
+@keyframes newword{from{opacity:0;transform:translateY(4px)}}
+/* to the Coach: the sheet, its words and controls fade (240 ms) while the orb flies into the box */
+.vlayer.handoff > *:not(.stagev),.vlayer.handoff .stagev > *:not(.orbwrap){opacity:0!important;transition:opacity var(--m-sheetout) var(--e-out)!important;transition-delay:0s!important}
+.vlayer.handoff{pointer-events:none}
+@media (prefers-reduced-motion: reduce){
+  .vlayer > *:not(.stagev):not(.vbg),.vlayer .vbg,.xl > span{transition:opacity var(--m-label) linear!important;transform:none!important}
+  .vlayer.on > *{transition-delay:0s!important}
+  .say .w{animation:none}
+  .orbwrap{transition:none}
+}
+html[data-motion=off] .say .w{animation:none}
+html[data-motion=off] .orbwrap{transition:none}
+/* one orb at a time: the dock's orb hides in the frame the flying one takes over at the same spot */
+.app.orbaway .orbbtn .orb{opacity:0;transition:none}
+html[data-motion=off] :is(.vlayer > *:not(.stagev):not(.vbg),.vlayer .vbg,.xl > span){transition:opacity var(--m-label) linear!important;transform:none!important}
+html[data-motion=off] .vlayer.on > *{transition-delay:0s!important}
