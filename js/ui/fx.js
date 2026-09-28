@@ -68,6 +68,17 @@ export function countAll(root, lang) {
 // The dock orb answers: a ring of light for a voice command that just landed, a gold flare for a
 // record, a softer "go" when a rest is over, a small settle when the orb flies home.
 const PULSES = ['pulse', 'pulse-warm', 'pulse-go', 'pulse-land'];
+// While a screen change runs, the two frosted surfaces (the dock, the message box) go solid for its
+// length: nothing is re-blurred behind something that's moving.
+let movingTimer = 0;
+export function moving(ms = 480) {
+  const app = document.getElementById('app');
+  if (!app) return;
+  app.classList.add('moving');
+  clearTimeout(movingTimer);
+  movingTimer = setTimeout(() => app.classList.remove('moving'), ms);
+}
+
 export function orbPulse(kind = 'pulse') {
   if (reduced()) return;
   const orb = document.querySelector('#dock .orbbtn');
@@ -105,36 +116,6 @@ export function bezier(css) {
     for (let i = 0; i < 22; i++) { t = (lo + hi) / 2; if (f(x1, x2, t) < x) lo = t; else hi = t; }
     return f(y1, y2, t);
   };
-}
-
-// The light an orb leaves while it flies: a soft comet tail, brightest under the orb and fading out
-// behind it. The orb itself stays sharp. The head runs with the orb and the tail a moment behind, so
-// the tail is longest when the orb is fastest and is drawn back into it as it lands. from/to are
-// centres in parent's coordinates; timing is the orb's own. Transform and opacity only.
-export function orbStreak(parent, from, to, { duration, delay = 0, easing, size = 40, lag = 64, go, before = null, z = '0' } = {}) {
-  if (!parent || reduced()) return null;
-  const dx = to.x - from.x, dy = to.y - from.y, D = Math.hypot(dx, dy);
-  if (D < 24) return null;
-  const P = bezier(easing), ang = Math.atan2(dy, dx) * 180 / Math.PI;
-  const el = document.createElement('div');
-  el.className = 'orbstreak';
-  el.setAttribute('aria-hidden', 'true');
-  Object.assign(el.style, { left: `${from.x}px`, top: `${from.y - size / 2}px`, width: `${D}px`, height: `${size}px` });
-  // just under the flying orb (the element before which it goes, at the orb's own level)
-  el.style.zIndex = z;
-  if (before) parent.insertBefore(el, before); else parent.append(el);
-  const T = duration + lag, N = 30, frames = [];
-  for (let i = 0; i <= N; i++) {
-    const ms = (T * i) / N, head = P(ms / duration), tail = P((ms - lag) / duration);
-    frames.push({ offset: i / N, opacity: Math.min(1, ms / (duration * 0.1)).toFixed(3),
-      transform: `rotate(${ang.toFixed(2)}deg) translateX(${(tail * D).toFixed(1)}px) scaleX(${Math.max(head - tail, 0.001).toFixed(4)})` });
-  }
-  const opts = { duration: T, delay, easing: 'linear', fill: 'both' };
-  const a = go ? go(el, frames, opts) : el.animate(frames, opts);
-  const gone = () => el.remove();
-  a.addEventListener('finish', gone);
-  a.addEventListener('cancel', gone);
-  return a;
 }
 
 // A voice-logged set: a spark of light leaves the orb, arcs to the new row and bursts on its check.

@@ -28,9 +28,10 @@ import { initBody } from './ui/body.js';
 import { initRoutine, setRoutineNav, renderRoutine, editRoutine, editRoutineFrom, programsSheet, startRoutine, planFor } from './ui/routine.js';
 import { setHistoryFilter } from './ui/history.js';
 import { renderProgress, renderExercise, setRange } from './ui/progress.js';
-import { countAll, burst, orbStreak, orbPulse } from './ui/fx.js';
+import { countAll, burst, orbPulse, moving } from './ui/fx.js';
 import { syncBeams } from './ui/beam.js';
 import { startDotOrbs, handOrb } from './ui/dotorb.js';
+import { initPerf } from './ui/perf.js';
 import { initPress } from './ui/press.js';
 import { initChrome, refreshChrome } from './ui/chrome.js';
 import { openCustomize } from './ui/customize.js';
@@ -201,7 +202,6 @@ function flyOrb(from, to, { duration, delay = 0, go, onland, easing, fromEl, toE
   const ang = Math.atan2(dy, dx) * 180 / Math.PI, st = (x, y) => `rotate(${ang}deg) scale(${x}, ${y}) rotate(${-ang}deg)`;
   go(ghost, [{ transform: st(1, 1) }, { transform: st(1.07, 0.95), offset: 0.2 }, { transform: st(1.03, 0.98), offset: 0.6 }, { transform: st(1, 1), offset: 0.9 }, { transform: st(1, 1) }],
     { duration, delay, easing: 'linear' });
-  orbStreak(app, from, to, { duration, delay, easing, size: Math.min(from.w, to.w), lag: duration * 0.28, go, before: ghost, z: '8' });
   // its glow comes up while it travels and settles as it lands
   go(a, [{ opacity: 0 }, { opacity: 0.8, offset: 0.35 }, { opacity: 0 }], { duration, delay, easing: 'linear', pseudoElement: '::before' });
   go(b, [{ opacity: 0 }, { opacity: 0.8, offset: 0.35 }, { opacity: 0 }], { duration, delay, easing: 'linear', pseudoElement: '::before' });
@@ -342,6 +342,7 @@ function growInto() {
 // Direction for the transition: tabs by position, sub screens push in from the right.
 const ORDER = { today: 0, workout: 1, food: 2, you: 3, coach: 4, history: 4, detail: 5, settings: 4, routine: 4, progress: 5, body: 4, exercise: 6 };
 function show(name, { back = false, still = false } = {}) {
+  moving(name === 'coach' || view.screen === 'coach' ? 1000 : 480); // the frosted bars go solid while the screens move
   const prev = view.screen;
   view.screen = name;
   // the Coach opening over a tab or closing back to one: the light does the moving, so the two
@@ -535,6 +536,7 @@ Object.assign(actions, {
 initPress(document);
 initChrome();
 startDotOrbs();
+initPerf(); // ?perf=1: a tiny frame meter in the corner (dev only)
 app.addEventListener('dockopen', () => renderDock());
 initHandsFree();
 initBodyScreen($('#s-body'));

@@ -103,6 +103,8 @@ const SHELL = [
   'js/ui/sortable.js',
   'js/audioprep.js',
   'js/ui/dotorb.js',
+  'js/ui/frame.js',
+  'js/ui/perf.js',
   'js/ui/voiceglow.js',
   'js/ui/beam.js',
   'js/ui/pins.js',
