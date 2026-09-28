@@ -1,8 +1,8 @@
 // Motion & performance rules, checked (see CLAUDE.md). Run by tests/motion-rules.test.js and by
 //   node scripts/lib/motionrules.mjs          (prints every violation)
-// 1. CSS transitions and @keyframes animate only transform (incl. translate/scale/rotate) and opacity.
+// 1. CSS transitions and @keyframes animate only transform (incl. translate/scale/rotate), opacity, filter and clip-path.
 // 2. (backdrop-filter rule removed by Omar's decision: blur is allowed anywhere.)
-// 3. Element.animate() keyframes in the app's JS animate only transform/opacity.
+// 3. Element.animate() keyframes in the app's JS animate only transform/opacity/filter/clip-path.
 // (`visibility` is allowed in keyframes: it switches, it isn't interpolated or repainted per frame.)
 // The one exception: small SVG progress rings and check marks draw their stroke (stroke-dashoffset on
 // `.fg` and the draw keyframes below), and the exercise figures morph their SVG path (`d`, figure.js).
@@ -11,7 +11,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const ALLOWED = new Set(['transform', 'opacity', 'translate', 'scale', 'rotate', 'visibility', 'animation-timing-function', 'none']);
+const ALLOWED = new Set(['transform', 'opacity', 'filter', 'clip-path', 'translate', 'scale', 'rotate', 'visibility', 'animation-timing-function', 'none']);
 const SVG_KF = new Set(['draw', 'drawline', 'ckdraw', 'ringfill', 'dringdraw']);
 const JS_OK = { 'js/ui/figure.js': new Set(['d']), 'js/ui/workout.js': new Set(['stroke-dashoffset']) };
 export const GLASS = /(^|[\s,>])(\.dcap|\.obub|\.composer|#composer)\b/;

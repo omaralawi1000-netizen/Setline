@@ -11,10 +11,9 @@ How Setline looks and moves, for every AI and every tool. The brand values (colo
 ## Rules (both modes)
 
 - All motion values come from the motion tokens in `css/tokens.css` (`--m-*` durations, `--e-*` easings). No hardcoded durations or easings anywhere else.
-- Animate only `transform` and `opacity` (`filter` and `backdrop-filter` sparingly). Never animate width, height, top, left, margin or box-shadow directly.
+- Animate `transform`, `opacity`, `filter` and `clip-path`. Never animate width, height, top, left, margin or box-shadow directly.
 - Every animation has a `prefers-reduced-motion` fallback and respects the in-app motion setting. Decorative motion never delays a state update.
 - Screen changes use the View Transitions API with a fallback.
-- Backdrop blur only on the dock, sheets, the Coach and one hero card per screen.
 - Tabular numerals for every number.
 - Nothing in the UI unless it works.
 - Work one screen at a time. Never refactor working logic just to restyle it.
