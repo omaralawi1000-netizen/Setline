@@ -27,6 +27,7 @@ import { toast } from './toast.js';
 import { pinHTML } from './pins.js';
 import { openQuickReport, FLAG } from './report.js';
 import { token } from './fx.js';
+import { thinkOrb } from './thinkorb.js';
 
 let nav = { openSettings: () => {} };
 let inflight = null; // {ctl, id}
@@ -40,7 +41,7 @@ const errorText = (code, t) => ({
 function thinkingHTML(m) {
   const { t } = state;
   const steps = [t('coach.step1'), t('coach.step2'), t('coach.step3'), t('coach.step4')];
-  return `<span class="think"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span><span class="tsteps">${steps.map((x, i) => `<span class="tl" style="--i:${i}">${esc(x)}</span>`).join('')}</span></span>`;
+  return `<span class="think"><canvas class="thinkorb" width="0" height="0"></canvas><span class="tsteps">${steps.map((x, i) => `<span class="tl" style="--i:${i}">${esc(x)}</span>`).join('')}</span></span>`;
 }
 
 function bubble(m) {
@@ -313,6 +314,22 @@ function syncThinking() {
   const on = !!document.querySelector('#s-coach .msg.ai.is-thinking') || document.getElementById('composer')?.dataset.talk === 'thinking';
   if (app && app.classList.contains('thinking') !== on) app.classList.toggle('thinking', on);
   thinkWords(on);
+  syncThinkOrb();
+}
+
+// The thinking orb (thinking-orbs, see ../orbs.js) sits where the answer will appear and acts out
+// what the message box says it's doing: a breathing ring while it starts, a globe being scanned
+// while it reads your log, particles at work over your lifts and food, a sash being woven while it
+// puts the answer together. It's gone the moment the first words arrive.
+const THINK_STATES = ['breathing', 'searching', 'working', 'composing'];
+let orbCtl = null, orbCanvas = null, orbState = 'breathing', orbLabel = '';
+function syncThinkOrb() {
+  const c = document.querySelector('#s-coach .msg.ai.is-thinking canvas.thinkorb');
+  if (c === orbCanvas) return;
+  orbCtl?.destroy();
+  orbCtl = null;
+  orbCanvas = c;
+  if (c) orbCtl = thinkOrb(c, { size: 32, state: orbState, label: orbLabel || state.t('coach.thinking') });
 }
 
 // While it thinks, the message box says what it's doing: "Thinking", then "Reading your log…",
@@ -324,6 +341,7 @@ function thinkWords(on) {
   if (!box) return;
   let el = box.querySelector('.thinkline');
   if (!on) {
+    orbState = 'breathing';
     clearInterval(thinkTimer); thinkTimer = 0;
     if (el && !el.classList.contains('gone')) { el.classList.add('gone'); setTimeout(() => { if (el.classList.contains('gone')) el.remove(); }, 400); }
     return;
@@ -334,8 +352,12 @@ function thinkWords(on) {
   const phrases = [t('coach.thinking'), t('coach.step1'), t('coach.step2'), t('coach.step4')];
   thinkN = 0;
   const show = () => {
-    const text = phrases[thinkN < phrases.length ? thinkN : 1 + ((thinkN - 1) % (phrases.length - 1))]; // then round the steps again
+    const n = thinkN < phrases.length ? thinkN : 1 + ((thinkN - 1) % (phrases.length - 1)); // then round the steps again
+    const text = phrases[n];
     thinkN++;
+    orbState = THINK_STATES[n];
+    orbLabel = text;
+    orbCtl?.set(orbState, text);
     const old = el.querySelector('.tp:not(.out)');
     if (old) { old.classList.add('out'); setTimeout(() => old.remove(), 420); }
     const p = document.createElement('span');

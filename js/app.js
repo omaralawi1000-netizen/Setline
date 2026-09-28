@@ -29,6 +29,7 @@ import { initRoutine, setRoutineNav, renderRoutine, editRoutine, editRoutineFrom
 import { setHistoryFilter } from './ui/history.js';
 import { renderProgress, renderExercise, setRange } from './ui/progress.js';
 import { countAll, burst, orbStreak, orbPulse } from './ui/fx.js';
+import { syncBeams } from './ui/beam.js';
 import { initPress } from './ui/press.js';
 import { initChrome, refreshChrome } from './ui/chrome.js';
 import { openCustomize } from './ui/customize.js';
@@ -144,6 +145,7 @@ function renderAll() {
   if (document.documentElement.dataset.accent !== state.settings.accent) { document.documentElement.dataset.accent = state.settings.accent; refreshChrome(); }
   renderScreen();
   titleWords($('#s-' + view.screen));
+  syncBeams($('#s-' + view.screen));
   animateFigures($('#s-' + view.screen));
   pauseHiddenFigures();
   renderDock();

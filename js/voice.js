@@ -56,22 +56,26 @@ export function level() {
   let sum = 0;
   for (let i = 0; i < rec.buf.length; i++) sum += rec.buf[i] * rec.buf[i];
   const rms = Math.sqrt(sum / rec.buf.length);
+  rec.rms = rms; // the raw value, for the voice glow (read once a frame, shared)
   const v = Math.min(1, Math.pow(rms * 6, 0.7));
   if (v > rec.peak) rec.peak = v;
   return v;
 }
 
-// The voice split in two, 0..1 each, for the orb: the body of it (roughly 90–500 Hz) and its edge
-// (the consonants, roughly 2–6 kHz).
+// The voice split up, from one read of the spectrum a frame. For the orb, 0..1 each: the body of it
+// (roughly 90–500 Hz) and its edge (the consonants, roughly 2–6 kHz). For the voice glow, the raw
+// RMS and voice-glow's own three bands (fundamentals and chest, vowels and presence, sibilance),
+// as the average spectrum share: it shapes them itself.
 let fbuf = null;
+const QUIET = { low: 0, high: 0, rms: 0, voice: [0, 0, 0] };
 export function bands() {
-  if (!rec?.analyser || audioContext()?.state !== 'running') return { low: 0, high: 0 };
+  if (!rec?.analyser || audioContext()?.state !== 'running') return QUIET;
   const n = rec.analyser.frequencyBinCount, hz = audioContext().sampleRate / 2 / n;
   if (!fbuf || fbuf.length !== n) fbuf = new Uint8Array(n);
   rec.analyser.getByteFrequencyData(fbuf);
   const avg = (a, b) => { const i0 = Math.max(1, Math.round(a / hz)), i1 = Math.min(n - 1, Math.round(b / hz)); let s = 0; for (let i = i0; i <= i1; i++) s += fbuf[i]; return s / Math.max(1, i1 - i0 + 1); };
   const shape = x => Math.max(0, Math.min(1, (x - 70) / 120));
-  return { low: shape(avg(90, 500)), high: shape(avg(2000, 6000) * 1.35) };
+  return { low: shape(avg(90, 500)), high: shape(avg(2000, 6000) * 1.35), rms: rec.rms || 0, voice: [avg(80, 300) / 255, avg(300, 2000) / 255, avg(2000, 6000) / 255] };
 }
 
 function release(r) {

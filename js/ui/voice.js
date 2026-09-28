@@ -32,6 +32,7 @@ import { dateKey } from '../body.js';
 import { planFor } from './routine.js';
 import { orbPulse, orbShake, orbSpark, orbStreak } from './fx.js';
 import { livePRSets } from '../pr.js';
+import { createVoiceGlow } from './voiceglow.js';
 import { ask as askCoach, ensureModels } from './coach.js';
 import { cmdModels } from '../settings.js';
 import { createEndpointer, looksUnfinished } from '../endpoint.js';
@@ -125,6 +126,9 @@ function build() {
     <div class="opull" id="opull" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M6 14.5l6-6 6 6"/></svg><span></span></div>
     <span class="owrap" id="owrap" data-o="orb"><span class="orb lift" id="oorb"><i class="core"><b></b><b></b><b></b></i><i class="spin"></i></span><span class="oglow"></span></span>`;
   document.getElementById('app').appendChild(mini);
+  // the voice glow (voice-glow): under everything on the voice screen, over the floating orb's scrim
+  el.glowFull = createVoiceGlow(layer, layer.querySelector('.vbg')?.nextSibling);
+  el.glowMini = createVoiceGlow(mini, mini.querySelector('.obubble'));
   Object.assign(el, {
     mini, owrap: mini.querySelector('#owrap'), oorb: mini.querySelector('#oorb'), ostatus: mini.querySelector('#ostatus'), osay: mini.querySelector('#osay'), opull: mini.querySelector('#opull'),
     layer, status: $('#vstatus span'), lang: $('#vlang'), stage: $('#vstage'), halo: $('#vhalo'), ripples: $('#vripples'),
@@ -420,10 +424,17 @@ function startLoop() {
       else if (ev === 'resume') { v.spec = null; v.waiting = false; setPausing(''); }
       if (v.waiting && endpoint.quietMs >= WAIT_MS) { v.waiting = false; finishRec(); }
     }
+    // the voice glow along the bottom: the recorder's own level and bands while it records, the
+    // processing sweep while the words are worked out, nothing otherwise (a meter, so it keeps
+    // answering the voice with reduced motion; only its breathing, flow and sweep stop)
+    const b = listening ? mic.bands() : { low: 0, high: 0, rms: 0, voice: [0, 0, 0] };
+    const glow = v.mode === 'mini' ? el.glowMini : el.glowFull, quiet = v.mode === 'mini' ? el.glowFull : el.glowMini;
+    const gsrc = { listening, processing: v.phase === 'thinking', rms: b.rms, voice: b.voice };
+    glow?.step(Math.min(0.05, dt / 1000), gsrc, reduced());
+    if (quiet?.on) quiet.off();
     if (reduced()) return;
     const l = v.lvl;
     // the body of the voice swells the orb's core, its edge (s, t, k) lights the rim
-    const b = listening ? mic.bands() : { low: 0, high: 0 };
     v.lo += (b.low - v.lo) * (b.low > v.lo ? 0.4 : 0.12);
     v.hi += (b.high - v.hi) * (b.high > v.hi ? 0.55 : 0.18);
     const fq = v.mode === 'mini' ? el.oorb : el.orb;
@@ -458,7 +469,7 @@ function startLoop() {
   v.raf = requestAnimationFrame(tick);
 }
 
-function stopLoop() { cancelAnimationFrame(v.raf); v.raf = 0; }
+function stopLoop() { cancelAnimationFrame(v.raf); v.raf = 0; v.lastTick = 0; el.glowFull?.off(); el.glowMini?.off(); }
 
 // ---------- recording ----------
 

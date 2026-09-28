@@ -1,6 +1,6 @@
 // Service worker: precached app shell, runtime cache for Google Fonts.
 // Bump VERSION on every release (keep js/version.js in sync).
-const VERSION = '1.56.0';
+const VERSION = '1.57.0';
 const CACHE = 'setline-' + VERSION;
 const FONTS = 'setline-fonts';
 const SHELL = [
@@ -102,6 +102,10 @@ const SHELL = [
   'js/ui/recap.js',
   'js/ui/sortable.js',
   'js/audioprep.js',
+  'js/orbs.js',
+  'js/ui/thinkorb.js',
+  'js/ui/voiceglow.js',
+  'js/ui/beam.js',
   'js/ui/pins.js',
   'icons/icon-192.png',
   'icons/icon-512.png',

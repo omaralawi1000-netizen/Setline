@@ -2847,3 +2847,68 @@ html[data-motion=off] .screen.enter :is(.greet .gw,.tw){animation:none}
 .prtile.tilting .prshine{opacity:1}
 @media (prefers-reduced-motion: reduce){ .prtile,.prbadge,.prshine{transition:none} }
 .prtile{animation-fill-mode:backwards}
+
+/* ======================= 1.57: thinking orbs, voice glow, border beam ======================= */
+/* thinking: a thinking orb where the answer will appear (the words stay in the message box, and are
+   read out from here to screen readers) */
+#s-coach .msg.ai.is-thinking{position:relative;width:auto;height:auto;overflow:visible;clip-path:none;animation:none}
+#s-coach .msg.ai.is-thinking .bub{padding:6px 0 2px!important;background:none!important;border:0!important}
+#s-coach .msg.ai.is-thinking .think{display:block}
+#s-coach .msg.ai.is-thinking .tsteps{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.thinkorb{display:block;animation:thinkorbin var(--m-slow) var(--e-out) both}
+@keyframes thinkorbin{from{opacity:0;transform:scale(.6)}}
+@media (prefers-reduced-motion: reduce){ .thinkorb{animation:none} }
+html[data-motion=off] .thinkorb{animation:none}
+/* the voice glow (voice-glow, see js/ui/voiceglow.js): the bottom of the voice screen and of the floating
+   orb. Every lobe is a soft ellipse moved by transform only; the layers fade by opacity. */
+.vglow{position:absolute;inset:0;pointer-events:none;overflow:hidden;opacity:0;transition:opacity var(--m-slow) var(--e-out)}
+.vglow.on{opacity:1}
+.vg-l{position:absolute;inset:0;opacity:0}
+.vg-m{position:absolute;left:50%;bottom:0;transform-origin:50% 100%;will-change:transform}
+.vg-m > i,.vg-m > .vg-core{position:absolute;left:50%;bottom:0;display:block;will-change:transform}
+/* the inner light hugs the edges (a band in from each side), as in the original */
+.vg-inner{
+  -webkit-mask-image:linear-gradient(to top,#fff,transparent var(--vg-edge)),linear-gradient(to right,#fff,transparent var(--vg-edge),transparent calc(100% - var(--vg-edge)),#fff);
+  mask-image:linear-gradient(to top,#fff,transparent var(--vg-edge)),linear-gradient(to right,#fff,transparent var(--vg-edge),transparent calc(100% - var(--vg-edge)),#fff);
+  -webkit-mask-composite:source-over;mask-composite:add}
+/* the stroke: the colours in the 1px edge ring, with the hot white core at the centre */
+.vg-stroke{padding:1px;
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;
+  mask:linear-gradient(#fff 0 0) content-box exclude,linear-gradient(#fff 0 0)}
+.vg-core{background:radial-gradient(closest-side,rgba(255,255,255,.45) 0%,rgba(255,255,255,.14) 30%,transparent 65%)}
+@media (prefers-reduced-motion: reduce){ .vglow{transition:none} }
+html[data-motion=off] .vglow{transition:none}
+.vlayer > .vglow{z-index:-1}
+/* the border beam (border-beam `md`, ocean, see js/ui/beam.js): round the live workout's card on Today.
+   A mask window on a turning square (the colours on a child turning back, so they stay put); the
+   phone only composites. It stands still off screen, on another tab, and with reduced motion. */
+.beam{position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:2;opacity:0;animation:bmin var(--m-slow) var(--e-out) forwards}
+@keyframes bmin{to{opacity:1}}
+.bm-l{position:absolute;inset:0;border-radius:inherit;overflow:hidden}
+.bm-rot{position:absolute;left:50%;top:50%;width:var(--bd,0);height:var(--bd,0);margin:calc(var(--bd,0) / -2) 0 0 calc(var(--bd,0) / -2);will-change:transform;animation:bmspin calc(var(--m-think) * 1.3) linear infinite}
+.bm-fix{position:absolute;left:50%;top:50%;width:var(--bw,0);height:var(--bh,0);margin:calc(var(--bh,0) / -2) 0 0 calc(var(--bw,0) / -2);border-radius:30px;will-change:transform;animation:bmspin calc(var(--m-think) * 1.3) linear infinite reverse}
+@keyframes bmspin{to{transform:rotate(360deg)}}
+/* the window the beam shows the colours through (the original's mask) */
+.bm-inner .bm-rot,.bm-stroke .bm-rot{
+  -webkit-mask-image:conic-gradient(transparent 0%,transparent 30%,rgba(255,255,255,.1) 36%,rgba(255,255,255,.35) 44%,#fff 52%,#fff 80%,rgba(255,255,255,.35) 86%,rgba(255,255,255,.1) 92%,transparent 95%,transparent 100%);
+  mask-image:conic-gradient(transparent 0%,transparent 30%,rgba(255,255,255,.1) 36%,rgba(255,255,255,.35) 44%,#fff 52%,#fff 80%,rgba(255,255,255,.35) 86%,rgba(255,255,255,.1) 92%,transparent 95%,transparent 100%)}
+/* stroke: the colours and a white highlight in the 1px edge ring */
+.bm-stroke{padding:1px;opacity:.26;filter:brightness(1.3) saturate(1.2);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;
+  mask:linear-gradient(#fff 0 0) content-box exclude,linear-gradient(#fff 0 0)}
+.bm-stroke .bm-rot{background:conic-gradient(transparent 0%,transparent 54%,rgba(255,255,255,.1) 57%,rgba(255,255,255,.3) 60%,rgba(255,255,255,.6) 63%,rgba(255,255,255,.75) 66%,rgba(255,255,255,.6) 69%,rgba(255,255,255,.3) 72%,rgba(255,255,255,.1) 75%,transparent 78%,transparent 100%)}
+/* inner: soft light in from the edges */
+.bm-inner{opacity:.42;filter:brightness(1.3) saturate(1.2);
+  -webkit-mask-image:linear-gradient(#fff,transparent 28px,transparent calc(100% - 28px),#fff),linear-gradient(to right,#fff,transparent 28px,transparent calc(100% - 28px),#fff);
+  mask-image:linear-gradient(#fff,transparent 28px,transparent calc(100% - 28px),#fff),linear-gradient(to right,#fff,transparent 28px,transparent calc(100% - 28px),#fff);
+  -webkit-mask-composite:source-over;mask-composite:add}
+.bm-inner .bm-fix{box-shadow:inset 0 0 9px 1px rgba(255,255,255,.27)}
+/* bloom: the blurred white highlight on the ring */
+.bm-bloom{padding:1px;opacity:.24;filter:blur(8px) brightness(1.3) saturate(1.2);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;
+  mask:linear-gradient(#fff 0 0) content-box exclude,linear-gradient(#fff 0 0)}
+.bm-bloom .bm-rot{background:conic-gradient(transparent 0%,transparent 58%,rgba(255,255,255,.03) 62%,rgba(255,255,255,.08) 65%,rgba(255,255,255,.2) 67%,rgba(255,255,255,.45) 69%,rgba(255,255,255,.85) 70%,rgba(255,255,255,.85) 70.5%,rgba(255,255,255,.45) 71.5%,rgba(255,255,255,.2) 73%,rgba(255,255,255,.08) 75%,rgba(255,255,255,.03) 78%,transparent 82%)}
+.screen:not(.on) .beam :is(.bm-rot,.bm-fix),.beam.bm-away :is(.bm-rot,.bm-fix){animation-play-state:paused}
+@media (prefers-reduced-motion: reduce){ .beam{animation:none;opacity:1} .beam :is(.bm-rot,.bm-fix){animation:none} }
+html[data-motion=off] .beam{animation:none;opacity:1}
+html[data-motion=off] .beam :is(.bm-rot,.bm-fix){animation:none}
