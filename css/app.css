@@ -2936,25 +2936,24 @@ html[data-motion=off] .beam :is(.bm-rot,.bm-fix){animation:none}
 /* One family (Geist), a deep-water base, soft light drifting in the sea behind everything, and glass
    that lets it through: the cards on a page are tinted, rim-lit glass (no blur needed, the light
    behind is already soft); real frosting and refraction only on the bars that float over content. */
-:root{--font:'Geist','Manrope',ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+:root{
   --bg:#060B13;--edge:#060B13;--card:rgba(20,34,50,.38);--card-line:rgba(255,255,255,.075);
   --muted:#93A4B5;--dim:#6E8093}
 html[data-accent]{--edge:#060B13}
 /* ocean, the house colours: mint light in deep blue water */
 html[data-accent=ocean]{--accent:#8CF2DF;--accent2:#6FB8FF;--a-rgb:140,242,223;--violet:#2F7FD6;--v-rgb:47,127,214;--blue:#3FD9BE;--b-rgb:63,217,190;--accent-ink:#02231E;
   --accent-soft:#7CCFC0;--accent-hi:#DDFFF8;--orb1:#2F7FD6;--orb2:#18A58C;--orb3:#07203A;--amb1:#1C7F86;--amb2:#1D4F9E}
-body{letter-spacing:-.005em}
 
 /* the sea: three soft lights drifting slowly under everything (pre-softened gradients, moved only
    by transform) */
 .ambient{background:radial-gradient(120% 60% at 50% 115%,color-mix(in srgb,var(--amb2) 35%,var(--bg)),var(--bg) 62%)}
 .ambient i{filter:none;border-radius:50%}
 .ambient i:nth-child(1),.ambient i:nth-child(2),.ambient i:nth-child(3){display:block;margin:0}
-.ambient i:nth-child(1){width:130vw;height:130vw;max-width:620px;max-height:620px;left:-40%;top:-14%;opacity:.62;
+.ambient i:nth-child(1){width:130vw;height:130vw;max-width:620px;max-height:620px;left:-40%;top:-14%;opacity:.42;
   background:radial-gradient(closest-side,var(--amb1),transparent);animation:sea1 24s ease-in-out infinite alternate}
-.ambient i:nth-child(2){width:120vw;height:120vw;max-width:580px;max-height:580px;right:-45%;left:auto;top:26%;opacity:.5;
+.ambient i:nth-child(2){width:120vw;height:120vw;max-width:580px;max-height:580px;right:-45%;left:auto;top:26%;opacity:.3;
   background:radial-gradient(closest-side,var(--amb2),transparent);animation:sea2 29s ease-in-out infinite alternate}
-.ambient i:nth-child(3){width:110vw;height:110vw;max-width:520px;max-height:520px;left:-15%;bottom:-32%;top:auto;opacity:.38;
+.ambient i:nth-child(3){width:110vw;height:110vw;max-width:520px;max-height:520px;left:-15%;bottom:-32%;top:auto;opacity:.22;
   background:radial-gradient(closest-side,var(--accent2),transparent);animation:sea3 33s ease-in-out infinite alternate}
 @keyframes sea1{to{transform:translate(18%,10%) scale(1.1)}}
 @keyframes sea2{to{transform:translate(-20%,-8%) scale(.92)}}
@@ -2973,7 +2972,7 @@ html[data-motion=off] .ambient i{animation:none}
 .screen .glass .label,.glass .label{color:var(--accent)}
 
 /* headings: tight, heavy Geist */
-.greet,.h1{letter-spacing:-.045em}
+.greet,.h1{letter-spacing:-.035em}
 .log{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 88%,#fff),var(--accent));color:var(--accent-ink);
   box-shadow:0 16px 34px -16px rgba(var(--a-rgb),.7),inset 0 1px 0 rgba(255,255,255,.6)}
 
@@ -2999,16 +2998,9 @@ html[data-glass=off] :is(.dcap,.obub){-webkit-backdrop-filter:none!important;bac
 .app.compact .dock .orbbtn .orb{transform:scale(.8)}
 .app.compact .dcap{border-radius:30px}
 
-/* the icons move as you pick them: the house's door, the dumbbell lifting, a spoon's stir, a wave */
-.tab.on svg.ti{animation:none}
-.tab[data-to=today].on svg.ti{animation:ictoday var(--m-slow) var(--e-spring)}
-.tab[data-to=workout].on svg.ti{animation:icworkout calc(var(--m-slow) * 1.8) var(--e-spring)}
-.tab[data-to=food].on svg.ti{animation:icfood calc(var(--m-slow) * 1.6) var(--e-spring)}
-.tab[data-to=you].on svg.ti{transform-origin:50% 90%;animation:icyou calc(var(--m-slow) * 1.8) var(--e-spring)}
-@keyframes ictoday{40%{transform:translateY(-4px) scale(1.14)}}
-@keyframes icworkout{25%{transform:translateY(-5px) rotate(-10deg)}55%{transform:translateY(-5px) rotate(9deg)}80%{transform:translateY(-1px) rotate(-3deg)}}
-@keyframes icfood{30%{transform:rotate(-12deg) scale(1.1)}60%{transform:rotate(8deg)}}
-@keyframes icyou{25%{transform:rotate(-12deg)}50%{transform:rotate(10deg) translateY(-3px)}75%{transform:rotate(-5deg)}}
+/* the chosen tab's icon lifts once and settles */
+.tab.on svg.ti{animation:icpop var(--m-slow) var(--e-spring)}
+@keyframes icpop{45%{transform:translateY(-3px) scale(1.12)}}
 @media (prefers-reduced-motion: reduce){ .tab.on svg.ti{animation:none!important} }
 html[data-motion=off] .tab.on svg.ti{animation:none!important}
 /* the other small capitals, in sentence case too */
@@ -3017,20 +3009,37 @@ html[data-motion=off] .tab.on svg.ti{animation:none!important}
 /* Today: the session you're about to do is the hero. Its name is big, and the numbers you'll lift
    are what you read first. */
 #s-today .upcoming,#s-workout > .upcoming{padding:22px 20px 20px;border-radius:32px}
-.upcoming h2{font-size:40px;font-weight:700;letter-spacing:-.05em;line-height:1;margin-top:4px;
+.upcoming h2{font-size:36px;font-weight:800;letter-spacing:-.035em;line-height:1;margin-top:4px;
   background:linear-gradient(180deg,#fff 35%,color-mix(in srgb,var(--accent-hi) 70%,var(--accent)));-webkit-background-clip:text;background-clip:text;color:transparent}
 .upcoming > p{margin-top:8px;color:var(--muted);font-weight:500}
 .ntargets{gap:0;margin:16px 0 16px}
 .ntargets .label{margin-bottom:4px}
-.ntargets .nt{align-items:baseline;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:15.5px;font-weight:550;color:color-mix(in srgb,var(--ink) 86%,transparent)}
+.ntargets .nt{align-items:baseline;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:15px;font-weight:600;color:color-mix(in srgb,var(--ink) 86%,transparent)}
 .ntargets .nt:last-of-type{border-bottom:0}
-.ntargets .nt b{font-size:23px;font-weight:600;letter-spacing:-.035em}
+.ntargets .nt b{font-size:20px;font-weight:800;letter-spacing:-.02em}
 .ntargets .ntmore{padding-top:6px;font-size:13.5px;color:var(--muted)}
 .upcoming .log{height:56px;border-radius:28px;font-size:17px;font-weight:700;letter-spacing:-.01em;overflow:hidden;position:relative}
-/* now and then a sheen of light crosses the one button that matters */
-#s-today .upcoming .log::after{content:"";position:absolute;top:0;bottom:0;left:-45%;width:40%;pointer-events:none;
-  background:linear-gradient(100deg,transparent,rgba(255,255,255,.5),transparent);animation:sheen calc(var(--m-drift) * .6) var(--e-out) infinite 1.4s}
-@keyframes sheen{0%{transform:translateX(0)}50%,100%{transform:translateX(360%)}}
-@media (prefers-reduced-motion: reduce){ #s-today .upcoming .log::after{animation:none;display:none} }
-html[data-motion=off] #s-today .upcoming .log::after{animation:none;display:none}
 .greet{font-size:36px}
+
+/* ======================= 1.59.1: calmer and cleaner ======================= */
+/* the bar: plain, strong frost (the refraction dropped the blur on the phone), a quiet rim, and the
+   lens under the chosen tab as a soft, colourless pill */
+.dcap,.obub{background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.02) 50%,rgba(255,255,255,.04)),rgba(10,18,28,.5);
+  -webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 0 0 1px rgba(255,255,255,.07),0 18px 36px -18px rgba(0,0,0,.85)}
+.dock .ind,.dock .ind.ready{background:rgba(255,255,255,.1);box-shadow:inset 0 1px 0 rgba(255,255,255,.18);border-radius:26px}
+.dock .ind.moving{animation:indstretch var(--m-slow) var(--e-out)}
+.app.compact .dock .tab.on{background:rgba(255,255,255,.1);box-shadow:inset 0 1px 0 rgba(255,255,255,.18)}
+.tab.on svg{color:var(--accent)}
+
+/* the floating orb sits a little higher over the page */
+.ofloat{--ob:calc(var(--dock-bottom) + var(--dock-h) + 84px)}
+
+/* the message box's orb: bigger, and the dots do the moving (no spinning, pulsing or breathing of
+   the whole orb on top of them) */
+.corb{width:50px;height:50px}
+.corb .orb,.composer .corb .orb{--s:42px}
+.composer .corb .orb.dotted,.composer:is(.hearing,.dictating,[data-talk]) .corb .orb.dotted{animation:none;transform:scale(calc(1 + var(--lv, 0) * .12))}
+.composer:is([data-talk=listening],[data-talk=hearing]) .corb::after{animation:none;opacity:0}
+.composer.talking,.composer.dictating{box-shadow:0 0 0 1px rgba(var(--a-rgb),.35),0 18px 40px -18px rgba(var(--v-rgb),.6)}
+.dock .ind.moving{animation:none}

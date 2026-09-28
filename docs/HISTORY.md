@@ -715,3 +715,13 @@ Your feedback over the last day says the look and motion started going downhill 
 - The chosen tab's icon moves: the house pops, the dumbbell lifts, the bowl stirs, the person waves.
 - Today: Up next is the hero, with the session's name big, next time's weights as big numbers and a sheen now and then on Start workout.
 - Restore point before the redesign: tag `pre-redesign-1.58.0`.
+
+## 1.59.1: calmer and cleaner
+
+- Font back to Manrope (Geist didn't suit it).
+- The bar: the liquid-glass refraction is gone (on the phone it dropped the blur); a strong frost with a quiet rim instead, and the chosen tab's lens is a soft, colourless pill that slides without stretching. Tab icons just lift once and settle. (`js/lib/liquid-glass.js` removed.)
+- Today is calmer: softer sea light, no sheen on Start workout, smaller headings.
+- Opening and closing the Coach: no more burst of light (with the orb at the end of the bar it was cut off in a hard edge); the orb's flight and the background fade carry it. When the orb lands in the message box, the box gives under it and springs back up.
+- Talking to the Coach: once the answer starts, the message box stops thinking and says it's speaking (the thinking look used to carry on while it spoke).
+- The message box's orb is bigger and doesn't spin or pulse as a whole any more; its dots do the moving: they swell, brighten and ripple in waves with the Coach's voice, react more to yours, and a slow ripple travels round it while it thinks.
+- The floating orb sits higher over the page.

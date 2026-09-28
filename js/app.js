@@ -31,7 +31,6 @@ import { renderProgress, renderExercise, setRange } from './ui/progress.js';
 import { countAll, burst, orbStreak, orbPulse } from './ui/fx.js';
 import { syncBeams } from './ui/beam.js';
 import { startDotOrbs, handOrb } from './ui/dotorb.js';
-import { liquidGlass } from './lib/liquid-glass.js';
 import { initPress } from './ui/press.js';
 import { initChrome, refreshChrome } from './ui/chrome.js';
 import { openCustomize } from './ui/customize.js';
@@ -87,9 +86,6 @@ function renderDock() {
     // split: the tabs share one capsule of glass, the orb has a drop of its own (sitting last)
     dock.innerHTML = '<span class="dcap" aria-hidden="true"></span><span class="ind" aria-hidden="true"></span>' + tab('today', TAB_ICONS.today) + tab('workout', TAB_ICONS.workout) + orbHTML() + tab('food', TAB_ICONS.food) + tab('you', TAB_ICONS.you);
     dock.dataset.built = '4';
-    // real liquid glass: what scrolls under the bar bends at its edges
-    liquidGlass(dock.querySelector('.dcap'), { scale: -80, chroma: 5, blur: 16, saturate: 1.8, border: 0.1 });
-    liquidGlass(dock.querySelector('.obub'), { scale: -110, chroma: 6, blur: 12, saturate: 1.7 });
     dock.dataset.lang = state.lang;
   }
   let on = null;
@@ -218,12 +214,24 @@ function flyOrb(from, to, { duration, delay = 0, go, onland, easing, fromEl, toE
   return ghost;
 }
 
-// The orb arrives in the message box: it glides to a stop exactly in its place (no squash, no
-// wobble, the box doesn't move), and a soft light spreads through the box as it settles; one light tap.
+// The orb arrives in the message box and hits it: the moment it touches, the box gives under it and
+// springs back up a little (weight, then lift), the light spreads through it, and one firm tap.
 function impact() {
   haptic('land');
   const box = $('#composer');
-  if (box) { box.classList.remove('hit'); void box.offsetWidth; box.classList.add('hit'); setTimeout(() => box.classList.remove('hit'), 1000); }
+  if (!box) return;
+  box.classList.remove('hit'); void box.offsetWidth; box.classList.add('hit'); setTimeout(() => box.classList.remove('hit'), 1000);
+  if (stillMotion()) return;
+  box.animate([
+    { transform: 'none' },
+    { transform: 'translateY(5px) scale(1.018, .93)', offset: 0.16 },
+    { transform: 'translateY(-6px) scale(.995, 1.02)', offset: 0.42 },
+    { transform: 'translateY(2px) scale(1.004, .995)', offset: 0.68 },
+    { transform: 'translateY(-.5px)', offset: 0.85 },
+    { transform: 'none' }
+  ], { duration: 680, easing: 'cubic-bezier(.25,.6,.3,1)' });
+  box.style.transformOrigin = '10% 60%';
+  setTimeout(() => { box.style.transformOrigin = ''; }, 700);
 }
 
 function coachMorph(open, under) {
@@ -255,10 +263,9 @@ function coachMorph(open, under) {
       go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
       setTimeout(() => haptic('land'), 560);
     });
-    const last = go(bloom, [{ scale: 0.1, opacity: 0 }, { scale: 0.55, opacity: 1, offset: 0.3 }, { scale: 1.5, opacity: 0 }], { duration: 820, easing: 'cubic-bezier(.33,.1,.25,1)' });
     // held (fill both) until everything settles together: an animation ending on its own mid-way let
     // the page underneath show through for a frame or two on the phone
-    go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: 560, delay: 90, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'both' });
+    const last = go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: 560, delay: 90, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'both' });
     go(other, [{ scale: 1, opacity: 1 }, { scale: 0.94, opacity: 0.3 }], { duration: 640, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'forwards' });
     app.classList.add('coach-in');
     last.onfinish = settleCoachFx;
@@ -279,8 +286,7 @@ function coachMorph(open, under) {
     // the conversation sinks away, the Coach's background fades, the light gathers back into the
     // orb and the page comes forward; the orb takes the light in last
     go(coach, [{ opacity: 1, transform: 'none', visibility: 'visible' }, { opacity: 0, transform: 'translateY(20px) scale(.97)', visibility: 'visible' }], { duration: 220, easing: 'cubic-bezier(.4,0,.6,1)' });
-    go(veil, [{ opacity: 1 }, { opacity: 0 }], { duration: 480, delay: 60, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'backwards' });
-    const last = go(bloom, [{ scale: 1.3, opacity: 0 }, { scale: 0.6, opacity: 0.85, offset: 0.5 }, { scale: 0.08, opacity: 0 }], { duration: 680, easing: 'cubic-bezier(.4,0,.25,1)' });
+    const last = go(veil, [{ opacity: 1 }, { opacity: 0 }], { duration: 480, delay: 60, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'backwards' });
     go(other, [{ scale: 0.95, opacity: 0.25 }, { scale: 1, opacity: 1 }], { duration: 560, delay: 80, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' });
     // the orb leaves the message box and flies home into the bar, which takes it with a small pulse
     const corb = $('#composer .corb .orb');

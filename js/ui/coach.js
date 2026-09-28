@@ -269,6 +269,8 @@ function wordsHTML(bub, text, births, now, st) {
   st.live = place(bub, el);
   if (newUl) st.liveUl = el;
 }
+// the answer has started: a spoken conversation stops thinking and speaks (set by the talk loop)
+let answering = null;
 function typewriter(root, id) {
   let words = [], shown = 0, raf = 0, last = 0, rate = 16, acc = 0, waiters = [];
   const births = [], st = {};
@@ -291,7 +293,7 @@ function typewriter(root, id) {
       if (bub) {
         const msg = bub.closest('.msg');
         // the answer starts: the box's orb gives one pulse and the first line rises out of it
-        if (msg?.classList.contains('is-thinking')) { msg.classList.add('arrive'); pulseOrb(); }
+        if (msg?.classList.contains('is-thinking')) { msg.classList.add('arrive'); pulseOrb(); answering?.(); }
         msg?.classList.remove('is-thinking');
         syncThinking();
         wordsHTML(bub, words.slice(0, shown).join(''), births, now, st);
@@ -745,6 +747,7 @@ export function initCoach(n) {
     input.placeholder = phase ? state.t('coach.talk.' + phase) : state.t('coach.ph');
     input.disabled = !!phase;
   };
+  answering = () => { if (talk.on && composer.dataset.talk === 'thinking') setTalk('speaking'); };
   const stopTalk = () => { talk.on = false; talk.l?.cancel(); talk.l = null; tts.stop(); setTalk(null); orbBtn.style.removeProperty('--lv'); };
   const listenTurn = async () => {
     if (!talk.on) return;

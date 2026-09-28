@@ -95,9 +95,9 @@ function autoState(o) {
   const box = o.orb.closest('#composer');
   if (box) {
     if (app?.classList.contains('thinking')) return { state: 'thinking', level: 0 };
-    if (box.classList.contains('speaking')) return { state: 'speaking', level: +box.style.getPropertyValue('--sv') || 0 };
+    if (box.classList.contains('speaking')) return { state: 'speaking', level: Math.min(1, (+box.style.getPropertyValue('--sv') || 0) * 1.3) };
     const talk = box.dataset.talk;
-    if (talk === 'listening' || talk === 'hearing') return { state: 'listening', level: +(o.orb.closest('.corb')?.style.getPropertyValue('--lv')) || 0 };
+    if (talk === 'listening' || talk === 'hearing') return { state: 'listening', level: Math.min(1, (+(o.orb.closest('.corb')?.style.getPropertyValue('--lv')) || 0) * 1.8), bands: [0.6, 0.5, 0.4] };
     if (talk === 'thinking') return { state: 'thinking', level: 0 };
     return IDLE;
   }
@@ -140,7 +140,7 @@ function paint(o, now) {
   const yaw = T * 0.32 + G.extra, tilt = 0.42 + 0.08 * Math.sin(T * 0.3);
   const sy = Math.sin(yaw), cyw = Math.cos(yaw), st = Math.sin(tilt), ct = Math.cos(tilt);
   const breathe = 1 + 0.025 * Math.sin(T * 1.3);
-  const lvl = s.level * Math.max(s.listen, s.speak);
+  const lvl = s.level * s.listen, spk = Math.min(1, s.level * 1.6) * s.speak;
   const thinking = s.think > 0.002, scan = T * 2.6;
   const k0 = (size / 60) * (size > 90 ? 0.8 : size < 44 ? 1.25 : 1);
   const t31 = T * 3.1, t53 = T * 5.3;
@@ -151,6 +151,10 @@ function paint(o, now) {
     // up at the poles), and while it thinks a bright meridian sweeping round
     let k = breathe, sweep = 0;
     if (lvl > 0.002) k += lvl * (0.08 + 0.14 * (s.bands[0] * p.lowW + s.bands[2] * p.highW) + 0.05 * s.bands[1]) * (0.6 + 0.2 * Math.sin(t31 + p.ph) + 0.2 * Math.sin(t53 + p.ph2));
+    // speaking: the voice runs over it in waves from the poles, each dot lifting on its own beat
+    if (spk > 0.002) k += spk * (0.07 + 0.09 * Math.sin(T * 7.3 - p.y * 5 + p.ph * 0.4) + 0.05 * Math.sin(T * 11.1 + p.ph2));
+    // thinking: a slow ripple travels round it under the sweep
+    if (thinking) k += s.think * 0.035 * Math.sin(p.lon * 3 + yaw * 2 - T * 4.2);
     if (thinking) {
       const a = p.lon + yaw - scan, d = Math.atan2(Math.sin(a), Math.cos(a));
       sweep = s.think * Math.exp(-(d * d) / 0.12);
@@ -162,7 +166,7 @@ function paint(o, now) {
     const depth = (z2 + 1) / 2; // 0 far … 1 near
     xs[i] = cx + x1 * R;
     ys[i] = cx - y1 * R;
-    radii[i] = Math.max(0.35, (0.55 + 1.45 * depth + 1.1 * sweep + 0.9 * lvl * depth) * k0);
+    radii[i] = Math.max(0.35, (0.55 + 1.45 * depth + 1.1 * sweep + (0.9 * lvl + 0.8 * spk) * depth) * k0);
     const db = Math.min(DB - 1, (depth * DB) | 0), vb = Math.min(VB - 1, (((y1 / k) + 1) / 2 * VB) | 0);
     const sb = sweep > 0.55 ? 2 : sweep > 0.15 ? 1 : 0;
     bk[(db * VB + vb) * SB + sb].push(i);
@@ -176,7 +180,7 @@ function paint(o, now) {
     const depth = (db + 0.5) / DB, u = (vb + 0.5) / VB, sweep = SWEEP[sb];
     // the theme's colours across the sphere: the accent up top, turning blue, violet round the bottom
     let c = mix(mix(P.v, P.b, u), P.a, Math.max(0, u * 1.2 - 0.25) * 0.78);
-    c = mix(c, [255, 255, 255], Math.min(1, 0.04 + 0.22 * depth ** 3 + 0.5 * sweep + 0.3 * lvl * depth));
+    c = mix(c, [255, 255, 255], Math.min(1, 0.04 + 0.22 * depth ** 3 + 0.5 * sweep + 0.3 * (lvl + spk) * depth));
     const a = Math.min(1, 0.07 + 0.93 * depth ** 1.7 + sweep * 0.5);
     ctx.fillStyle = `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a.toFixed(3)})`;
     ctx.beginPath();
@@ -212,7 +216,7 @@ function frame(now) {
     const every = !shown(o) ? 8 : active ? 1 : 2;
     if (tick % every) { if (active) busy = Math.max(busy, 0.55 * o.s.think + 0.25 * o.s.listen); continue; }
     settle(o, want, odt);
-    busy = Math.max(busy, 0.55 * o.s.think + 0.25 * o.s.listen);
+    busy = Math.max(busy, 0.55 * o.s.think + 0.25 * o.s.listen + 0.3 * o.s.speak);
     paint(o, now);
   }
   G.busy = busy;
