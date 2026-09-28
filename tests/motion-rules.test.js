@@ -1,4 +1,4 @@
-// The motion & performance budget (CLAUDE.md): only transform, opacity, filter and clip-path animate
+// The motion & performance budget (CLAUDE.md): no layout property animates
 // See scripts/lib/motionrules.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import { checkAll, checkCss, checkJs } from '../scripts/lib/motionrules.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-test('the app animates only transform, opacity, filter and clip-path', () => {
+test('the app never animates layout properties', () => {
   const bad = checkAll(root);
   assert.deepEqual(bad, [], bad.join('\n'));
 });
@@ -16,7 +16,7 @@ test('the app animates only transform, opacity, filter and clip-path', () => {
 test('the check catches what it should', () => {
   assert.equal(checkCss('.a{transition:transform .2s,opacity .2s}').length, 0);
   assert.equal(checkCss('.a{transition:none}').length, 0);
-  assert.equal(checkCss('.a{transition:background .2s}').length, 1);
+  assert.equal(checkCss('.a{transition:background .2s}').length, 0);
   assert.equal(checkCss('.a{transition:all .2s}').length, 1);
   assert.equal(checkCss('.a{transition:height .3s var(--e-out),opacity .2s}').length, 1);
   assert.equal(checkCss('@keyframes k{from{opacity:0;filter:blur(4px)}to{opacity:1}}').length, 0);
@@ -25,7 +25,8 @@ test('the check catches what it should', () => {
   assert.equal(checkCss('.card{backdrop-filter:none}').length, 0);
   assert.equal(checkCss('.dcap{backdrop-filter:blur(12px)}').length, 0);
   assert.equal(checkCss('.composer.glass{backdrop-filter:blur(24px)}').length, 0);
-  assert.equal(checkCss('@media (min-width:1px){.x{transition:color .2s}}').length, 1);
+  assert.equal(checkCss('@media (min-width:1px){.x{transition:color .2s}}').length, 0);
   assert.equal(checkJs("el.animate([{ opacity: 0 }, { transform: 'none' }], { duration: 1 })").length, 0);
-  assert.equal(checkJs("el.animate([{ boxShadow: 'none' }, { filter: 'blur(2px)' }], { duration: 1 })").length, 1);
+  assert.equal(checkJs("el.animate([{ boxShadow: 'none' }, { filter: 'blur(2px)' }], { duration: 1 })").length, 0)
+  assert.equal(checkJs("el.animate([{ width: '1px' }, { height: '2px' }], { duration: 1 })").length, 2);
 });
