@@ -31,6 +31,7 @@ import { renderProgress, renderExercise, setRange } from './ui/progress.js';
 import { countAll, burst, orbStreak, orbPulse } from './ui/fx.js';
 import { syncBeams } from './ui/beam.js';
 import { startDotOrbs, handOrb } from './ui/dotorb.js';
+import { liquidGlass } from './lib/liquid-glass.js';
 import { initPress } from './ui/press.js';
 import { initChrome, refreshChrome } from './ui/chrome.js';
 import { openCustomize } from './ui/customize.js';
@@ -81,10 +82,14 @@ function renderDock() {
   const { t } = state;
   const dock = $('#dock');
   const tab = (name, icon, cls = '') => `<button class="tab${cls}" data-act="go" data-to="${name}">${icon}<span>${t('tab.' + name)}</span></button>`;
-  if (dock.dataset.built !== '3' || dock.dataset.lang !== state.lang) {
+  if (dock.dataset.built !== '4' || dock.dataset.lang !== state.lang) {
     // the orb in the middle is the Coach (tap) and the quick voice command (hold)
-    dock.innerHTML = '<span class="ind" aria-hidden="true"></span>' + tab('today', TAB_ICONS.today) + tab('workout', TAB_ICONS.workout) + orbHTML() + tab('food', TAB_ICONS.food) + tab('you', TAB_ICONS.you);
-    dock.dataset.built = '3';
+    // split: the tabs share one capsule of glass, the orb has a drop of its own (sitting last)
+    dock.innerHTML = '<span class="dcap" aria-hidden="true"></span><span class="ind" aria-hidden="true"></span>' + tab('today', TAB_ICONS.today) + tab('workout', TAB_ICONS.workout) + orbHTML() + tab('food', TAB_ICONS.food) + tab('you', TAB_ICONS.you);
+    dock.dataset.built = '4';
+    // real liquid glass: what scrolls under the bar bends at its edges
+    liquidGlass(dock.querySelector('.dcap'), { scale: -80, chroma: 5, blur: 16, saturate: 1.8, border: 0.1 });
+    liquidGlass(dock.querySelector('.obub'), { scale: -110, chroma: 6, blur: 12, saturate: 1.7 });
     dock.dataset.lang = state.lang;
   }
   let on = null;

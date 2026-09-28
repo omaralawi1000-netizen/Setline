@@ -707,3 +707,11 @@ Your feedback over the last day says the look and motion started going downhill 
 - The floating orb sits back up where it was, above the dock's place.
 - The voice screen has a solid backdrop instead of blurring the whole page behind it on every frame (the lag opening it full screen).
 - Opening the Coach: its bloom of light fades out inside the screen's edges instead of being cut off by them (it showed as a hard-edged square).
+
+## 1.59.0: deep water glass (redesign)
+
+- New look across the app: Geist as the one font, a deep-water base with soft light drifting in the sea behind every screen (in each theme's colours), cards as tinted glass with a rim of light, labels in sentence case instead of small capitals. Ocean becomes mint on deep blue.
+- Split bar: the four tabs in one capsule of liquid glass and the orb in its own drop beside it, with real refraction at their edges (`js/lib/liquid-glass.js`, MIT, Deepika Rao; Chromium, plain frost elsewhere). It still collapses to the current tab and the orb on scroll.
+- The chosen tab's icon moves: the house pops, the dumbbell lifts, the bowl stirs, the person waves.
+- Today: Up next is the hero, with the session's name big, next time's weights as big numbers and a sheen now and then on Start workout.
+- Restore point before the redesign: tag `pre-redesign-1.58.0`.

@@ -1194,5 +1194,5 @@ export function initVoice(n) {
   store.subscribe(reason => { if (reason === 'settings' && v.open) paintStatic(); });
 }
 
-export const orbHTML = () => `<button class="orbbtn" aria-label="${esc(state.t('voice.talk'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span><span class="orest" aria-hidden="true"><i><b></b></i><i><b></b></i></span></button>`;
+export const orbHTML = () => `<button class="orbbtn" aria-label="${esc(state.t('voice.talk'))}"><span class="obub" aria-hidden="true"></span><span class="orb"><i class="core"><b></b><b></b><b></b></i></span><span class="orest" aria-hidden="true"><i><b></b></i><i><b></b></i></span></button>`;
 export const isVoiceOpen = () => v.open;
