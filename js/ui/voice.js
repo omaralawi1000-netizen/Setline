@@ -31,6 +31,7 @@ import { startCardioSession, finishSheet as cardioFinishSheet } from './cardio.j
 import { dateKey } from '../body.js';
 import { planFor } from './routine.js';
 import { orbPulse, orbShake, orbSpark, orbStreak } from './fx.js';
+import { setOrb, handOrb } from './dotorb.js';
 import { livePRSets } from '../pr.js';
 import { createVoiceGlow } from './voiceglow.js';
 import { ask as askCoach, ensureModels } from './coach.js';
@@ -181,6 +182,7 @@ const scaleOf = node => { const t = getComputedStyle(node).transform; return t &
 const dockOrb = () => document.querySelector('#dock .orbbtn .orb');
 function syncOrb(src, dst) {
   if (!src || !dst) return;
+  handOrb(src, dst); // the dotted orbs: the same pose, and just as swollen or lit
   const a = src.querySelectorAll('.core, .core b'), b = dst.querySelectorAll('.core, .core b');
   b.forEach((d, i) => {
     const from = a[i]?.getAnimations?.() || [], to = d.getAnimations?.() || [];
@@ -434,6 +436,8 @@ function startLoop() {
     const gsrc = { listening, processing: v.phase === 'thinking', rms: b.rms, voice: b.voice };
     glow?.step(Math.min(0.05, dt / 1000), gsrc, reduced());
     if (quiet?.on) quiet.off();
+    // the dotted orb ripples with the voice (the lows round its middle, the highs at its poles)
+    setOrb(v.mode === 'mini' ? el.oorb : el.orb, { state: !v.open ? 'idle' : listening ? 'listening' : v.phase === 'thinking' ? 'thinking' : 'idle', level: v.lvl, bands: [b.low, b.voice[1] * 3, b.high] });
     if (reduced()) return;
     const l = v.lvl;
     // the body of the voice swells the orb's core, its edge (s, t, k) lights the rim
@@ -444,8 +448,8 @@ function startLoop() {
     fq.style.setProperty('--hi', v.hi.toFixed(3));
     // alive, not mechanical: a slow breath, and a soft squash and stretch that follows the voice
     const breath = v.phase === 'thinking' ? 0 : 0.012 * Math.sin(now / 700);
-    const sx = 1 + breath + l * 0.16 + l * 0.05 * Math.sin(now / 95);
-    const sy = 1 + breath + l * 0.2 + l * 0.05 * Math.cos(now / 110);
+    const sx = 1 + breath + l * 0.07 + l * 0.025 * Math.sin(now / 95);
+    const sy = 1 + breath + l * 0.09 + l * 0.025 * Math.cos(now / 110);
     if (v.mode === 'mini') {
       el.oorb.style.transform = `scale(${sx.toFixed(4)}, ${sy.toFixed(4)})`;
       el.owrap.style.setProperty('--l', l.toFixed(3));

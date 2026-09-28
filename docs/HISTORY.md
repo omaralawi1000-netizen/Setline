@@ -698,3 +698,12 @@ Your feedback over the last day says the look and motion started going downhill 
 
 - Floating orb: the dock steps aside while it's up (nothing left in it), the orb sits low where the dock was, the page dims properly behind it, and the words stack in one column: status just above the orb, your words above that, at most three lines with the newest at the bottom.
 - Coach: opening no longer throws a big ring of light; sending moves only the messages on screen (moving the whole thread made the phone redraw it and it went blank for a moment); a finished reply keeps the exact width it was typed at, so it no longer re-wraps and jumps; the thinking orb is drawn at 64 px so it reads.
+
+## 1.58.0: the dotted orb
+
+- The Orb is now a sphere of lit dots turning in 3D (`js/ui/dotorb.js`), in the theme's colours, everywhere: the dock, the message box, the floating orb, the voice screen, onboarding and the interview. All orbs turn together on one clock and one spin, and a handover passes on how swollen or lit it is, so flying up, opening full screen, landing back and flying into the message box are seamless. It breathes at rest, ripples with your voice, a bright meridian sweeps it while it thinks, and it pulses while the Coach speaks. Drawn in colour batches (a few dozen fills a frame), at half rate at rest, rarely while hidden, still with reduced motion.
+- The old ball's blurred, screen-blended blobs are gone (the likely cause of the square flicker around the floating orb), and so is its white rim and glint.
+- The Coach's thinking orb in the thread is gone: the message box's own orb shows the thinking now. (`js/orbs.js`, `js/ui/thinkorb.js` and their golden test removed.)
+- The floating orb sits back up where it was, above the dock's place.
+- The voice screen has a solid backdrop instead of blurring the whole page behind it on every frame (the lag opening it full screen).
+- Opening the Coach: its bloom of light fades out inside the screen's edges instead of being cut off by them (it showed as a hard-edged square).

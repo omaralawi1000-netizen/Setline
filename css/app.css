@@ -2846,16 +2846,6 @@ html[data-motion=off] .screen.enter :is(.greet .gw,.tw){animation:none}
 .prtile{animation-fill-mode:backwards}
 
 /* ======================= 1.57: thinking orbs, voice glow, border beam ======================= */
-/* thinking: a thinking orb where the answer will appear (the words stay in the message box, and are
-   read out from here to screen readers) */
-#s-coach .msg.ai.is-thinking{position:relative;width:auto;height:auto;overflow:visible;clip-path:none;animation:none}
-#s-coach .msg.ai.is-thinking .bub{padding:6px 0 2px!important;background:none!important;border:0!important}
-#s-coach .msg.ai.is-thinking .think{display:block}
-#s-coach .msg.ai.is-thinking .tsteps{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
-.thinkorb{display:block;animation:thinkorbin var(--m-slow) var(--e-out) both}
-@keyframes thinkorbin{from{opacity:0;transform:scale(.6)}}
-@media (prefers-reduced-motion: reduce){ .thinkorb{animation:none} }
-html[data-motion=off] .thinkorb{animation:none}
 /* the voice glow (voice-glow, see js/ui/voiceglow.js): the bottom of the voice screen and of the floating
    orb. Every lobe is a soft ellipse moved by transform only; the layers fade by opacity. */
 .vglow{position:absolute;inset:0;pointer-events:none;overflow:hidden;opacity:0;transition:opacity var(--m-slow) var(--e-out)}
@@ -2914,7 +2904,7 @@ html[data-motion=off] .beam :is(.bm-rot,.bm-fix){animation:none}
 /* The orb floats low, where the dock was: the dock steps aside (nothing left behind in it), the page
    dims properly behind what you're saying, and the words sit in one tidy column above the orb: what
    it's doing just over it, your words above that, at most three lines, the newest at the bottom. */
-.ofloat{--ob:calc(var(--dock-bottom) + 20px)}
+.ofloat{--ob:calc(var(--dock-bottom) + var(--dock-h) + 44px)}
 .app.voice-mini .dock{opacity:0;transform:translateY(24px);transition:opacity var(--m-base) var(--e-out),transform var(--m-slow) var(--e-out)}
 .oscrim{background:linear-gradient(to top,rgba(8,9,14,.95) 0%,rgba(8,9,14,.9) 38%,rgba(8,9,14,.62) 58%,rgba(8,9,14,.18) 78%,rgba(8,9,14,0))}
 .owrap{bottom:var(--ob)}
@@ -2925,3 +2915,19 @@ html[data-motion=off] .beam :is(.bm-rot,.bm-fix){animation:none}
   -webkit-mask-image:linear-gradient(to bottom,transparent,#fff 1.1em);mask-image:linear-gradient(to bottom,transparent,#fff 1.1em)}
 .osay:not(.over){-webkit-mask-image:none;mask-image:none}
 .osay:empty{margin:0}
+
+/* ======================= 1.58.0: the dotted orb ======================= */
+/* Every orb is a sphere of lit dots (js/ui/dotorb.js paints it on a canvas it puts inside). The old
+   glowing ball and its blurred, blended blobs are gone: they were the costliest thing on screen and
+   what flickered in squares on the phone. The orb element itself stays, so every flight, press,
+   pulse and landing moves the dots exactly as it moved the ball. */
+.orb.dotted .core,.orb.dotted .spin{display:none}
+.orb.dotted > canvas.dots{position:absolute;display:block;pointer-events:none}
+/* (its white rim lit by the voice's edge belonged to the ball: the dots answer the highs themselves) */
+.orb.dotted::after{display:none}
+/* the light that blooms out of the orb as the Coach opens fades out inside the screen's own edges (it
+   used to be cut off by them, and shrunk down at the start it showed as a hard-edged square) */
+.aura .bloom{background:radial-gradient(ellipse 50% 58% at var(--ax) var(--ay),color-mix(in srgb,var(--accent-hi) 70%,transparent) 0,color-mix(in srgb,var(--accent) 45%,transparent) 17%,color-mix(in srgb,var(--violet) 22%,transparent) 50%,transparent 100%)}
+/* the voice screen: a solid backdrop instead of blurring the whole page behind it every frame (what
+   made opening it full screen lag) */
+.vlayer .vbg{-webkit-backdrop-filter:none;backdrop-filter:none;background:linear-gradient(180deg,rgba(9,10,15,.985),rgba(9,10,15,.97) 55%,rgba(9,10,15,.985))}

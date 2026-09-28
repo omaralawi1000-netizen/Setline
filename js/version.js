@@ -1,2 +1,2 @@
 // Keep in sync with VERSION in sw.js (tests/version.test.js checks this).
-export const VERSION = '1.57.1';
+export const VERSION = '1.58.0';
