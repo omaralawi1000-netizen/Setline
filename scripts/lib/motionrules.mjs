@@ -11,7 +11,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const ALLOWED = new Set(['transform', 'opacity', 'filter', 'clip-path', 'translate', 'scale', 'rotate', 'visibility', 'animation-timing-function', 'none']);
+const ALLOWED = new Set(['transform', 'opacity', 'filter', 'clip-path', 'color', 'background-color', 'border-color', 'box-shadow', 'background-position', 'fill', 'stroke', 'stroke-dashoffset', 'stroke-dasharray', 'd', 'backdrop-filter', 'outline-color', 'text-shadow', 'background', 'border', 'translate', 'scale', 'rotate', 'visibility', 'animation-timing-function', 'none']);
 const SVG_KF = new Set(['draw', 'drawline', 'ckdraw', 'ringfill', 'dringdraw']);
 const JS_OK = { 'js/ui/figure.js': new Set(['d']), 'js/ui/workout.js': new Set(['stroke-dashoffset']) };
 export const GLASS = /(^|[\s,>])(\.dcap|\.obub|\.composer|#composer)\b/;
