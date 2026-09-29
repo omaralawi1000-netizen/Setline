@@ -114,6 +114,10 @@ export function renderCoach(root) {
     // new messages keep the view at the bottom (in the same frame, before anything is painted) if
     // you were there, or if it's your own new question
     if (grew && (atEnd || grew.mine)) root.scrollTop = root.scrollHeight;
+    // the chips under a finished reply make their own room: the thread keeps to its end, gliding up
+    // as they rise (never a jump)
+    else if (ol._fresh && atEnd) roomFor(root, ol);
+    ol._fresh = null;
   }
   const composer = $('#composer');
   if (!composer.dataset.talk) composer.querySelector('input').placeholder = t('coach.ph'); // talking: the box shows what's happening
@@ -158,11 +162,26 @@ function finalize(li, m) {
   if (bub.textContent.replace(/\s+/g, ' ').trim() !== want) bub.innerHTML = p.head + formatAnswer(hideMemoryTail(m.text)); // (only if the words really differ)
   if (p.extras) bub.insertAdjacentHTML('beforeend', p.extras);
   for (const x of li.querySelectorAll(':scope > .dochips, :scope > .mflag')) x.remove();
-  if (p.after) { bub.insertAdjacentHTML('afterend', p.after); li.querySelector(':scope > .dochips')?.classList.add('fresh'); }
+  if (p.after) {
+    bub.insertAdjacentHTML('afterend', p.after);
+    const chips = li.querySelector(':scope > .dochips');
+    if (chips && m.actions?.length && !li._chipsShown) { chips.classList.add('fresh'); li._chipsShown = true; li.parentElement && (li.parentElement._fresh = chips); }
+    else chips?.classList.remove('fresh');
+  }
   li.className = p.cls + ' seen';
   li._sig = sigOf(m);
   li._text = m.text;
   return li;
+}
+// The chips arrived under the last reply while you were at the end: the scroll goes to the new end at
+// once and the thread is drawn back to where it was, then glides up with the chips' own rise.
+const CHIP_MS = 450; // as the chips' rise (css: .dochips.fresh)
+function roomFor(root, ol) {
+  const before = root.scrollTop;
+  root.scrollTop = root.scrollHeight;
+  const moved = root.scrollTop - before;
+  if (moved < 1 || stillMotion()) return;
+  ol.animate([{ transform: `translateY(${moved}px)` }, { transform: 'none' }], { duration: CHIP_MS, easing: 'cubic-bezier(.2,.8,.2,1)' }); // (the thread itself settles without the overshoot)
 }
 // Bring the list in line with the chat: returns {mine} if messages were added (mine: your own).
 function syncThread(ol) {
@@ -173,10 +192,15 @@ function syncThread(ol) {
     let li = have.get(m.id);
     have.delete(m.id);
     if (li && li._sig !== sigOf(m)) {
-      const inPlace = m.role !== 'user' && !m.streaming && !m.error && !m.plan && m.text &&
-        (li.classList.contains('is-streaming') || li._text === m.text) && !li.classList.contains('is-thinking');
-      const done = inPlace && finalize(li, m);
-      if (!done) { const fresh = makeLi(m); li.replaceWith(fresh); li = fresh; }
+      // the same message (by id) stays the same node: thinking → streaming → final → chips all happen
+      // in place. Only a reply that turns into something else (an error, a plan card) is redrawn.
+      // (while it streams, its words are the typewriter's: nothing here touches them)
+      if (m.streaming && li.classList.contains('is-streaming')) li._sig = sigOf(m);
+      else {
+        const inPlace = m.role !== 'user' && !m.error && !m.plan && m.text && !li.classList.contains('is-err') && !li.classList.contains('plan');
+        const done = inPlace && finalize(li, m);
+        if (!done) { const fresh = makeLi(m); li.replaceWith(fresh); li = fresh; }
+      }
     }
     // your spoken question: the bubble that appeared with dots when you stopped talking becomes it
     if (!li && m.role === 'user') {
@@ -332,7 +356,14 @@ function merge(a, b) {
 // every word still settling).
 function wordsHTML(bub, text, births, now, st) {
   if (bub._st !== st) { for (const c of [...bub.childNodes]) if (!c.classList?.contains('wkhead')) c.remove(); bub._st = st; Object.assign(st, { n: 0, w: 0, live: null, liveUl: null }); }
-  const lines = hideMemoryTail(text).split('\n'), tail = lines.pop();
+  // A hidden line (ACTION: …, REMEMBER: …, CHANGE: …) can't be told from a real one by its first letter
+  // or two, so a last line that could still become one waits a chunk before it shows ("\nA" would show,
+  // then "\nACT" hide it again).
+  const lines = hideMemoryTail(text).replace(/\n[ \t]*(?:A|AC|R|RE|C|CH|CHA)$/, '').split('\n');
+  let tail = lines.pop();
+  // The text can still lose its last line again (the end of it turned out to be a hidden line, taking
+  // its newline with it): a line already finished and on screen is never drawn a second time.
+  if (lines.length < st.n) tail = '';
   const drop = () => { st.live?.remove(); if (st.liveUl && !st.liveUl.children.length) st.liveUl.remove(); st.live = st.liveUl = null; };
   // the line on screen takes the new drawing of itself, if it has the same shape
   const keep = el => {
@@ -894,6 +925,11 @@ export function initCoach(n) {
   // a word that has settled drops its animation (it's already at rest), so a long line doesn't keep
   // dozens of them alive
   root.addEventListener('animationend', e => { if (e.animationName === 'wordrise' && e.target._wd) e.target.style.animation = 'none'; });
+  // a chip answers the finger on the frame it lands (pressed), before the tap is even a click
+  root.addEventListener('pointerdown', e => { e.target.closest?.('.dochip:not(:disabled)')?.classList.add('pressed'); }, { passive: true });
+  const unpress = () => { for (const c of root.querySelectorAll('.dochip.pressed:not(.going)')) c.classList.remove('pressed'); };
+  root.addEventListener('pointerup', () => setTimeout(unpress, 120), { passive: true });
+  root.addEventListener('pointercancel', unpress, { passive: true });
   root.addEventListener('click', e => {
     const b = e.target.closest('[data-coach]');
     if (!b) return;

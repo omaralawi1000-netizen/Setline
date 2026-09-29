@@ -2,6 +2,13 @@
 
 Follow `AGENTS.md`. It's short on purpose; don't read more than the task needs.
 
+## How to work with Omar
+- Work autonomously. Don't stop to ask for routine choices; decide and keep going.
+- Freedom on HOW: if you see a clearly better technique, structure, test or fix than what Omar's prompt describes, use it without asking, and explain it in the final report.
+- No freedom on WHAT: never remove or change a feature, the look (colours, blur, glass, orb, layout), or a flow Omar asked for without asking first. Better performance or simpler code is never a reason to change his design.
+- Stop and ask only when: (1) something could lose Omar's data or break the live app in a way a revert can't fix, (2) the prompt is impossible or clearly contradicts itself, or (3) you're convinced a design/feature change is needed. In that case, say what and why in 2–3 lines and wait.
+- Everything else: finish the whole task, test it, commit, deploy, then report.
+
 - Cloud sessions run `.claude/hooks/session-start.sh`, which installs Playwright for the check scripts.
 - For design and animation work, follow `docs/DESIGN_SYSTEM.md`. Omar wants the app as beautiful and premium as possible: be ambitious, change the look, layout and motion of any screen, use `impeccable`, `emil-design-eng` and `frontend-design` freely. Keep every feature and `data-act`/`data-k`/`#s-<screen>` hook.
 - Keep chat replies short.

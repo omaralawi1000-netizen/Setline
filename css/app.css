@@ -2428,6 +2428,17 @@ html[data-motion=off] .orbghost{display:none}
 .dochip:nth-child(2) .dox{background:rgba(var(--a-rgb),.16);color:var(--accent)}
 .dochip .dox svg{width:15px;height:15px;stroke-width:2.8}
 .dochip.going{opacity:.55;transform:scale(.97);transition:opacity var(--m-fast) var(--e-out),transform var(--m-fast) var(--e-out)}
+/* 1.62.4: once the reply's last word has settled, its chips rise out of it on a soft spring (one
+   gentle overshoot), staggered 60 ms; the thread makes room by gliding (coach.js roomFor). Pressed on
+   the frame the finger lands; taken: the check draws in. */
+.msg .dochips.fresh .dochip{animation:chiprise 450ms cubic-bezier(.34,1.32,.64,1) both;animation-delay:calc(var(--i, 0) * 60ms)}
+@keyframes chiprise{from{opacity:0;transform:translateY(10px) scale(.96)}}
+.dochip.pressed{transform:scale(.97);transition:transform 60ms var(--e-out)}
+.dochip.going .dox svg path{stroke-dasharray:24;stroke-dashoffset:24;animation:ckdraw 320ms var(--e-out) 60ms forwards}
+@media (prefers-reduced-motion: reduce){ .msg .dochips.fresh .dochip{animation:chipfade 150ms linear both} .dochip.going .dox svg path{animation:none;stroke-dashoffset:0} }
+html[data-motion=off] .msg .dochips.fresh .dochip{animation:chipfade 150ms linear both}
+html[data-motion=off] .dochip.going .dox svg path{animation:none;stroke-dashoffset:0}
+@keyframes chipfade{from{opacity:0}}
 @keyframes dochipin{from{opacity:0;transform:translateY(8px) scale(.94)}}
 .msg:has(~ .msg.me) .dochips{display:none}
 .app.typing .dochips{opacity:0;transform:translateY(4px);pointer-events:none}

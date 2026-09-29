@@ -6,6 +6,7 @@
 // (or update this file in the same change).
 import { launch, newPage, serve, settle, onScreen } from './lib/harness.mjs';
 import { STAND_IN, mockServices, installSampler, mark, samples, between } from './lib/voiceflow.mjs';
+import { streamReplies, probeReply } from './lib/sse.mjs';
 
 // chat-stream is 1.60's in-place chat, which the master fix's phase 3 brings to this design: until then
 // it reports without failing.
@@ -388,6 +389,62 @@ const FLOWS = {
     if (sent) throw new Error('something was sent without a mic');
     await context.close();
     return errors.filter(e => !/mic did not start/.test(e));
+  },
+
+  // A reply streamed for real (an SSE body read chunk by chunk, see lib/sse.mjs): plain, ending in an
+  // action chip, ending in a memory, and a long one in 200 chunks. On every frame from its first word
+  // to 1.5 s after the stream ends, its first sentence shows once, the thread has one more Coach message
+  // than before, and the thread never jumps back while it follows the reply. The chip arrives.
+  'reply-real-stream': async (browser, base) => {
+    const long = Array.from({ length: 24 }, (_, i) => `Point ${i + 1}: keep the bar path tight and breathe before each rep.`).join(' ');
+    const cases = [
+      { name: 'plain', first: 'Your bench is moving well.', text: 'Your bench is moving well. You added 2.5 kg in two weeks, so keep the same plan and aim for eight reps next time, then add a little weight when all three sets feel smooth.' },
+      { name: 'action', first: 'If your body is truly beaten up, take today as a full rest day.', chip: 'Rest today', text: 'If your body is truly beaten up, take today as a full rest day. But if it is just low energy, eat a good meal now and show up just to drill technique. Either way, eat and recharge for tomorrow\'s back and triceps.\nACTION: {"label":"Rest today","do":"rest today"}' },
+      { name: 'memory', first: 'Got it, wrestling on Tuesdays and Thursdays.', text: 'Got it, wrestling on Tuesdays and Thursdays. I will keep heavy legs away from those days and put them on Monday instead, with a lighter pull day before the mat.\nREMEMBER: Wrestles on Tuesdays and Thursdays.' },
+      { name: '200 chunks', first: 'Point 1: keep the bar path tight', chunks: 200, every: 25, text: long }
+    ];
+    const { context, page, errors } = await newPage(browser, base);
+    await streamReplies(page, cases.map(c => ({ text: c.text, chunks: c.chunks || 64, every: c.every ?? 40 })));
+    await page.addInitScript(k => { localStorage.setItem('setline.keys', JSON.stringify(k)); }, STAND_IN);
+    await page.goto(base + '?seed=1');
+    await onScreen(page, 'today');
+    await page.evaluate(async () => {
+      const s = await import('./js/store.js');
+      window.__s = s;
+      s.setSettings({ spoken: 'off', weeklyCheckin: false });
+      for (let i = 0; i < 5; i++) { s.addChat('user', `Question ${i + 1} about my plan?`); s.addChat('model', 'Keep the same plan this week, add a set of rows on Thursday and sleep a little more before the heavy day.'); }
+    });
+    await settle(page, 600);
+    await page.click('#dock .orbbtn');
+    await onScreen(page, 'coach');
+    await settle(page, 1300);
+    const bad = [];
+    for (const [i, c] of cases.entries()) {
+      const aiBefore = await page.locator('#thread > .msg.ai').count();
+      await probeReply(page, c.first);
+      await page.fill('#composer input', `Question for the ${c.name} reply?`);
+      await page.press('#composer input', 'Enter');
+      await page.waitForFunction(n => window.__sse.ended[n] != null, i, { timeout: 30000 });
+      await page.waitForFunction(() => { const m = [...window.__s.state.chat].reverse().find(x => x.role === 'model' && x.q); return m && m.streaming === false; }, null, { timeout: 30000 });
+      await settle(page, 1500);
+      const r = await page.evaluate(() => ({ f: window.__probe.splice(0), chips: [...document.querySelectorAll('#thread > .msg.ai:last-child .dochip')].map(b => b.textContent.trim()) }));
+      const f = r.f, from = f.findIndex(x => x.copies > 0);
+      const seen = from < 0 ? [] : f.slice(from);
+      const twice = seen.filter(x => x.copies > 1).length, maxAi = Math.max(...seen.map(x => x.ai));
+      // a jump: the thread moved back (up) by itself while it was following the end
+      let jumps = 0;
+      for (let k = 1; k < seen.length; k++) if (seen[k - 1].gap < 80 && seen[k].top < seen[k - 1].top - 2) jumps++;
+      const line = `${c.name}: ${seen.length} frames, ${twice} with the reply twice, up to ${maxAi - aiBefore} new Coach message node(s), ${jumps} jump(s)`;
+      console.log('    ' + line + (c.chip ? `, chip: ${r.chips.join(', ') || 'none'}` : ''));
+      if (from < 0) bad.push(`${c.name}: the reply never showed`);
+      if (twice) bad.push(`${c.name}: the reply showed twice in ${twice} frame(s)`);
+      if (maxAi - aiBefore > 1) bad.push(`${c.name}: ${maxAi - aiBefore} Coach message nodes for one reply`);
+      if (jumps) bad.push(`${c.name}: the thread jumped ${jumps} time(s)`);
+      if (c.chip && !r.chips.includes(c.chip)) bad.push(`${c.name}: no "${c.chip}" chip`);
+    }
+    if (bad.length) throw new Error(bad.join('; '));
+    await context.close();
+    return errors;
   },
 
   // Every main tab opens without throwing.

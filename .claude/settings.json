@@ -10,13 +10,26 @@
       "Grep",
       "WebFetch",
       "WebSearch",
-      "mcp__github"
+      "mcp__github",
+      "Bash(git:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(node:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)"
     ],
     "deny": [
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
       "Bash(git reset --hard origin/main:*)",
-      "Bash(rm -rf /:*)"
+      "Bash(rm -rf /:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git branch -D:*)",
+      "Bash(rm -rf:*)"
     ]
   },
   "hooks": {
