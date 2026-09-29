@@ -196,7 +196,12 @@ const io = 'IntersectionObserver' in window ? new IntersectionObserver(es => {
   for (const e of es) for (const o of orbs) if (o.canvas === e.target) o.seen = e.isIntersecting;
   wake();
 }) : null;
-const shown = o => o.canvas.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) ?? true;
+// (asked a few times a second, not every frame: each ask makes the browser work out every style on the
+// page first, which cost frames in the middle of transitions)
+const shown = o => {
+  if (o.visTick == null || tick - o.visTick >= 12) { o.visTick = tick; o.vis = o.canvas.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) ?? true; }
+  return o.vis;
+};
 function frame(now) {
   raf = 0;
   tick++;
@@ -232,6 +237,7 @@ export function setOrb(orb, want) {
   const o = orb && byEl.get(orb);
   if (!o) return;
   o.want = want;
+  o.visTick = null;
   if (!o.seen) { o.seen = true; paint(o, performance.now()); } // on its way into view: in step already
   if (still()) { settle(o, want || autoState(o), 0); paint(o, performance.now()); }
   wake();
@@ -245,6 +251,7 @@ export function handOrb(from, to) {
   const b = mount(to);
   b.s = { ...a.s, bands: [...a.s.bands] };
   b.seen = true;
+  b.visTick = null;
   paint(b, performance.now());
   wake();
 }

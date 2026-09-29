@@ -5,6 +5,7 @@
 // Google Fonts. Selectors are the app's own data-act / data-k hooks: a redesign must keep them
 // (or update this file in the same change).
 import { launch, newPage, serve, settle, onScreen } from './lib/harness.mjs';
+import { voicePage, visibleOrbs } from './lib/voicemock.mjs';
 
 const ONLY = process.argv.find(a => a.startsWith('--only='))?.slice(7).split(',').filter(Boolean);
 
@@ -88,6 +89,86 @@ const FLOWS = {
   },
 
   // Every main tab opens without throwing.
+  // Home ↔ Coach: Home is gone before the Coach's words arrive, both ways (never two pages at once).
+  'home-coach': async (browser, base) => {
+    const { context, page, errors } = await newPage(browser, base);
+    const o = await voicePage(page, base);
+    await page.evaluate(async () => { const s = await import('./js/store.js'); s.addChat('user', 'How was last week?'); s.addChat('model', 'Four sessions and a record on the bench.'); });
+    await settle(page, 400);
+    await page.evaluate(() => { window.__both = 0; const t0 = performance.now(); const op = el => { let a = 1; for (let n = el; n && n.nodeType === 1; n = n.parentElement) { const cs = getComputedStyle(n); if (cs.display === 'none' || cs.visibility === 'hidden') return 0; a *= +cs.opacity; } return a; };
+      const f = () => { const h = op(document.querySelector('#s-today .h1, #s-today h1') || document.getElementById('s-today')), c = op(document.querySelector('#s-coach .coachhead') || document.getElementById('s-coach')); if (h > 0.3 && c > 0.3) window.__both++; if (performance.now() - t0 < 5000) requestAnimationFrame(f); }; requestAnimationFrame(f); });
+    await page.mouse.move(o.x, o.y); await page.mouse.down(); await page.mouse.up();
+    await onScreen(page, 'coach'); await settle(page, 1200);
+    await page.goBack(); await onScreen(page, 'today'); await settle(page, 1200);
+    const both = await page.evaluate(() => window.__both);
+    if (both > 1) throw new Error(`Home and the Coach were both on screen in ${both} frames`);
+    await context.close();
+    return errors;
+  },
+
+  // A question said to the floating orb: straight into the Coach (never back to Home first), one orb
+  // the whole time, your words as your message, the reply streamed, and Back returns Home.
+  'voice-to-coach': async (browser, base) => {
+    const { context, page, errors } = await newPage(browser, base);
+    const o = await voicePage(page, base);
+    await page.mouse.move(o.x, o.y); await page.mouse.down();
+    await page.waitForSelector('#ofloat[data-phase=listening]', { timeout: 6000 });
+    await settle(page, 900);
+    const seen = new Set();
+    await page.evaluate(() => { window.__home = 0; const f = () => { const h = document.getElementById('s-today'); const fr = document.querySelector('#ofloat .oscrim'), frost = fr && !document.getElementById('ofloat').hidden ? +getComputedStyle(fr).opacity : 0; if (document.getElementById('app').classList.contains('coaching') && h && +getComputedStyle(h).opacity > 0.3 && frost < 0.6) window.__home++; if (performance.now() < 1e9) requestAnimationFrame(f); }; requestAnimationFrame(f); });
+    await page.mouse.up();
+    for (let i = 0; i < 40; i++) { const n = await visibleOrbs(page); if (n.length > 1) seen.add(n.join('+')); await page.waitForTimeout(40); }
+    await onScreen(page, 'coach');
+    await page.waitForFunction(() => /bench is moving well/.test(document.querySelector('#thread')?.textContent || ''), null, { timeout: 12000 });
+    const mine = await page.locator('#thread > .msg.me').last().textContent();
+    if (!/bench going/.test(mine)) throw new Error(`your words didn't become your message (${mine})`);
+    if (seen.size) throw new Error(`two orbs at once: ${[...seen].join(', ')}`);
+    if (await page.evaluate(() => window.__home)) throw new Error('Home showed through the Coach');
+    await settle(page, 600);
+    await page.goBack();
+    await onScreen(page, 'today');
+    await context.close();
+    return errors;
+  },
+
+  // The same from the full voice screen (hold, pull up, let go).
+  'voice-screen-to-coach': async (browser, base) => {
+    const { context, page, errors } = await newPage(browser, base);
+    const o = await voicePage(page, base);
+    await page.mouse.move(o.x, o.y); await page.mouse.down();
+    await page.waitForSelector('#ofloat[data-phase=listening]', { timeout: 6000 });
+    for (let dy = 10; dy <= 200; dy += 10) await page.mouse.move(o.x, o.y - dy);
+    await page.waitForSelector('#voice.on', { timeout: 4000 });
+    await settle(page, 700);
+    const up = await visibleOrbs(page);
+    if (up.length !== 1) throw new Error(`the voice screen shows ${up.length} orbs (${up.join(', ')})`);
+    // from here the page must never come back into view: the voice screen clears onto the Coach
+    await page.evaluate(() => { window.__home = 0; const t0 = performance.now(); const f = () => { const h = document.getElementById('s-today'), bg = document.querySelector('#voice .vbg'), cover = document.getElementById('voice').hidden ? 0 : +getComputedStyle(bg).opacity; if (h && +getComputedStyle(h).opacity > 0.3 && getComputedStyle(h).visibility !== 'hidden' && cover < 0.6) window.__home++; if (performance.now() - t0 < 4000) requestAnimationFrame(f); }; requestAnimationFrame(f); });
+    await page.mouse.up();
+    await onScreen(page, 'coach', 10000);
+    await page.waitForFunction(() => /bench going/.test([...document.querySelectorAll('#thread > .msg.me')].pop()?.textContent || ''), null, { timeout: 8000 });
+    await settle(page, 900);
+    if (!(await page.locator('#voice').isHidden())) throw new Error('the voice screen stayed up');
+    if (await page.evaluate(() => window.__home)) throw new Error('the voice screen went back to Home before the Coach');
+    await context.close();
+    return errors;
+  },
+
+  // Hold, let go, and hold again straight away (over the floating orb's frost): the second hold talks.
+  'mic-hold-twice': async (browser, base) => {
+    const { context, page, errors } = await newPage(browser, base);
+    const o = await voicePage(page, base, { heard: 'Bench press 80 kilo 8 reps', micDelay: 300 });
+    await page.mouse.move(o.x, o.y); await page.mouse.down(); await page.waitForTimeout(350); await page.mouse.up();
+    await page.waitForTimeout(90);
+    await page.mouse.down(); await page.waitForTimeout(1100);
+    const phase = await page.evaluate(() => document.getElementById('ofloat').hidden ? 'closed' : document.getElementById('ofloat').dataset.phase);
+    if (phase !== 'listening') throw new Error(`the second hold didn't open the mic (${phase})`);
+    await page.mouse.up();
+    await settle(page, 1500);
+    await context.close();
+    return errors;
+  },
+
   'tabs-open': async (browser, base) => {
     const { context, page, errors } = await newPage(browser, base);
     await page.goto(base + '?seed=1');

@@ -28,7 +28,9 @@ import { initBody } from './ui/body.js';
 import { initRoutine, setRoutineNav, renderRoutine, editRoutine, editRoutineFrom, programsSheet, startRoutine, planFor } from './ui/routine.js';
 import { setHistoryFilter } from './ui/history.js';
 import { renderProgress, renderExercise, setRange } from './ui/progress.js';
-import { countAll, burst, orbStreak, orbPulse } from './ui/fx.js';
+import { countAll, burst, orbPulse } from './ui/fx.js';
+import { spring, springFrames, SMOOTH, SNAPPY, installSprings } from './ui/springs.js';
+installSprings();
 import { syncBeams } from './ui/beam.js';
 import { startDotOrbs, handOrb } from './ui/dotorb.js';
 import { initPress } from './ui/press.js';
@@ -172,17 +174,19 @@ const relRect = el => { const a = app.getBoundingClientRect(), r = el.getBoundin
 const layRect = el => { let x = el.offsetWidth / 2, y = el.offsetHeight / 2; for (let n = el; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; } return { x, y, w: el.offsetWidth }; };
 // The stand-in carries both looks, the orb it leaves and the orb it becomes, and melts from one
 // into the other on the way, so at the end it is exactly the orb in its new place: nothing swaps.
-function flyOrb(from, to, { duration, delay = 0, go, onland, easing, fromEl, toEl }) {
+function flyOrb(from, to, { duration, delay = 0, go, onland, easing, fromEl, toEl, bow = null }) {
   if (!from.w || !to.w || !fromEl || !toEl || Math.hypot(to.x - from.x, to.y - from.y) < 4) return null;
   const W = to.w;
   const ghost = document.createElement('div');
   ghost.className = 'orbghost';
+  ghost.style.zIndex = '30'; // (over the voice's frost, which clears under it)
   ghost.setAttribute('aria-hidden', 'true');
   Object.assign(ghost.style, { left: `${from.x - W / 2}px`, top: `${from.y - W / 2}px`, width: `${W}px`, height: `${W}px` });
   const look = (el, w) => {
     const c = el.cloneNode(true), n = el.offsetWidth || w;
     c.className = 'orb';
     c.removeAttribute('style');
+    c.removeAttribute('id'); // (a look of the orb, not the orb)
     c.style.setProperty('--s', `${n}px`);
     Object.assign(c.style, { position: 'absolute', left: `${(W - n) / 2}px`, top: `${(W - n) / 2}px`, transform: `scale(${W / n})`, margin: '0' });
     return c;
@@ -193,116 +197,117 @@ function flyOrb(from, to, { duration, delay = 0, go, onland, easing, fromEl, toE
   app.append(ghost);
   handOrb(fromEl, a); handOrb(toEl, b); // (dotted: each look exactly as its orb is right now)
   const dx = to.x - from.x, dy = to.y - from.y, s0 = from.w / W;
-  // one straight line, no hop: it shoots off, eases, and still has some speed left when it hits
-  const path = [{ translate: '0 0', scale: s0 }, { scale: 1 + (s0 - 1) * 0.45, offset: 0.5 }, { translate: `${dx}px ${dy}px`, scale: 1 }];
-  const fly = go(ghost, path, { duration, delay, easing, fill: 'both' });
-  // the orb stays sharp (a blur only made it look out of focus): the speed is in the light it leaves
-  // behind, and in a barely-there stretch along the way it flies while it's fastest
-  const ang = Math.atan2(dy, dx) * 180 / Math.PI, st = (x, y) => `rotate(${ang}deg) scale(${x}, ${y}) rotate(${-ang}deg)`;
-  go(ghost, [{ transform: st(1, 1) }, { transform: st(1.07, 0.95), offset: 0.2 }, { transform: st(1.03, 0.98), offset: 0.6 }, { transform: st(1, 1), offset: 0.9 }, { transform: st(1, 1) }],
-    { duration, delay, easing: 'linear' });
-  orbStreak(app, from, to, { duration, delay, easing, size: Math.min(from.w, to.w), lag: duration * 0.28, go, before: ghost, z: '8' });
+  // one solid orb on a gentle arc (it lifts a little as it goes, like something picked up and set
+  // down), timed by a spring: quick away, settling softly with the smallest overshoot at the end
+  const sp = spring(duration / 1000 * 0.9, 0.82), lift = -Math.min(60, Math.hypot(dx, dy) * 0.22);
+  const path = springFrames(sp, p => {
+    const q = Math.min(1, Math.max(0, p));
+    const b = 4 * q * (1 - q), bx = bow ? bow.x : 0, by = bow ? bow.y : lift;
+    return { translate: `${(dx * p + bx * b).toFixed(1)}px ${(dy * p + by * b).toFixed(1)}px`, scale: (s0 + (1 - s0) * p).toFixed(4) };
+  });
+  const fly = go(ghost, path, { duration: sp.duration, delay, easing: 'linear', fill: 'both' });
   // its glow comes up while it travels and settles as it lands
-  go(a, [{ opacity: 0 }, { opacity: 0.8, offset: 0.35 }, { opacity: 0 }], { duration, delay, easing: 'linear', pseudoElement: '::before' });
-  go(b, [{ opacity: 0 }, { opacity: 0.8, offset: 0.35 }, { opacity: 0 }], { duration, delay, easing: 'linear', pseudoElement: '::before' });
-  // the new look fades in over the old one, which stays solid under it (fading both let the page
-  // show through the orb halfway)
-  go(b, [{ opacity: 0 }, { opacity: 1 }], { duration: duration * 0.55, delay: delay + duration * 0.3, easing: 'linear', fill: 'both' });
+  go(a, [{ opacity: 0 }, { opacity: 0.6, offset: 0.35 }, { opacity: 0 }], { duration: sp.duration * 0.8, delay, easing: 'ease-out', pseudoElement: '::before' });
+  go(b, [{ opacity: 0 }, { opacity: 0.6, offset: 0.35 }, { opacity: 0 }], { duration: sp.duration * 0.8, delay, easing: 'ease-out', pseudoElement: '::before' });
+  // the new look fades in over the old one, which stays solid under it
+  go(b, [{ opacity: 0 }, { opacity: 1 }], { duration: sp.duration * 0.4, delay: delay + sp.duration * 0.15, easing: 'linear', fill: 'both' });
   const done = () => ghost.remove();
   fly.addEventListener('cancel', done);
   fly.onfinish = () => { done(); onland?.(); };
   return ghost;
 }
 
-// The orb arrives in the message box and hits it: the moment it touches, the box gives under it and
-// springs back up a little (weight, then lift), the light spreads through it, and one firm tap.
+// The orb arrives in the message box: the box takes it with one soft give and settles (a spring,
+// the way a sheet settles on iOS), and one firm tap.
 function impact() {
   haptic('land');
   const box = $('#composer');
-  if (!box) return;
-  box.classList.remove('hit'); void box.offsetWidth; box.classList.add('hit'); setTimeout(() => box.classList.remove('hit'), 1000);
-  if (stillMotion()) return;
-  box.animate([
-    { transform: 'none' },
-    { transform: 'translateY(5px) scale(1.018, .93)', offset: 0.16 },
-    { transform: 'translateY(-6px) scale(.995, 1.02)', offset: 0.42 },
-    { transform: 'translateY(2px) scale(1.004, .995)', offset: 0.68 },
-    { transform: 'translateY(-.5px)', offset: 0.85 },
-    { transform: 'none' }
-  ], { duration: 680, easing: 'cubic-bezier(.25,.6,.3,1)' });
-  box.style.transformOrigin = '10% 60%';
-  setTimeout(() => { box.style.transformOrigin = ''; }, 700);
+  if (!box || stillMotion()) return;
+  const s = spring(0.38, 0.62);
+  box.animate([{ scale: '0.975' }, { scale: '1' }], { duration: s.duration, easing: s.easing, composite: 'add' });
 }
 
-function coachMorph(open, under) {
+// The visible messages at the end of the Coach, newest last (the ones that are on screen)
+const visibleMsgs = coach => {
+  const v = coach.getBoundingClientRect(), out = [];
+  for (const m of coach.querySelectorAll('#thread > .msg')) { const r = m.getBoundingClientRect(); if (r.bottom > v.top && r.top < v.bottom) out.push(m); }
+  return out;
+};
+
+// Home ↔ Coach. One motion, like opening an app on iOS: the page you're on sinks back and is gone
+// before the Coach's words arrive (never both at once), the Coach's background comes up out of the
+// orb, its header and newest messages rise into place on a spring, one after another, and the bar
+// hands over to the message box while the orb flies from one to the other. Closing runs it back.
+function coachMorph(open, under, { orbFlies = true, orbFrom = null, covered = false } = {}) {
   settleCoachFx();
-  const aura = $('.aura'), bloom = aura?.querySelector('.bloom'), veil = aura?.querySelector('.veil'), orb = $('#dock .orbbtn');
-  if (!aura || !bloom || !veil || !orb) return;
-  // the light swelling out of the orb is felt as a rising ripple, then a soft landing
+  const aura = $('.aura'), veil = aura?.querySelector('.veil'), orb = $('#dock .orbbtn');
+  if (!aura || !veil || !orb) return;
   haptic(open ? 'bloom' : 'tick');
-  // the orb's centre in the app's coordinates (layout, so a moving or shrunk bar can't skew it)
   let x = orb.offsetWidth / 2, y = orb.offsetHeight / 2;
   for (let n = orb; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }
   aura.style.setProperty('--ax', x + 'px'); aura.style.setProperty('--ay', y + 'px');
   if (stillMotion()) return;
-  const dockOrb = orb.querySelector('.orb'), coach = $('#s-coach');
+  const dockOrb = orb.querySelector('.orb'), coach = $('#s-coach'), dock = $('#dock'), box = $('#composer');
   const other = under && under !== coach ? under : null;
   aura.classList.add('run');
-  app.classList.add('morphing'); // the blurred edges step aside while the light moves under them
+  app.classList.add('morphing'); // (the bar and the box are moved here, not by their CSS transitions)
   const anims = [];
   const go = (el, frames, opts) => { if (!el) return null; const a = el.animate(frames, opts); anims.push(a); return a; };
+  const smooth = SMOOTH(), snappy = SNAPPY();
+  // (the Coach's parts are measured once it has drawn itself, later in this same frame)
+  const parts = () => [coach.querySelector('.coachhead'), ...visibleMsgs(coach).slice(-5).filter(m => !m.classList.contains('handed'))].filter(Boolean);
   if (open) {
-    if (other) Object.assign(other.style, { transition: 'none', opacity: '1', visibility: 'visible', transform: 'none' });
-    // the orb leaves the bar and lands in the message box (once the Coach's layout is in place)
-    const from = dockOrb ? relRect(dockOrb) : null;
-    let flying = null;
+    if (other) Object.assign(other.style, { transition: 'none', opacity: '1', visibility: 'visible' });
+    // the page sinks back and is gone within 170 ms (from the voice it's already covered: at once)
+    const out = orbFrom ? 90 : 240;
+    if (covered && other) other.style.opacity = '0'; // (under the voice screen: simply gone)
+    else go(other, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-6px) scale(.94)', offset: 0.7 }, { opacity: 0, transform: 'translateY(-8px) scale(.93)' }], { duration: out, easing: 'cubic-bezier(.4,0,.6,1)', fill: 'forwards' });
+    const last = go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: 420, easing: 'cubic-bezier(.25,.1,.25,1)', fill: 'both' });
+    // the Coach's header and newest messages rise in after it, a beat apart
+    queueMicrotask(() => parts().forEach((el, i) => go(el, [{ opacity: 0, transform: 'translateY(22px) scale(.98)' }, { opacity: 1, transform: 'none' }],
+      { duration: smooth.duration, easing: smooth.easing, delay: (orbFrom ? 90 : 110) + i * 30, fill: 'backwards' })));
+    // the bar gives way to the message box
+    if (!orbFrom) go(dock, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(14px) scale(.96)' }], { duration: 200, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
+    go(box, [{ opacity: 0, transform: 'translateY(18px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: snappy.duration, easing: snappy.easing, delay: 90, fill: 'backwards' });
+    // the orb flies from where it is (the bar, or the voice's own orb) into the message box
+    const src = orbFrom || dockOrb, from = src && relRect(src);
     queueMicrotask(() => {
       const corb = $('#composer .corb .orb');
-      flying = from && corb && flyOrb(from, layRect(corb), { duration: 440, easing: 'cubic-bezier(.2,.75,.2,1)', go, fromEl: dockOrb, toEl: corb, onland: () => { app.classList.remove('orbtravel'); impact(); } });
-      if (flying) { app.classList.add('orbtravel', 'orbflown'); go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 900, fill: 'forwards' }); return; }
-      go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
-      setTimeout(() => haptic('land'), 560);
+      if (!orbFlies || !src || !corb) return;
+      // (from the voice it bows out to the left, away from your words gliding up to the right)
+      const flying = flyOrb(from, layRect(corb), { duration: orbFrom ? 560 : 520, delay: orbFrom ? 50 : 40, bow: orbFrom ? { x: -46, y: 10 } : null, go, fromEl: src, toEl: corb, onland: () => { app.classList.remove('orbtravel'); impact(); } });
+      if (flying) { app.classList.add('orbtravel', 'orbflown'); if (!orbFrom) go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 900, fill: 'forwards' }); }
     });
-    // held (fill both) until everything settles together: an animation ending on its own mid-way let
-    // the page underneath show through for a frame or two on the phone
-    const last = go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: 560, delay: 90, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'both' });
-    go(other, [{ scale: 1, opacity: 1 }, { scale: 0.94, opacity: 0.3 }], { duration: 640, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'forwards' });
-    app.classList.add('coach-in');
-    last.onfinish = settleCoachFx;
+    last.onfinish = () => setTimeout(settleCoachFx, 400);
     coachFx = () => {
       anims.forEach(a => a.cancel());
       aura.classList.remove('run');
       app.classList.remove('morphing', 'orbtravel');
       setTimeout(() => app.classList.remove('orbflown'), 400);
-      // the messages have arrived: once coach-in goes they must not pick up another entrance animation
-      setTimeout(() => { for (const m of document.querySelectorAll('#s-coach .msg')) m.classList.add('seen'); app.classList.remove('coach-in'); }, 300);
+      for (const m of document.querySelectorAll('#s-coach .msg')) m.classList.add('seen');
       if (!other) return;
       if (other.classList.contains('on')) { Object.assign(other.style, { transition: '', opacity: '', visibility: '', transform: '' }); return; }
-      Object.assign(other.style, { visibility: 'hidden', opacity: '0' }); // covered: gone at once
-      void other.offsetWidth; // settled first, so releasing the styles can't start a fade
+      Object.assign(other.style, { visibility: 'hidden', opacity: '0' });
+      void other.offsetWidth;
       setTimeout(() => { if (!other.classList.contains('on')) Object.assign(other.style, { transition: '', opacity: '', visibility: '', transform: '' }); }, 60);
     };
   } else {
-    // the conversation sinks away, the Coach's background fades, the light gathers back into the
-    // orb and the page comes forward; the orb takes the light in last
-    go(coach, [{ opacity: 1, transform: 'none', visibility: 'visible' }, { opacity: 0, transform: 'translateY(20px) scale(.97)', visibility: 'visible' }], { duration: 220, easing: 'cubic-bezier(.4,0,.6,1)' });
-    const last = go(veil, [{ opacity: 1 }, { opacity: 0 }], { duration: 480, delay: 60, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'backwards' });
-    go(other, [{ scale: 0.95, opacity: 0.25 }, { scale: 1, opacity: 1 }], { duration: 560, delay: 80, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' });
-    // the orb leaves the message box and flies home into the bar, which takes it with a small pulse
+    // the Coach's words go first, quickly; then its background; the page comes forward on a spring
+    go(coach, [{ opacity: 1, transform: 'none', visibility: 'visible' }, { opacity: 0, transform: 'translateY(12px) scale(.985)', visibility: 'visible' }], { duration: 140, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
+    const last = go(veil, [{ opacity: 1 }, { opacity: 0 }], { duration: 360, delay: 60, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'both' });
+    go(other, [{ opacity: 0, transform: 'scale(.95)' }, { opacity: 1, transform: 'none' }], { duration: smooth.duration, easing: smooth.easing, delay: 130, fill: 'backwards' });
+    go(box, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(14px) scale(.96)' }], { duration: 180, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
+    go(dock, [{ opacity: 0, transform: 'translateY(16px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: snappy.duration, easing: snappy.easing, delay: 120, fill: 'backwards' });
     const corb = $('#composer .corb .orb');
     let hold = null;
-    const flying = corb && dockOrb && flyOrb(relRect(corb), layRect(dockOrb), { duration: 460, delay: 40, easing: 'cubic-bezier(.25,.75,.2,1)', go, fromEl: corb, toEl: dockOrb, onland: () => {
+    const flying = orbFlies && corb && dockOrb && flyOrb(relRect(corb), layRect(dockOrb), { duration: 500, delay: 30, go, fromEl: corb, toEl: dockOrb, onland: () => {
       hold?.cancel();
       app.classList.remove('orbtravel');
       orbPulse('pulse-land');
       haptic('land');
     } });
-    if (flying) { app.classList.add('orbtravel'); hold = go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 700, fill: 'forwards' }); }
-    else {
-      go(dockOrb, [{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 460, delay: 380, easing: 'cubic-bezier(.3,1.25,.5,1)', fill: 'backwards' });
-      setTimeout(() => haptic('land'), 520);
-    }
-    last.onfinish = settleCoachFx;
+    if (flying) { app.classList.add('orbtravel'); hold = go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 800, fill: 'forwards' }); }
+    last.onfinish = () => setTimeout(settleCoachFx, 350);
     coachFx = () => { anims.forEach(a => a.cancel()); aura.classList.remove('run'); app.classList.remove('morphing', 'orbtravel'); };
   }
 }
@@ -341,7 +346,7 @@ function growInto() {
 
 // Direction for the transition: tabs by position, sub screens push in from the right.
 const ORDER = { today: 0, workout: 1, food: 2, you: 3, coach: 4, history: 4, detail: 5, settings: 4, routine: 4, progress: 5, body: 4, exercise: 6 };
-function show(name, { back = false, still = false } = {}) {
+function show(name, { back = false, still = false, handin = null, covered = false } = {}) {
   const prev = view.screen;
   view.screen = name;
   // the Coach opening over a tab or closing back to one: the light does the moving, so the two
@@ -379,7 +384,7 @@ function show(name, { back = false, still = false } = {}) {
     s.inert = !on;
   }
   app.classList.toggle('is-sub', SUB.includes(name));
-  if (coachSwap && !still) coachMorph(name === 'coach', $('#s-' + (name === 'coach' ? prev : name)));
+  if (coachSwap && !still) coachMorph(name === 'coach', $('#s-' + (name === 'coach' ? prev : name)), { orbFrom: handin, covered });
   else if (prev === 'coach' || name === 'coach') settleCoachFx();
   if (name === 'workout' && prev !== 'workout') growInto(); else grow = null;
   // back from a finished workout: today's dot in the week strip fills in, once, where you can see it
@@ -417,6 +422,16 @@ function go(name, { quiet = false } = {}) {
 }
 
 let coachFrom = 'today';
+// A question from the voice (the floating orb, or the voice screen): the Coach comes in at once, under
+// the frost that's clearing, with the voice's own orb flying into the message box. Its history entry
+// goes in once the voice's own has been stepped back over.
+function coachHandin(orbFrom, popped, covered = false) {
+  if (view.screen === 'coach') return;
+  if (!TABS.includes(view.screen)) { popped.then(() => go('coach')); return; }
+  coachFrom = view.screen;
+  show('coach', { handin: orbFrom, covered });
+  popped.then(() => { if (view.screen === 'coach' && history.state?.screen !== 'coach') history.pushState({ screen: 'coach', from: coachFrom }, ''); });
+}
 function closeCoach() {
   if (view.screen !== 'coach') return;
   if (history.state?.screen === 'coach') history.back(); else go(coachFrom || 'today');
@@ -544,7 +559,7 @@ setOnboardNav({ go: name => go(name), ask: q => askCoach(q) });
 initWorkout($('#s-workout'), actions);
 initSettings(actions, $('#s-settings'));
 setWorkoutNav({ go, showDetail });
-initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings'), openCoach: () => go('coach') });
+initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings'), openCoach: () => go('coach'), coachHandin });
 initCoach({ openSettings: () => pushSub('settings'), closeCoach: () => closeCoach(), go: name => go(name, { quiet: true }), open: name => pushSub(name) });
 setCardioNav({ go, showDetail });
 initCardio();

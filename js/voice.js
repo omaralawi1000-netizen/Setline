@@ -14,8 +14,18 @@ function pickMime() {
 }
 
 // Start recording. Resolves once the mic is open. Throws {code:'denied'|'nomic'|'unsupported'|'busy'}.
-export async function start({ onMaxed, maxMs = MAX_MS } = {}) {
-  if (rec) return;
+// One opening at a time: a second call while the mic is still opening waits for the same one (two
+// getUserMedia calls racing left one stream open and the other recorder lost), and an opening that
+// was cancelled meanwhile closes its stream instead of recording.
+let opening = null, gen = 0;
+export function start(opts = {}) {
+  if (rec) return Promise.resolve();
+  if (!opening) opening = open(opts).finally(() => { opening = null; });
+  return opening;
+}
+export const isStarting = () => !!opening;
+async function open({ onMaxed, maxMs = MAX_MS } = {}) {
+  const mine = ++gen;
   if (!navigator.mediaDevices?.getUserMedia || !globalThis.MediaRecorder) throw Object.assign(new Error('unsupported'), { code: 'unsupported' });
   let stream;
   try {
@@ -26,6 +36,7 @@ export async function start({ onMaxed, maxMs = MAX_MS } = {}) {
     const code = e?.name === 'NotAllowedError' || e?.name === 'SecurityError' ? 'denied' : e?.name === 'NotFoundError' ? 'nomic' : 'busy';
     throw Object.assign(new Error(code), { code });
   }
+  if (mine !== gen || rec) { for (const tr of stream.getTracks()) tr.stop(); return; }
   const mimeType = pickMime();
   const recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 32000 } : undefined);
   const r = { stream, recorder, chunks: [], analyser: null, source: null, startedAt: performance.now(), peak: 0, buf: null, timer: 0, frames: 0 };
@@ -111,6 +122,7 @@ export function snapshot() {
 }
 
 export function cancel() {
+  if (opening) gen++; // (an opening in flight closes itself)
   const r = rec;
   rec = null;
   if (!r) return;

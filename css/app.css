@@ -2846,26 +2846,6 @@ html[data-motion=off] .screen.enter :is(.greet .gw,.tw){animation:none}
 .prtile{animation-fill-mode:backwards}
 
 /* ======================= 1.57: thinking orbs, voice glow, border beam ======================= */
-/* the voice glow (voice-glow, see js/ui/voiceglow.js): the bottom of the voice screen and of the floating
-   orb. Every lobe is a soft ellipse moved by transform only; the layers fade by opacity. */
-.vglow{position:absolute;inset:0;pointer-events:none;overflow:hidden;opacity:0;transition:opacity var(--m-slow) var(--e-out)}
-.vglow.on{opacity:1}
-.vg-l{position:absolute;inset:0;opacity:0}
-.vg-m{position:absolute;left:50%;bottom:0;transform-origin:50% 100%;will-change:transform}
-.vg-m > i,.vg-m > .vg-core{position:absolute;left:50%;bottom:0;display:block;will-change:transform}
-/* the inner light hugs the edges (a band in from each side), as in the original */
-.vg-inner{
-  -webkit-mask-image:linear-gradient(to top,#fff,transparent var(--vg-edge)),linear-gradient(to right,#fff,transparent var(--vg-edge),transparent calc(100% - var(--vg-edge)),#fff);
-  mask-image:linear-gradient(to top,#fff,transparent var(--vg-edge)),linear-gradient(to right,#fff,transparent var(--vg-edge),transparent calc(100% - var(--vg-edge)),#fff);
-  -webkit-mask-composite:source-over;mask-composite:add}
-/* the stroke: the colours in the 1px edge ring, with the hot white core at the centre */
-.vg-stroke{padding:1px;
-  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;
-  mask:linear-gradient(#fff 0 0) content-box exclude,linear-gradient(#fff 0 0)}
-.vg-core{background:radial-gradient(closest-side,rgba(255,255,255,.45) 0%,rgba(255,255,255,.14) 30%,transparent 65%)}
-@media (prefers-reduced-motion: reduce){ .vglow{transition:none} }
-html[data-motion=off] .vglow{transition:none}
-.vlayer > .vglow{z-index:-1}
 /* the border beam (border-beam `md`, ocean, see js/ui/beam.js): round the live workout's card on Today.
    A mask window on a turning square (the colours on a child turning back, so they stay put); the
    phone only composites. It stands still off screen, on another tab, and with reduced motion. */
@@ -3043,3 +3023,45 @@ html[data-motion=off] .tab.on svg.ti{animation:none!important}
 .composer:is([data-talk=listening],[data-talk=hearing]) .corb::after{animation:none;opacity:0}
 .composer.talking,.composer.dictating{box-shadow:0 0 0 1px rgba(var(--a-rgb),.35),0 18px 40px -18px rgba(var(--v-rgb),.6)}
 .dock .ind.moving{animation:none}
+
+/* ======================= 1.66.0: premium motion pass =======================
+   Springs (js/ui/springs.js) move the big things; nothing leaves a trail, glows are soft gradients that
+   can't clip into boxes, and a screen is always gone before the next one's words arrive. */
+/* while Home and the Coach change places, the bar and the box are moved by the choreography alone */
+.app.morphing .dock,.app.morphing .composer{transition:none!important}
+.orbstreak{display:none!important}
+/* the floating orb handing over to the voice screen: gone at once (one orb), its frost held until the
+   voice screen has covered the page */
+.ofloat.handoff .owrap,.ofloat.handoff .obubble,.ofloat.handoff .opull{opacity:0;transition:none!important}
+.vlayer.on .vbg{transition:opacity .26s cubic-bezier(.2,.8,.2,1)}
+/* the floating orb's light: one soft round glow behind it, following the voice; a gradient, never a
+   filter or a mask, so the phone can't cut it into rectangles */
+.oglow{width:260px;height:260px;margin:-130px 0 0 -130px;background:radial-gradient(closest-side,rgba(var(--v-rgb),.42),rgba(var(--b-rgb),.14) 58%,rgba(var(--b-rgb),0) 100%);
+  opacity:calc(.35 + var(--l, 0) * .5);transform:scale(calc(.92 + var(--l, 0) * .22));transition:opacity .25s,transform .12s linear}
+/* the voice screen's orb gets the same soft light behind it */
+.vlayer .halo{background:radial-gradient(closest-side,rgba(var(--v-rgb),.34),rgba(var(--b-rgb),.1) 60%,rgba(var(--b-rgb),0) 100%);filter:none}
+/* the frost under the floating orb: an even dim over the whole page, deeper at the bottom where the
+   orb is, so the page reads as set aside (not cut into bright and dark bands) */
+.oscrim{background:linear-gradient(to top,rgba(8,9,14,.9) 0%,rgba(8,9,14,.7) 40%,rgba(8,9,14,.5) 100%);transition:opacity .34s cubic-bezier(.2,.8,.2,1)}
+/* messages already on screen never play their entrance again */
+.msg.seen{animation:none}
+@media (prefers-reduced-motion: reduce){ .oglow{transition:none} }
+/* the floating orb handing a question to the Coach: its words and status go at once (the bubble takes them) */
+.ofloat.leaving .obubble,.ofloat.leaving .opull{opacity:0;transition:opacity .1s ease-out}
+/* the voice screen handing a question to the Coach: its controls go quickly, its background clears over
+   the Coach coming in */
+.vlayer.leaving > *:not(.stagev):not(.vbg){transition:opacity .16s ease-out,transform .3s cubic-bezier(.4,0,1,1)}
+.vlayer.leaving .vbg{transition:opacity .34s cubic-bezier(.3,0,.2,1)}
+/* (the frost holds for the moment the page under it takes to go, then clears onto the Coach) */
+.ofloat.leaving .oscrim{transition:opacity .36s cubic-bezier(.3,0,.2,1) .08s}
+/* depth: while the orb is up, the page sinks back a little under the frost (further under the voice
+   screen), and comes forward again as it closes. Transform only, on the compositor. */
+.app.voice-mini .screen.on,.app.voice .screen.on{transition:transform .6s cubic-bezier(.2,.9,.25,1),opacity .3s ease-out!important}
+.app.voice-mini .screen.on{transform:scale(.965) translateY(6px)!important}
+.app.voice .screen.on{transform:scale(.93) translateY(10px)!important}
+@media (prefers-reduced-motion: reduce){ .app.voice-mini .screen.on,.app.voice .screen.on{transform:none!important} }
+html[data-motion=off] .app.voice-mini .screen.on,html[data-motion=off] .app.voice .screen.on{transform:none!important}
+/* the cards that rise from the bottom (what the voice understood, toasts) come in on a spring */
+.intent,.toast{transition:opacity .26s cubic-bezier(.2,.8,.2,1),transform var(--sp-card-d,.55s) var(--sp-card,cubic-bezier(.2,.9,.25,1))}
+.intent:not(.show),.toast:not(.show){transition:opacity .2s ease-in,transform .3s cubic-bezier(.4,0,1,1)}
+.app.voice .intent.show{transition:opacity .26s cubic-bezier(.2,.8,.2,1),transform var(--sp-card-d,.55s) var(--sp-card,cubic-bezier(.2,.9,.25,1))}

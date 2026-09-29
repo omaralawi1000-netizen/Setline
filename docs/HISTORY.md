@@ -929,3 +929,36 @@ Omar asked for the app exactly as 1.59.1 (2e5ef25). Every app file, test and scr
 only the version number is new, so phones update. 1.62.0–1.65.1 are undone. Kept from the latest version:
 this history, PLAN.md's version line, CLAUDE.md, AGENTS.md and `.claude/`. The database is untouched
 (schema 4 in both; no stored format changed). Backup of 1.65.1: branch `backup-before-rollback-1.59.1`.
+
+## 1.66.0: Premium motion pass on the 1.59.1 design
+
+From Omar's four recordings of 1.65.2 (29–30 Sep). The 1.59.1 look stays; how it moves was rebuilt.
+- Springs (`js/ui/springs.js`): a damped spring worked out once and handed to the compositor as a CSS
+  `linear()` easing. The orb's flights, the floating orb, the voice screen's orb, the Coach's arrival,
+  the voice card and toasts, and the app's `--e-spring` token all use real springs now.
+- Voice → Coach: a question said to the floating orb or on the voice screen goes straight into the
+  Coach. It used to close back to Home first and then open the Coach, with two orbs and both screens
+  showing at once. Your words rest for a beat, then become your message bubble and glide into the
+  conversation. The orb bows out and flies into the message box, and the frost (or the voice screen)
+  clears onto the Coach.
+- Home ↔ Coach: Home sinks back and is gone before the Coach's header and newest messages rise in on a
+  spring, one after another. It used to fade to 30 % while the Coach arrived on top of it. The dock and
+  message box hand over, and the orb flies on a spring arc: no comet streak and no stretch. The box
+  takes it with one soft give; the squash and the light sweeping through it are gone.
+- The hard-edged rectangles in the frost and around the orb came from the voice glow's blurred, masked
+  layers, which Android clips into boxes. The voice glow is gone (`voiceglow.js` removed). The floating
+  orb and the voice screen each have one soft radial light following the voice. The floating orb's
+  frost is an even dim, deeper at the bottom.
+- Pulling up to the voice screen: the floating orb hands over at once (one orb), and its frost stays
+  until the voice screen has covered the page, so Home no longer flashes through.
+- Depth: while the orb is up the page sinks back a little, and further under the voice screen.
+- Mic: a second hold straight after the first one talks again instead of closing everything. The press
+  goes through the frost to the dock's orb, the first hold's late release no longer stops the new one,
+  and an error never closes the orb while a finger is down. Opening the mic is serialised (two
+  getUserMedia calls could race and leave it stuck on "Ready").
+- Chat: the conversation is patched, never rebuilt. Each message keeps its node, so nothing flickers or
+  restarts when a reply arrives or finishes, and the thread follows a streamed reply smoothly.
+- Frames: the dotted orbs no longer force a full style recalculation every frame (checkVisibility is
+  asked a few times a second). The flying orb's clone no longer copies the floating orb's id.
+- Golden: `home-coach`, `voice-to-coach`, `voice-screen-to-coach`, `mic-hold-twice` (with stand-ins in
+  `scripts/lib/voicemock.mjs`); each fails on 1.65.2.

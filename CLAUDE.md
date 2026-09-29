@@ -16,15 +16,12 @@ Follow `AGENTS.md`. It's short on purpose; don't read more than the task needs.
 - Before and after any visual change, screenshot the main screens and the voice orb and look at them (`npm run screens`; `scripts/snap.mjs` was part of the undone 1.62–1.65 releases and is not in the repo now). Never commit screenshots.
 
 ## Motion & performance rules
-29 Sep 2026: rolled back to 1.59.1 exactly (released as 1.65.2). Don't reapply 1.62.0–1.65.1 unless Omar asks; the backup is branch `backup-before-rollback-1.59.1`. Notes below that name `choreo.js`, `strips.mjs`, `choreo.mjs` or the bottom-right orb describe those undone releases.
-28 Sep 2026: Omar restored the 1.59.1 design (floating orb, pull-up voice screen, frosted glass, sea light). Keep those; make them move as well as possible. Omar wants the best animation: springs, blur, glow, parallax, richer transitions are all welcome.
-- Animate anything except layout (width, height, top, left, margin, padding, `all`). If a heavy effect (big or animated blur, many blurred layers, large shadows) stutters on the phone, shrink or simplify it and check `?perf=1`; don't drop the idea.
-- Ambient motion (clouds, sea) may keep running; if it costs frames during scrolling or a transition, pause just that part.
-- Exactly one orb visible at a time (hand over cleanly).
-- No comet trails, streaks or smears: the orb is one solid object at every frame (flights go through `arcFly` in `js/ui/choreo.js`, which carries a glass disc under the dots).
-- Never dip to black and never double-expose two screens' content; the sea background is shared and never fades.
-- The destination exists and is visible before anything lands on it.
-- 29 Sep 2026: the orb stays near the bottom-right anchor. The Coach's message box has its orb at the right end, in exactly the dock orb's place; Home ↔ Coach grows the box out of the orb (the orb never flies there). Coordinate contour, particle deformation, restrained moving edge light and content reveal as one reversible sequence. Local highlights on the composer are allowed; protect text clarity. Quick voice remains compact beside the dock. The current motion brief supersedes the old flying-orb and plain-composer prescriptions.
-- Judge motion by how it looks on the phone: `node scripts/strips.mjs` makes contact strips from the frames the compositor really showed (0–560 ms); `node scripts/choreo.mjs` is only the safety net (frame checks).
+29 Sep 2026: rolled back to 1.59.1 (released as 1.65.2), then 1.66.0 polished its motion. Don't reapply 1.62.0–1.65.1 unless Omar asks (backup: branch `backup-before-rollback-1.59.1`). Keep the 1.59.1 design: floating orb, pull-up voice screen, frosted glass, sea light, the message box's orb on the left. Omar wants iOS-quality motion: springs, depth, soft light; be creative.
+- Springs come from `js/ui/springs.js` (`spring(response, damping)` → a CSS `linear()` easing the compositor runs; `SMOOTH`, `SNAPPY`, `LIVELY`; `--e-spring` and `--sp-card` in CSS). Use them for anything that arrives or settles.
+- Animate anything except layout (width, height, top, left, margin, padding, `all`). Glows are radial gradients, never big `filter: blur` or masked layers (Android clips those into hard rectangles). If an effect stutters on the phone, simplify it and check `?perf=1`.
+- Exactly one orb visible at a time; orb flights go through `flyOrb` in `js/app.js` (one solid orb on a spring arc, no trail, no stretch).
+- Never two pages' content at once: the page being left is gone before the next one's words arrive (Home ↔ Coach in `coachMorph`). The sea background is shared and never fades.
+- Voice → Coach (`handToCoach` in `js/ui/voice.js`): straight into the Coach, never back to Home; the words become the message bubble, the orb flies into the message box.
+- Checks: `npm run golden` covers `home-coach`, `voice-to-coach`, `voice-screen-to-coach` and `mic-hold-twice` (overlaps, two orbs, Home showing through, the second hold). Judge motion by frames: record the compositor's frames (CDP screencast) of the flow and look at them.
 - Chat: never rebuild the thread with innerHTML; one DOM node per message for its whole life; one DOM write per frame.
 - will-change only just before an animation, removed after. Canvases ≤ 2× DPR, never resized in the loop.

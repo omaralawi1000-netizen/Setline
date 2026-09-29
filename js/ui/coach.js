@@ -77,6 +77,34 @@ function planCard(m) {
         <button class="btn2 solid" data-coach="saveplan" data-mode="add" data-id="${m.id}">${I.plus}<span>${t('plan.add')}</span></button></div>`}</div>`;
 }
 
+// One node per message: kept while its drawing is the same, redrawn in place when it changes, and the
+// reply being typed out is never touched (its words are written into it as they arrive).
+function patchThread(ol, chat) {
+  const have = new Map([...ol.children].map(li => [li.dataset.id, li]));
+  let prev = null;
+  for (const m of chat) {
+    let li = have.get(m.id);
+    have.delete(m.id);
+    const seen = shown.has(m.id);
+    shown.add(m.id);
+    if (li && !(m.streaming && li._streaming)) {
+      const h = bubble(m);
+      if (li._h !== h) { const n = make(h, true); li.replaceWith(n); li = n; }
+    } else if (!li) li = make(bubble(m), seen);
+    li._streaming = !!m.streaming;
+    if (li.previousElementSibling !== prev || li.parentNode !== ol) (prev ? prev.after(li) : ol.prepend(li));
+    prev = li;
+  }
+  for (const li of have.values()) li.remove();
+}
+function make(h, seen) {
+  const t = document.createElement('template');
+  t.innerHTML = seen ? h.replace('<li class="msg', '<li class="msg seen') : h;
+  const li = t.content.firstElementChild;
+  li._h = h;
+  return li;
+}
+
 export function renderCoach(root) {
   const { t } = state;
   const key = getKey('google');
@@ -89,16 +117,24 @@ export function renderCoach(root) {
     body = `<div class="coachhero glass"><span class="orb" aria-hidden="true"><i class="core"><b></b><b></b><b></b></i></span>
       <h2>${t('coach.empty')}</h2><p>${t('coach.emptySub')}</p>
       <div class="exq">${['coach.ex1', 'coach.ex2', 'coach.ex3'].map(k => `<button class="chip" data-coach="ask" data-q="${esc(t(k))}">${esc(t(k))}</button>`).join('')}</div></div>`;
-  } else {
-    // messages already on screen don't slide in again when the thread re-renders
-    body = `<ol class="thread" id="thread">${chat.map(m => { const h = bubble(m); const seen = shown.has(m.id); shown.add(m.id); return seen ? h.replace('<li class="msg', '<li class="msg seen') : h; }).join('')}</ol>`;
   }
-  root.innerHTML = `<div class="tabtop"></div>
+  const top = `<div class="tabtop"></div>
     <button class="iconbtn cclose" data-coach="close" aria-label="${t('common.close')}">${I.back.replace('d="M14.5 6 8.5 12l6 6"', 'd="M6 9.5l6 6 6-6"')}</button>
     <header class="coachhead"><div><h1 class="h1">${t('coach.title')}</h1><p class="sub">${t('coach.sub')}</p></div>
       ${chat.length ? `<button class="iconbtn" data-coach="clear" aria-label="${t('coach.clear')}">${I.trash}</button>` : ''}</header>
-    ${key ? pinHTML('coach') : ''}
-    ${body}`;
+    ${key ? pinHTML('coach') : ''}`;
+  // The conversation is patched, never rebuilt: a message keeps its node for its whole life, so
+  // nothing on screen flickers, restarts its entrance or jumps when a new one comes in or a reply
+  // finishes (only the messages that changed are redrawn, the one being typed is left to the typer).
+  const ol = chat.length && body === undefined ? root.querySelector(':scope > #thread') : null;
+  if (ol && root._top === top) patchThread(ol, chat);
+  else {
+    if (body === undefined) body = '<ol class="thread" id="thread"></ol>';
+    root.innerHTML = top + body;
+    root._top = top;
+    const fresh = root.querySelector(':scope > #thread');
+    if (fresh) patchThread(fresh, chat);
+  }
   const composer = $('#composer');
   if (!composer.dataset.talk) composer.querySelector('input').placeholder = t('coach.ph'); // talking: the box shows what's happening
   composer.querySelector('.csend').setAttribute('aria-label', t('coach.send'));
