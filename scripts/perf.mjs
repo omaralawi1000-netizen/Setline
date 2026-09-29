@@ -54,7 +54,7 @@ const streamDone = page => page.waitForFunction(async () => { const s = await im
 // Each flow: steps run inside named segments; seg(name, fn) measures fn's time window.
 const FLOWS = {
   // hold the dock orb: the floating orb lifts over the page and listens; pull up into the voice screen;
-  // listen there; release: the question goes to the Coach and the reply streams in
+  // listen there; release: your words to check; Send: the question goes to the Coach and the reply streams in
   async voice(page, seg) {
     const o = await center(page, '#dock .orbbtn');
     await page.mouse.move(o.x, o.y);
@@ -64,7 +64,8 @@ const FLOWS = {
       await page.waitForTimeout(700);
     });
     await seg('listening (voice screen)', () => page.waitForTimeout(1400));
-    await seg('release → Coach', async () => { await page.mouse.up(); await page.waitForSelector('#s-coach.screen.on', { state: 'attached', timeout: 10000 }); await page.waitForTimeout(600); });
+    await seg('release → review', async () => { await page.mouse.up(); await page.waitForSelector('#voice.reviewing #vrtext:not(:empty)', { timeout: 10000 }); await page.waitForTimeout(500); });
+    await seg('Send → Coach', async () => { await page.click('#vreview .vrsend'); await page.waitForSelector('#s-coach.screen.on', { state: 'attached', timeout: 10000 }); await page.waitForTimeout(600); });
     await seg('reply streaming', async () => { await streamDone(page); await page.waitForTimeout(400); });
   },
   // tap the orb: the Coach opens; back: Home again

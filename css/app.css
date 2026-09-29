@@ -3093,3 +3093,28 @@ html[data-motion=off] .pdots i{animation:none;opacity:.6}
 .ofloat .owrap::before,.ofloat .owrap::after{transition:filter .3s var(--e-out)}
 .ofloat[data-phase=thinking] .owrap::before{animation:ripple 2.4s var(--ease) infinite;filter:opacity(0)}
 .ofloat[data-phase=thinking] .owrap::after{animation:ripple 2.4s var(--ease) 1.2s infinite;filter:opacity(0)}
+
+/* ======================= 1.62.3: review before it's sent ======================= */
+/* pulled up while holding: what you said, big in the middle (tap to change it), Send, "Say more" (it
+   adds to it) and the top ✕ to throw it away */
+.vreview{position:absolute;left:20px;right:20px;top:calc(var(--safe-top) + 230px);bottom:calc(46px + var(--safe-bottom));display:flex;flex-direction:column;
+  animation:vrin var(--m-base) var(--e-out) both}
+@keyframes vrin{from{opacity:0;transform:translateY(10px)}}
+.vrtext{flex:1;min-height:0;overflow:auto;display:flex;align-items:center;justify-content:center;text-align:center;font-size:29px;line-height:1.25;font-weight:700;letter-spacing:-.02em;
+  overflow-wrap:anywhere;outline:none;border-radius:20px;padding:8px 6px;-webkit-user-select:text;user-select:text;caret-color:var(--accent)}
+.vrtext:focus{background:rgba(255,255,255,.04)}
+.vrhint{text-align:center;font-size:13px;color:var(--muted);margin:6px 0 16px}
+.vracts{display:flex;gap:12px;align-items:center}
+.vrmic{flex:none;width:68px;height:68px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.08);border:1px solid var(--line);color:var(--ink);position:relative}
+.vrmic span{position:absolute;top:100%;margin-top:6px;font-size:12px;color:var(--muted);white-space:nowrap}
+.vrmic svg.i{width:26px;height:26px}
+.vrsend{flex:1;height:68px;border-radius:34px;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:800;font-size:18px;background:var(--accent);color:var(--accent-ink);
+  box-shadow:0 16px 40px -10px rgba(var(--a-rgb),.6),inset 0 1px 0 rgba(255,255,255,.65);transition:opacity var(--m-fast) var(--e-out),transform var(--m-fast) var(--e-out)}
+.vrsend svg.i{width:20px;height:20px}
+.vrsend:disabled{opacity:.4}
+.vrsend:not(:disabled):active,.vrmic:active{transform:scale(.97)}
+.vlayer.reviewing .stagev{transform:translateY(-30px) scale(.62)}
+.vlayer.reviewing :is(.wave,.hints,.hold,.holdnote,.say){opacity:0!important;pointer-events:none}
+.vlayer[data-phase=stuck] .live{color:var(--warm)}
+@media (prefers-reduced-motion: reduce){ .vreview{animation:none} }
+html[data-motion=off] .vreview{animation:none}

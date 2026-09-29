@@ -1,7 +1,7 @@
 // Look at the UI: main screens, Today scrolled, plus a frame every 100 ms through the voice flow.
 //   node scripts/snap.mjs            → /tmp/snaps (never committed)
 // Voice flow (1.59.1's design): hold the dock orb → the floating orb lifts over the page → pull up
-// into the voice screen → release → the question goes to the Coach and the reply streams in.
+// into the voice screen → release → your words to check → Send → the Coach, and the reply streams in.
 // Frames: /tmp/snaps/orb-frames/NN-<where>-<phase>.png, so animations can be judged frame by frame.
 // Serves the repo root locally on dev seed data; Groq/Google are mocked, nothing else leaves the machine.
 import { mkdir, rm } from 'node:fs/promises';
@@ -74,7 +74,9 @@ async function main() {
     for (let dy = 12; dy <= 180; dy += 12) { await page.mouse.move(x, y - dy); if (dy % 36 === 0) await frame(); }
     await film(1500);                                               // the voice screen, still listening
     await page.mouse.up();
-    await film(4500);                                               // → Coach, the reply streams in
+    await film(1800);                                               // pulled up: what you said, to check
+    await page.click('#vreview .vrsend');
+    await film(4000);                                               // Send → Coach, the reply streams in
     console.log(`  orb-frames/ (${n} frames, ~${FRAME_MS} ms apart plus screenshot time)`);
     await shot('05-coach-after-voice');
     // the other two flows, each in its own folder: a quick release over the floating orb, and the orb

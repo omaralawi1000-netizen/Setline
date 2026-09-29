@@ -92,7 +92,7 @@ const FLOWS = {
   },
 
   // 1.59.1's voice flow: hold the dock orb → the floating orb lifts over the page and listens → pull up
-  // into the voice screen → release → the question goes to the Coach, once. From the moment the
+  // into the voice screen → release (your words to check) → Send → the question goes to the Coach, once. From the moment the
   // floating orb is up until the voice screen hands over, the page is always covered (the floating
   // orb's scrim or the voice screen's backdrop: both fading at once used to let the page show through).
   'voice-to-coach': async (browser, base) => {
@@ -124,10 +124,14 @@ const FLOWS = {
     for (let dy = 10; dy <= 180; dy += 10) await page.mouse.move(x, y - dy);
     await page.waitForSelector('#voice.on[data-phase=listening]', { timeout: 4000 });
     await settle(page, 900);
-    await installSampler(page);
-    await mark(page, 'release');
     const relAt = await page.evaluate(() => performance.now());
     await page.mouse.up();
+    // pulled up: your words to check first, then Send hands over to the Coach
+    await page.waitForSelector('#voice.reviewing #vrtext:not(:empty)', { timeout: 6000 });
+    await settle(page, 500);
+    await installSampler(page);
+    await mark(page, 'release');
+    await page.click('#vreview .vrsend');
     await onScreen(page, 'coach', 10000);
     await page.waitForSelector('#voice[hidden]', { state: 'attached', timeout: 6000 });
     await settle(page, 700);
@@ -274,6 +278,116 @@ const FLOWS = {
     if (r.gap > 80) throw new Error(`the thread didn't follow the reply (${Math.round(r.gap)} px from the end)`);
     await context.close();
     return errors;
+  },
+
+  // The voice gestures, each from a fresh start with a fake microphone and speech-to-text mocked:
+  // hold → listening within a second; hold + release → exactly one send; hold + pull up + release →
+  // nothing sent until Send, then one; drag down → nothing; tap → the Coach, fully. Nothing left
+  // behind after any of them.
+  'voice-gestures': async (browser, base) => {
+    const { context, page, errors } = await newPage(browser, base);
+    await mockServices(page);
+    let stt = 0;
+    page.on('request', r => { if (/api\.groq\.com/.test(r.url())) stt++; });
+    await page.addInitScript(k => { localStorage.setItem('setline.keys', JSON.stringify(k)); }, STAND_IN);
+    await page.goto(base + '?seed=1');
+    await onScreen(page, 'today');
+    await page.evaluate(async () => { const s = await import('./js/store.js'); window.__s = s; s.setSettings({ spoken: 'off', weeklyCheckin: false }); });
+    await settle(page, 1000);
+    const orb = await page.locator('#dock .orbbtn').boundingBox();
+    const x = orb.x + orb.width / 2, y = orb.y + orb.height / 2;
+    const sent = () => page.evaluate(() => window.__s.state.chat.filter(m => m.role === 'user').length);
+    const home = async () => { if (await page.locator('#s-coach.screen.on').count()) { await page.goBack(); await onScreen(page, 'today'); } await settle(page, 900); };
+    const clean = async what => {
+      await settle(page, 900);
+      const left = await page.evaluate(() => {
+        const app = document.getElementById('app'), bad = [];
+        for (const c of ['voice', 'voice-mini', 'orbaway', 'orbtravel', 'voice-covered', 'bg-still']) if (app.classList.contains(c)) bad.push('.' + c);
+        if (!document.getElementById('voice').hidden) bad.push('#voice shown');
+        if (!document.getElementById('ofloat').hidden) bad.push('#ofloat shown');
+        if (document.querySelector('.orbghost, .orbstreak')) bad.push('a flight left over');
+        return bad;
+      });
+      if (left.length) throw new Error(`after ${what}: ${left.join(', ')}`);
+    };
+    // 1. hold: listening within a second
+    const t0 = Date.now();
+    await page.mouse.move(x, y); await page.mouse.down();
+    await page.waitForSelector('#ofloat[data-phase=listening]', { timeout: 3000 });
+    const ms = Date.now() - t0;
+    if (ms > 1000) throw new Error(`listening only after ${ms} ms`);
+    // …and released: exactly one send
+    await settle(page, 900);
+    await page.mouse.up();
+    await onScreen(page, 'coach', 8000);
+    await settle(page, 800);
+    if (stt !== 1 || await sent() !== 1) throw new Error(`hold + release: ${stt} transcription(s), ${await sent()} message(s) sent (expected 1, 1)`);
+    await home(); await clean('hold + release');
+    // 2. hold, pull up, release: nothing sent until Send
+    stt = 0;
+    const before = await sent();
+    await page.mouse.move(x, y); await page.mouse.down();
+    await page.waitForSelector('#ofloat[data-phase=listening]', { timeout: 3000 });
+    await settle(page, 500);
+    for (let dy = 10; dy <= 180; dy += 10) await page.mouse.move(x, y - dy);
+    await page.waitForSelector('#voice.on', { timeout: 3000 });
+    await settle(page, 900);
+    await page.mouse.up();
+    await page.waitForSelector('#voice.reviewing #vrtext:not(:empty)', { timeout: 6000 });
+    await settle(page, 1200);
+    if (await sent() !== before) throw new Error('pull up + release sent something before Send');
+    if (await page.locator('#s-coach.screen.on').count()) throw new Error('pull up + release went to the Coach before Send');
+    await page.click('#vreview .vrsend');
+    await onScreen(page, 'coach', 8000);
+    await settle(page, 800);
+    if (await sent() !== before + 1) throw new Error(`after Send: ${await sent() - before} message(s) sent (expected 1)`);
+    await home(); await clean('review + Send');
+    // 3. hold, drag down: nothing sent
+    stt = 0;
+    const b3 = await sent();
+    await page.mouse.move(x, y); await page.mouse.down();
+    await page.waitForSelector('#ofloat[data-phase=listening]', { timeout: 3000 });
+    await settle(page, 500);
+    for (let dy = 10; dy <= 110; dy += 10) await page.mouse.move(x, y + dy);
+    await page.mouse.up();
+    await settle(page, 1500);
+    if (stt || await sent() !== b3) throw new Error(`drag down: ${stt} transcription(s), ${await sent() - b3} message(s) sent (expected none)`);
+    await clean('drag down');
+    // 4. tap: the Coach opens, fully
+    await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.up();
+    await onScreen(page, 'coach', 4000);
+    await settle(page, 1200);
+    const full = await page.evaluate(() => { const c = document.getElementById('composer'); return +getComputedStyle(c).opacity > 0.99 && +getComputedStyle(document.getElementById('s-coach')).opacity > 0.99; });
+    if (!full) throw new Error('the Coach did not open fully on a tap');
+    await home(); await clean('tap');
+    await context.close();
+    return errors;
+  },
+
+  // The mic never opens (getUserMedia never answers): after 4 s it says so, with a way to retry, and
+  // letting go sends nothing.
+  'mic-stuck': async (browser, base) => {
+    const { context, page, errors } = await newPage(browser, base);
+    await mockServices(page);
+    await page.addInitScript(k => {
+      localStorage.setItem('setline.keys', JSON.stringify(k));
+      navigator.mediaDevices.getUserMedia = () => new Promise(() => {});
+    }, STAND_IN);
+    await page.goto(base + '?seed=1');
+    await onScreen(page, 'today');
+    await settle(page, 900);
+    const orb = await page.locator('#dock .orbbtn').boundingBox();
+    await page.mouse.move(orb.x + orb.width / 2, orb.y + orb.height / 2);
+    await page.mouse.down();
+    await page.waitForSelector('#ofloat[data-phase=stuck]', { timeout: 6000 });
+    const says = await page.locator('#ostatus').textContent();
+    if (!/retry/i.test(says)) throw new Error(`the floating orb says "${says}", not that the mic didn't start`);
+    await page.mouse.up();
+    await settle(page, 800);
+    const sent = await page.evaluate(async () => (await import('./js/store.js')).state.chat.filter(m => m.role === 'user').length);
+    if (sent) throw new Error('something was sent without a mic');
+    await context.close();
+    return errors.filter(e => !/mic did not start/.test(e));
   },
 
   // Every main tab opens without throwing.

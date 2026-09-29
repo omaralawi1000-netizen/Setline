@@ -778,3 +778,20 @@ Fixes the flashes, lag and half-drawn frames in the voice → Coach recording, i
   listening rings fade out on release.
 - Golden flows: voice-to-coach (one orb per frame, no Home frame), home-coach, spoken-reply, and
   chat-stream blocking again. `node scripts/snap.mjs` films all three voice/Coach flows.
+
+## 1.62.3: review before sending, and dots that answer your voice (master fix, phase 4)
+
+- Pull up while holding and let go: what you said shows big in the middle (tap it to change it), with
+  Send, "Say more" (adds to it) and ✕ to throw it away. Nothing is sent until Send; then it goes to the
+  Coach the same way as before. Letting go over the floating orb still sends straight away.
+- The mic: it starts at the hold; a cancel always resets; nothing empty is ever sent; if it hasn't
+  opened in 4 s it says "Mic didn't start – tap to retry" (and why, in `?perf=1`). Dragging the floating
+  orb down lets go of it all.
+- The dotted orb answers the voice in eight bands (each with its own quick-rise, slow-fall envelope):
+  the lows swell it a little, the middle ripples its surface through a drifting noise field like
+  liquid, the highs shimmer at its rim. It breathes at rest, a wave runs round it while it thinks, and
+  it moves with the Coach's voice while it speaks. One canvas per orb, pre-drawn sprites, nothing
+  allocated per frame. `?orbtest=1` drives it with a voice sample.
+- Golden flows voice-gestures (hold → listening within 1 s; hold + release → one send; pull up +
+  release → none until Send, then one; drag down → none; tap → the Coach; nothing left over) and
+  mic-stuck.

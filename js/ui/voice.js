@@ -38,6 +38,7 @@ import { ask as askCoach, ensureModels } from './coach.js';
 import { cmdModels } from '../settings.js';
 import { createEndpointer, looksUnfinished } from '../endpoint.js';
 import { onFrame, nextFrame } from './frame.js';
+import { perfNote } from './perf.js';
 
 const endpoint = createEndpointer({ pauseMs: 850 });
 const WAIT_MS = 3000; // sounded unfinished: still send after this much quiet
@@ -112,6 +113,11 @@ function build() {
     </div>
     <div class="wave" id="vwave" aria-hidden="true">${'<i></i>'.repeat(BARS)}</div>
     <p class="say" id="vsay" aria-live="polite"></p>
+    <div class="vreview" id="vreview" hidden>
+      <p class="vrtext" id="vrtext" contenteditable="plaintext-only" enterkeyhint="send" spellcheck="true" autocapitalize="sentences"></p>
+      <p class="vrhint" id="vrhint"></p>
+      <div class="vracts"><button class="vrmic" data-v="more">${micIcon}<span></span></button><button class="vrsend" data-v="send"><span></span>${I.fwd}</button></div>
+    </div>
     <form class="typebox solid" id="vtype" autocomplete="off">
       <input id="vinput" enterkeyhint="send" autocapitalize="off" autocorrect="on" spellcheck="false">
       <button class="send" type="submit">${I.fwd}</button>
@@ -136,7 +142,8 @@ function build() {
     layer, status: $('#vstatus span'), lang: $('#vlang'), stage: $('#vstage'), halo: $('#vhalo'), ripples: $('#vripples'),
     orbwrap: $('#vorbwrap'), orb: $('#vorb'), wave: $('#vwave'), bars: [...$('#vwave').children], say: $('#vsay'),
     type: $('#vtype'), input: $('#vinput'), hints: $('#vhints'), hold: $('#vhold'), holdtxt: $('#vholdtxt'), note: $('#vnote'),
-    card: $('#intent'), dockOrb: null
+    card: $('#intent'), dockOrb: null,
+    review: $('#vreview'), rtext: $('#vrtext'), rhint: $('#vrhint'), rmore: layer.querySelector('.vrmic'), rsend: layer.querySelector('.vrsend')
   });
 }
 
@@ -163,16 +170,17 @@ function setPhase(phase) {
   v.phase = phase;
   el.layer.dataset.phase = phase;
   const t = state.t;
-  const status = { idle: 'voice.ready', opening: 'voice.opening', listening: 'voice.listening', thinking: 'voice.thinking', result: 'voice.ready', error: 'voice.ready' }[phase];
+  const status = { idle: 'voice.ready', opening: 'voice.opening', listening: 'voice.listening', thinking: 'voice.thinking', result: 'voice.ready', error: 'voice.ready', review: 'voice.ready', stuck: 'voice.micStuck' }[phase];
   el.status.textContent = t(status);
   const rec = phase === 'listening' || phase === 'opening';
-  el.holdtxt.textContent = t(rec ? (v.toggle ? 'voice.tapSend' : 'voice.release') : 'voice.hold');
+  el.holdtxt.textContent = t(rec ? (v.toggle ? 'voice.tapSend' : v.review ? 'voice.releaseReview' : 'voice.release') : 'voice.hold');
   el.note.textContent = t(rec && v.toggle ? 'voice.tapNote' : 'voice.holdNote');
   el.hold.disabled = phase === 'thinking';
   el.layer.dataset.toggle = v.toggle ? '1' : '';
   el.mini.dataset.phase = phase;
   el.mini.dataset.toggle = v.toggle ? '1' : '';
   el.ostatus.textContent = t(phase === 'listening' && v.toggle ? 'voice.tapSendMini' : status);
+  if (phase === 'stuck') el.status.textContent = t('voice.micStuck');
 }
 
 const translateY = node => { const t = getComputedStyle(node).transform; return t && t !== 'none' ? new DOMMatrix(t).m42 : 0; };
@@ -315,6 +323,8 @@ export function openMini() {
 function expandFull() {
   if (!v.open || v.mode !== 'mini') return;
   haptic('tap');
+  // pulled up while holding: letting go shows what you said to check first, nothing is sent yet
+  v.review = !!v.press;
   const from = el.oorb;
   v.mode = 'full';
   v.typing = false;
@@ -373,6 +383,7 @@ export function closeVoice({ fromPop = false } = {}) {
   v.press = null;
   v.toggle = false;
   mic.cancel();
+  endReview();
   if (v.mode === 'mini') {
     // the orb sinks back into the dock
     el.mini.classList.remove('on');
@@ -429,6 +440,7 @@ export function voiceHandlePop() {
 
 // ---------- level animation (transform/opacity only) ----------
 
+const WANT = { state: 'idle', level: 0, bands: [0, 0, 0], b8: null }, B8 = new Float32Array(8), QUIETB = { low: 0, high: 0, rms: 0, voice: [0, 0, 0] }, GSRC = { listening: false, processing: false, rms: 0, voice: null };
 function startLoop() {
   if (v.raf) return;
   const tick = now => {
@@ -448,13 +460,17 @@ function startLoop() {
     // the voice glow along the bottom: the recorder's own level and bands while it records, the
     // processing sweep while the words are worked out, nothing otherwise (a meter, so it keeps
     // answering the voice with reduced motion; only its breathing, flow and sweep stop)
-    const b = listening ? mic.bands() : { low: 0, high: 0, rms: 0, voice: [0, 0, 0] };
+    const b = listening ? mic.bands() : QUIETB;
     const glow = v.mode === 'mini' ? el.glowMini : el.glowFull, quiet = v.mode === 'mini' ? el.glowFull : el.glowMini;
-    const gsrc = { listening, processing: v.phase === 'thinking', rms: b.rms, voice: b.voice };
+    const gsrc = GSRC; gsrc.listening = listening; gsrc.processing = v.phase === 'thinking'; gsrc.rms = b.rms; gsrc.voice = b.voice;
     glow?.step(Math.min(0.05, dt / 1000), gsrc, reduced());
     if (quiet?.on) quiet.off();
     // the dotted orb ripples with the voice (the lows round its middle, the highs at its poles)
-    setOrb(v.mode === 'mini' ? el.oorb : el.orb, { state: !v.open ? 'idle' : listening ? 'listening' : v.phase === 'thinking' ? 'thinking' : 'idle', level: v.lvl, bands: [b.low, b.voice[1] * 3, b.high] });
+    // (one state object and one band array, refilled each frame: nothing allocated per frame)
+    WANT.state = !v.open ? 'idle' : listening ? 'listening' : v.phase === 'thinking' ? 'thinking' : 'idle';
+    WANT.level = v.lvl; WANT.bands[0] = b.low; WANT.bands[1] = b.voice[1] * 3; WANT.bands[2] = b.high;
+    WANT.b8 = listening && mic.bands8(B8) ? B8 : null;
+    setOrb(v.mode === 'mini' ? el.oorb : el.orb, WANT);
     if (reduced()) return;
     const l = v.lvl;
     // the body of the voice swells the orb's core, its edge (s, t, k) lights the rim
@@ -513,9 +529,24 @@ async function startRec() {
   const token = ++v.token;
   setPhase('opening');
   const opening = performance.now();
+  // the mic hasn't opened in 4 s (a permission prompt that never came, a device held elsewhere): say
+  // so, with a way to try again, and note why
+  const watchdog = setTimeout(async () => {
+    if (token !== v.token || v.phase !== 'opening') return;
+    let why = 'getUserMedia still pending';
+    try { const q = await navigator.permissions?.query({ name: 'microphone' }); if (q) why += `, permission ${q.state}`; } catch {}
+    console.warn('[voice] mic did not start within 4 s:', why);
+    perfNote('mic stuck: ' + why);
+    if (token !== v.token || v.phase !== 'opening') return;
+    v.token++; v.toggle = false; v.pendingStop = false;
+    mic.cancel();
+    setPhase('stuck');
+  }, 4000);
   try {
     await mic.start({ onMaxed: () => finishRec() });
+    clearTimeout(watchdog);
   } catch (e) {
+    clearTimeout(watchdog);
     if (token !== v.token) return;
     v.toggle = false;
     if (e.code === 'denied') return showError('voice.micDenied', 'voice.micDeniedSub', { type: true });
@@ -566,7 +597,7 @@ async function speculate() {
   mic.cancel();
   setPausing('');
   setPhase('thinking');
-  handleText(withCarry(text));
+  deliver(withCarry(text));
 }
 function setPausing(k) {
   el.mini.dataset.pause = k;
@@ -583,7 +614,8 @@ async function finishRec() {
   setPhase('thinking');
   const r = await mic.stop();
   if (!r || token !== v.token) return;
-  if (r.ms < 400 || (r.measured && r.peak < 0.03) || r.blob.size < 800) return showError('voice.tooShort', 'voice.tooShortSub');
+  // never sent empty: a hold with nothing in it is "too short" (or, in review, just back to what you had)
+  if (r.ms < 400 || (r.measured && r.peak < 0.03) || r.blob.size < 800) return v.review && v.open ? showReview(withCarry('')) : showError('voice.tooShort', 'voice.tooShortSub');
   let text;
   try {
     text = await transcribe(r.blob, sttOpts());
@@ -596,8 +628,8 @@ async function finishRec() {
   }
   if (token !== v.token) return;
   text = withCarry(text);
-  if (!text) return showError('voice.tooShort', 'voice.tooShortSub', { retry: true });
-  handleText(text);
+  if (!text && !(v.review && v.open)) return showError('voice.tooShort', 'voice.tooShortSub', { retry: true });
+  deliver(text);
 }
 
 function cancelRec() {
@@ -606,6 +638,55 @@ function cancelRec() {
   v.pendingStop = false;
   mic.cancel();
   if (v.open) setPhase('idle');
+}
+
+// ---------- review: what you said, to check before it goes ----------
+
+// After a pull-up, what you said is shown big in the middle, editable with a tap, with Send, "Say more"
+// (it adds to it) and ✕ (the top close) to throw it away. Nothing is sent until Send.
+function deliver(text) {
+  if (v.review && v.open && v.mode === 'full') return showReview(text);
+  handleText(text);
+}
+function showReview(text) {
+  v.reviewing = true;
+  el.say.innerHTML = '';
+  el.rtext.textContent = text || '';
+  el.rhint.textContent = state.t(text ? 'voice.reviewHint' : 'voice.reviewEmpty');
+  el.rmore.querySelector('span').textContent = state.t('voice.reviewMore');
+  el.rsend.querySelector('span').textContent = state.t('voice.reviewSend');
+  el.review.hidden = false;
+  el.layer.classList.add('reviewing');
+  setPhase('review');
+  syncSend();
+  haptic('tap');
+}
+const reviewText = () => el.rtext.textContent.replace(/\s+/g, ' ').trim();
+function syncSend() { el.rsend.disabled = !reviewText(); }
+function endReview() {
+  v.review = false; v.reviewing = false;
+  if (!el.review) return;
+  el.review.hidden = true;
+  el.layer.classList.remove('reviewing');
+  el.rtext.blur?.();
+}
+function reviewSend() {
+  const text = reviewText();
+  if (!text) return;
+  haptic('success');
+  endReview();
+  setPhase('thinking');
+  handleText(text);
+}
+function reviewMore() {
+  const text = reviewText();
+  el.review.hidden = true;
+  el.layer.classList.remove('reviewing');
+  v.reviewing = false;
+  v.carry = text; // what you say next is added to it
+  el.say.textContent = text;
+  v.toggle = true; // tap the button (or pause) when you're done
+  startRec();
 }
 
 // ---------- text → intent → card ----------
@@ -1185,6 +1266,16 @@ function holdUp(tapMeansToggle) {
 // threshold and hands over to the full screen; a quick flick up does the same.
 const PULL_AT = 110;
 function pullTo(p, e) {
+  // dragged down, away from the page: let go of it all, nothing is sent
+  if (e.clientY - p.y > 70 && v.mode === 'mini' && !p.cancelled) {
+    p.cancelled = true;
+    if (v.press === p) { clearTimeout(p.timer); v.press = null; }
+    haptic('tap');
+    releasePull();
+    cancelRec();
+    closeVoice();
+    return;
+  }
   const raw = Math.min(0, e.clientY - p.y);
   const now = performance.now();
   const vel = p.lastY != null ? (e.clientY - p.lastY) / Math.max(1, now - p.lastT) : 0; // px/ms, negative is up
@@ -1216,9 +1307,13 @@ export function initVoice(n) {
     const b = e.target.closest('[data-v]');
     if (!b) return;
     if (b.dataset.v === 'close') return closeVoice();
+    if (b.dataset.v === 'send') return reviewSend();
+    if (b.dataset.v === 'more') { haptic('tap'); return reviewMore(); }
     if (b.dataset.v === 'type') return startTyping();
     if (b.dataset.v === 'hint') { haptic('tap'); cancelRec(); handleText(b.textContent, { typed: true }); }
   });
+  el.rtext.addEventListener('input', syncSend);
+  el.rtext.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); reviewSend(); } });
   el.type.addEventListener('submit', e => {
     e.preventDefault();
     const text = el.input.value;

@@ -79,3 +79,22 @@ sections and never draw. What really draws:
 | Thinking bubble glow `.msg.ai.is-thinking .bub::after` | 16 px filter on a small gradient | keep (small, only while thinking) |
 
 At most five blurred layers show at once (bar ×2, bottom edge, scrim, sheet).
+
+## After phase 4 (1.62.3)
+
+Same conditions. The voice flow now has a review step (release → your words, then Send → Coach).
+
+| flow | fps | dropped | worst ms | long tasks | long ms | paint ms/f | raster ms/f | layers | layer MP |
+|---|---|---|---|---|---|---|---|---|---|
+| hold → floating orb | 46.3 | 22 | 83 | 1 | 57 | 0.22 | 0.38 | 46 | 22.9 |
+| pull up → voice screen | 37.7 | 61 | 117 | 3 | 241 | 0.19 | 0.45 | 54 | 28.7 |
+| listening (voice screen) | 46 | 18 | 67 | 1 | 50 | 0 | 0.13 | 42 | 23.6 |
+| release → review | 48.6 | 20 | 83 | 0 | 0 | 0.48 | 0.2 | 63 | 23.8 |
+| Send → Coach | 24.6 | 54 | 283 | 4 | 563 | 2.01 | 2.01 | 70 | 27.2 |
+| reply streaming | 49.7 | 5 | 50 | 0 | 0 | 1.39 | 0.44 | 58 | 24.2 |
+| tap orb → Coach | 49.7 | 14 | 233 | 1 | 210 | 0.6 | 0.66 | 53 | 24.6 |
+| Coach → back to Home | 53.7 | 8 | 117 | 1 | 109 | 0.54 | 1.65 | 39 | 25.6 |
+| typed question → streamed reply | 43.6 | 13 | 133 | 3 | 200 | 2.08 | 1.89 | 57 | 23.7 |
+| scroll Today | 60.1 | 0 | 17 | 0 | 0 | 0 | 0 | 30 | 17 |
+
+Still slow in the sandbox: Send → Coach (laying out the Coach and building the question's context in the same moment). Judge on the phone with `?perf=1`.
