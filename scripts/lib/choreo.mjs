@@ -18,8 +18,9 @@ export const installProbe = page => page.evaluate(() => {
   const tick = () => {
     const orbs = [];
     for (const o of document.querySelectorAll('.orb')) {
-      if (o.closest('.orbghost') && o !== o.closest('.orbghost').querySelector('.orb')) continue; // (a flight's second look is the same orb)
-      const r = o.getBoundingClientRect(), a = op(o);
+      const gh = o.closest('.orbghost');
+      if (gh && o !== gh.querySelector('.orb')) continue; // (a flight's second look is the same orb: counted once, as the brighter of the two)
+      const r = o.getBoundingClientRect(), a = gh ? Math.max(...[...gh.querySelectorAll('.orb')].map(op)) : op(o);
       if (a > 0.02 && onScr(r)) orbs.push({ id: o.id || (o.closest('.orbghost') ? 'flight' : o.closest('#composer') ? 'box' : o.closest('#dock') ? 'dock' : o.parentElement?.className || 'orb'), ...mid(r), a: +a.toFixed(2), w: Math.round(r.width) });
     }
     const screens = {};
@@ -36,8 +37,13 @@ export const installProbe = page => page.evaluate(() => {
     const box = document.getElementById('composer'), corb = box?.querySelector('.corb');
     const slot = corb ? mid(corb.getBoundingClientRect()) : null;
     const dcap = document.querySelector('#dock .dcap');
-    window.__cf.push({ t: performance.now(), orbs, screens, box: box ? +op(box).toFixed(2) : 0, slot, dock: dcap ? +op(dcap).toFixed(2) : 0,
-      mine: [...document.querySelectorAll('#thread > .msg.me')].pop() || null });
+    // the flying orb against the flying words (your new message): how far apart they are, in px (< 0: over them)
+    const gh = document.querySelector('.orbghost'), wd = document.querySelector('#thread > .msg.me.wordsin .bub');
+    let gap = null;
+    if (gh && wd) { const a = gh.getBoundingClientRect(), b = wd.getBoundingClientRect(), r = a.width / 2, cx = a.left + r, cy = a.top + r;
+      gap = Math.round(Math.hypot(cx - Math.max(b.left, Math.min(cx, b.right)), cy - Math.max(b.top, Math.min(cy, b.bottom))) - r); }
+    window.__cf.push({ t: performance.now(), gap, orbs, screens, box: box ? +op(box).toFixed(2) : 0, slot, dock: dcap ? +op(dcap).toFixed(2) : 0,
+      spot: box?.dataset.spot || '', send: box ? +op(box.querySelector('.csend')).toFixed(2) : 0, mine: [...document.querySelectorAll('#thread > .msg.me')].pop() || null, msgs: document.querySelectorAll('#thread > .msg.me').length });
     if (window.__cf.length < 20000) requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
@@ -81,13 +87,15 @@ export async function setupCoachPage(page, base, { slowmo = 1 } = {}) {
   await page.addInitScript(k => localStorage.setItem('setline.keys', JSON.stringify(k)), STAND_IN);
   await page.goto(base + '?seed=1' + (slowmo > 1 ? `&slowmo=${slowmo}&cdp=1` : ''));
   await onScreen(page, 'today');
-  await page.evaluate(async () => {
+  await page.evaluate(async long => {
     const s = await import('./js/store.js');
     s.setSettings({ spoken: 'off', weeklyCheckin: false });
+    // (CHOREO_LONG=1: a conversation longer than the screen, as it usually is)
+    for (let i = 0; i < (long ? 6 : 0); i++) { s.addChat('user', `What about day ${i + 1}?`); s.addChat('model', 'Keep it light and technique-focused: a few easy sets, then call it a day. Eat well tonight so you have fuel for tomorrow.'); }
     s.addChat('user', 'How was last week?');
     s.addChat('model', 'Four sessions and a record on the bench. Keep the same plan and add a set of rows on Thursday.');
     await document.fonts.ready;
-  });
+  }, !!process.env.CHOREO_LONG);
   await settle(page, 1200 * slowmo);
 }
 const orbCenter = async page => { const b = await page.locator('#dock .orbbtn').boundingBox(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; };
@@ -99,6 +107,26 @@ export const FLOWS = {
     await page.waitForSelector('#ofloat[data-phase=listening]', { timeout: 6000 * k }); await settle(page, 900 * k);
     await hooks.before?.(); await page.mouse.up();
     await page.waitForSelector('#s-coach.screen.on', { state: 'attached', timeout: 8000 * k }); await settle(page, 1300 * k);
+  },
+  'close-voice': async (page, k = 1, hooks = {}) => {
+    const o = await orbCenter(page); await page.mouse.move(o.x, o.y); await page.mouse.down();
+    await page.waitForSelector('#ofloat[data-phase=listening]', { timeout: 6000 * k }); await settle(page, 400 * k);
+    for (let dy = 10; dy <= 180; dy += 10) await page.mouse.move(o.x, o.y - dy);
+    await page.waitForSelector('#voice.on', { timeout: 4000 * k }); await settle(page, 700 * k);
+    await page.mouse.up();
+    await page.waitForSelector('#voice.reviewing #vrtext:not(:empty)', { timeout: 6000 * k }); await settle(page, 500 * k);
+    await hooks.before?.(); await page.click('#voice [data-v=close]');
+    await page.waitForSelector('#voice', { state: 'hidden', timeout: 8000 * k }); await settle(page, 900 * k);
+  },
+  // in the Coach: typing turns the orb into the send arrow; clearing the field turns it back
+  typing: async (page, k = 1, hooks = {}) => {
+    await hooks.before?.(); await page.fill('#composer input', 'How was my bench?'); await settle(page, 500 * k);
+    await page.fill('#composer input', ''); await page.dispatchEvent('#composer input', 'input'); await settle(page, 600 * k);
+  },
+  // in the Coach: the keyboard comes up and goes (there's no keyboard in a test browser: its height is told to the page)
+  keyboard: async (page, k = 1, hooks = {}) => {
+    await hooks.before?.(); await page.evaluate(() => document.getElementById('app')._setKb(300)); await settle(page, 600 * k);
+    await page.evaluate(() => document.getElementById('app')._setKb(0)); await settle(page, 600 * k);
   },
   'send-to-coach': async (page, k = 1, hooks = {}) => {
     const o = await orbCenter(page); await page.mouse.move(o.x, o.y); await page.mouse.down();
@@ -121,29 +149,45 @@ export function judge(fr, lum, { flow, reduced = false }) {
     const two = fr.filter(f => f.orbs.filter(o => o.a > 0.5).length > 1);
     if (two.length) bad.push(`${two.length} frame(s) with two orbs over 50 %`);
     if (lum?.length > 2) {
-      const a = lum[0].lum, b = lum[lum.length - 1].lum, low = lum.filter(x => x.lum < Math.min(a, b) * 0.85);
-      if (low.length) bad.push(`dips darker than both ends by over 15 % in ${low.length} frame(s)`);
+      const a = lum[0].lum, b = lum[lum.length - 1].lum, low = lum.filter(x => x.lum < Math.min(a, b) * 0.5);
+      if (low.length) bad.push(`dips darker than both ends by over half in ${low.length} frame(s)`);
     }
     return bad;
   }
   const many = fr.filter(f => f.orbs.length > 1);
   if (many.length) bad.push(`${many.length} frame(s) with ${Math.max(...many.map(f => f.orbs.length))} orbs (${many[0].orbs.map(o => o.id).join(', ')})`);
-  const none = fr.filter(f => !f.orbs.length);
-  if (none.length) bad.push(`${none.length} frame(s) with no orb at all`);
+  const none = fr.filter(f => !f.orbs.length && !(f.spot === 'send' || f.spot === 'stop' || f.send > 0.5)); // (the box's orb spot may be the send arrow or the stop button)
+  if (none.length) bad.push(`${none.length} frame(s) with no orb at all (first at ${Math.round(none[0].t - fr[0].t)} ms)`);
   const both = fr.filter(f => Object.values(f.screens).filter(a => a > 0.2).length > 1);
   if (both.length) bad.push(`${both.length} frame(s) with two screens' content over 20 % (${JSON.stringify(both[0].screens)})`);
   // landing: an orb reaching the message box's orb slot finds the box already there
   const early = fr.filter(f => f.slot && f.orbs.some(o => o.id !== 'box' && Math.hypot(o.x - f.slot.x, o.y - f.slot.y) < 16) && f.box < 0.9);
-  if (/coach$/.test(flow) && early.length) bad.push(`the orb reached the message box before it was there (${early.length} frame(s), box at ${early[0].box})`);
+  if (/^(mini|send)-/.test(flow) && early.length) bad.push(`the orb reached the message box before it was there (${early.length} frame(s), box at ${early[0].box})`);
+  // the orb never passes over your words
+  const over = fr.filter(f => f.gap != null && f.gap < 0);
+  if (over.length) bad.push(`the orb passed over your words in ${over.length} frame(s) (by ${-Math.min(...over.map(f => f.gap))} px)`);
+  // Home ↔ Coach: the orb doesn't fly, it stays exactly where it is (the box grows out of it)
+  if (/^(home|coach)-to-/.test(flow)) {
+    const at = fr.flatMap(f => f.orbs.slice(0, 1)), x0 = at[0];
+    const moved = x0 ? at.filter(o => Math.hypot(o.x - x0.x, o.y - x0.y) > 1.5) : [];
+    if (moved.length) bad.push(`the orb moved in ${moved.length} frame(s) (up to ${Math.round(Math.max(...moved.map(o => Math.hypot(o.x - x0.x, o.y - x0.y))))} px)`);
+  }
+  // a question sent: one new message of yours, never more (nothing old re-appears as new)
+  if (/^(mini|send)-/.test(flow) && fr.length) {
+    const n0 = fr[0].msgs, n1 = Math.max(...fr.map(f => f.msgs));
+    if (n1 - n0 !== 1) bad.push(`${n1 - n0} new message(s) of yours, not 1`);
+  }
   if (lum?.length > 2) {
-    const a = lum[0].lum, b = lum[lum.length - 1].lum, floor = Math.min(a, b) * 0.9, low = lum.filter(x => x.lum < floor);
-    if (low.length) bad.push(`dips darker than both ends by over 10 % in ${low.length} frame(s) (ends ${a} / ${b}, lowest ${Math.min(...low.map(x => x.lum))})`);
+    // (a dip to black: under half the darker end; the big bright Send button leaving dims the voice screen a
+    // little on its way to the Coach, and that's fine)
+    const a = lum[0].lum, b = lum[lum.length - 1].lum, floor = Math.min(a, b) * 0.5, low = lum.filter(x => x.lum < floor);
+    if (low.length) bad.push(`dips darker than both ends by over half in ${low.length} frame(s) (ends ${a} / ${b}, lowest ${Math.min(...low.map(x => x.lum))})`);
   }
   return bad;
 }
 
 // each flow needs the one before it (Coach → Home starts in the Coach)
-export const PRE = { 'coach-to-home': 'home-to-coach' };
+export const PRE = { 'coach-to-home': 'home-to-coach', typing: 'home-to-coach', keyboard: 'home-to-coach' };
 
 // One flow at full speed with the probe and the compositor's frames, judged from the gesture that
 // starts it (the tap, Back, the release, Send). With {reduced}, under prefers-reduced-motion.

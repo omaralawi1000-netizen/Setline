@@ -67,7 +67,7 @@ function mount(orb) {
   for (const c of orb.querySelectorAll(':scope > canvas.dots')) c.remove(); // a copy's blank canvas
   const size = parseFloat(orb.style.getPropertyValue('--s')) || parseFloat(getComputedStyle(orb).getPropertyValue('--s')) || orb.offsetWidth || 60;
   const box = Math.round(size * 1.3); // room to swell past the orb's own edge
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const dpr = orb.dataset.low ? 1 : Math.min(2, window.devicePixelRatio || 1);
   const canvas = document.createElement('canvas');
   canvas.className = 'dots';
   canvas.setAttribute('aria-hidden', 'true');

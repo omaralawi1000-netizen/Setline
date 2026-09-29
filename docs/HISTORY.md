@@ -839,3 +839,45 @@ Fixes the flashes, lag and half-drawn frames in the voice → Coach recording, i
 
 - The orb flying between the dock and the voice screen (and the floating orb) no longer draws its
   comet trail; the streak code (orbStreak, .orbstreak) is gone. One solid orb on every frame.
+
+## 1.63.0: the orb lives in the bottom-right corner
+
+Omar tried 1.62.6 on the phone: the checks passed, but the transitions felt worse (an empty stretched
+bar, the orb crawling across it, a see-through orb over the text, old messages over the voice screen,
+words sliding off the edge, a pink fog and a flash). From here, how it looks on the phone is the goal;
+the frame checks are only a safety net.
+- The message box is the dock grown: one pill of the dock's own glass, as tall as the dock, with its
+  orb at the right end in exactly the dock orb's place and size. That spot has three faces, cross-faded
+  in 150 ms: the orb (empty field, tap to talk), the send arrow (typing), the stop button (a reply
+  streaming in). While a reply is still thinking the orb stays; tapping it stops the reply.
+- Home ↔ Coach: the orb never moves. It gives a small press as the finger lifts; the tabs fade in 90 ms
+  and the box grows out of the orb leftwards (its glass layer clipped from the orb's circle to the whole
+  box, a spring from rest over 320 ms), "Ask your coach" fading in at 70 %. Home fades out in 90 ms, the
+  Coach in over 200 ms from 60 ms, rising 10 px, already at its latest message. Back is the reverse;
+  Chrome's own back-swipe (`still`) skips it. The Coach is painted in advance, invisibly, while the
+  finger is on the orb (on the phone its first paint used to hold the first frame back).
+- Voice → Coach (the floating orb let go, or Send): the orb and the controls answer on the same frame;
+  the Coach is drawn just after (so the orb's flight and the fades keep moving while it's laid out), and
+  every delay counts from the tap. What you said flies into your message as one piece, never wider than
+  the screen, shrinking early; its glass grows in under it over the last 40 %; it's the message's own
+  node. The orb (with a drop of glass under its dots, so it's solid over anything) flies one curve to the
+  box's orb spot, round behind your words, and the box takes it with a small press in depth (no light).
+  The frost or the voice screen stays until the Coach comes in, then fades as it arrives; the old
+  conversation holds at a third while your words fly across it. Only the one new message ever appears;
+  nothing shifts after it lands; the box's spot stays the orb until it has landed.
+- Closing the voice screen (✕): the orb flies home (the dock, or the box's spot in the Coach) on the same
+  kind of curve while the screen fades (its words drop to a fifth while the backdrop still covers the
+  page, then both go: no dark frame, no double exposure).
+- Glow: the bloom and the landing flash are gone; the message box has no light of its own; the orb halos
+  and the floating orb's glow reach at most ~20 % past the orb's edge.
+- Keyboard: on Android the keyboard now lies over the page while the message box is typed in
+  (VirtualKeyboard), so the page knows its height as it starts to move: the box glides up with it and the
+  conversation's newest messages glide with it, anchored to the bottom (elsewhere, a FLIP of the resize).
+  The room under the thread no longer changes when the field is focused.
+- Speed: the review text is parsed while it's on screen (Send used to parse it first); the handoff measures
+  the page before writing to it; the flying orb's canvas is drawn at 1×.
+- Reduced motion: every transition is a 150 ms fade; nothing flies or scales.
+- `node scripts/strips.mjs` (new): contact strips from the frames the compositor really showed at full
+  speed (0–560 ms), timed from the event; `CHOREO_LONG=1` for a long conversation. The frame checks
+  (`scripts/choreo.mjs`, golden `move-*`) now also cover ✕, typing and the keyboard, and check that the
+  orb stays put on Home ↔ Coach, never passes over your words, and that exactly one new message appears.

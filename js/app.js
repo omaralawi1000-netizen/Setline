@@ -23,19 +23,19 @@ installErrorLog(); // errors are kept (the last few) so a bug report can carry t
 import { afterSession, checkWeek, dropPin } from './ui/pins.js';
 import { initVoice, orbHTML, voiceHandlePop, closeVoice, isVoiceOpen, openVoice } from './ui/voice.js';
 import { renderYou } from './ui/you.js';
-import { renderCoach, initCoach, ask as askCoach, ensureModels, weeklyCheckin, markWeeklySeen, sessionDebrief, markDebriefSeen } from './ui/coach.js';
+import { renderCoach, initCoach, syncSpot, ask as askCoach, ensureModels, weeklyCheckin, markWeeklySeen, sessionDebrief, markDebriefSeen } from './ui/coach.js';
 import { initCardio, setCardioNav, tickCardio, renderCardioDetail, syncGps, startCardioSession, pickTypeSheet } from './ui/cardio.js';
 import { initBody } from './ui/body.js';
 import { initRoutine, setRoutineNav, renderRoutine, editRoutine, editRoutineFrom, programsSheet, startRoutine, planFor } from './ui/routine.js';
 import { setHistoryFilter } from './ui/history.js';
 import { renderProgress, renderExercise, setRange } from './ui/progress.js';
 import { countAll, burst, orbPulse } from './ui/fx.js';
-import { nextFrame } from './ui/frame.js';
 import { syncBeams } from './ui/beam.js';
 import { startDotOrbs, handOrb } from './ui/dotorb.js';
 import { initPerf } from './ui/perf.js';
-import { arcFly, recoil, EASE } from './ui/choreo.js';
+import { recoil } from './ui/choreo.js';
 import { initPress } from './ui/press.js';
+import { initKeyboard } from './ui/keyboard.js';
 import { initChrome, refreshChrome } from './ui/chrome.js';
 import { openCustomize } from './ui/customize.js';
 import { autoBackup } from './ui/drive.js';
@@ -167,130 +167,99 @@ const stillMotion = () => document.documentElement.dataset.motion === 'off' || m
 let coachFx = null; // tidies up the open or close in progress
 function settleCoachFx() { const c = coachFx; coachFx = null; c?.(); }
 
-// The orb arrives in the message box: the box is pushed back in depth from where it was hit (never up
-// or down) and springs back with one soft overshoot, the light spreads through it, and one firm tap.
+// The orb arrives in the message box: the box is pressed back in depth from where it landed (never up
+// or down) and springs back with one soft overshoot, with one firm tap. No light, no flash.
 function impact(point) {
   haptic('land');
-  const box = $('#composer');
-  if (!box) return;
-  box.classList.remove('hit'); nextFrame(() => { box.classList.add('hit'); setTimeout(() => box.classList.remove('hit'), 1000); });
-  recoil(box, point);
-  setTimeout(() => app.classList.remove('awaitland'), 120); // the Coach's "Thinking" row, just after
+  recoil($('#composer'), point);
+  setTimeout(() => { app.classList.remove('awaitland'); syncSpot(); }, 120); // the Coach's "Thinking" words (or its stop button), just after
 }
 
-// Home ↔ Coach, as one piece: the bar's glass pill reshapes into the message box (one glass layer,
-// clipped from the pill's shape to the box's) while the tab icons fade; Home's content fades out in
-// 100 ms as the Coach's fades in from 60 ms over the same sea; the orb arcs from the bar into the box
-// (which is there before it arrives) and the box takes it with a recoil. Back is the exact reverse.
-// Asked over the floating orb (flyFrom), there is no bar: the box comes in and that orb flies in.
-let flyFrom = null;
+// Home ↔ Coach. The orb stays exactly where it is (the message box's orb sits in the dock orb's place):
+// it gives a small press, the dock's tabs fade, and the message box grows out of the orb leftwards, one
+// pill of glass (its .cbg layer, clipped from the orb's circle to the whole box), "Ask your coach"
+// fading in as the field opens. The page fades through to the Coach over the same sea. Back is the
+// exact reverse: the box shrinks into the orb and the tabs come back. (Chrome's own back-swipe
+// animation, `still`, skips all of it.) Reduced motion: 150 ms fades.
 const rectIn = el => { const a = app.getBoundingClientRect(), r = el.getBoundingClientRect(); return { l: r.left - a.left, t: r.top - a.top, r: r.right - a.left, b: r.bottom - a.top, w: r.width, h: r.height }; };
-const insetOf = (x, u, round) => `inset(${(x.t - u.t).toFixed(1)}px ${(u.r - x.r).toFixed(1)}px ${(u.b - x.b).toFixed(1)}px ${(x.l - u.l).toFixed(1)}px round ${round}px)`;
-const MORPH_MS = 260;
+const insetOf = (x, u) => `inset(${(x.t - u.t).toFixed(1)}px ${(u.r - x.r).toFixed(1)}px ${(u.b - x.b).toFixed(1)}px ${(x.l - u.l).toFixed(1)}px round ${(x.h / 2).toFixed(1)}px)`;
+const GROW_MS = 320, GROW_EASE = 'cubic-bezier(.5,0,.15,1)'; // (a spring from rest: slow off the mark, so it only reaches the tabs once they've gone)
 function coachMorph(open, under) {
   settleCoachFx();
-  const aura = $('.aura'), veil = aura?.querySelector('.veil'), box = $('#composer'), coach = $('#s-coach');
-  const dockOrb = $('#dock .orbbtn .orb'), dcap = $('#dock .dcap');
-  if (!aura || !veil || !box || !coach) return;
+  const box = $('#composer'), cbg = box?.querySelector('.cbg'), coach = $('#s-coach'), aura = $('.aura'), veil = aura?.querySelector('.veil');
+  const dock = $('#dock'), dockBtn = dock?.querySelector('.orbbtn'), dockOrb = dockBtn?.querySelector('.orb'), obub = dockBtn?.querySelector('.obub');
+  const spot = box?.querySelector('.cspot'), boxOrb = box?.querySelector('.corb .orb');
+  if (!box || !cbg || !coach || !dockBtn || !spot) return;
   const other = under && under !== coach ? under : null;
-  const src = open && flyFrom?.isConnected ? flyFrom : null;
-  flyFrom = null;
-  haptic(open ? 'bloom' : 'tick');
-  const anims = [], timers = [];
-  // (reduced motion: the same, as plain 150 ms fades: nothing moves or grows)
   const calm = stillMotion();
-  const go = (el, f, o) => {
-    if (!el) return null;
-    if (calm) { f = f.map(({ transform, ...k }) => k); o = { ...o, duration: Math.min(o.duration, 150), delay: 0 }; }
-    const a = el.animate(f, o); anims.push(a); return a;
-  };
-  const bar = !src && !!dcap;
-  app.classList.add('choreo');
-  if (bar) app.classList.add('choreo-bar');
-  aura.classList.add('run');
-  let gm = null;
+  const anims = [], timers = [];
+  const go = (el, f, o) => { if (!el) return null; const a = el.animate(f, { fill: 'both', ...o }); anims.push(a); return a; };
+  const parts = [...dock.querySelectorAll('.tab, .ind, .dcap')];
+  const fields = [...box.querySelectorAll(':scope > input, :scope > .thinkline')];
+  haptic(open ? 'bloom' : 'tick');
+  app.classList.add('choreo', 'cm-dock', 'cm-box');
+  aura?.classList.add('run');
+  // the page under it stays drawn while it fades (its screen has already been switched off)
+  if (other) Object.assign(other.style, { visibility: 'visible' });
+  Object.assign(coach.style, { visibility: 'visible' });
   const wipe = () => {
+    // (the dock goes to its resting state with no transition, then the pieces let go of their frames)
+    const held = [dock, box, coach, other, veil, ...parts].filter(Boolean);
+    for (const el of held) el.style.transition = 'none';
+    app.classList.remove('choreo', 'cm-dock', 'cm-box');
+    aura?.classList.remove('run');
     anims.forEach(a => a.cancel());
     timers.forEach(clearTimeout);
-    gm?.remove();
-    app.classList.remove('choreo', 'choreo-bar');
-    aura.classList.remove('run');
-    for (const el of [box, coach, other, dcap]) if (el) Object.assign(el.style, { transition: '', opacity: '', visibility: '', transform: '', bottom: '' });
-    box.classList.remove('bare');
+    dockBtn.style.visibility = '';
+    for (const el of [other, coach]) if (el) el.style.visibility = '';
     for (const m of document.querySelectorAll('#s-coach .msg')) m.classList.add('seen');
+    void dock.offsetWidth;
+    requestAnimationFrame(() => { for (const el of held) el.style.transition = ''; });
   };
   coachFx = wipe;
   const end = ms => timers.push(setTimeout(settleCoachFx, ms));
-  const tabs = () => [...document.querySelectorAll('#dock .tab, #dock .ind, #dock .obub')];
-  const morph = (from, to, fromR, toR, done) => {
-    const u = { l: Math.min(from.l, to.l), t: Math.min(from.t, to.t), r: Math.max(from.r, to.r), b: Math.max(from.b, to.b) };
-    gm = document.createElement('div');
-    gm.className = 'gmorph glass';
-    gm.setAttribute('aria-hidden', 'true');
-    Object.assign(gm.style, { left: `${u.l}px`, top: `${u.t}px`, width: `${u.r - u.l}px`, height: `${u.b - u.t}px`, clipPath: insetOf(from, u, fromR) });
-    app.append(gm);
-    const a = go(gm, [{ clipPath: insetOf(from, u, fromR) }, { clipPath: insetOf(to, u, toR) }], { duration: MORPH_MS, easing: EASE, fill: 'forwards' });
-    a.onfinish = () => { done(); gm?.remove(); gm = null; };
-  };
-  const radius = el => parseFloat(getComputedStyle(el).borderTopLeftRadius) || 24;
-  if (open) {
-    if (other) Object.assign(other.style, { transition: 'none', opacity: '1', visibility: 'visible', transform: 'none' });
-    // (they cross at about a fifth each: never both readable, and never a moment with neither)
-    go(other, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.985)' }], { duration: src ? 60 : 80, easing: 'linear', fill: 'forwards' });
-    // (from the floating orb, the Coach's content comes in with .handin, over the frost, see voice.js)
-    if (!src) go(coach, [{ opacity: 0.005, transform: 'translateY(12px)' }, { opacity: 1, transform: 'none' }], { duration: 220, delay: 64, easing: 'cubic-bezier(.1,.7,.3,1)', fill: 'backwards' });
-    // (the Coach's light lies over the page: it comes up quickly, so the page is covered as it goes)
-    go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: src ? 120 : 200, easing: 'ease-out', fill: 'backwards' });
-    // (laid out as the Coach, once show() has put the classes on: before this frame is painted)
-    queueMicrotask(() => {
-      const corb = $('#composer .corb .orb');
-      if (bar) {
-        const D = rectIn(dcap), C = rectIn(box), rD = radius(dcap), rC = radius(box);
-        dcap.style.visibility = 'hidden';
-        box.style.transition = 'none';
-        box.style.opacity = '0';
-        for (const t of tabs()) go(t, [{ opacity: 1 }, { opacity: 0 }], { duration: 100, easing: 'ease-out', fill: 'forwards' });
-        morph(D, C, rD, rC, () => {
-          app.classList.remove('choreo-bar'); // (the bar has become the box: it goes)
-          box.style.opacity = '';
-          for (const k of box.querySelectorAll(':scope > input, :scope > .csend')) go(k, [{ opacity: 0 }, { opacity: 1 }], { duration: 120, easing: 'ease-out', fill: 'backwards' });
-        });
-        arcFly(dockOrb, corb, { delay: 90, onland: () => impact(centreOf(corb)) }); // (lands once the box is whole)
-      } else {
-        box.style.transition = 'none';
-        go(box, [{ opacity: 0 }, { opacity: 1 }], { duration: 120, easing: 'ease-out', fill: 'backwards' });
-        arcFly(src, corb, { delay: 160, onland: () => impact(centreOf(corb)) }); // (the box is in before it lands)
-      }
-    });
-    end(bar ? 900 : 1100);
-  } else {
-    // (the box is measured where it is now, before the Coach's classes come off)
-    const C = rectIn(box), rC = radius(box), corb = $('#composer .corb .orb');
-    Object.assign(box.style, { transition: 'none', bottom: getComputedStyle(box).bottom });
-    Object.assign(coach.style, { transition: 'none', visibility: 'visible' });
-    go(coach, [{ opacity: 1 }, { opacity: 0 }], { duration: 80, easing: 'linear', fill: 'forwards' });
-    // Home is already a faint fifth under the Coach as it goes (never more than that while the Coach is
-    // readable), so there's never a moment with neither: then it comes up the rest of the way
-    // (it starts at 0.005, not 0: a layer under about 1/255 isn't drawn at all, so it would only get its tiles when
-    // it's already meant to show, arriving late as a dip)
-    go(other, [{ opacity: 0.005, transform: 'scale(.985)', easing: 'linear' }, { opacity: 0.18, transform: 'scale(.985)', offset: 0.2, easing: 'linear' },
-      { opacity: 0.2, transform: 'scale(.985)', offset: 0.24, easing: 'cubic-bezier(.1,.7,.3,1)' }, { opacity: 1, transform: 'none' }], { duration: 300, fill: 'backwards' });
-    // (the Coach's light lies over the page, so it leaves with the Coach's words: Home comes up in it)
-    go(veil, [{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
-    box.classList.add('bare'); // its glass is the morph's from here
-    go(box, [{ opacity: 1 }, { opacity: 0 }], { duration: 100, easing: 'ease-out', fill: 'forwards' });
-    queueMicrotask(() => {
-      if (!dcap) return;
-      const D = rectIn(dcap), rD = radius(dcap);
-      dcap.style.visibility = 'hidden';
-      for (const t of tabs()) go(t, [{ opacity: 0 }, { opacity: 1 }], { duration: 140, delay: MORPH_MS, easing: 'ease-out', fill: 'backwards' });
-      morph(C, D, rC, rD, () => { dcap.style.visibility = ''; });
-      arcFly(corb, dockOrb, { onland: () => { orbPulse('pulse-land'); haptic('land'); } });
-    });
-    end(900);
+  const fadeIn = (el, late = 0) => go(el, calm ? [{ opacity: 0.005 }, { opacity: 1 }] : [{ opacity: 0.005, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }],
+    { duration: calm ? 150 : 200, delay: calm ? 0 : 60 + late, easing: calm ? 'linear' : 'cubic-bezier(.2,.8,.2,1)' });
+  const fadeOut = el => go(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'none' }], { duration: calm ? 150 : 90, easing: calm ? 'linear' : 'ease-out' });
+  if (open) coach.scrollTop = coach.scrollHeight; // (it arrives already at its latest message)
+  fadeOut(open ? other : coach);
+  fadeIn(open ? coach : other, open ? 0 : 15); // (back: the Coach's words are all but gone before Home's show)
+  go(veil, [{ opacity: open ? 0 : 1 }, { opacity: open ? 1 : 0 }], open ? { duration: calm ? 150 : 200, delay: calm ? 0 : 60, easing: 'ease-out' } : { duration: calm ? 150 : 90, easing: 'ease-out' });
+  if (calm) {
+    // the dock and the box simply cross-fade in place
+    go(dock, [{ opacity: open ? 1 : 0 }, { opacity: open ? 0 : 1 }], { duration: 150, easing: 'linear' });
+    go(box, [{ opacity: open ? 0 : 1 }, { opacity: open ? 1 : 0 }], { duration: 150, easing: 'linear' });
+    if (open) handOrb(dockOrb, boxOrb); else handOrb(boxOrb, dockOrb);
+    end(170);
+    return;
   }
+  // (measured once show() has put the Coach's classes on or off: before this frame is painted)
+  queueMicrotask(() => {
+    const C = rectIn(box), O = rectIn(obub), S = rectIn(spot);
+    const circle = insetOf(O, C), whole = 'inset(0px 0px 0px 0px round 36px)';
+    // the orb's spot starts (or ends) exactly on the dock's orb, which is the same place unless the dock
+    // is collapsed on a scrolled page
+    const dx = (O.l + O.w / 2) - (S.l + S.w / 2), dy = (O.t + O.h / 2) - (S.t + S.h / 2), k = O.w / S.w;
+    const at = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${k.toFixed(3)})`, home = Math.hypot(dx, dy) > 1 || Math.abs(k - 1) > 0.01;
+    dockBtn.style.visibility = 'hidden';
+    if (open) {
+      handOrb(dockOrb, boxOrb);
+      const press = parseFloat(new DOMMatrix(getComputedStyle(dockBtn).transform).a) || 1; // (where the finger's press left it)
+      for (const p of parts) go(p, [{ opacity: 1 }, { opacity: 0 }], { duration: p.matches('.dcap') ? 70 : 90, easing: 'ease-out' });
+      go(cbg, [{ clipPath: circle }, { clipPath: whole }], { duration: GROW_MS, easing: GROW_EASE });
+      go(spot, [{ transform: home ? at : 'none', scale: Math.min(press, 0.94) }, { transform: 'none', scale: 1 }], { duration: 420, easing: 'cubic-bezier(.3,1.25,.5,1)' });
+      for (const f of fields) go(f, [{ opacity: 0 }, { opacity: 1 }], { duration: 120, delay: Math.round(GROW_MS * 0.7), easing: 'ease-out' }); // (once the box is wide enough to hold them)
+      end(GROW_MS + 140);
+    } else {
+      box.dataset.spot = 'orb'; // (it closes on the orb, whatever the field held)
+      for (const f of fields) go(f, [{ opacity: 1 }, { opacity: 0 }], { duration: 60, easing: 'ease-out' });
+      go(cbg, [{ clipPath: whole }, { clipPath: circle }], { duration: GROW_MS - 20, easing: GROW_EASE });
+      if (home) go(spot, [{ transform: 'none' }, { transform: at }], { duration: GROW_MS - 20, easing: GROW_EASE });
+      for (const p of parts) go(p, [{ opacity: 0 }, { opacity: 1 }], { duration: 140, delay: 170, easing: 'ease-out' });
+      timers.push(setTimeout(() => { handOrb(boxOrb, dockOrb); settleCoachFx(); }, GROW_MS - 10));
+    }
+  });
 }
-const centreOf = el => { const a = app.getBoundingClientRect(), r = el.getBoundingClientRect(); return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height / 2 }; };
 
 // Up next becomes the workout: the card's surface opens out into the page while the workout's cards
 // arrive on top of it (only when the workout screen follows the tap straight away; a readiness question
@@ -384,6 +353,7 @@ function show(name, { back = false, still = false } = {}) {
     app._uncoach = setTimeout(() => app.classList.remove('uncoaching'), 700);
   }
   app.classList.toggle('coaching', name === 'coach');
+  app.classList.remove('warmcoach');
   if (name === 'coach') { markWeeklySeen(); markDebriefSeen(); }
   requestAnimationFrame(() => app.dispatchEvent(new Event('screenchange')));
   renderAll();
@@ -404,14 +374,27 @@ function go(name, { quiet = false } = {}) {
   show(name);
 }
 
-// The Coach laid out under the voice screen while that still covers everything: it appears in place
-// (no light, no flight: the voice screen's own orb flies into the message box as it fades away), so
-// the page you were on never shows in between.
-function coachUnder() {
-  if (view.screen === 'coach') return;
-  coachFrom = TABS.includes(view.screen) ? view.screen : 'today';
-  history.pushState({ screen: 'coach', from: coachFrom }, '');
+// The Coach drawn in advance, invisibly (the moment a finger is on the orb): its screen, its light and its
+// message box are laid out and painted at 0.5 % opacity, so on the frame the finger lifts they only
+// have to fade in (on the phone, painting the Coach for the first time otherwise held the first frame
+// of the transition back by a good part of a second).
+function warmCoach(on) {
+  if (on && view.screen === 'coach') return;
+  const c = $('#s-coach');
+  if (on && !c._warm) { c._warm = true; renderScreen('coach'); }
+  app.classList.toggle('warmcoach', !!on);
+}
+
+// A voice handoff (the floating orb, or Send on the voice screen): the Coach replaces the page at once,
+// with nothing animated here (the voice code runs the whole transition). It gets back the page that was
+// on screen, to fade it out, and entry(), which gives the Coach its history entry once the voice
+// screen's own entry has been popped.
+function coachHandin() {
+  if (view.screen === 'coach') return { under: null, entry: () => {} };
+  const from = TABS.includes(view.screen) ? view.screen : 'today', under = $('#s-' + view.screen);
+  coachFrom = from;
   show('coach', { still: true });
+  return { under, entry: () => { if (view.screen === 'coach' && history.state?.screen !== 'coach') history.pushState({ screen: 'coach', from }, ''); } };
 }
 
 let coachFrom = 'today';
@@ -543,8 +526,9 @@ setOnboardNav({ go: name => go(name), ask: q => askCoach(q) });
 initWorkout($('#s-workout'), actions);
 initSettings(actions, $('#s-settings'));
 setWorkoutNav({ go, showDetail });
-initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings'), openCoach: () => go('coach'), coachUnder, impact, coachFromOrb: el => { flyFrom = el; go('coach'); } });
+initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings'), openCoach: () => go('coach'), coachHandin, impact, warmCoach });
 initCoach({ openSettings: () => pushSub('settings'), closeCoach: () => closeCoach(), go: name => go(name, { quiet: true }), open: name => pushSub(name) });
+initKeyboard();
 setCardioNav({ go, showDetail });
 initCardio();
 initBody();

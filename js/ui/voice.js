@@ -34,8 +34,8 @@ import { orbPulse, orbShake, orbSpark } from './fx.js';
 import { setOrb, handOrb } from './dotorb.js';
 import { livePRSets } from '../pr.js';
 import { createVoiceGlow } from './voiceglow.js';
-import { ask as askCoach, ensureModels, wordsFrom } from './coach.js';
-import { arcFly } from './choreo.js';
+import { ask as askCoach, ensureModels, wordsFrom, syncSpot } from './coach.js';
+import { arcFly, releaseOrb } from './choreo.js';
 import { cmdModels } from '../settings.js';
 import { createEndpointer, looksUnfinished } from '../endpoint.js';
 import { onFrame, nextFrame } from './frame.js';
@@ -360,13 +360,16 @@ export function openVoice() {
 // Close; resolves once history has settled so callers can navigate safely.
 export function closeVoice({ fromPop = false } = {}) {
   if (!v.open) return v.closing || Promise.resolve();
+  nav.warmCoach?.(false);
   v.open = false;
   v.token++;
   v.press = null;
   v.toggle = false;
   mic.cancel();
-  endReview();
+  // (what you said stays on the screen while it fades; it's cleared once the screen has gone)
+  v.review = false; v.reviewing = false;
   if (v.mode === 'mini') {
+    endReview();
     // the orb sinks back into the dock
     el.mini.classList.remove('on');
     el.oorb.style.transform = '';
@@ -388,22 +391,41 @@ export function closeVoice({ fromPop = false } = {}) {
   }
   el.input.blur();
   coverPage(false);
+  // the orb goes home (the dock's orb, or the message box's in the Coach) on the same kind of gentle
+  // curve as everything else, while the screen fades
+  const app = document.getElementById('app'), dock = document.getElementById('dock');
+  const home = app.classList.contains('coaching') ? document.querySelector('#composer .corb .orb') : dockOrb();
+  const hb = home?.getBoundingClientRect(), ab = app.getBoundingClientRect();
+  const lift = app.classList.contains('coaching') ? 0 : new DOMMatrix(getComputedStyle(dock).transform).m42 || 0; // (the dock is on its way back up)
+  const to = hb && { x: hb.left - ab.left + hb.width / 2, y: hb.top - ab.top + hb.height / 2 - lift, w: hb.width };
+  dock.style.transition = 'opacity .3s var(--e-out)'; // (it comes back in place: the orb lands on it, not on a moving target)
+  // its words and buttons drop to a fifth while the backdrop still covers the page, then the page comes
+  // up as they finish going (never a dark moment, never both screens at once)
+  el.layer.classList.add('closing');
+  const fades = reduced() ? [...el.layer.children].map(c => c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 150, easing: 'linear', fill: 'forwards' })) : [
+    el.layer.querySelector('.vbg')?.animate([{ opacity: 1 }, { opacity: 0.84, offset: 0.32, easing: 'ease-out' }, { opacity: 0 }], { duration: 200, fill: 'forwards' }),
+    ...[...el.layer.children].filter(c => !c.classList.contains('vbg')).map(c => c.animate([{ opacity: 1 }, { opacity: 0.2, offset: 0.6 }, { opacity: 0 }], { duration: 100, easing: 'linear', fill: 'forwards' }))
+  ].filter(Boolean);
   el.layer.classList.remove('on');
   el.layer.inert = true;
   el.orb.style.transform = '';
-  flyOrb(false);
-  document.getElementById('app').classList.remove('voice');
+  app.classList.remove('voice');
   el.layer.classList.remove('carded');
-  // show the dock orb again the moment the flying one lands
-  let landed = false;
-  const land = e => {
-    if (landed || v.open || (e && (e.target !== el.orbwrap || e.propertyName !== 'transform'))) return;
-    landed = true;
-    landOrb(el.orb, () => { el.orbwrap.style.visibility = 'hidden'; });
-  };
-  el.orbwrap.addEventListener('transitionend', land);
-  setTimeout(() => { el.orbwrap.removeEventListener('transitionend', land); land(); }, reduced() ? 0 : 700);
-  setTimeout(() => { if (!v.open) { el.orbwrap.style.visibility = ''; el.layer.hidden = true; stopLoop(); el.orbwrap.style.transform = ''; } }, 680);
+  const token = v.token;
+  const flown = home ? arcFly(el.orb, home, { to, keepFrom: true, onland: () => {
+    app.classList.add('orbland'); app.classList.remove('orbaway'); // (the dock's orb is there on the same frame, not faded in)
+    requestAnimationFrame(() => requestAnimationFrame(() => app.classList.remove('orbland')));
+  } }) : Promise.resolve();
+  flown.then(() => {
+    dock.style.transition = '';
+    releaseOrb(el.orb);
+    el.layer.classList.remove('closing');
+    if (!v.reviewing) endReview(); // (unless a new review has begun since)
+    fades.forEach(f => f.cancel());
+    if (v.open || v.token !== token) return; // (opened again meanwhile)
+    app.classList.remove('orbaway');
+    el.layer.hidden = true; stopLoop(); el.orbwrap.style.transform = '';
+  });
   // only step back over our own entry, never past it (that would leave the app)
   if (fromPop || !history.state?.voice) return v.closing || Promise.resolve();
   v.closing = new Promise(res => { v.popWaiting++; v.popResolve = res; history.back(); }).then(() => { v.closing = null; });
@@ -590,6 +612,9 @@ function setPausing(k) {
 async function finishRec() {
   if (v.phase === 'opening') { v.pendingStop = true; return; }
   if (!mic.isRecording()) return;
+  // let go: the orb answers the finger at once, a small settle, while your words are made out
+  nav.warmCoach?.(true); // (in case it's for the Coach: painted, invisibly, while the words are made out)
+  if (v.mode === 'mini' && !reduced()) el.oorb.animate([{ scale: '1' }, { scale: '0.94', offset: 0.3 }, { scale: '1' }], { duration: 360, easing: 'cubic-bezier(.3,1.2,.5,1)' });
   const token = v.token;
   v.toggle = false;
   v.spec = null; v.waiting = false; setPausing('');
@@ -641,10 +666,13 @@ function showReview(text) {
   el.layer.classList.add('reviewing');
   setPhase('review');
   syncSend();
+  preparse(reviewText());
+  nav.warmCoach?.(true);
   haptic('tap');
 }
 const reviewText = () => el.rtext.textContent.replace(/\s+/g, ' ').trim();
-function syncSend() { el.rsend.disabled = !reviewText(); }
+let preT = 0;
+function syncSend() { el.rsend.disabled = !reviewText(); clearTimeout(preT); preT = setTimeout(() => preparse(reviewText()), 250); }
 function endReview() {
   v.review = false; v.reviewing = false;
   if (!el.review) return;
@@ -656,10 +684,12 @@ function reviewSend() {
   const text = reviewText();
   if (!text) return;
   haptic('success');
-  // (the review stays up: sent to the Coach, its words fly into their bubble; anything else closes it)
+  // (the review stays up: sent to the Coach, its words fly into their bubble; anything else closes it.
+  // Nothing is written to the page before that's known, so the handoff can measure it for free.)
   v.review = false;
-  setPhase('thinking');
+  const was = v.phase;
   handleText(text);
+  if (v.open && v.phase === was) setPhase('thinking');
 }
 function reviewMore() {
   const text = reviewText();
@@ -686,13 +716,30 @@ function fitSay() {
   o.classList.toggle('over', o.scrollHeight > o.clientHeight + 1);
 }
 
+// What the parser makes of the words on the review screen is worked out while you look at them (it can
+// take a good part of a frame budget on the phone), so Send answers on the frame you tap it.
+let pre = null;
+const ctxSig = c => JSON.stringify([c.lang, c.unit, c.workoutExerciseIds, c.current, c.restRunning, c.screen]);
+function parseFor(text) {
+  const ctx = parseCtx();
+  if (pre && pre.text === text && pre.sig === ctxSig(ctx) && Date.now() - pre.at < 60000) return pre.intent;
+  return parse(text, ctx);
+}
+function preparse(text) {
+  if (!text) return;
+  (window.requestIdleCallback || setTimeout)(() => {
+    const ctx = parseCtx();
+    try { pre = { text, sig: ctxSig(ctx), intent: parse(text, ctx), at: Date.now() }; } catch { pre = null; }
+  }, { timeout: 600 });
+}
+
 export function handleText(text, { typed = false } = {}) {
   text = String(text || '').trim();
   if (!text) return;
   if (!typed) noteHeard(text); // kept for a bug report
   if (card.cmd && !card.committed && card.cmd.kind === 'auto') commitNow(); // a new command lands the previous one
-  if (v.open) showWords(text);
-  const intent = parse(text, parseCtx());
+  if (v.open && !v.reviewing) showWords(text); // (on the review screen your words are already there)
+  const intent = parseFor(text);
   if (intent.type === 'Unknown') {
     // one stray word the mic caught ("with", "doing", gym noise) is not sent anywhere
     if (!typed && isNoise(text)) return showError('voice.tooShort', 'voice.tooShortSub', { retry: true });
@@ -741,94 +788,118 @@ export const speakCue = (text, lang = state.lang) => speak(text, lang);
 // Questions land in the Coach thread; the answer is streamed there and spoken when complete.
 async function toCoach(text) {
   dismissCard();
-  if (v.open && v.mode === 'full') return handoffToCoach(text);
-  if (v.open && v.mode === 'mini') return miniToCoach(text);
+  if (v.open) return handToCoach(text);
   if (v.open) { setPhase('result'); await new Promise(r => setTimeout(r, 380)); await closeVoice(); }
   nav.go('coach');
   askCoach(text);
 }
 
-// Asked over the floating orb: the Coach comes in under its frost (the page fading out as the Coach's
-// content fades in), then the frost fades as the Coach arrives. What you said becomes your message
-// (the same words, flying into their bubble), and the orb arcs into the message box, which takes it
-// with a recoil; the Coach's "Thinking" row appears just after it lands.
-// (reduced motion: the same handoffs as plain fades of 150 ms at most, nothing moving)
-const ani = (x, f, o) => reduced()
-  ? x?.animate(f.map(({ transform, ...k }) => k), { ...o, duration: Math.min(o.duration, 150), delay: 0 })
-  : x?.animate(f, o);
-async function miniToCoach(text) {
+// A question for the Coach, from the floating orb (let go) or from the voice screen (Send). Everything
+// flows to the bottom right, where your messages live, from the same frame:
+// - what you said becomes your message (its own bubble, flown from where the words were, shrinking
+//   into place; see coach.js wordsFly),
+// - the orb goes on one gentle curve to its place at the right end of the message box, passing under
+//   the words, and the box takes it with a small press in depth,
+// - the frost (or the voice screen) fades over 180 ms while the Coach fades in, already at its latest
+//   message, with nothing from the thread's past on top of the voice screen or the page.
+// Reduced motion: 150 ms fades, nothing moves.
+async function handToCoach(text) {
   const app = document.getElementById('app');
-  setPhase('result');
-  v.open = false; v.token++; v.press = null; v.toggle = false;
-  mic.cancel();
-  if (history.state?.voice) await new Promise(res => { v.popWaiting++; v.popResolve = res; history.back(); });
-  app.style.setProperty('--handin-delay', '30ms'); // (the page under the frost goes in 60 ms: the Coach comes up past it)
-  app.classList.add('awaitland', 'handin');
-  setTimeout(() => { app.classList.remove('handin'); app.style.removeProperty('--handin-delay'); }, 420);
-  wordsFrom(el.osay, text);
-  nav.coachFromOrb(el.oorb);
-  askCoach(text);
-  const scrim = el.mini.querySelector('.oscrim');
-  // (the frost goes with the page: what's left under it is the Coach's own light coming up)
-  const fade = ani(scrim, [{ opacity: 1 }, { opacity: 0 }], { duration: 100, easing: 'ease-out', fill: 'forwards' });
-  el.mini.style.pointerEvents = 'none';
-  // (the Coach's light comes up under the frost as the page goes, so the screen never empties out)
-  ani(document.querySelector('.aura .bloom'), [{ opacity: 0 }, { opacity: 0.8, offset: 0.2 }, { opacity: 0.45, offset: 0.55 }, { opacity: 0 }], { duration: 700, easing: 'ease-out' });
-  const bits = [el.opull, el.ostatus].map(x => ani(x, [{ opacity: 1 }, { opacity: 0 }], { duration: 120, easing: 'ease-out', fill: 'forwards' }));
-  setTimeout(() => {
-    fade.cancel();
-    bits.forEach(a => a.cancel());
-    el.mini.classList.remove('on');
-    el.mini.hidden = true;
-    el.mini.style.pointerEvents = '';
-    el.osay.style.visibility = '';
-    app.classList.remove('voice-mini', 'orbaway');
-    el.owrap.style.transform = ''; el.owrap.style.translate = '';
-    stopLoop();
-  }, 380);
-  setTimeout(() => app.classList.remove('awaitland'), 1600); // (a safety net: normally the landing does it)
-}
-
-// Send on the voice screen: its controls step away (fade, a small drop) and its header fades; what you
-// said becomes your message; the Coach fades in beneath over the same sea as the screen's backdrop
-// goes; once the message box is there, the orb arcs down into it and the box takes it with a recoil.
-async function handoffToCoach(text) {
-  const app = document.getElementById('app');
+  const mini = v.mode === 'mini', calm = reduced();
+  const src0 = mini ? el.oorb : el.orb, box0 = document.getElementById('composer'), corb0 = box0.querySelector('.corb .orb');
+  // (measured before anything is written, so it costs nothing: where the orb is, and where the box's orb
+  // will be, less the little drop the hidden box sits at)
+  // (and whether your words will fly down to their message, or up: below the Coach's last message, which
+  // is laid out already, invisibly)
+  const lastMsg = document.querySelector('#s-coach #thread > .msg:last-child'), wordsAt = (mini ? el.osay : el.rtext).getBoundingClientRect();
+  const lands = lastMsg ? Math.min(lastMsg.getBoundingClientRect().bottom + 40, box0.getBoundingClientRect().top - 30) : 0;
+  const wordsGoDown = lands > wordsAt.top + wordsAt.height / 2;
+  const a0 = { ...centreOf(src0), w: src0.getBoundingClientRect().width }, b0 = centreOf(corb0), drop0 = new DOMMatrix(getComputedStyle(box0).transform).m42 || 0, w0 = corb0.getBoundingClientRect().width;
+  const tA = performance.now(); // (the tap: every delay below counts from it, however long the Coach takes to draw)
   setPhase('result');
   v.open = false; v.token++; v.press = null; v.toggle = false;
   mic.cancel();
   coverPage(false);
-  if (history.state?.voice) await new Promise(res => { v.popWaiting++; v.popResolve = res; history.back(); });
+  // (the voice screen's history entry is popped meanwhile: nothing waits for it)
+  const popped = history.state?.voice ? new Promise(res => { v.popWaiting++; v.popResolve = res; history.back(); }) : Promise.resolve();
+  const words = mini ? el.osay : !el.review.hidden ? el.rtext : el.say;
+  const src = mini ? el.oorb : el.orb;
+  const box = document.getElementById('composer'), corb = box.querySelector('.corb .orb');
+  const under = document.querySelector('.screen.on');
   const anims = [];
-  const go = (x, f, o) => { if (x) anims.push(ani(x, f, o)); };
-  const away = [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(8px)' }];
-  for (const x of [el.review.querySelector('.vracts'), el.rhint, el.hints, el.hold, el.note]) go(x, away, { duration: 120, easing: 'ease-out', fill: 'forwards' });
-  go(el.layer.querySelector('.top'), [{ opacity: 1 }, { opacity: 0 }], { duration: 120, easing: 'ease-out', fill: 'forwards' });
-  // (Send's light doesn't just go out: the Coach's bloom comes up where it was and settles into the message box)
-  go(document.querySelector('.aura .bloom'), [{ opacity: 0 }, { opacity: 0.8, offset: 0.2 }, { opacity: 0.45, offset: 0.55 }, { opacity: 0 }], { duration: 700, easing: 'ease-out' });
-  app.style.setProperty('--handin-delay', '60ms'); // (the Coach's words come in as yours shrink into their bubble)
-  app.classList.add('awaitland', 'choreo', 'handin');
-  setTimeout(() => { app.classList.remove('handin'); app.style.removeProperty('--handin-delay'); }, 420);
-  wordsFrom(!el.review.hidden ? el.rtext : el.say, text);
-  nav.coachUnder();
-  askCoach(text);
-  const box = document.getElementById('composer');
-  go(el.layer.querySelector('.vbg'), [{ opacity: 1 }, { opacity: 0 }], { duration: 110, easing: 'ease-out', fill: 'forwards' });
-  app.classList.remove('voice'); // (the message box's place, under the screen)
-  go(box, [{ opacity: 0 }, { opacity: 1 }], { duration: 110, easing: 'ease-out', fill: 'backwards' });
-  el.layer.inert = true;
-  const corb = box.querySelector('.corb .orb');
-  await arcFly(el.orb, corb, { delay: 140, onland: () => nav.impact?.(centreOf(corb)) }); // (the box is whole by 110 ms)
-  anims.forEach(a => a.cancel());
-  el.layer.classList.remove('on', 'carded');
-  el.layer.hidden = true;
-  el.rtext.style.visibility = el.say.style.visibility = '';
-  endReview();
-  for (const m of document.querySelectorAll('#s-coach .msg')) m.classList.add('seen'); // (nothing plays its entrance again)
-  app.classList.remove('choreo', 'orbaway');
-  el.orbwrap.style.transform = '';
+  const go = (x, f, o) => { if (x) anims.push(x.animate(f, { fill: 'both', ...o })); };
+  const fade = [{ opacity: 1 }, { opacity: 0 }];
+  // On this frame, before anything heavy: what runs on its own (the orb's flight, the fades) starts
+  // now, so it keeps moving smoothly while the Coach is laid out just after.
+  const a = a0, to = { x: b0.x, y: b0.y - drop0, w: w0 };
+  const t = calm ? 150 : 120, bg = calm ? 150 : 180;
+  app.classList.add('choreo', 'awaitland');
+  // (the voice screen covers the page under it already: that simply goes; under the frost it fades, below)
+  if (under && under.id !== 's-coach') {
+    if (mini) { under.style.visibility = 'visible'; go(under, fade, { duration: calm ? 150 : 90, easing: 'ease-out' }); } // (under the frost, which stays)
+    else under.style.visibility = 'hidden';
+  }
+  if (mini) {
+    for (const x of [el.opull, el.ostatus, ...el.mini.querySelectorAll('.vglow')]) go(x, fade, { duration: t, easing: 'ease-out' });
+    el.mini.style.pointerEvents = 'none';
+  } else {
+    const step = calm ? fade : [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(8px)' }];
+    for (const x of [el.review.querySelector('.vracts'), el.rhint, el.hints, el.hold, el.note]) go(x, step, { duration: t, easing: 'ease-out' });
+    for (const x of [el.layer.querySelector('.top'), ...el.layer.querySelectorAll('.vglow')]) go(x, fade, { duration: t, easing: 'ease-out' });
+    el.layer.inert = true;
+  }
+  // the orb: from the floating orb, down and along the bottom; from the top of the voice screen, round
+  // the left of your words and along the bottom (never over them)
+  // (from the top: out to the left first, clear of your words as they set off to the right, then down
+  // and along into its place; most of the way is flown before the Coach has faded in)
+  const ctrl = mini ? { x: a.x, y: to.y + 6 } : { x: -150, y: a.y + (to.y - a.y) * 0.88 };
+  // (from the top it lets your words set off first and goes round behind them: they cross its way down,
+  // or, flying up to a message higher up, they have to be clear of its way first)
+  const flight = arcFly(src, corb, { from: a, to, ctrl, delay: mini || calm ? 0 : wordsGoDown ? 150 : 240, keepFrom: true, onland: () => { app.classList.remove('orbaway'); nav.impact?.(centreOf(corb)); } });
+  // Just after that frame: the Coach, with your words flying into their message
+  await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+  wordsFrom(words, text);
+  const { entry } = nav.coachHandin();
+  popped.then(entry);
+  app.classList.remove(mini ? 'voice-mini' : 'voice'); // (the message box is there, under the frost or the screen)
+  const coach = document.getElementById('s-coach');
+  const since = ms => calm ? 0 : Math.max(0, ms - (performance.now() - tA));
+  // the Coach comes in over the frost, rising a little from 60 ms: everything but your new message (that's your words)
+  // (the conversation itself holds back at a third while your words fly across it, so they stay the one
+  // thing you read, and comes up the rest of the way as they land)
+  const head = [...coach.children].filter(c => c.id !== 'thread'), thread = [...coach.querySelectorAll('#thread > .msg')];
+  for (const c of calm ? [...head, ...thread] : head) go(c, calm ? [{ opacity: 0.005 }, { opacity: 1 }] : [{ opacity: 0.005, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }],
+    { duration: calm ? 150 : 200, delay: since(60), easing: 'cubic-bezier(.2,.8,.2,1)' });
+  if (!calm) for (const c of thread) go(c, [{ opacity: 0.005, transform: 'translateY(10px)' }, { opacity: 0.34, transform: 'none', offset: 0.36 }, { opacity: 0.34, offset: 0.7 }, { opacity: 1 }],
+    { duration: 560, delay: since(60), easing: 'cubic-bezier(.2,.8,.2,1)' });
+  go(document.querySelector('.aura .veil'), [{ opacity: 0 }, { opacity: 1 }], { duration: calm ? 150 : 200, delay: since(60), easing: 'ease-out' });
+  // the frost (or the voice screen's backdrop) stays until now, with the Coach coming in: then it fades as it arrives
+  if (mini) {
+    go(el.mini.querySelector('.oscrim'), fade, { duration: bg, delay: since(60), easing: 'ease-out' });
+  } else go(el.layer.querySelector('.vbg'), fade, { duration: bg, delay: since(40), easing: 'ease-out' });
+  app.classList.add('handin');
+  coach.scrollTop = coach.scrollHeight;
+  askCoach(text); // (your message, flown from your words, and the reply on its way)
+  await Promise.all([flight, new Promise(r => setTimeout(r, calm ? 170 : 620))]); // (and the words have landed, the conversation come up)
+  anims.forEach(x => x.cancel());
+  if (under) under.style.visibility = '';
+  for (const m of coach.querySelectorAll('.msg')) m.classList.add('seen'); // (nothing plays its entrance again)
+  if (mini) {
+    el.mini.classList.remove('on');
+    el.mini.hidden = true;
+    el.mini.style.pointerEvents = '';
+    el.owrap.style.transform = ''; el.owrap.style.translate = '';
+  } else {
+    el.layer.classList.remove('on', 'carded');
+    el.layer.hidden = true;
+    endReview();
+    el.orbwrap.style.transform = '';
+  }
+  for (const x of [el.osay, el.rtext, el.say]) x.style.visibility = '';
+  releaseOrb(src);
+  app.classList.remove('handin', 'choreo', 'orbaway');
   stopLoop();
-  setTimeout(() => app.classList.remove('awaitland'), 1600);
+  setTimeout(() => { if (app.classList.contains('awaitland')) { app.classList.remove('awaitland'); syncSpot(); } }, 1600); // (a safety net: normally the landing does it)
 }
 const centreOf = x => { const a = document.getElementById('app').getBoundingClientRect(), r = x.getBoundingClientRect(); return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height / 2 }; };
 
@@ -1330,6 +1401,7 @@ export function initVoice(n) {
     // hands-free and the orb is up: touching the dock orb again sends, like tapping the floating one
     if (v.open && v.mode === 'mini' && v.toggle && (mic.isRecording() || v.phase === 'opening')) { haptic('tap'); v.press = null; finishRec(); return; }
     // a tap opens the Coach; holding talks (the mic starts once it's clearly a hold)
+    nav.warmCoach?.(true); // (a tap opens the Coach: it's painted, invisibly, while the finger is down)
     const press = v.press = { t: performance.now(), orb: true, y: e.clientY, waiting: true };
     orb.classList.add('pressing');
     press.timer = setTimeout(() => {
@@ -1362,7 +1434,7 @@ export function initVoice(n) {
     if (v.phase === 'listening' || v.phase === 'opening') setPhase(v.phase);
   };
   document.getElementById('dock').addEventListener('pointerup', orbUp);
-  document.getElementById('dock').addEventListener('pointercancel', () => { document.querySelector('#dock .orbbtn')?.classList.remove('pressing'); if (v.press?.orb) { const p = v.press; v.press = null; if (p.waiting) clearTimeout(p.timer); else cancelRec(); } });
+  document.getElementById('dock').addEventListener('pointercancel', () => { nav.warmCoach?.(false); document.querySelector('#dock .orbbtn')?.classList.remove('pressing'); if (v.press?.orb) { const p = v.press; v.press = null; if (p.waiting) clearTimeout(p.timer); else cancelRec(); } });
   document.getElementById('dock').addEventListener('contextmenu', e => { if (e.target.closest('.orbbtn')) e.preventDefault(); });
 
   // floating orb: tap to send (or to listen again), tap outside to cancel

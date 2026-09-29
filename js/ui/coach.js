@@ -123,7 +123,7 @@ export function renderCoach(root) {
   if (!composer.dataset.talk) composer.querySelector('input').placeholder = t('coach.ph'); // talking: the box shows what's happening
   composer.querySelector('.csend').setAttribute('aria-label', t('coach.send'));
   const send = composer.querySelector('.csend'), icon = inflight ? 'stop' : 'fwd';
-  if (send.dataset.icon !== icon) { send.innerHTML = inflight ? I.stop : I.fwd; send.dataset.icon = icon; }
+  if (send.dataset.icon !== icon) { send.innerHTML = inflight ? I.stop : I.fwd; send.dataset.icon = icon; send.classList.toggle('stop', !!inflight); }
   syncThinking();
   // a message just sent from the box stays hidden until it flies up from there (sendFly)
   const hold = pendingSend || sending;
@@ -150,22 +150,33 @@ function wordsFly(li) {
   pendingWords = null;
   const bub = li.querySelector('.bub');
   if (!bub) return;
-  const b = bub.getBoundingClientRect(), l = li.getBoundingClientRect();
+  const b = bub.getBoundingClientRect(), W = document.getElementById('app').clientWidth;
   if (!b.width) return;
-  const k = p.size / (parseFloat(getComputedStyle(bub).fontSize) || 16);
-  const ox = b.left - l.left + b.width / 2, oy = b.top - l.top + b.height / 2;
-  const dx = p.box.left + p.box.width / 2 - (b.left + b.width / 2), dy = p.box.top + p.box.height / 2 - (b.top + b.height / 2);
-  if (stillMotion()) {
-    li.classList.add('seen', 'wordsin'); p.el.style.visibility = 'hidden'; return; // (reduced motion: the words are simply your message now)
+  p.el.style.visibility = 'hidden'; // (the words themselves are this bubble now; their screen restores their old place once it has gone)
+  li.classList.add('seen', 'wordsin');
+  if (stillMotion()) { li.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: 'linear' }); return; } // (reduced motion: they simply appear as your message)
+  // as big as they were, but never wider than the screen (so never clipped), centred where they were
+  const k = Math.max(1, Math.min(p.size / (parseFloat(getComputedStyle(bub).fontSize) || 16), (W - 24) / b.width));
+  const half = b.width * k / 2;
+  const sx = Math.min(W - 12 - half, Math.max(12 + half, p.box.left + p.box.width / 2)), sy = p.box.top + p.box.height / 2;
+  const ex = b.left + b.width / 2, ey = b.top + b.height / 2;
+  // one gentle curve down and to the right (out first, then down: the orb comes in underneath)
+  const cx = (sx + ex) / 2 + ((ex - (sx + ex) / 2) * 0.4), cy = (sy + ey) / 2 + ((sy - (sy + ey) / 2) * 0.4);
+  const frames = [];
+  for (let i = 0, N = 16; i <= N; i++) {
+    const u = i / N, v = 1 - u;
+    const x = v * v * sx + 2 * v * u * cx + u * u * ex - ex, y = v * v * sy + 2 * v * u * cy + u * u * ey - ey;
+    const sc = k + (1 - k) * (1 - (1 - u) ** 2.4); // (they shrink early: small enough to read as a message well before they arrive)
+    frames.push({ offset: u, transform: `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${sc.toFixed(4)})` });
   }
-  bub.style.transition = 'none'; // (bare at once: its glass only ever fades in, as the words land)
-  li.classList.add('arriving', 'seen', 'wordsin');
-  bub.getBoundingClientRect(); bub.style.transition = '';
-  li.style.transformOrigin = `${ox}px ${oy}px`;
-  p.el.style.visibility = 'hidden'; // (the words themselves are this bubble now)
-  const a = li.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${k.toFixed(3)})` }, { transform: 'none' }], { duration: 480, easing: 'cubic-bezier(0.32, 0.72, 0, 1)', fill: 'backwards' });
-  setTimeout(() => li.classList.remove('arriving'), 300); // the glass fades in under them as they land
-  a.onfinish = a.oncancel = () => { li.style.transformOrigin = ''; li.classList.remove('arriving'); }; // (the words' old place stays empty: its screen restores it once it has gone)
+  const l = li.getBoundingClientRect();
+  li.style.transformOrigin = `${(ex - l.left).toFixed(1)}px ${(ey - l.top).toFixed(1)}px`;
+  li.classList.add('flyglass');
+  const T = 480;
+  const a = li.animate(frames, { duration: T, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'backwards' }); // (the orb's own curve: they travel together)
+  // the bubble's glass grows in under the words over the last 40 % of the way
+  const g = bub.animate([{ opacity: 0, transform: 'scale(.86)' }, { opacity: 1, transform: 'none' }], { duration: T * 0.4, delay: T * 0.6, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'both', pseudoElement: '::before' });
+  a.onfinish = a.oncancel = () => { li.style.transformOrigin = ''; li.classList.remove('flyglass'); g.cancel(); };
 }
 
 // what a message looks like, apart from the words a streaming reply is still typing
@@ -492,6 +503,7 @@ function syncThinking() {
   const on = !!document.querySelector('#s-coach .msg.ai.is-thinking') || document.getElementById('composer')?.dataset.talk === 'thinking';
   if (app && app.classList.contains('thinking') !== on) app.classList.toggle('thinking', on);
   thinkWords(on);
+  syncSpot();
 }
 
 // While it thinks, the message box says what it's doing: "Thinking", then "Reading your log…",
@@ -778,7 +790,7 @@ export async function ask(question, { root = $('#s-coach'), voice = false } = {}
     const text = await withFallback(coachModels(state.settings), model => streamChat({
       key, model, system: systemPrompt(lang), contents: chatContents(history, context, question), signal: ctl.signal,
       onText: full => {
-        clearTimeout(slow); store.updateChat(reply.id, { text: full }, { quiet: true }); typer.set(full);
+        clearTimeout(slow); store.updateChat(reply.id, { text: full }, { quiet: true }); typer.set(full); syncSpot();
         if (willTalk && !first) { const f = tts.firstSentence(speakable(hideMemoryTail(full))); if (f && f.length < speakable(hideMemoryTail(full)).length - 2) { first = f; tts.prefetch(first, ttsOpts); } }
       }
     }), { rounds: 3, wait: 2500, alsoRetry: ['timeout'] }).finally(() => clearTimeout(slow)); // busy servers get a patient second and third go
@@ -874,14 +886,30 @@ async function savePlan(id, mode = 'replace') {
 
 function syncButton() {
   const b = $('#composer .csend');
-  if (b) { b.innerHTML = inflight ? I.stop : I.fwd; b.classList.toggle('stop', !!inflight); }
+  if (b) { b.innerHTML = inflight ? I.stop : I.fwd; b.dataset.icon = inflight ? 'stop' : 'fwd'; b.classList.toggle('stop', !!inflight); }
+  syncSpot();
+}
+// The message box's right end: the orb while the field is empty, the send arrow while you type, the
+// stop button while a reply streams in (while it's still thinking, and while you talk with it, the
+// orb stays: it's the one doing the work).
+export function syncSpot() {
+  const box = document.getElementById('composer');
+  if (!box) return;
+  const input = box.querySelector('input');
+  const streaming = inflight && state.chat.find(m => m.id === inflight.id)?.text;
+  const landing = document.getElementById('app')?.classList.contains('awaitland'); // (the orb is on its way here: it's the orb's spot until it has landed)
+  const spot = box.dataset.talk || landing ? 'orb' : streaming ? 'stop' : input?.value.trim() ? 'send' : 'orb';
+  if (box.dataset.spot !== spot) box.dataset.spot = spot;
 }
 
 export function initCoach(n) {
   nav = n;
   const root = $('#s-coach');
   const composer = $('#composer');
-  composer.innerHTML = `<span class="cglow" aria-hidden="true"><i></i></span><span class="chit" aria-hidden="true"></span><button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span></button><input enterkeyhint="send" autocomplete="off" maxlength="5000"><button type="submit" class="csend">${I.fwd}</button>`;
+  // one glass pill (.cbg, the layer the Home ↔ Coach morph grows), the field, and at the right end, exactly
+  // where the dock's orb sits, one spot with three faces: the orb (empty field), the send arrow (typing)
+  // and the stop button (a reply streaming in)
+  composer.innerHTML = `<span class="cbg" aria-hidden="true"></span><input enterkeyhint="send" autocomplete="off" maxlength="5000"><span class="cspot"><button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span></button><button type="submit" class="csend">${I.fwd}</button></span>`;
   // The composer's orb: talk to your coach. What you say is sent when you pause, the answer is
   // spoken, then it listens again, so it's a conversation. Tap while it listens to send at once;
   // tap while it thinks or speaks (or say nothing) to end it.
@@ -892,6 +920,7 @@ export function initCoach(n) {
   const setTalk = phase => {
     composer.dataset.talk = phase || '';
     syncThinking();
+    syncSpot();
     composer.classList.toggle('talking', !!phase);
     input.placeholder = phase ? state.t('coach.talk.' + phase) : state.t('coach.ph');
     input.disabled = !!phase;
@@ -931,6 +960,7 @@ export function initCoach(n) {
     setTalk(null);
   };
   orbBtn.addEventListener('click', () => {
+    if (!talk.on && inflight) { haptic('tap'); inflight.ctl.abort(); return; } // (still thinking: the orb stops it)
     if (talk.on) { haptic('tap'); if (talk.l && composer.dataset.talk !== 'thinking') talk.l.stop(); else stopTalk(); return; }
     if (!getKey('groq')) { toast({ title: esc(state.t('voice.noKey')), error: true }); return; }
     haptic('tap');
@@ -944,7 +974,7 @@ export function initCoach(n) {
   });
   document.getElementById('app').addEventListener('screenchange', () => { if (talk.on && !document.getElementById('app').classList.contains('coaching')) stopTalk(); });
   // typing: the Coach's offers step aside
-  const typing = () => document.getElementById('app').classList.toggle('typing', !!input.value.trim());
+  const typing = () => { document.getElementById('app').classList.toggle('typing', !!input.value.trim()); syncSpot(); };
   input.addEventListener('input', typing);
   composer.addEventListener('submit', () => requestAnimationFrame(typing));
   composer.addEventListener('submit', e => {

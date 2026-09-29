@@ -3125,29 +3125,76 @@ html[data-motion=off] .pdots i{animation:none;opacity:.6}
 @media (prefers-reduced-motion: reduce){ .vreview{animation:none} }
 html[data-motion=off] .vreview{animation:none}
 
-/* ======================= 1.62.5: one choreography for Home, the floating orb, the voice screen and the Coach ======================= */
-/* While js/app.js coachMorph / js/ui/voice.js run a transition (.app.choreo) nothing else animates the
-   pieces they move: every part's own CSS transition is off and they're driven frame by frame. The bar
-   stays up (.choreo-bar) while its pill reshapes into the message box through one glass layer (.gmorph,
-   clipped from one shape to the other). */
-.app.choreo :is(.dock,.composer,.screen,.aura .veil,.dock .tab,.dock .ind,.dock .obub){transition:none!important}
-.app.choreo:not(.handin) #s-coach > *,.app.choreo:not(.handin) #s-coach .msg{animation:none!important}
-/* a voice handoff: the Coach comes up over the voice screen / the floating orb's frost (so the words
-   you said can fly into their bubble above them) and everything in it but those words fades in */
+/* ======================= 1.63.0: the orb lives in the bottom-right corner ======================= */
+/* The Coach's message box is the dock grown: one pill of the dock's own glass (.cbg), as tall as the
+   dock, with the orb at its right end in exactly the dock orb's place and size. That one spot has three
+   faces: the orb (an empty field), the send arrow (while you type), the stop button (a reply streaming
+   in). No light of its own: plain frosted glass at every moment. */
+#composer{left:16px;right:16px;bottom:var(--dock-bottom);height:var(--dock-h);border-radius:36px;padding:0 0 0 24px;gap:4px;
+  background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;isolation:isolate}
+#composer::before,#composer::after{display:none}
+#composer > .cbg{position:absolute;inset:0;z-index:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.02) 50%,rgba(255,255,255,.04)),rgba(10,18,28,.5);
+  -webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 0 0 1px rgba(255,255,255,.07),0 18px 36px -18px rgba(0,0,0,.85)}
+html[data-glass=off] #composer > .cbg{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(10,20,30,.94)}
+#composer > :not(.cbg){position:relative;z-index:1}
+#composer input{padding:0;height:100%}
+#composer > .thinkline{position:absolute;z-index:2;left:24px;right:80px}
+#composer .cspot{flex:none;width:72px;height:72px}
+#composer .cspot > button{position:absolute;inset:0;margin:auto;transition:opacity 150ms var(--e-out),scale 150ms var(--e-out),transform .3s var(--e-out)}
+#composer .corb{width:72px;height:72px;border-radius:50%}
+#composer .corb .orb{--s:60px}
+#composer .corb::before,#composer .corb::after{display:none}
+#composer .csend,#composer .csend.stop{width:48px;height:48px;border-radius:50%;transform:none;opacity:1;pointer-events:auto}
+#composer .csend svg{width:22px;height:22px}
+#composer .csend:active{transform:scale(.9)}
+/* orb ↔ arrow ↔ stop: one cross-fades and scales into the other */
+#composer:not([data-spot=send]):not([data-spot=stop]) .csend{opacity:0;scale:1.25;pointer-events:none}
+#composer:is([data-spot=send],[data-spot=stop]) .corb{opacity:0;scale:.8;pointer-events:none}
+@media (prefers-reduced-motion: reduce){ #composer .cspot > button{transition:opacity 150ms linear} #composer .cspot > button{scale:1!important} }
+html[data-motion=off] #composer .cspot > button{transition:opacity 150ms linear;scale:1!important}
+/* the keyboard (js/ui/keyboard.js): the box glides up with it, and the thread keeps the same room
+   below its newest message at every moment (no step when the field is focused) */
+#composer{transition:opacity .3s var(--e-out),transform 280ms cubic-bezier(.2,.8,.2,1)}
+.app.coaching.kbup:not(.is-sub):not(.voice) #composer{transform:translateY(calc(var(--dock-bottom) - 10px - var(--kbh, 0px)))}
+#app.coaching #s-coach.screen{padding-bottom:calc(max(var(--kbh, 0px) + 10px, var(--dock-bottom)) + var(--dock-h) + 20px)}
+/* no glow reaches more than about a fifth past the orb's edge, and none covers text */
+.orb::before{inset:-18%}
+.composer:is([data-talk=listening],[data-talk=hearing]) .corb .orb::before,.ofloat .orb.lift::before{transform:scale(calc(.94 + var(--l, var(--lv, 0)) * .1))}
+.oglow{width:176px;height:176px;margin:-88px 0 0 -88px;transform:scale(calc(.94 + var(--l, 0) * .08))}
+.app.thinking .composer .corb .orb::before{animation:none;opacity:.6}
+
+/* the flying orb carries a drop of the dock's glass under its dots (faded in and out by js/ui/choreo.js) */
+.orbghost.disc::before{content:"";position:absolute;inset:-9%;border-radius:50%;opacity:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.02) 50%,rgba(255,255,255,.04)),rgba(10,18,28,.82);
+  -webkit-backdrop-filter:blur(20px) saturate(160%);backdrop-filter:blur(20px) saturate(160%);box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 0 0 1px rgba(255,255,255,.07)}
+/* the Coach painted in advance, invisibly (app.js warmCoach) */
+.app.warmcoach #s-coach:not(.on){visibility:visible;opacity:.005;transition:none;pointer-events:none}
+.app.warmcoach:not(.coaching) #composer{opacity:.005;transition:none}
+.app.warmcoach .aura{visibility:visible}
+.app.warmcoach:not(.coaching) .aura .veil{opacity:.005;transition:none}
+/* While a transition runs (.app.choreo, js/ui/choreo.js), nothing else animates the pieces it drives. */
+.app.choreo :is(.dock,.composer,.screen,.aura .veil,.dock .tab,.dock .ind,.dock .dcap,.dock .orbbtn){transition:none!important}
+.app.choreo #s-coach > *,.app.choreo #s-coach .msg{animation:none!important}
+/* Home ↔ Coach: the dock stays where it is (its parts fade) while the message box grows out of its orb */
+.app.cm-dock #dock{opacity:1;transform:none;pointer-events:none}
+.app.cm-box #composer{opacity:1;transform:none;pointer-events:none}
+/* a voice handoff: the Coach sits over the frost / the voice screen, so your words fly into their
+   bubble in plain sight; everything else in it is faded in from js (never an old message on top) */
 .app.handin #s-coach{z-index:9}
-.app.handin #s-coach > :not(#thread),.app.handin #thread > .msg:not(.wordsin){animation:handin 220ms cubic-bezier(.1,.7,.3,1) var(--handin-delay, 64ms) both!important}
-@keyframes handin{from{opacity:.005;transform:translateY(12px)}}
-@media (prefers-reduced-motion: reduce){ .app.handin #s-coach > :not(#thread),.app.handin #thread > .msg:not(.wordsin){animation:handinfade 150ms linear both!important} }
-@keyframes handinfade{from{opacity:.005}}
-.app.choreo-bar .dock{opacity:1!important;transform:none!important}
-.gmorph{position:absolute;z-index:6;pointer-events:none;border-radius:0!important}
-.composer.bare{background:none!important;border-color:transparent!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
-.composer.bare > .cglow,.composer.bare > .chit{display:none}
-/* your words becoming your bubble: its glass fades in under them as they land */
-.msg.me .bub{transition:background-color .22s var(--e-out),border-color .22s var(--e-out)}
-.msg.me.arriving .bub{background-color:transparent!important;background-image:none!important;border-color:transparent!important}
-/* the Coach's "Thinking" row waits until the orb has landed (about 120 ms after) */
-.app.awaitland #thread > .msg.ai.is-thinking{opacity:0}
-#thread > .msg.ai.is-thinking{transition:opacity .18s var(--e-out)}
+
+/* your words becoming your message: the bubble's glass grows in under them as they land (a layer of
+   its own, so only it fades and scales, never the words) */
+.msg.me .bub{--mebg:rgba(var(--a-rgb),.16);--mebd:rgba(var(--a-rgb),.22)}
+html[data-duo] .msg.me .bub{--mebg:linear-gradient(135deg,rgba(var(--a-rgb),.2),color-mix(in srgb,var(--accent2) 16%,transparent));--mebd:rgba(var(--a-rgb),.26)}
+.msg.me.flyglass .bub{background:none!important;border-color:transparent!important;isolation:isolate}
+.msg.me.flyglass .bub::before{content:"";position:absolute;inset:-1px;z-index:-1;border-radius:inherit;background:var(--mebg);border:1px solid var(--mebd);transform-origin:100% 100%;opacity:0}
+.msg.me .bub{position:relative}
+/* the Coach's "Thinking" words in the box wait until the orb has landed (about 120 ms after) */
 .app.awaitland .composer .thinkline{opacity:0}
+.app.awaitland.thinking #composer input::placeholder{color:var(--dim)} /* (never an empty bar while the orb is on its way) */
 .composer .thinkline{transition:opacity .18s}
+/* the dock takes its orb back with a settle only: no ring of light */
+.orbbtn.pulse-land::after{animation:none}
+.vlayer.closing > *{transition:none!important} /* (closing: faded from js/ui/voice.js closeVoice) */
