@@ -364,7 +364,7 @@ export function renderToday(root) {
     review: () => (on('review') ? reviewHTML() : ''),
     routines: () => (busy || !on('routines') ? '' : routinesHTML())
   };
-  root.innerHTML = `<header class="brand">
+  const html = `<header class="brand">
       <div><strong>Setline</strong><span>${t('app.tagline')}</span></div>
       <button class="iconbtn" data-act="open-settings" aria-label="${t('settings.title')}">${I.settings}</button>
     </header>
@@ -376,6 +376,12 @@ ${state.settings.greeting ? `<h1 class="greet">${greeting(t(greetingKey(hour))).
     ${busy ? '' : monthCardHTML()}
     ${todayOrderOf(state.settings).map(k => part[k]()).join('')}
     <button class="custom" data-act="customize">${I.settings}<span>${t('cust.open')}</span></button>`;
+  // (drawn again only when something on it changed: rebuilding it on every visit threw away what the
+  // phone had already drawn, so it came back late, a dip to the bare background, and replayed its
+  // entrance)
+  if (root._html === html && root.childElementCount) return;
+  root._html = html;
+  root.innerHTML = html;
   nameParts(root);
   const fg = root.querySelector('.week .fg');
   if (fg) {

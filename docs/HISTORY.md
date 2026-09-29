@@ -811,3 +811,26 @@ Fixes the flashes, lag and half-drawn frames in the voice → Coach recording, i
 - New golden flow reply-real-stream: replies streamed chunk by chunk through a real SSE body (plain,
   ending in a chip, ending in a memory, 200 chunks), checked on every frame. It failed on 1.62.3
   (the reply twice in 41 and 47 frames, 3 jumps).
+
+## 1.62.5: one choreography for Home, the orb, the voice screen and the Coach
+
+- Measured first: `?slowmo=N` (js/ui/slowmo.js) slows the app's own clock and every animation, and
+  `node scripts/choreo.mjs` films the four transitions at 6× and checks them at full speed with an
+  in-page frame probe (orbs, each screen's content opacity, the message box) and the compositor's
+  own frames (luminance). Before: all four failed (early landings, two or no orbs, double exposure,
+  dips to 10.8 of ~24).
+- One orb flight everywhere (`arcFly`, js/ui/choreo.js): a single stand-in carrying the source's
+  dots, on an arc bowing 12 % of the distance, 380–520 ms by distance, cubic-bezier(0.32, 0.72, 0, 1),
+  size from source to target, fully opaque, a small squash on landing, both real orbs hidden in
+  flight and swapped in the same frame. The old streak/trail flight is gone.
+- The message box no longer hops: it recoils in depth from the landing point (0.97, one soft
+  overshoot to 1.008, 420 ms) and its light brightens 20 % at impact.
+- Home ↔ Coach: the dock pill's glass reshapes into the message box (one clip-path layer) while the
+  tabs fade; Home fades out in 80 ms, the Coach rises in over 220 ms; Back is the reverse, and the
+  Coach's light leaves with its words, so Home is never hidden under it (that was the dip to black).
+- Floating orb → Coach and Send → Coach: your words fly into your message (the message's own node,
+  inverted onto them, its glass fading in as it lands); the frost / voice screen give way as the
+  Coach comes up; the Coach's bloom rises where the orb and the Send button were, so the screen never
+  empties; the orb lands in the box only once it's there; the Thinking row waits ~120 ms after.
+- Reduced motion: the same transitions as 150 ms fades, nothing flying.
+- Golden flows `move-*` (and `move-*-reduced`) assert these on every frame.

@@ -7,6 +7,7 @@
 import { launch, newPage, serve, settle, onScreen } from './lib/harness.mjs';
 import { STAND_IN, mockServices, installSampler, mark, samples, between } from './lib/voiceflow.mjs';
 import { streamReplies, probeReply } from './lib/sse.mjs';
+import { FLOWS as MOVES, checkFlow } from './lib/choreo.mjs';
 
 // chat-stream is 1.60's in-place chat, which the master fix's phase 3 brings to this design: until then
 // it reports without failing.
@@ -448,6 +449,15 @@ const FLOWS = {
   },
 
   // Every main tab opens without throwing.
+  // The four big transitions, checked on every frame (see lib/choreo.mjs judge()): one solid orb, never
+  // two screens' content over 20 %, no dip darker than both ends by 10 %, the message box there before
+  // the orb lands, and your words become your message's own node. Then the same under reduced motion.
+  ...Object.fromEntries(Object.keys(MOVES).flatMap(name => [false, true].map(reduced => [`move-${name}${reduced ? '-reduced' : ''}`, async (browser, base) => {
+    const r = await checkFlow(browser, base, name, { reduced });
+    if (r.bad.length) throw new Error(r.bad.join('; '));
+    return r.errors;
+  }]))),
+
   'tabs-open': async (browser, base) => {
     const { context, page, errors } = await newPage(browser, base);
     await page.goto(base + '?seed=1');

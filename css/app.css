@@ -3129,3 +3129,30 @@ html[data-motion=off] .pdots i{animation:none;opacity:.6}
 .vlayer[data-phase=stuck] .live{color:var(--warm)}
 @media (prefers-reduced-motion: reduce){ .vreview{animation:none} }
 html[data-motion=off] .vreview{animation:none}
+
+/* ======================= 1.62.5: one choreography for Home, the floating orb, the voice screen and the Coach ======================= */
+/* While js/app.js coachMorph / js/ui/voice.js run a transition (.app.choreo) nothing else animates the
+   pieces they move: every part's own CSS transition is off and they're driven frame by frame. The bar
+   stays up (.choreo-bar) while its pill reshapes into the message box through one glass layer (.gmorph,
+   clipped from one shape to the other). */
+.app.choreo :is(.dock,.composer,.screen,.aura .veil,.dock .tab,.dock .ind,.dock .obub){transition:none!important}
+.app.choreo:not(.handin) #s-coach > *,.app.choreo:not(.handin) #s-coach .msg{animation:none!important}
+/* a voice handoff: the Coach comes up over the voice screen / the floating orb's frost (so the words
+   you said can fly into their bubble above them) and everything in it but those words fades in */
+.app.handin #s-coach{z-index:9}
+.app.handin #s-coach > :not(#thread),.app.handin #thread > .msg:not(.wordsin){animation:handin 220ms cubic-bezier(.1,.7,.3,1) var(--handin-delay, 64ms) both!important}
+@keyframes handin{from{opacity:.005;transform:translateY(12px)}}
+@media (prefers-reduced-motion: reduce){ .app.handin #s-coach > :not(#thread),.app.handin #thread > .msg:not(.wordsin){animation:handinfade 150ms linear both!important} }
+@keyframes handinfade{from{opacity:.005}}
+.app.choreo-bar .dock{opacity:1!important;transform:none!important}
+.gmorph{position:absolute;z-index:6;pointer-events:none;border-radius:0!important}
+.composer.bare{background:none!important;border-color:transparent!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+.composer.bare > .cglow,.composer.bare > .chit{display:none}
+/* your words becoming your bubble: its glass fades in under them as they land */
+.msg.me .bub{transition:background-color .22s var(--e-out),border-color .22s var(--e-out)}
+.msg.me.arriving .bub{background-color:transparent!important;background-image:none!important;border-color:transparent!important}
+/* the Coach's "Thinking" row waits until the orb has landed (about 120 ms after) */
+.app.awaitland #thread > .msg.ai.is-thinking{opacity:0}
+#thread > .msg.ai.is-thinking{transition:opacity .18s var(--e-out)}
+.app.awaitland .composer .thinkline{opacity:0}
+.composer .thinkline{transition:opacity .18s}

@@ -20,5 +20,8 @@ Follow `AGENTS.md`. It's short on purpose; don't read more than the task needs.
 - Animate anything except layout (width, height, top, left, margin, padding, `all`). If a heavy effect (big or animated blur, many blurred layers, large shadows) stutters on the phone, shrink or simplify it and check `?perf=1`; don't drop the idea.
 - Ambient motion (clouds, sea) may keep running; if it costs frames during scrolling or a transition, pause just that part.
 - Exactly one orb visible at a time (hand over cleanly).
+- No comet trails, streaks or smears: the orb is one solid object at every frame (flights go through `arcFly` in `js/ui/choreo.js`).
+- Never dip to black and never double-expose two screens' content; the sea background is shared and never fades.
+- The destination exists and is visible before anything lands on it. `node scripts/choreo.mjs` films and checks the four big transitions.
 - Chat: never rebuild the thread with innerHTML; one DOM node per message for its whole life; one DOM write per frame.
 - will-change only just before an animation, removed after. Canvases ≤ 2× DPR, never resized in the loop.

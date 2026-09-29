@@ -1,4 +1,5 @@
 // Entry point: navigation, dock, clock, service worker updates.
+import './ui/slowmo.js'; // (first: ?slowmo=N slows every clock before anything reads one)
 import * as store from './store.js';
 import { configureSteps } from './progression.js';
 import { state } from './store.js';
@@ -28,10 +29,12 @@ import { initBody } from './ui/body.js';
 import { initRoutine, setRoutineNav, renderRoutine, editRoutine, editRoutineFrom, programsSheet, startRoutine, planFor } from './ui/routine.js';
 import { setHistoryFilter } from './ui/history.js';
 import { renderProgress, renderExercise, setRange } from './ui/progress.js';
-import { countAll, burst, orbStreak, orbPulse } from './ui/fx.js';
+import { countAll, burst, orbPulse } from './ui/fx.js';
+import { nextFrame } from './ui/frame.js';
 import { syncBeams } from './ui/beam.js';
 import { startDotOrbs, handOrb } from './ui/dotorb.js';
 import { initPerf } from './ui/perf.js';
+import { arcFly, recoil, EASE } from './ui/choreo.js';
 import { initPress } from './ui/press.js';
 import { initChrome, refreshChrome } from './ui/chrome.js';
 import { openCustomize } from './ui/customize.js';
@@ -164,156 +167,130 @@ const stillMotion = () => document.documentElement.dataset.motion === 'off' || m
 let coachFx = null; // tidies up the open or close in progress
 function settleCoachFx() { const c = coachFx; coachFx = null; c?.(); }
 
-// Two screen-sized layers, so the phone never has to draw anything bigger than the screen (a
-// giant scaled disc was what left the screen dark for a moment on Android): .bloom is a burst of
-// light that grows out of the orb and fades, .veil is the Coach's own background fading in under it.
-// The orb itself travels between the bar and the message box on a short arc, swelling a little at
-// the top and settling at its new size. A stand-in flies while the real orbs at both ends stay hidden.
-const relRect = el => { const a = app.getBoundingClientRect(), r = el.getBoundingClientRect(); return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height / 2, w: r.width }; };
-const layRect = el => { let x = el.offsetWidth / 2, y = el.offsetHeight / 2; for (let n = el; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; } return { x, y, w: el.offsetWidth }; };
-// The stand-in carries both looks, the orb it leaves and the orb it becomes, and melts from one
-// into the other on the way, so at the end it is exactly the orb in its new place: nothing swaps.
-function flyOrb(from, to, { duration, delay = 0, go, onland, easing, fromEl, toEl }) {
-  if (!from.w || !to.w || !fromEl || !toEl || Math.hypot(to.x - from.x, to.y - from.y) < 4) return null;
-  const W = to.w;
-  const ghost = document.createElement('div');
-  ghost.className = 'orbghost';
-  ghost.setAttribute('aria-hidden', 'true');
-  Object.assign(ghost.style, { left: `${from.x - W / 2}px`, top: `${from.y - W / 2}px`, width: `${W}px`, height: `${W}px` });
-  const look = (el, w) => {
-    const c = el.cloneNode(true), n = el.offsetWidth || w;
-    c.className = 'orb';
-    c.removeAttribute('style');
-    c.style.setProperty('--s', `${n}px`);
-    Object.assign(c.style, { position: 'absolute', left: `${(W - n) / 2}px`, top: `${(W - n) / 2}px`, transform: `scale(${W / n})`, margin: '0' });
-    return c;
-  };
-  const a = look(fromEl, from.w), b = look(toEl, to.w);
-  b.style.opacity = '0';
-  ghost.append(a, b);
-  app.append(ghost);
-  handOrb(fromEl, a); handOrb(toEl, b); // (dotted: each look exactly as its orb is right now)
-  const dx = to.x - from.x, dy = to.y - from.y, s0 = from.w / W;
-  // one straight line, no hop: it shoots off, eases, and still has some speed left when it hits
-  const path = [{ translate: '0 0', scale: s0 }, { scale: 1 + (s0 - 1) * 0.45, offset: 0.5 }, { translate: `${dx}px ${dy}px`, scale: 1 }];
-  const fly = go(ghost, path, { duration, delay, easing, fill: 'both' });
-  // the orb stays sharp (a blur only made it look out of focus): the speed is in the light it leaves
-  // behind, and in a barely-there stretch along the way it flies while it's fastest
-  const ang = Math.atan2(dy, dx) * 180 / Math.PI, st = (x, y) => `rotate(${ang}deg) scale(${x}, ${y}) rotate(${-ang}deg)`;
-  go(ghost, [{ transform: st(1, 1) }, { transform: st(1.07, 0.95), offset: 0.2 }, { transform: st(1.03, 0.98), offset: 0.6 }, { transform: st(1, 1), offset: 0.9 }, { transform: st(1, 1) }],
-    { duration, delay, easing: 'linear' });
-  orbStreak(app, from, to, { duration, delay, easing, size: Math.min(from.w, to.w), lag: duration * 0.28, go, before: ghost, z: '8' });
-  // its glow comes up while it travels and settles as it lands
-  go(a, [{ opacity: 0 }, { opacity: 0.8, offset: 0.35 }, { opacity: 0 }], { duration, delay, easing: 'linear', pseudoElement: '::before' });
-  go(b, [{ opacity: 0 }, { opacity: 0.8, offset: 0.35 }, { opacity: 0 }], { duration, delay, easing: 'linear', pseudoElement: '::before' });
-  // the new look fades in over the old one, which stays solid under it (fading both let the page
-  // show through the orb halfway)
-  go(b, [{ opacity: 0 }, { opacity: 1 }], { duration: duration * 0.55, delay: delay + duration * 0.3, easing: 'linear', fill: 'both' });
-  const done = () => ghost.remove();
-  fly.addEventListener('cancel', done);
-  fly.onfinish = () => { done(); onland?.(); };
-  return ghost;
-}
-
-// The orb arrives in the message box and hits it: the moment it touches, the box gives under it and
-// springs back up a little (weight, then lift), the light spreads through it, and one firm tap.
-function impact() {
+// The orb arrives in the message box: the box is pushed back in depth from where it was hit (never up
+// or down) and springs back with one soft overshoot, the light spreads through it, and one firm tap.
+function impact(point) {
   haptic('land');
   const box = $('#composer');
   if (!box) return;
-  box.classList.remove('hit'); void box.offsetWidth; box.classList.add('hit'); setTimeout(() => box.classList.remove('hit'), 1000);
-  if (stillMotion()) return;
-  box.animate([
-    { transform: 'none' },
-    { transform: 'translateY(5px) scale(1.018, .93)', offset: 0.16 },
-    { transform: 'translateY(-6px) scale(.995, 1.02)', offset: 0.42 },
-    { transform: 'translateY(2px) scale(1.004, .995)', offset: 0.68 },
-    { transform: 'translateY(-.5px)', offset: 0.85 },
-    { transform: 'none' }
-  ], { duration: 680, easing: 'cubic-bezier(.25,.6,.3,1)' });
-  box.style.transformOrigin = '10% 60%';
-  setTimeout(() => { box.style.transformOrigin = ''; }, 700);
+  box.classList.remove('hit'); nextFrame(() => { box.classList.add('hit'); setTimeout(() => box.classList.remove('hit'), 1000); });
+  recoil(box, point);
+  setTimeout(() => app.classList.remove('awaitland'), 120); // the Coach's "Thinking" row, just after
 }
 
-let flyFrom = null; // an orb the next Coach opening flies from instead of the bar's
+// Home ↔ Coach, as one piece: the bar's glass pill reshapes into the message box (one glass layer,
+// clipped from the pill's shape to the box's) while the tab icons fade; Home's content fades out in
+// 100 ms as the Coach's fades in from 60 ms over the same sea; the orb arcs from the bar into the box
+// (which is there before it arrives) and the box takes it with a recoil. Back is the exact reverse.
+// Asked over the floating orb (flyFrom), there is no bar: the box comes in and that orb flies in.
+let flyFrom = null;
+const rectIn = el => { const a = app.getBoundingClientRect(), r = el.getBoundingClientRect(); return { l: r.left - a.left, t: r.top - a.top, r: r.right - a.left, b: r.bottom - a.top, w: r.width, h: r.height }; };
+const insetOf = (x, u, round) => `inset(${(x.t - u.t).toFixed(1)}px ${(u.r - x.r).toFixed(1)}px ${(u.b - x.b).toFixed(1)}px ${(x.l - u.l).toFixed(1)}px round ${round}px)`;
+const MORPH_MS = 260;
 function coachMorph(open, under) {
   settleCoachFx();
-  const aura = $('.aura'), bloom = aura?.querySelector('.bloom'), veil = aura?.querySelector('.veil'), orb = $('#dock .orbbtn');
-  if (!aura || !bloom || !veil || !orb) return;
-  // the light swelling out of the orb is felt as a rising ripple, then a soft landing
-  haptic(open ? 'bloom' : 'tick');
-  // the orb's centre in the app's coordinates (layout, so a moving or shrunk bar can't skew it)
-  let x = orb.offsetWidth / 2, y = orb.offsetHeight / 2;
-  for (let n = orb; n && n !== app; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }
-  aura.style.setProperty('--ax', x + 'px'); aura.style.setProperty('--ay', y + 'px');
-  if (stillMotion()) return;
-  const dockOrb = orb.querySelector('.orb'), coach = $('#s-coach');
+  const aura = $('.aura'), veil = aura?.querySelector('.veil'), box = $('#composer'), coach = $('#s-coach');
+  const dockOrb = $('#dock .orbbtn .orb'), dcap = $('#dock .dcap');
+  if (!aura || !veil || !box || !coach) return;
   const other = under && under !== coach ? under : null;
+  const src = open && flyFrom?.isConnected ? flyFrom : null;
+  flyFrom = null;
+  haptic(open ? 'bloom' : 'tick');
+  const anims = [], timers = [];
+  // (reduced motion: the same, as plain 150 ms fades: nothing moves or grows)
+  const calm = stillMotion();
+  const go = (el, f, o) => {
+    if (!el) return null;
+    if (calm) { f = f.map(({ transform, ...k }) => k); o = { ...o, duration: Math.min(o.duration, 150), delay: 0 }; }
+    const a = el.animate(f, o); anims.push(a); return a;
+  };
+  const bar = !src && !!dcap;
+  app.classList.add('choreo');
+  if (bar) app.classList.add('choreo-bar');
   aura.classList.add('run');
-  app.classList.add('morphing'); // the blurred edges step aside while the light moves under them
-  const anims = [];
-  const go = (el, frames, opts) => { if (!el) return null; const a = el.animate(frames, opts); anims.push(a); return a; };
+  let gm = null;
+  const wipe = () => {
+    anims.forEach(a => a.cancel());
+    timers.forEach(clearTimeout);
+    gm?.remove();
+    app.classList.remove('choreo', 'choreo-bar');
+    aura.classList.remove('run');
+    for (const el of [box, coach, other, dcap]) if (el) Object.assign(el.style, { transition: '', opacity: '', visibility: '', transform: '', bottom: '' });
+    box.classList.remove('bare');
+    for (const m of document.querySelectorAll('#s-coach .msg')) m.classList.add('seen');
+  };
+  coachFx = wipe;
+  const end = ms => timers.push(setTimeout(settleCoachFx, ms));
+  const tabs = () => [...document.querySelectorAll('#dock .tab, #dock .ind, #dock .obub')];
+  const morph = (from, to, fromR, toR, done) => {
+    const u = { l: Math.min(from.l, to.l), t: Math.min(from.t, to.t), r: Math.max(from.r, to.r), b: Math.max(from.b, to.b) };
+    gm = document.createElement('div');
+    gm.className = 'gmorph glass';
+    gm.setAttribute('aria-hidden', 'true');
+    Object.assign(gm.style, { left: `${u.l}px`, top: `${u.t}px`, width: `${u.r - u.l}px`, height: `${u.b - u.t}px`, clipPath: insetOf(from, u, fromR) });
+    app.append(gm);
+    const a = go(gm, [{ clipPath: insetOf(from, u, fromR) }, { clipPath: insetOf(to, u, toR) }], { duration: MORPH_MS, easing: EASE, fill: 'forwards' });
+    a.onfinish = () => { done(); gm?.remove(); gm = null; };
+  };
+  const radius = el => parseFloat(getComputedStyle(el).borderTopLeftRadius) || 24;
   if (open) {
     if (other) Object.assign(other.style, { transition: 'none', opacity: '1', visibility: 'visible', transform: 'none' });
-    // the orb leaves the bar and lands in the message box (once the Coach's layout is in place)
-    // (from the floating orb when a question asked there opens the Coach: it flies straight in)
-    const src = flyFrom?.isConnected ? flyFrom : dockOrb;
-    flyFrom = null;
-    const from = src ? relRect(src) : null;
-    let flying = null;
+    // (they cross at about a fifth each: never both readable, and never a moment with neither)
+    go(other, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.985)' }], { duration: src ? 60 : 80, easing: 'linear', fill: 'forwards' });
+    // (from the floating orb, the Coach's content comes in with .handin, over the frost, see voice.js)
+    if (!src) go(coach, [{ opacity: 0.005, transform: 'translateY(12px)' }, { opacity: 1, transform: 'none' }], { duration: 220, delay: 64, easing: 'cubic-bezier(.1,.7,.3,1)', fill: 'backwards' });
+    // (the Coach's light lies over the page: it comes up quickly, so the page is covered as it goes)
+    go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: src ? 120 : 200, easing: 'ease-out', fill: 'backwards' });
+    // (laid out as the Coach, once show() has put the classes on: before this frame is painted)
     queueMicrotask(() => {
       const corb = $('#composer .corb .orb');
-      flying = from && corb && flyOrb(from, layRect(corb), { duration: 440, easing: 'cubic-bezier(.2,.75,.2,1)', go, fromEl: src, toEl: corb, onland: () => { app.classList.remove('orbtravel'); impact(); } });
-      if (flying) { app.classList.add('orbtravel', 'orbflown'); go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 900, fill: 'forwards' }); return; }
-      go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
-      setTimeout(() => haptic('land'), 560);
+      if (bar) {
+        const D = rectIn(dcap), C = rectIn(box), rD = radius(dcap), rC = radius(box);
+        dcap.style.visibility = 'hidden';
+        box.style.transition = 'none';
+        box.style.opacity = '0';
+        for (const t of tabs()) go(t, [{ opacity: 1 }, { opacity: 0 }], { duration: 100, easing: 'ease-out', fill: 'forwards' });
+        morph(D, C, rD, rC, () => {
+          app.classList.remove('choreo-bar'); // (the bar has become the box: it goes)
+          box.style.opacity = '';
+          for (const k of box.querySelectorAll(':scope > input, :scope > .csend')) go(k, [{ opacity: 0 }, { opacity: 1 }], { duration: 120, easing: 'ease-out', fill: 'backwards' });
+        });
+        arcFly(dockOrb, corb, { delay: 90, onland: () => impact(centreOf(corb)) }); // (lands once the box is whole)
+      } else {
+        box.style.transition = 'none';
+        go(box, [{ opacity: 0 }, { opacity: 1 }], { duration: 120, easing: 'ease-out', fill: 'backwards' });
+        arcFly(src, corb, { delay: 160, onland: () => impact(centreOf(corb)) }); // (the box is in before it lands)
+      }
     });
-    // held (fill both) until everything settles together: an animation ending on its own mid-way let
-    // the page underneath show through for a frame or two on the phone
-    const last = go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: 560, delay: 90, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'both' });
-    // one screen readable at a time: the page shrinks back and is gone before the Coach's words come up
-    go(other, [{ scale: 1, opacity: 1 }, { scale: 0.97, opacity: 0, offset: 0.4 }, { scale: 0.94, opacity: 0 }], { duration: 640, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'forwards' });
-    go(coach, [{ opacity: 0 }, { opacity: 0, offset: 0.35 }, { opacity: 1 }], { duration: 520, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'backwards' });
-    app.classList.add('coach-in');
-    last.onfinish = settleCoachFx;
-    coachFx = () => {
-      anims.forEach(a => a.cancel());
-      aura.classList.remove('run');
-      app.classList.remove('morphing', 'orbtravel');
-      setTimeout(() => app.classList.remove('orbflown'), 400);
-      // the messages have arrived: once coach-in goes they must not pick up another entrance animation
-      setTimeout(() => { for (const m of document.querySelectorAll('#s-coach .msg')) m.classList.add('seen'); app.classList.remove('coach-in'); }, 300);
-      if (!other) return;
-      if (other.classList.contains('on')) { Object.assign(other.style, { transition: '', opacity: '', visibility: '', transform: '' }); return; }
-      Object.assign(other.style, { visibility: 'hidden', opacity: '0' }); // covered: gone at once
-      void other.offsetWidth; // settled first, so releasing the styles can't start a fade
-      setTimeout(() => { if (!other.classList.contains('on')) Object.assign(other.style, { transition: '', opacity: '', visibility: '', transform: '' }); }, 60);
-    };
+    end(bar ? 900 : 1100);
   } else {
-    // the conversation sinks away, the Coach's background fades, the light gathers back into the
-    // orb and the page comes forward; the orb takes the light in last
-    go(coach, [{ opacity: 1, transform: 'none', visibility: 'visible' }, { opacity: 0, transform: 'translateY(20px) scale(.97)', visibility: 'visible' }], { duration: 220, easing: 'cubic-bezier(.4,0,.6,1)' });
-    const last = go(veil, [{ opacity: 1 }, { opacity: 0 }], { duration: 480, delay: 60, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'backwards' });
-    // (the page comes forward only once the conversation has gone: never both readable at once)
-    go(other, [{ scale: 0.95, opacity: 0 }, { scale: 1, opacity: 1 }], { duration: 480, delay: 200, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' });
-    // the orb leaves the message box and flies home into the bar, which takes it with a small pulse
-    const corb = $('#composer .corb .orb');
-    let hold = null;
-    const flying = corb && dockOrb && flyOrb(relRect(corb), layRect(dockOrb), { duration: 460, delay: 40, easing: 'cubic-bezier(.25,.75,.2,1)', go, fromEl: corb, toEl: dockOrb, onland: () => {
-      hold?.cancel();
-      app.classList.remove('orbtravel');
-      orbPulse('pulse-land');
-      haptic('land');
-    } });
-    if (flying) { app.classList.add('orbtravel'); hold = go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 700, fill: 'forwards' }); }
-    else {
-      go(dockOrb, [{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 460, delay: 380, easing: 'cubic-bezier(.3,1.25,.5,1)', fill: 'backwards' });
-      setTimeout(() => haptic('land'), 520);
-    }
-    last.onfinish = settleCoachFx;
-    coachFx = () => { anims.forEach(a => a.cancel()); aura.classList.remove('run'); app.classList.remove('morphing', 'orbtravel'); };
+    // (the box is measured where it is now, before the Coach's classes come off)
+    const C = rectIn(box), rC = radius(box), corb = $('#composer .corb .orb');
+    Object.assign(box.style, { transition: 'none', bottom: getComputedStyle(box).bottom });
+    Object.assign(coach.style, { transition: 'none', visibility: 'visible' });
+    go(coach, [{ opacity: 1 }, { opacity: 0 }], { duration: 80, easing: 'linear', fill: 'forwards' });
+    // Home is already a faint fifth under the Coach as it goes (never more than that while the Coach is
+    // readable), so there's never a moment with neither: then it comes up the rest of the way
+    // (it starts at 0.005, not 0: a layer under about 1/255 isn't drawn at all, so it would only get its tiles when
+    // it's already meant to show, arriving late as a dip)
+    go(other, [{ opacity: 0.005, transform: 'scale(.985)', easing: 'linear' }, { opacity: 0.18, transform: 'scale(.985)', offset: 0.2, easing: 'linear' },
+      { opacity: 0.2, transform: 'scale(.985)', offset: 0.24, easing: 'cubic-bezier(.1,.7,.3,1)' }, { opacity: 1, transform: 'none' }], { duration: 300, fill: 'backwards' });
+    // (the Coach's light lies over the page, so it leaves with the Coach's words: Home comes up in it)
+    go(veil, [{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
+    box.classList.add('bare'); // its glass is the morph's from here
+    go(box, [{ opacity: 1 }, { opacity: 0 }], { duration: 100, easing: 'ease-out', fill: 'forwards' });
+    queueMicrotask(() => {
+      if (!dcap) return;
+      const D = rectIn(dcap), rD = radius(dcap);
+      dcap.style.visibility = 'hidden';
+      for (const t of tabs()) go(t, [{ opacity: 0 }, { opacity: 1 }], { duration: 140, delay: MORPH_MS, easing: 'ease-out', fill: 'backwards' });
+      morph(C, D, rC, rD, () => { dcap.style.visibility = ''; });
+      arcFly(corb, dockOrb, { onland: () => { orbPulse('pulse-land'); haptic('land'); } });
+    });
+    end(900);
   }
 }
+const centreOf = el => { const a = app.getBoundingClientRect(), r = el.getBoundingClientRect(); return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height / 2 }; };
 
 // Up next becomes the workout: the card's surface opens out into the page while the workout's cards
 // arrive on top of it (only when the workout screen follows the tap straight away; a readiness question

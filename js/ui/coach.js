@@ -129,6 +129,43 @@ export function renderCoach(root) {
   const hold = pendingSend || sending;
   if (hold) { const mine = [...root.querySelectorAll('.msg.me')].pop(); if (mine && mine.textContent.trim() === hold.text) mine.classList.add('sending', 'seen'); }
   if (pendingSend) nextFrame(() => { if (pendingSend) sendFly(root); });
+  // your spoken words, becoming your bubble: it's inverted onto them before this frame is painted
+  if (pendingWords) { const mine = [...root.querySelectorAll('#thread > .msg.me')].pop(); if (mine && mine.textContent.trim() === pendingWords.text) wordsFly(mine); }
+}
+
+// Words said to the floating orb or on the voice screen become your message: the bubble's own node
+// starts exactly over them (same place, their size), flies home into the thread, and its glass fades in
+// under the words as they land. (One node the whole way: the words ARE the bubble.)
+let pendingWords = null;
+export function wordsFrom(el, text) {
+  if (!el) { pendingWords = null; return; }
+  const r = document.createRange();
+  r.selectNodeContents(el);
+  const box = r.getBoundingClientRect();
+  if (!box.width) return;
+  pendingWords = { el, text: String(text || '').replace(/\s+/g, ' ').trim(), box, size: parseFloat(getComputedStyle(el).fontSize) || 21 };
+}
+function wordsFly(li) {
+  const p = pendingWords;
+  pendingWords = null;
+  const bub = li.querySelector('.bub');
+  if (!bub) return;
+  const b = bub.getBoundingClientRect(), l = li.getBoundingClientRect();
+  if (!b.width) return;
+  const k = p.size / (parseFloat(getComputedStyle(bub).fontSize) || 16);
+  const ox = b.left - l.left + b.width / 2, oy = b.top - l.top + b.height / 2;
+  const dx = p.box.left + p.box.width / 2 - (b.left + b.width / 2), dy = p.box.top + p.box.height / 2 - (b.top + b.height / 2);
+  if (stillMotion()) {
+    li.classList.add('seen', 'wordsin'); p.el.style.visibility = 'hidden'; return; // (reduced motion: the words are simply your message now)
+  }
+  bub.style.transition = 'none'; // (bare at once: its glass only ever fades in, as the words land)
+  li.classList.add('arriving', 'seen', 'wordsin');
+  bub.getBoundingClientRect(); bub.style.transition = '';
+  li.style.transformOrigin = `${ox}px ${oy}px`;
+  p.el.style.visibility = 'hidden'; // (the words themselves are this bubble now)
+  const a = li.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${k.toFixed(3)})` }, { transform: 'none' }], { duration: 480, easing: 'cubic-bezier(0.32, 0.72, 0, 1)', fill: 'backwards' });
+  setTimeout(() => li.classList.remove('arriving'), 300); // the glass fades in under them as they land
+  a.onfinish = a.oncancel = () => { li.style.transformOrigin = ''; li.classList.remove('arriving'); }; // (the words' old place stays empty: its screen restores it once it has gone)
 }
 
 // what a message looks like, apart from the words a streaming reply is still typing
