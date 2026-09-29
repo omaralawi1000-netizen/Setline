@@ -24,9 +24,10 @@
 // lobes gather into one beam that sweeps left and right while the words are being worked out). The
 // `mobile` type's tuning (the bottom of a phone screen), with a lower reach so it stays restrained.
 //
-// Changed for Setline: the original repaints its gradients every frame through custom properties;
-// here every lobe and mask is its own element moved only by transform and opacity, so the phone
-// composites it instead of repainting. The colours are Setline's theme instead of the rainbow, held
+// Changed for Setline: the original repaints its gradients every frame through custom properties.
+// Here it is one canvas (at 1× pixel density: it is all soft light) and every lobe, mask and edge is
+// a sprite drawn once when the glow opens, so a frame is a few dozen scaled image copies and there is
+// one layer on screen instead of two dozen masked ones (1.62.1; before, each lobe was its own element). The colours are Setline's theme instead of the rainbow, held
 // still (the library's `staticColors`), with no colour filters. Left out: the curved band line and the displacement warp
 // (a canvas and an SVG filter every frame: too much for a restrained glow on Android). It reads the
 // voice from the recorder's own analyser: no second microphone stream.
@@ -72,19 +73,61 @@ function follow(prev, target, dt, attack, release) {
   return prev + (target - prev) * (1 - Math.exp(-dt / Math.max(0.001, tau)));
 }
 
-// A layer: its lobes (each a soft ellipse, the original's radial gradient at the same size and fade)
-// inside a box masked to the layer's ellipse, which the driver scales from the bottom centre.
-function layerHTML(cls, { sw, sh, y, alpha, fade, mask, soft = false }) {
-  const lobes = LOBES.map((l, i) => {
-    const W = Math.round(l.w * sw), H = Math.round(l.h * sh), c = withAlpha(COLORS[i], alpha);
-    const stops = soft ? `${c},${withAlpha(COLORS[i], alpha * 0.55)} 40%,${withAlpha(COLORS[i], alpha * 0.18)} 70%,transparent ${fade}%` : `${c},transparent ${fade}%`;
-    return `<i style="width:${2 * W}px;height:${2 * H}px;margin:0 0 ${-H - y}px ${-W}px;background:radial-gradient(closest-side,${stops})"></i>`;
-  }).join('');
-  return `<div class="vg-l ${cls}"><div class="vg-m" style="width:${2 * mask.w}px;height:${mask.h}px;margin-left:${-mask.w}px;${maskCSS(mask)}">${lobes}</div></div>`;
+// ---------- sprites (drawn once per theme, then only copied) ----------
+const SPR = 64;
+const cssColor = (() => { let probe = null; return c => { probe ||= document.createElement('i'); probe.style.color = ''; probe.style.color = c; document.body.append(probe); const v = getComputedStyle(probe).color; probe.remove(); return v; }; })();
+const rgbaOf = (rgb, a) => { const m = /(\d+(?:\.\d+)?)[ ,]+(\d+(?:\.\d+)?)[ ,]+(\d+(?:\.\d+)?)/.exec(rgb) || [0, 255, 255, 255]; return `rgba(${m[1]},${m[2]},${m[3]},${Math.max(0, Math.min(1, a)).toFixed(3)})`; };
+function canvas(w, h) { const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; }
+// a lobe: the original's radial-gradient(closest-side, …) in a square, stretched to its ellipse when drawn
+function lobeSprite(rgb, alpha, fade, soft) {
+  const c = canvas(SPR, SPR), x = c.getContext('2d'), g = x.createRadialGradient(SPR / 2, SPR / 2, 0, SPR / 2, SPR / 2, SPR / 2);
+  g.addColorStop(0, rgbaOf(rgb, alpha));
+  if (soft) { g.addColorStop(0.4, rgbaOf(rgb, alpha * 0.55)); g.addColorStop(0.7, rgbaOf(rgb, alpha * 0.18)); }
+  g.addColorStop(fade / 100, rgbaOf(rgb, 0));
+  g.addColorStop(1, rgbaOf(rgb, 0));
+  x.fillStyle = g; x.fillRect(0, 0, SPR, SPR);
+  return c;
 }
-function maskCSS({ w, h, mid, tail = 0 }) {
-  const g = `radial-gradient(ellipse ${w}px ${h}px at 50% 100%,#fff 0%,rgba(255,255,255,.5) ${mid}%${tail ? `,rgba(255,255,255,${tail}) 85%` : ''},transparent 100%)`;
-  return `-webkit-mask-image:${g};mask-image:${g}`;
+// a layer's mask: the ellipse growing from the bottom centre of its box (2w × h), as its mask-image
+function maskSprite({ mid, tail = 0 }) {
+  const W = SPR * 2, H = SPR, c = canvas(W, H), x = c.getContext('2d');
+  x.setTransform(1, 0, 0, 1, W / 2, H); x.scale(1, 1);
+  const g = x.createRadialGradient(0, 0, 0, 0, 0, SPR);
+  g.addColorStop(0, '#fff'); g.addColorStop(mid / 100, 'rgba(255,255,255,.5)');
+  if (tail) g.addColorStop(0.85, `rgba(255,255,255,${tail})`);
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(-W / 2, -H, W, H);
+  return c;
+}
+function coreSprite() {
+  const c = canvas(SPR, SPR), x = c.getContext('2d'), g = x.createRadialGradient(SPR / 2, SPR / 2, 0, SPR / 2, SPR / 2, SPR / 2);
+  g.addColorStop(0, 'rgba(255,255,255,.45)'); g.addColorStop(0.3, 'rgba(255,255,255,.14)'); g.addColorStop(0.65, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, SPR, SPR);
+  return c;
+}
+const EDGE_CSS = Math.round(28 * SC); // the inner light's band in from each edge (--vg-edge)
+const Q = 0.5;                    // the canvas's scale (of CSS pixels)
+const TALL = 480;                 // the glow never reaches higher than this above the bottom edge
+const themeKey = () => (document.documentElement.dataset.accent || '') + '|' + (document.documentElement.dataset.theme || '');
+let shared = null;
+function themeSprites(layers) {
+  const key = themeKey();
+  if (shared?.key === key) return shared;
+  const rgb = COLORS.map(cssColor);
+  return (shared = { key, core: coreSprite(), layers: layers.map(ly => ({ mask: maskSprite(ly.base), lobes: rgb.map(c => lobeSprite(c, ly.alpha, ly.fade, ly.soft)) })) });
+}
+// the inner light shows in a band along the bottom and up each side (its two masks added); the
+// stroke only in the 1px ring round the edge of the screen
+function edgeMasks(W, H, EDGE) {
+  const e1 = canvas(W, H), x1 = e1.getContext('2d');
+  let g = x1.createLinearGradient(0, H, 0, H - EDGE); g.addColorStop(0, '#fff'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  x1.fillStyle = g; x1.fillRect(0, 0, W, H);
+  g = x1.createLinearGradient(0, 0, W, 0); const k = EDGE / W;
+  g.addColorStop(0, '#fff'); g.addColorStop(k, 'rgba(255,255,255,0)'); g.addColorStop(1 - k, 'rgba(255,255,255,0)'); g.addColorStop(1, '#fff');
+  x1.fillStyle = g; x1.fillRect(0, 0, W, H);
+  const e2 = canvas(W, H), x2 = e2.getContext('2d');
+  x2.fillStyle = '#fff'; x2.fillRect(0, H - 1, W, 1); x2.fillRect(0, 0, 1, H); x2.fillRect(W - 1, 0, 1, H); // (1 canvas px: 2 CSS px, softly)
+  return { inner: e1, ring: e2 };
 }
 
 export function createVoiceGlow(host, before = null) {
@@ -99,24 +142,34 @@ export function createVoiceGlow(host, before = null) {
   el.setAttribute('aria-hidden', 'true');
   // bottom to top as in the original: the inner light (hugging the edges), the stroke (the 1px edge
   // ring), the bloom
-  el.innerHTML =
-    layerHTML('vg-inner', { sw: gw(0.9), sh: gh(0.9), y: 0, alpha: 0.46, fade, mask: inner }) +
-    layerHTML('vg-stroke', { sw: gw(1), sh: gh(1), y: 2, alpha: 1, fade, mask: stroke }) +
-    // the bloom's blur is baked into its gradient (a longer, softer fall-off) instead of a blur
-    // filter re-run every frame over a moving layer
-    layerHTML('vg-bloom', { sw: gw(1.15) * 1.08, sh: gh(1.5) * 1.06, y: 0, alpha: 0.9, fade: 100, mask: bloom, soft: true });
-  // the hot white core at the centre of the edge: the light the colours fan out from
-  const coreEl = document.createElement('b');
-  coreEl.className = 'vg-core';
-  Object.assign(coreEl.style, { width: `${2 * core}px`, height: `${2 * core}px`, margin: `0 0 ${-core - 2}px ${-core}px` });
-  el.querySelector('.vg-stroke .vg-m').append(coreEl);
-  el.style.setProperty('--vg-edge', `${Math.round(28 * SC)}px`);
+  const cv = document.createElement('canvas');
+  cv.className = 'vg-canvas';
+  el.append(cv);
   if (before) host.insertBefore(el, before); else host.append(el);
-
-  const layers = ['vg-inner', 'vg-stroke', 'vg-bloom'].map((c, k) => {
-    const L = el.querySelector('.' + c);
-    return { L, M: L.firstElementChild, lobes: [...L.firstElementChild.children].filter(n => n.tagName === 'I'), base: [inner, stroke, bloom][k], opacity: [G.inner, G.stroke, G.bloom][k] };
-  });
+  const ctx = cv.getContext('2d');
+  // bottom to top as in the original: the inner light (hugging the edges), the stroke (the 1px edge
+  // ring), the bloom (its blur baked into a longer, softer fall-off)
+  const layers = [
+    { base: inner, opacity: G.inner, sw: gw(0.9), sh: gh(0.9), y: 0, alpha: 0.46, fade, soft: false, edge: 'inner' },
+    { base: stroke, opacity: G.stroke, sw: gw(1), sh: gh(1), y: 2, alpha: 1, fade, soft: false, edge: 'ring', core: true },
+    { base: bloom, opacity: G.bloom, sw: gw(1.15) * 1.08, sh: gh(1.5) * 1.06, y: 0, alpha: 0.9, fade: 100, soft: true }
+  ];
+  let sprites = null, W = 0, H = 0, buf = null, octx = null, edges = {};
+  // what the glow draws with: the theme's colours (shared by every glow) and canvases at the screen's
+  // size, made while the app is idle, so turning the glow on costs nothing mid-gesture
+  function prepare() {
+    const app = document.getElementById('app');
+    const w = Math.round(host.clientWidth || app?.clientWidth || innerWidth), h = Math.min(TALL, Math.round(host.clientHeight || app?.clientHeight || innerHeight));
+    sprites = themeSprites(layers);
+    if (w === W && h === H) return;
+    W = w; H = h;
+    // drawn at half the screen's size and stretched: it is all soft light, and a quarter of the pixels
+    cv.width = Math.round(W * Q); cv.height = Math.round(H * Q);
+    ctx.setTransform(Q, 0, 0, Q, 0, 0);
+    buf = canvas(Math.round(W * Q), Math.round(H * Q)); octx = buf.getContext('2d'); octx.setTransform(Q, 0, 0, Q, 0, 0);
+    edges = edgeMasks(Math.round(W * Q), Math.round(H * Q), EDGE_CSS * Q);
+  }
+  (window.requestIdleCallback || setTimeout)(prepare, { timeout: 3000 });
   const s = { level: 0, bands: [0, 0, 0], phase: 0, scanA: 0, scanT: 0, t: 0, on: false };
   const span = LOBE_SPAN * G.lobeSpacing;
 
@@ -127,7 +180,7 @@ export function createVoiceGlow(host, before = null) {
   const pace = { slowFor: 0, half: false, skip: false, probe: 0, acc: 0 };
   function step(dt, src, still) {
     const on = src.listening || src.processing;
-    if (on !== s.on) { s.on = on; el.classList.toggle('on', on); }
+    if (on !== s.on) { s.on = on; if (on && (!sprites || sprites.key !== themeKey())) prepare(); el.classList.toggle('on', on); }
     // switched off: it holds its last frame and fades out by opacity, with no more per-frame work
     if (!on) { Object.assign(s, { level: 0, bands: [0, 0, 0], scanA: 0, scanT: 0 }); return; }
     if (dt > 0.022) pace.slowFor += dt; else if (!pace.half) pace.slowFor = 0;
@@ -165,20 +218,43 @@ export function createVoiceGlow(host, before = null) {
     const glow = 0.15 + 0.85 * eff, h = 0.5 + G.reach * eff, w = (0.85 + G.spread * eff) * passW;
     if (!still) s.phase = (((s.phase + G.flow * eff * dt) % span) + span) % span;
     const bh = G.bend * eff;
-    // ── write: each layer's mask box scales from the bottom centre (the original's growing ellipse),
-    // and its lobes move inside it, divided by that scale so they keep their own size ──
-    for (const ly of layers) {
-      const Cx = w * maskW, Cy = (ly.base.h * h + bh) / ly.base.h;
-      ly.M.style.transform = `translateX(${(cx * w).toFixed(1)}px) scale(${Cx.toFixed(4)}, ${Cy.toFixed(4)})`;
-      ly.L.style.opacity = (glow * ly.opacity).toFixed(3);
+    // ── draw: each layer's lobes inside its mask ellipse, which grows from the bottom centre; the
+    // same geometry the original's elements had (mask box scaled by Cx, Cy round its bottom centre) ──
+    if (!W) return;
+    // only the part of the canvas the light covers is touched (a copy is paid per pixel)
+    ctx.clearRect(0, 0, W, H);
+    const X0 = W / 2 + cx * w;
+    for (let k = 0; k < layers.length; k++) {
+      const ly = layers[k], sp = sprites.layers[k], m = ly.base;
+      const Cx = w * maskW, Cy = (m.h * h + bh) / m.h;
+      const mw = m.w * Cx, mh = m.h * Cy;
+      const rx = Math.max(0, Math.floor(X0 - mw)), rw = Math.min(W, Math.ceil(X0 + mw)) - rx;
+      const ry = Math.max(0, Math.floor(H - mh)), rh = H - ry;
+      if (rw <= 0 || rh <= 0) continue;
+      octx.globalCompositeOperation = 'source-over';
+      octx.clearRect(rx, ry, rw, rh);
+      octx.save();
+      octx.beginPath(); octx.rect(rx, ry, rw, rh); octx.clip();
       for (let i = 0; i < LOBES.length; i++) {
-        const x = wrapX(LOBES[i].x * G.lobeSpacing + s.phase, span);
-        const amp = (0.6 + 0.7 * s.bands[LOBES[i].band]) * edgeEnvelope(x, span);
-        ly.lobes[i].style.transform = `translate(${((x * gather * w) / Cx).toFixed(1)}px, 0) scale(${(w / Cx).toFixed(4)}, ${((h * amp) / Cy).toFixed(4)})`;
+        const L = LOBES[i];
+        const x = wrapX(L.x * G.lobeSpacing + s.phase, span);
+        const amp = (0.6 + 0.7 * s.bands[L.band]) * edgeEnvelope(x, span);
+        const lw = Math.round(L.w * ly.sw) * w, lh = Math.round(L.h * ly.sh) * h * amp; // half sizes, on screen
+        const lx = X0 + x * gather * w, ly0 = H + ly.y * Cy;
+        if (lw > 0.5 && lh > 0.5) octx.drawImage(sp.lobes[i], lx - lw, ly0 - lh, lw * 2, lh * 2);
       }
+      if (ly.core) { const r = Math.round(30 * G.coreSize); const cw = r * w, ch = r * h; octx.drawImage(sprites.core, X0 - cw, H + 2 * Cy - ch, cw * 2, ch * 2); }
+      octx.globalCompositeOperation = 'destination-in';
+      octx.drawImage(sp.mask, X0 - mw, H - mh, mw * 2, mh);
+      if (ly.edge) { octx.setTransform(1, 0, 0, 1, 0, 0); octx.drawImage(edges[ly.edge], 0, 0); octx.setTransform(Q, 0, 0, Q, 0, 0); }
+      octx.restore();
+      ctx.globalAlpha = Math.min(1, glow * ly.opacity);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      const qx = Math.floor(rx * Q), qy = Math.floor(ry * Q), qw = Math.min(buf.width - qx, Math.ceil(rw * Q) + 1), qh = buf.height - qy;
+      ctx.drawImage(buf, qx, qy, qw, qh, qx, qy, qw, qh);
+      ctx.setTransform(Q, 0, 0, Q, 0, 0);
     }
-    const S = layers[1];
-    coreEl.style.transform = `scale(${(w / (w * maskW)).toFixed(4)}, ${(h / ((S.base.h * h + bh) / S.base.h)).toFixed(4)})`;
+    ctx.globalAlpha = 1;
   }
 
   // off at once (the voice closed): the glow fades out by its own opacity and the envelope starts

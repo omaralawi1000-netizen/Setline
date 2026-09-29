@@ -13,19 +13,33 @@ export function normalize(s) {
     .replace(/[^a-z0-9]+/g, '');
 }
 
-export function levenshtein(a, b) {
+// Edit distance. With `max`, it stops as soon as the distance must be over it and returns max + 1
+// (callers only ask "within 1?", "within 2?"): the parser asks thousands of these per sentence, so the
+// rows are reused typed arrays and hopeless pairs end early.
+let rowA = new Int32Array(64), rowB = new Int32Array(64);
+export function levenshtein(a, b, max = Infinity) {
   if (a === b) return 0;
-  if (!a.length) return b.length;
-  if (!b.length) return a.length;
-  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
-  for (let i = 1; i <= a.length; i++) {
-    const cur = [i];
-    for (let j = 1; j <= b.length; j++) {
-      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  const la = a.length, lb = b.length;
+  if (!la) return lb;
+  if (!lb) return la;
+  if (Math.abs(la - lb) > max) return max + 1;
+  if (rowA.length <= lb) { rowA = new Int32Array(lb + 1); rowB = new Int32Array(lb + 1); }
+  let prev = rowA, cur = rowB;
+  for (let j = 0; j <= lb; j++) prev[j] = j;
+  for (let i = 1; i <= la; i++) {
+    cur[0] = i;
+    let lo = i;
+    const ca = a.charCodeAt(i - 1);
+    for (let j = 1; j <= lb; j++) {
+      const del = prev[j] + 1, ins = cur[j - 1] + 1, sub = prev[j - 1] + (ca === b.charCodeAt(j - 1) ? 0 : 1);
+      const v = del < ins ? (del < sub ? del : sub) : (ins < sub ? ins : sub);
+      cur[j] = v;
+      if (v < lo) lo = v;
     }
-    prev = cur;
+    if (lo > max) return max + 1;
+    const t = prev; prev = cur; cur = t;
   }
-  return prev[b.length];
+  return prev[lb] > max ? max + 1 : prev[lb];
 }
 
 // ---------- word by word ----------
@@ -51,7 +65,7 @@ function wordSim(a, b) {
   if (a.length >= 4 && b.length >= 4 && stem(a) === stem(b)) return 0.95;
   const [s, l] = a.length <= b.length ? [a, b] : [b, a];
   if (s.length >= 4 && l.startsWith(s) && l.length - s.length <= 3) return 0.85;
-  if (s.length >= 4) { const d = levenshtein(a, b); if (d <= 1) return 0.8; if (d <= 2 && s.length >= 7) return 0.7; }
+  if (s.length >= 4) { const d = levenshtein(a, b, 2); if (d <= 1) return 0.8; if (d <= 2 && s.length >= 7) return 0.7; }
   return 0;
 }
 const weightOf = w => (MOD.has(w) ? 0.6 : 1);
@@ -94,10 +108,9 @@ export function createCatalog(custom = []) {
     const at = term.indexOf(q);
     if (at > 0) return 60 - Math.min(20, at);
     if (q.length >= 4) {
-      const d = levenshtein(term.slice(0, q.length + 1), q);
-      const d2 = levenshtein(term, q);
-      const dist = Math.min(d, d2);
-      if (dist <= Math.floor(q.length / 4)) return 40 - dist * 5;
+      const lim = Math.floor(q.length / 4);
+      const dist = Math.min(levenshtein(term.slice(0, q.length + 1), q, lim), levenshtein(term, q, lim));
+      if (dist <= lim) return 40 - dist * 5;
     }
     return 0;
   }

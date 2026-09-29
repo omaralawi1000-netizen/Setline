@@ -7,9 +7,9 @@
 import { launch, newPage, serve, settle, onScreen } from './lib/harness.mjs';
 import { STAND_IN, mockServices, installSampler, mark, samples, between } from './lib/voiceflow.mjs';
 
-// Flows written for 1.60's design; with the 1.59.1 design back (1.62.0) they report but don't fail until
-// the master fix's phase 2 updates them.
-const ADVISORY = new Set(['voice-to-coach', 'chat-stream']);
+// chat-stream is 1.60's in-place chat, which the master fix's phase 3 brings to this design: until then
+// it reports without failing.
+const ADVISORY = new Set(['chat-stream']);
 const ONLY = process.argv.find(a => a.startsWith('--only='))?.slice(7).split(',').filter(Boolean);
 
 const countWorkouts = page => page.evaluate(() => new Promise((resolve, reject) => {
@@ -91,9 +91,10 @@ const FLOWS = {
     return errors.filter(e => !/offline|network|fetch/i.test(e));
   },
 
-  // Hold the orb → talk → release → the question goes to the Coach. One listening UI (the sheet),
-  // one orb on screen at every frame, the sheet's top bar and controls there from open to handoff,
-  // and Home never shows on the way from the sheet into the chat.
+  // 1.59.1's voice flow: hold the dock orb → the floating orb lifts over the page and listens → pull up
+  // into the voice screen → release → the question goes to the Coach, once. From the moment the
+  // floating orb is up until the voice screen hands over, the page is always covered (the floating
+  // orb's scrim or the voice screen's backdrop: both fading at once used to let the page show through).
   'voice-to-coach': async (browser, base) => {
     const { context, page, errors } = await newPage(browser, base);
     await mockServices(page);
@@ -102,34 +103,38 @@ const FLOWS = {
     await onScreen(page, 'today');
     await page.evaluate(async () => { const s = await import('./js/store.js'); s.setSettings({ spoken: 'off' }); });
     await settle(page, 1000);
-    await installSampler(page);
+    await page.evaluate(() => {
+      window.__cover = [];
+      const op = el => { if (!el || el.closest('[hidden]')) return 0; let o = 1; for (let n = el; n; n = n.parentElement) o *= +getComputedStyle(n).opacity; return o; };
+      const tick = () => {
+        const mini = document.getElementById('ofloat'), full = document.getElementById('voice');
+        window.__cover.push({ t: performance.now(), mini: !mini.hidden, full: !full.hidden, cover: Math.max(op(mini.querySelector('.oscrim')), op(full.querySelector('.vbg'))) });
+        if (window.__cover.length < 4000) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
     const orb = await page.locator('#dock .orbbtn').boundingBox();
-    await page.mouse.move(orb.x + orb.width / 2, orb.y + orb.height / 2);
-    await mark(page, 'down');
+    const x = orb.x + orb.width / 2, y = orb.y + orb.height / 2;
+    await page.mouse.move(x, y);
     await page.mouse.down();
-    await page.waitForSelector('#voice.on', { timeout: 4000 });
-    await mark(page, 'open');
-    if (await page.locator('#ofloat:not([hidden])').count()) throw new Error('the floating orb over Home showed (a second listening UI)');
-    await page.waitForSelector('#voice[data-phase=listening]', { timeout: 6000 });
-    await settle(page, 1500);
-    await mark(page, 'release');
+    await page.waitForSelector('#ofloat.on', { timeout: 4000 });
+    await page.waitForSelector('#ofloat[data-phase=listening]', { timeout: 6000 });
+    const upAt = await page.evaluate(() => performance.now());
+    await settle(page, 700);
+    for (let dy = 10; dy <= 180; dy += 10) await page.mouse.move(x, y - dy);
+    await page.waitForSelector('#voice.on[data-phase=listening]', { timeout: 4000 });
+    await settle(page, 900);
+    const relAt = await page.evaluate(() => performance.now());
     await page.mouse.up();
     await onScreen(page, 'coach', 10000);
     await page.waitForSelector('#voice[hidden]', { state: 'attached', timeout: 6000 });
     await settle(page, 700);
-    await mark(page, 'end');
-    const rec = await samples(page);
-    const all = between(rec, 'down', 'end');
-    const two = all.filter(x => x.orbs > 1);
-    if (two.length) throw new Error(`${two.length} frame(s) with ${Math.max(...two.map(x => x.orbs))} orbs on screen (${two[0].orbIds})`);
-    const openAt = rec.marks.find(m => m.name === 'open').t;
-    const handoff = all.find(x => x.handoff)?.t;
-    if (!handoff) throw new Error('the sheet never handed over to the Coach');
-    const session = all.filter(x => x.t > openAt + 600 && x.t < handoff);
-    const gone = session.filter(x => !x.chrome);
-    if (gone.length) throw new Error(`the sheet's top bar or controls were missing in ${gone.length} of ${session.length} frames (${gone[0].why})`);
-    const home = all.filter(x => x.t >= handoff && x.home);
-    if (home.length) throw new Error(`Home showed in ${home.length} frame(s) on the way to the Coach`);
+    const frames = await page.evaluate(() => window.__cover);
+    // covered from once the scrim has faded in (0.4 s) until release
+    const open = frames.filter(f => f.t > upAt + 450 && f.t < relAt && (f.mini || f.full));
+    const thin = open.filter(f => f.cover < 0.9);
+    if (!open.length) throw new Error('never saw the floating orb or the voice screen');
+    if (thin.length) throw new Error(`the page showed through in ${thin.length} of ${open.length} frames (cover ${Math.min(...thin.map(f => f.cover)).toFixed(2)})`);
     const users = await page.locator('#s-coach .msg.me').count();
     if (users !== 1) throw new Error(`expected the question once in the chat, found ${users}`);
     await context.close();

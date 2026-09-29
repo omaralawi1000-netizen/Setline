@@ -3,6 +3,7 @@
 // the way, the list scrolls by itself near the top or bottom, and on letting go the row settles into
 // its slot before onMove(from, to) redraws the list. Only transform moves.
 import { haptic } from '../haptics.js';
+import { onFrame } from './frame.js';
 
 const HOLD_MS = 320, EDGE = 72;
 const still = () => document.documentElement.dataset.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -25,7 +26,7 @@ export function sortable(root, { item, handle, onMove, hold = true }) {
     rows.forEach(r => { if (r !== row) r.classList.add('shifting'); });
     try { row.setPointerCapture?.(e.pointerId); } catch {}
     haptic('tap');
-    tick();
+    d.raf = onFrame(tick);
   };
 
   const place = () => {
@@ -57,14 +58,13 @@ export function sortable(root, { item, handle, onMove, hold = true }) {
       const v = d.y < b.top + EDGE ? -(b.top + EDGE - d.y) : d.y > b.bottom - EDGE ? d.y - (b.bottom - EDGE) : 0;
       if (v) { d.sc.scrollTop += Math.max(-18, Math.min(18, v * 0.25)); place(); }
     }
-    d.raf = requestAnimationFrame(tick);
   };
 
   const finish = cancel => {
     if (!d) return;
     const x = d;
     d = null;
-    cancelAnimationFrame(x.raf);
+    x.raf?.();
     const to = cancel ? x.from : x.to;
     // the row settles into its slot, then the list is drawn in its new order
     const slot = to === x.from ? 0 : (to > x.from ? 1 : -1) * x.rects.slice(Math.min(x.from, to) + (to > x.from ? 1 : 0), Math.max(x.from, to) + (to > x.from ? 1 : 0)).reduce((a, q) => a + q.h + x.gap, 0);

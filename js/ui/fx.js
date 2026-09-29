@@ -1,9 +1,18 @@
 // Moments of delight: bursts, count-ups, orb pulses. Transform/opacity only; skipped with reduced motion.
+import { onFrame } from './frame.js';
 const reduced = () => document.documentElement.dataset.motion === 'off' ||
   (document.documentElement.dataset.motion !== 'on' && matchMedia('(prefers-reduced-motion: reduce)').matches);
 
 // A motion token from css/tokens.css: a duration in ms, or an easing as written.
+// (read once each: asking for a computed style mid-transition makes the browser work the page out again)
+const tokens = new Map();
 export function token(name) {
+  if (tokens.has(name)) return tokens.get(name);
+  const v = tokenOf(name);
+  tokens.set(name, v);
+  return v;
+}
+function tokenOf(name) {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   if (/^[\d.]+m?s$/.test(v)) return parseFloat(v) * (v.endsWith('ms') ? 1 : 1000);
   return v || 'ease';
@@ -49,9 +58,9 @@ export function countUp(el, to, { ms = 900, format = v => Math.round(v).toLocale
     const k = Math.min(1, (now - t0) / ms);
     const s = format(to * ease(k));
     if (el.textContent !== s) el.textContent = s; // (only when the digits change: each write lays the page out again)
-    if (k < 1) requestAnimationFrame(step);
+    if (k >= 1) stop();
   };
-  requestAnimationFrame(step);
+  const stop = onFrame(step);
 }
 
 // Every [data-count] in root counts up to its data-count value (formatted with data-dp decimals).

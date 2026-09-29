@@ -31,6 +31,7 @@ import { renderProgress, renderExercise, setRange } from './ui/progress.js';
 import { countAll, burst, orbStreak, orbPulse } from './ui/fx.js';
 import { syncBeams } from './ui/beam.js';
 import { startDotOrbs, handOrb } from './ui/dotorb.js';
+import { initPerf } from './ui/perf.js';
 import { initPress } from './ui/press.js';
 import { initChrome, refreshChrome } from './ui/chrome.js';
 import { openCustomize } from './ui/customize.js';
@@ -349,8 +350,11 @@ function show(name, { back = false, still = false } = {}) {
   const coachSwap = prev !== name && (prev === 'coach' || name === 'coach') && TABS.includes(prev) && TABS.includes(name);
   // Chrome is already animating this (its own back-swipe from the left edge): don't animate on top
   if (still) { app.classList.add('uanav'); setTimeout(() => app.classList.remove('uanav'), 60); }
+  // the sea drifts to its place for this screen once the screens have finished moving (it moves by a
+  // long transition, and every frosted surface over it would be blurred afresh each frame meanwhile)
   const amb = document.querySelector('.ambient');
-  if (amb && name !== 'coach') amb.dataset.s = TABS.includes(name) ? name : 'sub';
+  clearTimeout(show.sea);
+  if (amb && name !== 'coach') { const s = TABS.includes(name) ? name : 'sub'; show.sea = setTimeout(() => { amb.dataset.s = s; }, still || stillMotion() ? 0 : 700); }
   const dir = prev === name ? 0 : (back ? -1 : Math.sign((ORDER[name] ?? 0) - (ORDER[prev] ?? 0)) || 1);
   for (const s of document.querySelectorAll('.screen')) {
     const on = s.dataset.screen === name;
@@ -535,6 +539,7 @@ Object.assign(actions, {
 initPress(document);
 initChrome();
 startDotOrbs();
+initPerf(); // ?perf=1: a tiny frame meter in the corner (dev only)
 app.addEventListener('dockopen', () => renderDock());
 initHandsFree();
 initBodyScreen($('#s-body'));

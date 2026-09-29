@@ -37,6 +37,7 @@ import { createVoiceGlow } from './voiceglow.js';
 import { ask as askCoach, ensureModels } from './coach.js';
 import { cmdModels } from '../settings.js';
 import { createEndpointer, looksUnfinished } from '../endpoint.js';
+import { onFrame } from './frame.js';
 
 const endpoint = createEndpointer({ pauseMs: 850 });
 const WAIT_MS = 3000; // sounded unfinished: still send after this much quiet
@@ -183,6 +184,7 @@ const dockOrb = () => document.querySelector('#dock .orbbtn .orb');
 function syncOrb(src, dst) {
   if (!src || !dst) return;
   handOrb(src, dst); // the dotted orbs: the same pose, and just as swollen or lit
+  if (dst.classList.contains('dotted')) return; // (their blobs are hidden: nothing else to line up)
   const a = src.querySelectorAll('.core, .core b'), b = dst.querySelectorAll('.core, .core b');
   b.forEach((d, i) => {
     const from = a[i]?.getAnimations?.() || [], to = d.getAnimations?.() || [];
@@ -264,6 +266,16 @@ function flyMini(open) {
   trail(el.mini, w, open ? dock : mid(was), open ? mid(b) : dock, w);
 }
 
+// Once the voice screen has faded in, the page under it (which still shows through faintly) holds still (.app.voice-covered); it
+// comes back the moment the screen starts to close, while the backdrop still covers it.
+let coverTimer = 0;
+function coverPage(on) {
+  const app = document.getElementById('app');
+  clearTimeout(coverTimer);
+  if (!on) { app.classList.remove('voice-covered'); return; }
+  coverTimer = setTimeout(() => { if (v.open && v.mode === 'full') app.classList.add('voice-covered'); }, reduced() ? 160 : 460);
+}
+
 function pushVoiceEntry() {
   const push = () => { if (v.open && !history.state?.voice) history.pushState({ ...(history.state || {}), voice: 1 }, ''); };
   if (v.closing) v.closing.then(push); else push();
@@ -317,10 +329,13 @@ function expandFull() {
   void el.layer.offsetWidth;
   el.layer.classList.add('on');
   flyOrb(true, from);
+  coverPage(true);
   setPhase(v.phase);
   el.mini.classList.remove('on');
   el.mini.classList.add('handoff');
-  setTimeout(() => { el.mini.hidden = true; el.mini.classList.remove('handoff'); document.getElementById('app').classList.remove('voice-mini'); el.owrap.style.translate = ''; }, 260);
+  // (the scrim stays up until the voice screen's backdrop has faded in over it: both fading at once let
+  // the page show through for a moment)
+  setTimeout(() => { if (v.mode !== 'full') return; el.mini.hidden = true; el.mini.classList.remove('handoff'); document.getElementById('app').classList.remove('voice-mini'); el.owrap.style.translate = ''; }, reduced() ? 0 : 420);
 }
 
 export function openVoice() {
@@ -342,6 +357,7 @@ export function openVoice() {
   void el.layer.offsetWidth;
   el.layer.classList.add('on');
   flyOrb(true);
+  coverPage(true);
   // own history entry so Android back closes the layer; wait for a previous close to settle first
   const push = () => { if (v.open && !history.state?.voice) history.pushState({ ...(history.state || {}), voice: 1 }, ''); };
   if (v.closing) v.closing.then(push); else push();
@@ -377,6 +393,7 @@ export function closeVoice({ fromPop = false } = {}) {
     return v.closing;
   }
   el.input.blur();
+  coverPage(false);
   el.layer.classList.remove('on');
   el.layer.inert = true;
   el.orb.style.transform = '';
@@ -414,7 +431,6 @@ export function voiceHandlePop() {
 function startLoop() {
   if (v.raf) return;
   const tick = now => {
-    v.raf = requestAnimationFrame(tick);
     const listening = v.phase === 'listening';
     const target = listening ? mic.level() : 0;
     v.lvl += (target - v.lvl) * (target > v.lvl ? 0.45 : 0.12);
@@ -444,8 +460,10 @@ function startLoop() {
     v.lo += (b.low - v.lo) * (b.low > v.lo ? 0.4 : 0.12);
     v.hi += (b.high - v.hi) * (b.high > v.hi ? 0.55 : 0.18);
     const fq = v.mode === 'mini' ? el.oorb : el.orb;
-    fq.style.setProperty('--lo', v.lo.toFixed(3));
-    fq.style.setProperty('--hi', v.hi.toFixed(3));
+    if (!fq.classList.contains('dotted')) { // (the blobs and rim they light are hidden on a dotted orb)
+      fq.style.setProperty('--lo', v.lo.toFixed(3));
+      fq.style.setProperty('--hi', v.hi.toFixed(3));
+    }
     // alive, not mechanical: a slow breath, and a soft squash and stretch that follows the voice
     const breath = v.phase === 'thinking' ? 0 : 0.012 * Math.sin(now / 700);
     const sx = 1 + breath + l * 0.07 + l * 0.025 * Math.sin(now / 95);
@@ -472,10 +490,10 @@ function startLoop() {
       el.bars[i].style.transform = `scaleY(${h.toFixed(3)})`;
     }
   };
-  v.raf = requestAnimationFrame(tick);
+  v.raf = onFrame(tick);
 }
 
-function stopLoop() { cancelAnimationFrame(v.raf); v.raf = 0; v.lastTick = 0; el.glowFull?.off(); el.glowMini?.off(); }
+function stopLoop() { v.raf?.(); v.raf = 0; v.lastTick = 0; el.glowFull?.off(); el.glowMini?.off(); }
 
 // ---------- recording ----------
 
@@ -1190,6 +1208,9 @@ export function initVoice(n) {
   el.owrap.addEventListener('pointerup', dragEnd);
   el.owrap.addEventListener('pointercancel', dragEnd);
 
+  // the parser's first sentence is its slowest (nothing compiled yet): run one while the app is idle,
+  // so the first thing you say isn't also a hitch at the moment you let go
+  (window.requestIdleCallback || setTimeout)(() => { try { parse('bench press 80 kg 8 reps', parseCtx()); } catch {} }, { timeout: 4000 });
   tts.onSpeaking(on => document.getElementById('app').classList.toggle('speaking', on));
   store.subscribe(reason => { if (reason === 'settings' && v.open) paintStatic(); });
 }

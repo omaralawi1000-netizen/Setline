@@ -1,6 +1,7 @@
 // Motion & performance rules, checked (see CLAUDE.md). Run by tests/motion-rules.test.js and by
 //   node scripts/lib/motionrules.mjs          (prints every violation)
-// 1. CSS transitions and @keyframes animate only transform (incl. translate/scale/rotate), opacity, filter and clip-path.
+// 1. CSS transitions and @keyframes never animate layout (width, height, top, left, margin, padding, all…);
+//    paint properties are fine (see ALLOWED), and the few layout transitions in KEPT_LAYOUT are kept on purpose.
 // 2. (backdrop-filter rule removed by Omar's decision: blur is allowed anywhere.)
 // 3. Element.animate() keyframes in the app's JS animate only transform/opacity/filter/clip-path.
 // (`visibility` is allowed in keyframes: it switches, it isn't interpolated or repainted per frame.)
@@ -13,6 +14,12 @@ import { join } from 'node:path';
 
 const ALLOWED = new Set(['transform', 'opacity', 'filter', 'clip-path', 'color', 'background-color', 'border-color', 'box-shadow', 'background-position', 'fill', 'stroke', 'stroke-dashoffset', 'stroke-dasharray', 'd', 'backdrop-filter', 'outline-color', 'text-shadow', 'background', 'border', 'translate', 'scale', 'rotate', 'visibility', 'animation-timing-function', 'none']);
 const SVG_KF = new Set(['draw', 'drawline', 'ckdraw', 'ringfill', 'dringdraw']);
+// Layout transitions 1.59.1's look is built on, kept on purpose (1.62.1): the bar folding into the pill on
+// scroll (its glass must stay real blur and keep its rounded rim, which a scale would stretch), the
+// tab lens and the send button growing, and the food split's bars. Each is one small element, never
+// on the voice or chat paths while they move. Anything new that animates layout fails the check.
+const KEPT_LAYOUT = new Set(['.dock', '.dock .ind', '.tab', '.orbbtn', '.composer', '.composer .csend', '.frow', '.fwp', '.fsplit i']);
+const paintOnly = p => p.startsWith('--') || p === 'fill-opacity';
 const JS_OK = { 'js/ui/figure.js': new Set(['d']), 'js/ui/workout.js': new Set(['stroke-dashoffset']) };
 export const GLASS = /(^|[\s,>])(\.dcap|\.obub|\.composer|#composer)\b/;
 
@@ -59,13 +66,13 @@ export function checkCss(css, file = 'css') {
       for (const block of r.body.split('}')) {
         const k = block.indexOf('{');
         if (k < 0) continue;
-        for (const [p] of decls(block.slice(k + 1))) if (p && !ALLOWED.has(p) && !(p === 'stroke-dashoffset' && SVG_KF.has(r.name))) bad.push(`${file}: @keyframes ${r.name} animates ${p}`);
+        for (const [p] of decls(block.slice(k + 1))) if (p && !ALLOWED.has(p) && !paintOnly(p) && !(p === 'stroke-dashoffset' && SVG_KF.has(r.name))) bad.push(`${file}: @keyframes ${r.name} animates ${p}`);
       }
       continue;
     }
     for (const [p, v] of decls(r.body)) {
       if (p === 'transition' || p === 'transition-property') {
-        for (const t of transitionProps(v)) if (!ALLOWED.has(t) && !(t === 'stroke-dashoffset' && r.selector.includes('.fg'))) bad.push(`${file}: ${r.selector} transitions ${t}`);
+        for (const t of transitionProps(v)) if (!ALLOWED.has(t) && !paintOnly(t) && !KEPT_LAYOUT.has(r.selector.trim()) && !(t === 'stroke-dashoffset' && r.selector.includes('.fg'))) bad.push(`${file}: ${r.selector} transitions ${t}`);
       }
     }
   }

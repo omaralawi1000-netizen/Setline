@@ -745,3 +745,16 @@ Fixes the flashes, lag and half-drawn frames in the voice → Coach recording, i
 - Omar chose 1.59.1's design: the floating mini orb over the page, pulling up into the full voice screen, frosted glass and the sea light. The app (index.html, css, js, sw.js, manifest, icons, SPEC.md, PLAN.md, visual baselines) is exactly 1.59.1 again (2e5ef25); the checks added since (golden flows, motion checker, `npm run motion`) are kept. The 1.60 budget test and the voice-to-coach / chat-stream golden flows describe 1.60's design, so they report without failing until phase 2 brings them up to date.
 - The database is schema 4 in both, so nothing logged changes. The version moved up so the phone takes the update. What came before is on the branch backup-before-restore-1.59.1.
 - Next (phases 2–4): make it fast without changing the look (blur audit, background holds still, one frame loop), fix the voice → Coach and chat flow bugs, then review-before-send and voice-reactive dots.
+
+## 1.62.1: same look, drawn for less (master fix, phase 2)
+
+- Nothing restyled. Numbers, root causes and the blur audit are in docs/PERF.md.
+- Hold → release → Coach no longer stalls on the command parser (a faster, bounded word match, warmed
+  up while idle) or on the dotted orb forcing a style pass every frame.
+- One shared animation frame for everything that draws per frame; `?perf=1` shows a frame meter.
+- The voice glow is one canvas (it was ~25 layers); no layer is kept just in case; the sea, clouds and
+  the Coach's glow hold still while scrolling, while screens or sheets move and under the voice UI.
+- The floating orb's scrim stays up until the voice screen has covered the page (the flash where the
+  page showed through at the pull-up).
+- `tests/motion-rules.test.js` is blocking again (no layout animation except a documented few), and the
+  `voice-to-coach` golden flow follows 1.59.1's flow (floating orb → pull up → voice screen → Coach).

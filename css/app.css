@@ -1825,7 +1825,6 @@ html[data-dock=icons] .dock .tab span{display:none}
 .msg.ai:not(.is-streaming):not(.seen) .bub{animation:settle .9s ease-out}
 @keyframes settle{0%{box-shadow:0 0 0 1px rgba(var(--a-rgb),.45),0 0 24px -6px rgba(var(--a-rgb),.55)}100%{box-shadow:0 0 0 1px transparent,0 0 0 0 transparent}}
 .msg.ai .bub{backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%)}
-.msg.is-streaming .bub{transition:height .2s}
 
 /* targets that add up: the numbers that followed your change glow for a moment */
 .stepper b.synced{animation:synced .8s ease-out}
@@ -3043,3 +3042,33 @@ html[data-motion=off] .tab.on svg.ti{animation:none!important}
 .composer:is([data-talk=listening],[data-talk=hearing]) .corb::after{animation:none;opacity:0}
 .composer.talking,.composer.dictating{box-shadow:0 0 0 1px rgba(var(--a-rgb),.35),0 18px 40px -18px rgba(var(--v-rgb),.6)}
 .dock .ind.moving{animation:none}
+
+/* ======================= 1.62.1: the same look, drawn for less ======================= */
+/* No layer is kept around "just in case": the browser lifts what animates while it animates, and
+   script-driven parts are lifted only while their screen is open (.vlayer/.ofloat are display:none
+   when closed). Keyframes that end on a filter end on `none`, so a finished word or letter carries no
+   filter. The sea, the clouds and the Coach's glow hold still (paused, not reset) while the page
+   scrolls, a screen or sheet moves, or the voice UI covers the page: .app.bg-still, set in app.js. */
+.dock{will-change:auto}
+.ambient i{will-change:auto}
+.wave i{will-change:auto}
+.vlayer:not([data-phase=idle]) .wave{will-change:transform}
+.vg-m > i,.vg-m > .vg-core{will-change:auto}
+.vg-m{will-change:auto}
+.vglow.on .vg-m{will-change:transform}
+.aura .clouds i{will-change:auto}
+.app.thinking .aura .clouds i{will-change:transform}
+.cglow i,.cglow::after{will-change:auto}
+.app.coaching .cglow i,.app.coaching .cglow::after{will-change:transform}
+.orb .core b{mix-blend-mode:normal;will-change:auto}
+@keyframes wordrise{0%{opacity:0;filter:blur(5px);transform:translateY(.28em)}55%{opacity:.85;filter:blur(1.2px)}100%{opacity:1;filter:none;transform:none}}
+@keyframes thinkin{to{opacity:.95;filter:none;transform:none}}
+.app.bg-still :is(.aura .clouds i,.aura .glow,.cglow i,.cglow::after,.ambient i){animation-play-state:paused!important}
+/* under the floating orb and the voice screen the page still shows through (faintly under the voice
+   screen: its backdrop isn't quite opaque, which is part of the look), but it holds still */
+.app.voice-mini > .screen.on *,.app.voice-covered > .screen.on *{animation-play-state:paused!important}
+/* the voice glow is one canvas along the bottom (js/ui/voiceglow.js) */
+.vg-canvas{position:absolute;left:0;right:0;bottom:0;width:100%;height:min(480px,100%);display:block}
+/* set every frame from the voice loop (already eased there): a transition on it restarted each frame */
+.ofloat .orb.lift::before{transition:none}
+.ofloat.handoff .oscrim{opacity:1;transition:none}

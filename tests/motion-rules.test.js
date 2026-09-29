@@ -8,9 +8,7 @@ import { checkAll, checkCss, checkJs } from '../scripts/lib/motionrules.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-// Non-blocking while the 1.59.1 design is back (1.62.0): 1.59.1 breaks this budget. The master fix's
-// phase 2 brings it in line with the restored design and turns it on again.
-test('the app never animates layout properties', { skip: 'the 1.59.1 design is back; re-enabled in the master fix phase 2' }, () => {
+test('the app never animates layout properties', () => {
   const bad = checkAll(root);
   assert.deepEqual(bad, [], bad.join('\n'));
 });

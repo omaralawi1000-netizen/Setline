@@ -27,6 +27,7 @@ import { toast } from './toast.js';
 import { pinHTML } from './pins.js';
 import { openQuickReport, FLAG } from './report.js';
 import { token } from './fx.js';
+import { onFrame } from './frame.js';
 
 let nav = { openSettings: () => {} };
 let inflight = null; // {ctl, id}
@@ -146,11 +147,11 @@ function sendFly(root) {
   const ease = w => t => 1 - (1 + w * t) * Math.exp(-w * t); // a spring that settles without bouncing
   const ey = ease(9), ex = ease(7), es = ease(8);
   const dur = token('--m-slow') * 1.25, t0 = performance.now();
-  let last = { x: sx, y: sy }, raf = 0, over = false;
+  let last = { x: sx, y: sy }, raf = null, over = false;
   const done = () => {
     if (over) return;
     over = true;
-    cancelAnimationFrame(raf);
+    raf?.();
     reveal();
     ghost.remove();
   };
@@ -162,7 +163,7 @@ function sendFly(root) {
     ghost.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
     ghost.firstChild.style.transform = `scale(${k.toFixed(4)})`;
     if (t >= 1 || !s) return done();
-    raf = requestAnimationFrame(frame);
+    raf ||= onFrame(frame);
   };
   frame(t0);
   // …and the conversation above makes room for it by gliding up, instead of jumping
@@ -302,15 +303,14 @@ function typewriter(root, id) {
     }
     if (done()) {
       // let the last words finish settling before anything re-renders the bubble
+      raf?.();
       raf = 0;
       last = 0;
       setTimeout(() => { if (done()) waiters.splice(0).forEach(r => r()); }, WORD_MS);
-      return;
     }
-    raf = requestAnimationFrame(step);
   };
   return {
-    set(t) { words = t.match(/\S+\s*/g) || []; if (!raf) raf = requestAnimationFrame(step); },
+    set(t) { words = t.match(/\S+\s*/g) || []; if (!raf) raf = onFrame(step); },
     // (a safety net in case frames stop, sized to what's still to show at the fastest pace)
     drain: () => (done() && !raf ? new Promise(r => setTimeout(r, WORD_MS)) : Promise.race([new Promise(r => waiters.push(r)), new Promise(r => setTimeout(r, 3000 + ((words.length - shown) / 40) * 1000))]))
   };
@@ -419,7 +419,7 @@ function voiceLight(composer) {
   let raf = 0, lv = 0;
   let quiet = 0;
   const stop = () => {
-    cancelAnimationFrame(raf); raf = 0; lv = 0;
+    raf?.(); raf = 0; lv = 0;
     composer.classList.remove('speaking'); composer.style.removeProperty('--sv');
     // between two pieces of one reply the voice stops for a moment: only let go after a real pause
     clearTimeout(quiet);
@@ -431,14 +431,13 @@ function voiceLight(composer) {
     lv += (target - lv) * (target > lv ? 0.35 : 0.12); // rises quickly, settles slowly
     composer.style.setProperty('--sv', lv.toFixed(3));
     followAlong(tts.speechPos());
-    raf = requestAnimationFrame(frame);
   };
   tts.onSpeaking(on => {
     if (!on) return stop();
     clearTimeout(quiet);
     if (raf || !document.getElementById('app')?.classList.contains('coaching')) return;
     composer.classList.add('speaking');
-    raf = requestAnimationFrame(frame);
+    raf = onFrame(frame);
   });
 }
 
@@ -457,7 +456,7 @@ function follow(root, fresh = false) {
   let f = followers.get(root);
   if (!f) {
     f = { raf: 0, t: 0, held: false };
-    const hold = () => { f.held = true; cancelAnimationFrame(f.raf); f.raf = 0; };
+    const hold = () => { f.held = true; f.raf?.(); f.raf = 0; };
     root.addEventListener('touchstart', hold, { passive: true });
     root.addEventListener('wheel', hold, { passive: true });
     followers.set(root, f);
@@ -472,13 +471,12 @@ function follow(root, fresh = false) {
     const dt = f.t ? Math.min(50, now - f.t) : 16;
     f.t = now;
     const g = gap();
-    if (g < 1 || f.held) { f.raf = 0; return; }
+    if (g < 1 || f.held) { f.raf?.(); f.raf = 0; return; }
     const was = root.scrollTop;
     root.scrollTop = was + Math.max(g * (1 - Math.exp(-dt / 150)), Math.min(g, 1));
     if (root.scrollTop === was) root.scrollTop = root.scrollHeight; // the last sub-pixel
-    f.raf = requestAnimationFrame(step);
   };
-  f.raf = requestAnimationFrame(step);
+  f.raf = onFrame(step);
 }
 
 // Pick coach/command models once, from the key's model list.

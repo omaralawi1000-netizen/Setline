@@ -1,6 +1,7 @@
 // The phone's own bars: the status bar takes the colour of the app's top edge (darker under a sheet
 // or the voice layer), and soft blurred edges fade in at the top and bottom once content scrolls under them.
 import * as store from '../store.js';
+import { nextFrame } from './frame.js';
 
 export const DIM = '#07080B';
 // The top edge (and so the status bar) is the background with a touch of the theme's glow, so the
@@ -26,10 +27,31 @@ export function through(c, rgb, alpha) {
 let edgeCache = '';
 const edge = () => (edgeCache ||= edgeColor());
 let repaint = () => {};
-export const refreshChrome = () => { edgeCache = ''; bgCache = ''; repaint(); };
+// (both colours are worked out now, while nothing moves, not the first time the Coach opens)
+export const refreshChrome = () => { edgeCache = ''; bgCache = ''; repaint(); edge(); bgHex(); };
+
+// The sea, the clouds and the Coach's glow hold still (paused where they are, and picked up again from
+// there) while the page scrolls, a screen or sheet moves, or the voice UI covers the page: every
+// frosted surface over them then has nothing new to blur. One class on the app: .bg-still.
+const holds = new Set();
+let holdApp = null;
+export function holdBackground(reason, on) {
+  if (on) holds.add(reason); else holds.delete(reason);
+  const still = holds.size > 0;
+  if (!holdApp || holdApp.classList.contains('bg-still') === still) return;
+  holdApp.classList.toggle('bg-still', still);
+}
+export const backgroundHeld = () => holds.size > 0;
+const timed = new Map();
+export function holdBackgroundFor(reason, ms) {
+  holdBackground(reason, true);
+  clearTimeout(timed.get(reason));
+  timed.set(reason, setTimeout(() => holdBackground(reason, false), ms));
+}
 
 export function initChrome() {
   const app = document.getElementById('app');
+  holdApp = app;
   const metas = () => document.querySelectorAll('meta[name=theme-color]');
   let color = '';
   const paint = () => {
@@ -40,6 +62,8 @@ export function initChrome() {
     const top = coach ? bgHex() : edge(); // the Coach's own background has no glow at the top
     const next = voice ? through(top, [9, 10, 15], 0.62) : scrim ? through(top, [5, 6, 10], 0.55) : top;
     if (next !== color) { color = next; for (const m of metas()) m.setAttribute('content', next); }
+    holdBackground('voice', voice || app.classList.contains('voice-mini'));
+    holdBackground('sheet', !!app.querySelector(':scope > .sheet'));
   };
   new MutationObserver(paint).observe(app, { attributes: true, attributeFilter: ['class'], childList: true, subtree: false });
   // a sheet's scrim gets .show a frame after it's added
@@ -48,8 +72,10 @@ export function initChrome() {
   let raf = 0, lastY = 0;
   const onScroll = e => {
     const s = e.target;
-    if (!s.classList?.contains('screen') || raf) return;
-    raf = requestAnimationFrame(() => {
+    if (!s.classList?.contains('screen')) return;
+    holdBackgroundFor('scroll', 150);
+    if (raf) return;
+    raf = nextFrame(() => {
       raf = 0;
       app.classList.toggle('under-top', s.scrollTop > 6);
       app.classList.toggle('under-bottom', s.scrollHeight - s.clientHeight - s.scrollTop > 6);
@@ -60,12 +86,17 @@ export function initChrome() {
     });
   };
   app.addEventListener('scroll', onScroll, { capture: true, passive: true });
-  // a new screen starts at its own scroll position
+  // a new screen starts at its own scroll position (measured just after the frame is drawn, when the
+  // page is laid out already, so the frame that moves the screens never waits on a layout for this)
   app.addEventListener('screenchange', () => {
-    const s = app.querySelector('.screen.on');
-    app.classList.remove('compact'); lastY = s?.scrollTop || 0;
-    app.classList.toggle('under-top', !!s && s.scrollTop > 6);
-    app.classList.toggle('under-bottom', !!s && s.scrollHeight - s.clientHeight - s.scrollTop > 6);
+    holdBackgroundFor('screen', 900);
+    app.classList.remove('compact');
+    setTimeout(() => {
+      const s = app.querySelector('.screen.on');
+      lastY = s?.scrollTop || 0;
+      app.classList.toggle('under-top', !!s && s.scrollTop > 6);
+      app.classList.toggle('under-bottom', !!s && s.scrollHeight - s.clientHeight - s.scrollTop > 6);
+    });
   });
   // tapping the small pill opens the dock again (the orb still talks straight away)
   const dock = document.getElementById('dock');
@@ -91,5 +122,5 @@ export function initChrome() {
     else goFull(); // switched on: still inside the tap
   });
   repaint = paint;
-  paint();
+  paint(); edge(); bgHex();
 }
