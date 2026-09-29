@@ -2721,11 +2721,6 @@ html[data-motion=off] .bub .w{animation:none;will-change:auto}
 .intent.flagged{grid-template-columns:36px 1fr auto auto;column-gap:6px}
 
 /* ======================= 1.54: the orb, polished ======================= */
-/* its trail while it flies: the orb stays sharp and leaves a soft comet of its own light behind it,
-   brightest under the orb, fading and narrowing towards the tail (see orbStreak) */
-.orbstreak{position:absolute;z-index:7;pointer-events:none;transform-origin:0 50%;opacity:0;will-change:transform,opacity;
-  background:radial-gradient(farthest-side at 100% 50%,rgba(255,255,255,.6),rgba(255,255,255,0) 30%),
-    radial-gradient(farthest-side at 100% 50%,rgba(var(--a-rgb),.9),rgba(var(--v-rgb),.5) 45%,rgba(var(--v-rgb),0))}
 /* a voice-logged set: the spark on its way from the orb to the row */
 .orbspark{position:absolute;z-index:30;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;pointer-events:none;opacity:0;will-change:translate,scale,opacity;
   background:radial-gradient(circle,#fff 0,var(--accent-hi) 30%,rgba(var(--a-rgb),.55) 55%,rgba(var(--a-rgb),0) 72%)}
@@ -2776,13 +2771,13 @@ html[data-motion=off] .bub .w{animation:none;will-change:auto}
 @keyframes orbswirl{to{rotate:360deg}}
 
 @media (prefers-reduced-motion: reduce){
-  .orbstreak,.orbspark{display:none}
+  .orbspark{display:none}
   #dock .orbbtn .orb .core::after,#app .orb.shake{animation:none}
   .orbbtn:is(.pulse-land,.pulse-warm,.pulse-go) .orb,.orbbtn:is(.pulse-land,.pulse-warm,.pulse-go) .orb::before,.orbbtn:is(.pulse-land,.pulse-warm,.pulse-go) .orb .core::after,.orbbtn:is(.pulse-land,.pulse-warm,.pulse-go)::after{animation:none}
   .vlayer[data-phase=thinking] .orb .core,.ofloat[data-phase=thinking] .orb .core,.app.thinking .composer .corb .orb .core{animation:none}
   .orb.big::after,.orb.lift::after{transform:none}
 }
-html[data-motion=off] :is(.orbstreak,.orbspark){display:none}
+html[data-motion=off] .orbspark{display:none}
 html[data-motion=off] #dock .orbbtn .orb .core::after,html[data-motion=off] #app .orb.shake{animation:none}
 html[data-motion=off] :is(.vlayer[data-phase=thinking] .orb .core,.ofloat[data-phase=thinking] .orb .core,.app.thinking .composer .corb .orb .core){animation:none}
 

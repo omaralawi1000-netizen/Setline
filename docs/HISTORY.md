@@ -834,3 +834,8 @@ Fixes the flashes, lag and half-drawn frames in the voice → Coach recording, i
   empties; the orb lands in the box only once it's there; the Thinking row waits ~120 ms after.
 - Reduced motion: the same transitions as 150 ms fades, nothing flying.
 - Golden flows `move-*` (and `move-*-reduced`) assert these on every frame.
+
+## 1.62.6: no trail on the voice screen's orb either
+
+- The orb flying between the dock and the voice screen (and the floating orb) no longer draws its
+  comet trail; the streak code (orbStreak, .orbstreak) is gone. One solid orb on every frame.

@@ -30,7 +30,7 @@ import { isQuestion, isPlanRequest, isNoise } from '../coach.js';
 import { startCardioSession, finishSheet as cardioFinishSheet } from './cardio.js';
 import { dateKey } from '../body.js';
 import { planFor } from './routine.js';
-import { orbPulse, orbShake, orbSpark, orbStreak } from './fx.js';
+import { orbPulse, orbShake, orbSpark } from './fx.js';
 import { setOrb, handOrb } from './dotorb.js';
 import { livePRSets } from '../pr.js';
 import { createVoiceGlow } from './voiceglow.js';
@@ -217,7 +217,6 @@ function flyOrb(open, fromEl = null) {
   const from = fromEl || document.querySelector('#dock .orbbtn .orb');
   const w = el.orbwrap;
   if (!from || reduced()) { w.style.transform = ''; return; }
-  const was = w.getBoundingClientRect();          // where it is now, for the trail home
   const current = getComputedStyle(w).transform;
   w.style.transition = 'none';
   w.style.transform = 'none';
@@ -234,21 +233,6 @@ function flyOrb(open, fromEl = null) {
   void w.offsetWidth;
   w.style.transition = '';
   w.style.transform = open ? '' : far;
-  const dock = { x: mid(a).x, y: mid(a).y - dockShift };
-  trail(el.layer, el.stage, open ? dock : mid(was), open ? mid(b) : dock, w);
-}
-
-// The orb flying between the dock and the voice screen leaves a soft trail of light, timed to its
-// own transition (the same trail as the Coach's orb, in the layer it flies in, just under it).
-const mid = r => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
-function trail(layer, before, from, to, node) {
-  const cs = getComputedStyle(node), L = layer.getBoundingClientRect();
-  const props = cs.transitionProperty.split(',').map(s => s.trim()), i = Math.max(0, props.indexOf('transform'));
-  const pick = s => { const l = s.split(/,(?![^(]*\))/); return (l[i] ?? l[0]).trim(); };
-  const duration = parseFloat(pick(cs.transitionDuration)) * 1000;
-  if (!duration) return;
-  const at = p => ({ x: p.x - L.left, y: p.y - L.top });
-  orbStreak(layer, at(from), at(to), { duration, easing: pick(cs.transitionTimingFunction), size: 50, lag: 80, before });
 }
 
 // ---------- mini mode: the orb lifts out of the dock ----------
@@ -257,7 +241,6 @@ function flyMini(open) {
   const from = document.querySelector('#dock .orbbtn .orb');
   const w = el.owrap;
   if (!from || reduced()) { w.style.transform = ''; return; }
-  const was = el.oorb.getBoundingClientRect();
   const current = getComputedStyle(w).transform;
   w.style.transition = 'none';
   w.style.transform = 'none';
@@ -271,8 +254,6 @@ function flyMini(open) {
   void w.offsetWidth;
   w.style.transition = open ? '' : 'transform .5s cubic-bezier(.3,.7,.2,1)';
   w.style.transform = open ? '' : far;
-  const dock = { x: mid(a).x, y: mid(a).y - dockShift };
-  trail(el.mini, w, open ? dock : mid(was), open ? mid(b) : dock, w);
 }
 
 // Once the voice screen has faded in, the page under it (which still shows through faintly) holds still (.app.voice-covered); it
