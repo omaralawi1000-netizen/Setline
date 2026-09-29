@@ -52,4 +52,18 @@ try {
   assert.ok(await page.evaluate(()=>window.__lateStream?.getTracks().every(t=>t.readyState==='ended')),'late stream was not released');
   assert.equal(await page.locator('#ofloat:not([hidden])').count(),0);assert.deepEqual(errors,[]);
   console.log('✓ pointer cancellation while permission is pending releases the late stream');await context.close();
+  const cancelled=await newPage(browser,base); await mockServices(cancelled.page);
+  await cancelled.page.addInitScript(k=>localStorage.setItem('setline.keys',JSON.stringify(k)),STAND_IN);
+  await cancelled.page.route(/generativelanguage\.googleapis\.com.*:generateContent/,async route=>{
+    await new Promise(r=>setTimeout(r,1800));
+    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({type:'question'})}]}}]})}).catch(()=>{});
+  });
+  await cancelled.page.goto(base+'?seed=1');await onScreen(cancelled.page,'today');await settle(cancelled.page,800);
+  await cancelled.page.evaluate(async()=>{const voice=await import('./js/ui/voice.js');voice.openVoice();voice.handleText('kumquat quantum salutation',{typed:true});});
+  await cancelled.page.waitForSelector('#intent.show[data-kind=wait]');
+  await cancelled.page.evaluate(async()=>{await (await import('./js/ui/voice.js')).closeVoice();});
+  assert.equal(await cancelled.page.locator('#intent.show[data-kind=wait]').count(),0,'cancelled classification left a waiting card');
+  await settle(cancelled.page,2200);
+  assert.equal(await cancelled.page.locator('#s-coach.screen.on,#voice:not([hidden]),#intent.show[data-kind=wait]').count(),0,'late classification reopened a cancelled session');
+  assert.deepEqual(cancelled.errors,[]);console.log('✓ cancellation clears its waiting card and ignores the late classification');await cancelled.context.close();
 } finally {await browser.close();server.close();}

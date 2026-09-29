@@ -916,3 +916,9 @@ From Omar's Apple motion references and Setline brief (29 Sep 2026).
 - The expanded voice background clears sooner during Send so controls do not leave a dark gap.
 - Conflicting old visual restrictions in CLAUDE.md, SPEC.md and the design guide now defer to this brief. Data, security, working controls and regression checks remain required.
 - Validation and real-phone limits: docs/CONNECTED_MOTION.md.
+
+
+## 1.65.1: Cancel the voice waiting card with its session
+
+- Expanded voice's AI classification card belongs to its voice-session token. Cancelling clears it immediately; a late classification cannot leave a permanent spinner or navigate back to the Coach.
+- `scripts/connected-motion.mjs` now delays classification, cancels after the waiting card appears and checks both immediate dismissal and the late response. Motion and data behavior otherwise unchanged.

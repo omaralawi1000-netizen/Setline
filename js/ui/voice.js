@@ -381,6 +381,7 @@ export function openVoice() {
 // Close; resolves once history has settled so callers can navigate safely.
 export function closeVoice({ fromPop = false } = {}) {
   if (!v.open) return v.closing || Promise.resolve();
+  if (card.cmd?.voiceToken === v.token) dismissCard({ keepPending: false });
   nav.warmCoach?.(false);
   v.open = false;
   v.token++;
@@ -1001,7 +1002,7 @@ async function aiFallback(text, parsed, { typed }) {
     if (stale()) return;
     waitAt = performance.now();
     if (v.open && v.mode === 'mini') el.ostatus.textContent = t('voice.thinkingAi');
-    else showCard({ kind: 'wait', icon: 'info', title: t('voice.thinkingAi'), sub: t('voice.heard', { text }), lang, intent: parsed });
+    else showCard({ kind: 'wait', icon: 'info', title: t('voice.thinkingAi'), sub: t('voice.heard', { text }), lang, intent: parsed, voiceToken });
   }, 600);
   let intent;
   try {

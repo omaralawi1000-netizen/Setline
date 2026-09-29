@@ -1,8 +1,8 @@
-# Connected motion — Setline 1.65.0
+# Connected motion — Setline 1.65.1
 
 The split dock now becomes the Coach composer through one joined glass contour. The Coach opens upward from that surface while the orb holds its bottom-right anchor. Back reverses from the current presentation, including during opening. The theme palette and dotted particle identity remain.
 
-Holding the orb keeps voice beside the dock, with a meter driven by the real microphone level. Release shows an editable review. Say more appends, and Send delivers once. The review and actions clear the keyboard. Pull up still opens expanded voice; its transcript stays at reading size and fades before the chat bubble becomes readable. Retry/type actions stay visible on voice errors. Cancelling, backgrounding and delayed permission completion clean up the microphone; cancelled sessions ignore late AI classification.
+Holding the orb keeps voice beside the dock, with a meter driven by the real microphone level. Release shows an editable review. Say more appends, and Send delivers once. The review and actions clear the keyboard. Pull up still opens expanded voice; its transcript stays at reading size and fades before the chat bubble becomes readable. Retry/type actions stay visible on voice errors. Cancelling, backgrounding and delayed permission completion clean up the microphone; cancelled sessions ignore late AI classification and clear their waiting card (1.65.1).
 
 The connected contour and content mask share a progress value and cached geometry (`js/ui/coachmotion.js`). They use the existing shared animation frame and particle handoff. Navigation and processing start immediately, independent of animation completion. Reduced motion keeps short fades; reduced transparency and glass-off use opaque material. No new runtime dependency or database migration.
 
@@ -31,7 +31,7 @@ The result scenario now ends at explicit review, so its timing reflects a delibe
 
 ## On the phone
 
-1. After the update prompt, confirm version 1.65.0, then restart the installed PWA once. Check offline opening.
+1. After the update prompt, confirm version 1.65.1, then restart the installed PWA once. Check offline opening.
 2. Tap the dock orb, press Back during opening, then reopen. Check the joined glass, single orb and physical smoothness (`?perf=1` can help).
 3. Hold, speak, release, edit with the keyboard, Say more, then Send. Check actual gym audio, permission prompts, haptics and music resuming after recording.
 4. Cancel a hold, background the app during recording and repeat a hold. Check the system mic indicator goes away. Pull up and send from expanded voice once.
