@@ -2,7 +2,7 @@
 
 Setline is a voice-first gym PWA for one user (Omar) on Android Chrome, served as static files from GitHub Pages. Plain HTML/CSS/JS modules, no app dependencies, no backend. The goal of every session: make the app better, especially how it looks, feels and moves.
 
-## 1. Keep it smooth and cheap
+## 1. Keep it smooth and premium
 
 - Read `PLAN.md` at the start. Read other files only when the task needs them: `docs/DESIGN_SYSTEM.md` for any UI or motion work, `SPEC.md` only for the part you're touching. Never read `docs/HISTORY.md` or whole test files unless the task needs them.
 - **Don't ask Omar for permission.** He says what he wants; you build it, check it and ship it. Ask first only if you see a clearly better way (say it in one or two sentences) or it would lose his data. Tool permissions are pre-approved in `.claude/settings.json`; don't remove them.
