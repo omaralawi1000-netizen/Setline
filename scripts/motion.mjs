@@ -186,7 +186,7 @@ const ANIMATIONS = [
   {
     name: 'orb-result', group: 'voice orb', setup: (p, env) => at.thinking(p, env.stt),
     trigger: (p, env) => env.stt.release(), min: 1200, max: 4500, ignore: '#toast',
-    expect: p => p.waitForSelector('#s-workout.screen.on, .intent.show, #ofloat[data-phase=result]', { state: 'attached', timeout: 5000 })
+    expect: p => p.waitForSelector('#s-workout.screen.on, .intent.show, #ofloat.reviewing', { state: 'attached', timeout: 5000 })
   },
 
   { name: 'tab-today-to-workout', ...tabTo('tab-today-to-workout', 'workout'), setup: p => at.today(p) },

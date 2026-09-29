@@ -6,12 +6,14 @@ How Setline looks and moves, for every AI and every tool. The brand values (colo
 
 Omar wants Setline as beautiful and premium as it can be. Any screen may be redesigned: layout, hierarchy, colour, type, surfaces, motion, even the orb's look. Show a big change on one screen first, tag the version before a wide rollout (`git tag pre-redesign-x.y.z`), keep every feature and every `data-act` / `data-k` hook, and update `SPEC.md` §2 and the `npm run visual` baselines when the result is approved. Use the `impeccable`, `emil-design-eng` and `frontend-design` skills.
 
+The latest motion brief authorizes refining the dock, composer, Coach and voice surfaces together. Keep the dark identity, theme palette and dotted orb; old specifications of flight paths, plain glass or absent highlights are historical, not quality ceilings. Changes to safety, storage and real voice state remain outside visual discretion.
+
 ## Rules
 
 - All motion values come from the motion tokens in `css/tokens.css` (`--m-*` durations, `--e-*` easings). No hardcoded durations or easings anywhere else.
 - Never animate layout (width, height, top, left, margin, padding). Everything else may animate; if it stutters on the phone, shrink the effect rather than drop it.
 - Every animation has a `prefers-reduced-motion` fallback and respects the in-app motion setting. Decorative motion never delays a state update.
-- Screen changes use the View Transitions API with a fallback.
+- Use the existing screen navigation and shared-element tooling. The signature Coach transition uses one reversible progress value for connected glass, an upward content mask and a synchronized orb. Never require a framework or a new API solely for animation.
 - Tabular numerals for every number.
 - Nothing in the UI unless it works.
 - Work one screen at a time. Never refactor working logic just to restyle it.

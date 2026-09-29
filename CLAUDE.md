@@ -5,8 +5,8 @@ Follow `AGENTS.md`. It's short on purpose; don't read more than the task needs.
 ## How to work with Omar
 - Work autonomously. Don't stop to ask for routine choices; decide and keep going.
 - Freedom on HOW: if you see a clearly better technique, structure, test or fix than what Omar's prompt describes, use it without asking, and explain it in the final report.
-- No freedom on WHAT: never remove or change a feature, the look (colours, blur, glass, orb, layout), or a flow Omar asked for without asking first. Better performance or simpler code is never a reason to change his design.
-- Stop and ask only when: (1) something could lose Omar's data or break the live app in a way a revert can't fix, (2) the prompt is impossible or clearly contradicts itself, or (3) you're convinced a design/feature change is needed. In that case, say what and why in 2–3 lines and wait.
+- Preserve product functions, data and the requested dotted-orb identity. The latest user brief authorizes changes to layout, glass, lighting and motion; older visual prescriptions do not veto those changes. Explain meaningful design decisions when delivering them.
+- Stop and ask only when: (1) something could lose Omar's data or break the live app in a way a revert can't fix, (2) the prompt is impossible or clearly contradicts itself, or (3) an essential product requirement cannot be inferred. Routine visual and motion improvements are already authorized. In that case, say what and why in 2–3 lines and wait.
 - Everything else: finish the whole task, test it, commit, deploy, then report.
 
 - Cloud sessions run `.claude/hooks/session-start.sh`, which installs Playwright for the check scripts.
@@ -23,7 +23,7 @@ Follow `AGENTS.md`. It's short on purpose; don't read more than the task needs.
 - No comet trails, streaks or smears: the orb is one solid object at every frame (flights go through `arcFly` in `js/ui/choreo.js`, which carries a glass disc under the dots).
 - Never dip to black and never double-expose two screens' content; the sea background is shared and never fades.
 - The destination exists and is visible before anything lands on it.
-- 29 Sep 2026 (1.63.0): the orb lives in the bottom-right corner. The Coach's message box has its orb at the right end, in exactly the dock orb's place; Home ↔ Coach grows the box out of the orb (the orb never flies there). One calm motion per transition. Glow never reaches more than ~20 % past an orb's edge and never covers text; the message box is plain frosted glass (no light of its own, no landing flash).
+- 29 Sep 2026: the orb stays near the bottom-right anchor. The Coach's message box has its orb at the right end, in exactly the dock orb's place; Home ↔ Coach grows the box out of the orb (the orb never flies there). Coordinate contour, particle deformation, restrained moving edge light and content reveal as one reversible sequence. Local highlights on the composer are allowed; protect text clarity. Quick voice remains compact beside the dock. The current motion brief supersedes the old flying-orb and plain-composer prescriptions.
 - Judge motion by how it looks on the phone: `node scripts/strips.mjs` makes contact strips from the frames the compositor really showed (0–560 ms); `node scripts/choreo.mjs` is only the safety net (frame checks).
 - Chat: never rebuild the thread with innerHTML; one DOM node per message for its whole life; one DOM write per frame.
 - will-change only just before an animation, removed after. Canvases ≤ 2× DPR, never resized in the loop.

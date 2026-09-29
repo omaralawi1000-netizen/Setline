@@ -83,7 +83,7 @@ async function main() {
     // tapped (Home → Coach) then Back
     const flow = async (dir, steps) => { await mkdir(join(OUT, dir), { recursive: true }); const was = n; n = 0; const keep = frame; frameDir = dir; await steps(); frameDir = 'orb-frames'; console.log(`  ${dir}/ (${n} frames)`); n = was; void keep; };
     await page.goBack(); await onScreen(page, 'today'); await settle(page, 1200);
-    await flow('quick-frames', async () => { await page.mouse.move(x, y); await page.mouse.down(); await film(1300); await page.mouse.up(); await film(3000); });
+    await flow('quick-frames', async () => { await page.mouse.move(x, y); await page.mouse.down(); await film(1300); await page.mouse.up(); await film(1400); await page.waitForSelector('#ofloat.reviewing #vrtext:not(:empty)'); await page.click('#ofloat .vrsend'); await film(2500); });
     await page.goBack(); await onScreen(page, 'today'); await settle(page, 1200);
     await flow('coach-frames', async () => { await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.up(); await film(1400); await page.goBack(); await film(1400); });
     if (errors.length) { failed = true; console.error('  page errors:\n   ' + errors.join('\n   ')); }

@@ -905,3 +905,14 @@ From Omar's phone recording of 1.63.0.
   the view follows once per frame only within ~80 px of the end.
 - Checks: golden `mic-hold-twice`, `mic-after-reply`, `mic-pullup-starting` (with a slow mic);
   `strips.mjs --cpu=4` (phone pace) and `--long` with the new `stream-reply` flow.
+
+
+## 1.65.0: Connected glass and compact voice
+
+From Omar's Apple motion references and Setline brief (29 Sep 2026).
+- The split dock joins into the composer; the Coach unfolds from it. One reversible progress value coordinates the joined contour, edge highlight, readable content and a single particle orb at the bottom-right anchor. Back can interrupt the opening without restarting or leaving duplicate orbs.
+- Holding keeps voice compact at the original thumb target, with a real-level meter. Release opens an editable review; explicit Send delivers once, while Say more appends. Pull up still expands voice. Voice errors remain beside their origin with retry/type actions.
+- Pointer cancellation, backgrounding and delayed microphone permission clean up the recording. Late AI classification cannot reopen a cancelled session. Keyboard entry, reduced motion and opaque glass alternatives are supported.
+- The expanded voice background clears sooner during Send so controls do not leave a dark gap.
+- Conflicting old visual restrictions in CLAUDE.md, SPEC.md and the design guide now defer to this brief. Data, security, working controls and regression checks remain required.
+- Validation and real-phone limits: docs/CONNECTED_MOTION.md.

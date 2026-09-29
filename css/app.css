@@ -3188,3 +3188,64 @@ html[data-duo] .msg.me .bub{--mebg:linear-gradient(135deg,rgba(var(--a-rgb),.2),
 /* the floating orb's light when it starts listening: a small breath, within its fifth */
 @keyframes bloom{0%{scale:.9;opacity:.3}45%{scale:1.04;opacity:1}100%{scale:1}}
 .msg.me.pending.handed .bub{min-width:0;text-align:inherit} /* (your spoken message, placed ahead: exactly as it will be) */
+
+/* Connected controls: one material silhouette, with a small travelling edge light. */
+.cm-skin{position:absolute;z-index:6;pointer-events:none;isolation:isolate;overflow:hidden;
+  background:linear-gradient(165deg,rgba(255,255,255,.13),rgba(255,255,255,.025) 50%,rgba(var(--a-rgb),.06)),rgba(10,18,28,.72);
+  backdrop-filter:blur(20px) saturate(155%);-webkit-backdrop-filter:blur(20px) saturate(155%);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.28),inset 0 -1px 1px rgba(255,255,255,.06)}
+.cm-light{position:absolute;left:0;top:0;width:64px;height:2px;border-radius:50%;pointer-events:none;
+  background:linear-gradient(90deg,transparent,var(--accent-hi),transparent);transform-origin:center}
+.cm-orb{z-index:7;pointer-events:none;overflow:visible}
+.app.cm-ready #composer{pointer-events:auto}
+.app.cm-box #composer > :not(.cbg){z-index:8}
+.app.cm-box #composer{z-index:7}
+html[data-glass=off] .cm-skin{backdrop-filter:none;-webkit-backdrop-filter:none;background:#111B28}
+@supports not (backdrop-filter:blur(1px)){.cm-skin{background:#111B28}}
+@media (prefers-reduced-transparency:reduce){.cm-skin,#composer>.cbg{backdrop-filter:none;-webkit-backdrop-filter:none;background:#111B28}}
+
+/* The compact dock keeps its orb anchor while the tab capsule contracts. */
+.app.compact:not(.is-sub):not(.voice):not(.kb) .dock{--ow:80px;left:calc(100% - 166px);right:16px;height:72px}
+.app.compact .dock .orbbtn{width:72px;height:72px}
+.app.compact .dock .orbbtn .orb{transform:none}
+.dock .orbbtn.pressing{transform:scale(.95)}
+
+/* Quick voice: the original thumb target, a joined capsule and one honest meter. */
+.app.voice-mini:not(.voice) .dock{opacity:1;transform:none;pointer-events:none}
+.app.voice-mini:not(.voice) .dock :is(.tab,.ind,.dcap,.obub){opacity:0}
+.ofloat .oscrim{background:linear-gradient(to top,rgba(6,11,19,.3),transparent 180px)}
+.ofloat .owrap{left:auto;right:16px;top:auto;bottom:var(--dock-bottom);width:72px;height:72px;margin:0;display:grid;place-items:center;will-change:auto;transition:translate var(--m-voice) var(--e-out),opacity var(--m-fast) var(--e-out)}
+.ofloat .owrap .orb.lift{--s:60px;width:var(--s);height:var(--s);padding:0;border-radius:50%;will-change:auto}
+.ofloat .owrap::before,.ofloat .owrap::after,.ofloat .oglow{display:none}
+.omini-skin{position:absolute;left:16px;right:16px;bottom:var(--dock-bottom);height:72px;pointer-events:none;opacity:0;
+  background:linear-gradient(165deg,rgba(255,255,255,.13),rgba(255,255,255,.025) 50%,rgba(var(--a-rgb),.06)),rgba(10,18,28,.85);
+  backdrop-filter:blur(20px) saturate(155%);-webkit-backdrop-filter:blur(20px) saturate(155%);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.28);transition:opacity var(--m-voice) var(--e-out)}
+.ofloat.on .omini-skin{opacity:1}
+.ofloat .obubble{left:32px;right:108px;bottom:var(--dock-bottom);height:72px;display:flex;flex-direction:row;justify-content:space-between;gap:8px;text-align:left}
+.ofloat .obubble{transition:opacity var(--m-fast) var(--e-out),transform var(--m-voice) var(--e-out)}
+.ofloat .ostatus{padding:0;height:auto;line-height:1.35;background:none;color:var(--ink);font-weight:650;letter-spacing:0}
+.ofloat[data-phase=listening] .ostatus{background:none;color:var(--accent-hi)}
+.ofloat .osay{display:none}
+.ofloat .opull{left:auto;right:26px;bottom:calc(var(--dock-bottom) + 84px);transform:none;letter-spacing:0;text-transform:none;display:none}
+.ometer{height:24px;display:flex;align-items:center;gap:3px;flex:none;color:var(--accent)}
+.ometer i{width:3px;height:24px;border-radius:3px;background:currentColor;transform:scaleY(.18)}
+.ofloat .vreview{top:auto;bottom:calc(var(--dock-bottom) + 86px);left:16px;right:16px;max-height:min(54vh,380px);padding:20px;border-radius:28px;
+  background:#101B29;box-shadow:0 18px 48px -16px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.14);gap:8px;animation:compact-review var(--m-voice) var(--e-out) both}
+@keyframes compact-review{from{clip-path:inset(100% 0 0 0 round 28px)}to{clip-path:inset(0 0 0 0 round 28px)}}
+.ofloat .vrtext{font-size:20px;line-height:1.45;display:block;text-align:left;padding:0;min-height:56px;max-height:220px;overflow:auto}
+.ofloat .vrhint{font-size:12px;text-align:left;margin:0 0 4px;color:var(--muted)}
+.ofloat .vrmic{width:48px;height:48px}
+.ofloat .vrmic span{display:none}
+.ofloat .vrsend{height:48px;font-size:15px;box-shadow:inset 0 1px 0 rgba(255,255,255,.4);gap:8px}
+.ofloat.reviewing .ometer{opacity:0}
+.ofloat.reviewing .owrap{transform:none!important}
+html[data-glass=off] .omini-skin{backdrop-filter:none;-webkit-backdrop-filter:none;background:#111B28}
+@media (prefers-reduced-transparency:reduce){.omini-skin{backdrop-filter:none;-webkit-backdrop-filter:none;background:#111B28}}
+@media (prefers-reduced-motion:reduce){.ofloat .vreview{animation:none}.ofloat .obubble{transform:none;transition:opacity var(--m-fast) linear}}
+html[data-motion=off] .ofloat .vreview{animation:none}
+/* Editing a compact transcript keeps its actions above the Android keyboard. */
+.ofloat.reviewing :is(.omini-skin,.obubble){bottom:calc(var(--dock-bottom) + max(var(--kb,0px),var(--kbh,0px)))}
+.ofloat.reviewing .owrap{top:auto!important;bottom:calc(var(--dock-bottom) + max(var(--kb,0px),var(--kbh,0px)))}
+.ofloat.reviewing .vreview{bottom:calc(var(--dock-bottom) + 86px + max(var(--kb,0px),var(--kbh,0px)));max-height:min(54vh,380px,calc(100% - var(--dock-bottom) - 110px - max(var(--kb,0px),var(--kbh,0px))))}
+.app.voice-mini .intent[data-kind=error] .undo{min-height:44px}

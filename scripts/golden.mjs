@@ -138,8 +138,8 @@ const FLOWS = {
     await page.waitForSelector('#voice[hidden]', { state: 'attached', timeout: 6000 });
     await settle(page, 700);
     const frames = await page.evaluate(() => window.__cover);
-    // covered from once the scrim has faded in (0.4 s) until release
-    const open = frames.filter(f => f.t > upAt + 450 && f.t < relAt && (f.mini || f.full));
+    // Only the expanded voice view covers the page; quick voice keeps Home legible.
+    const open = frames.filter(f => f.t > upAt + 450 && f.t < relAt && f.full);
     const thin = open.filter(f => f.cover < 0.9);
     if (!open.length) throw new Error('never saw the floating orb or the voice screen');
     if (thin.length) throw new Error(`the page showed through in ${thin.length} of ${open.length} frames (cover ${Math.min(...thin.map(f => f.cover)).toFixed(2)})`);
@@ -318,9 +318,12 @@ const FLOWS = {
     await page.waitForSelector('#ofloat[data-phase=listening]', { timeout: 3000 });
     const ms = Date.now() - t0;
     if (ms > 1000) throw new Error(`listening only after ${ms} ms`);
-    // …and released: exactly one send
+    // …and released: review first, then exactly one send
     await settle(page, 900);
     await page.mouse.up();
+    await page.waitForSelector('#ofloat.reviewing #vrtext:not(:empty)', { timeout: 6000 });
+    if (await sent() !== 0) throw new Error('compact review sent before Send');
+    await page.click('#ofloat .vrsend');
     await onScreen(page, 'coach', 8000);
     await settle(page, 800);
     if (stt !== 1 || await sent() !== 1) throw new Error(`hold + release: ${stt} transcription(s), ${await sent()} message(s) sent (expected 1, 1)`);
@@ -461,7 +464,7 @@ const FLOWS = {
   // The mic, held in the awkward moments (1.64.0): it always opens, the pull-up shows one orb, and
   // nothing throws. The mic is made slow to open (getUserMedia 350 ms) so the races really happen.
   'mic-hold-twice': (browser, base) => micCase(browser, base, async (page, o, see) => {
-    await page.mouse.move(o.x, o.y); await page.mouse.down(); await page.waitForTimeout(250); await page.mouse.up(); await page.waitForTimeout(80);
+    await page.mouse.move(o.x, o.y); await page.mouse.down(); await page.waitForTimeout(300); await page.mouse.up(); await page.waitForTimeout(80);
     await page.mouse.down(); await page.waitForTimeout(900);
     await see('the second hold', { phase: 'listening' });
     await page.mouse.up(); await page.waitForTimeout(900);
@@ -474,7 +477,7 @@ const FLOWS = {
     await page.mouse.up(); await page.waitForTimeout(900);
   }),
   'mic-pullup-starting': (browser, base) => micCase(browser, base, async (page, o, see) => {
-    await page.mouse.move(o.x, o.y); await page.mouse.down(); await page.waitForTimeout(200);
+    await page.mouse.move(o.x, o.y); await page.mouse.down(); await page.waitForTimeout(330);
     for (let dy = 10; dy <= 180; dy += 15) await page.mouse.move(o.x, o.y - dy);
     await page.waitForSelector('#voice.on', { timeout: 4000 }); await page.waitForTimeout(120);
     await see('the pull-up while the mic opens', { orbs: 1 });

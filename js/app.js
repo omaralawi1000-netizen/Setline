@@ -31,9 +31,10 @@ import { setHistoryFilter } from './ui/history.js';
 import { renderProgress, renderExercise, setRange } from './ui/progress.js';
 import { countAll, burst, orbPulse } from './ui/fx.js';
 import { syncBeams } from './ui/beam.js';
-import { startDotOrbs, handOrb } from './ui/dotorb.js';
+import { startDotOrbs } from './ui/dotorb.js';
 import { initPerf } from './ui/perf.js';
 import { recoil } from './ui/choreo.js';
+import { morphCoach, settleCoachMotion } from './ui/coachmotion.js';
 import { initPress } from './ui/press.js';
 import { initKeyboard } from './ui/keyboard.js';
 import { initChrome, refreshChrome } from './ui/chrome.js';
@@ -164,8 +165,7 @@ function renderAll() {
 
 // The Coach is the orb, grown (1.31's light, in this design).
 const stillMotion = () => document.documentElement.dataset.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches;
-let coachFx = null; // tidies up the open or close in progress
-function settleCoachFx() { const c = coachFx; coachFx = null; c?.(); }
+const settleCoachFx = settleCoachMotion;
 
 // The orb arrives in the message box: the box is pressed back in depth from where it landed (never up
 // or down) and springs back with one soft overshoot, with one firm tap. No light, no flash.
@@ -175,90 +175,11 @@ function impact(point) {
   setTimeout(() => { app.classList.remove('awaitland'); syncSpot(); }, 120); // the Coach's "Thinking" words (or its stop button), just after
 }
 
-// Home ↔ Coach. The orb stays exactly where it is (the message box's orb sits in the dock orb's place):
-// it gives a small press, the dock's tabs fade, and the message box grows out of the orb leftwards, one
-// pill of glass (its .cbg layer, clipped from the orb's circle to the whole box), "Ask your coach"
-// fading in as the field opens. The page fades through to the Coach over the same sea. Back is the
-// exact reverse: the box shrinks into the orb and the tabs come back. (Chrome's own back-swipe
-// animation, `still`, skips all of it.) Reduced motion: 150 ms fades.
-const rectIn = el => { const a = app.getBoundingClientRect(), r = el.getBoundingClientRect(); return { l: r.left - a.left, t: r.top - a.top, r: r.right - a.left, b: r.bottom - a.top, w: r.width, h: r.height }; };
-const insetOf = (x, u) => `inset(${(x.t - u.t).toFixed(1)}px ${(u.r - x.r).toFixed(1)}px ${(u.b - x.b).toFixed(1)}px ${(x.l - u.l).toFixed(1)}px round ${(x.h / 2).toFixed(1)}px)`;
-const GROW_MS = 320, GROW_EASE = 'cubic-bezier(.5,0,.15,1)'; // (a spring from rest: slow off the mark, so it only reaches the tabs once they've gone)
+// The dock's lobes join into the composer; the conversation unfolds upward around
+// the same particle pose. Retargeting reverses the current presentation value.
 function coachMorph(open, under) {
-  settleCoachFx();
-  const box = $('#composer'), cbg = box?.querySelector('.cbg'), coach = $('#s-coach'), aura = $('.aura'), veil = aura?.querySelector('.veil');
-  const dock = $('#dock'), dockBtn = dock?.querySelector('.orbbtn'), dockOrb = dockBtn?.querySelector('.orb'), obub = dockBtn?.querySelector('.obub');
-  const spot = box?.querySelector('.cspot'), boxOrb = box?.querySelector('.corb .orb');
-  if (!box || !cbg || !coach || !dockBtn || !spot) return;
-  const other = under && under !== coach ? under : null;
-  const calm = stillMotion();
-  const anims = [], timers = [];
-  const go = (el, f, o) => { if (!el) return null; const a = el.animate(f, { fill: 'both', ...o }); anims.push(a); return a; };
-  const parts = [...dock.querySelectorAll('.tab, .ind, .dcap')];
-  const fields = [...box.querySelectorAll(':scope > input, :scope > .thinkline')];
   haptic(open ? 'bloom' : 'tick');
-  app.classList.add('choreo', 'cm-dock', 'cm-box');
-  aura?.classList.add('run');
-  // the page under it stays drawn while it fades (its screen has already been switched off)
-  if (other) Object.assign(other.style, { visibility: 'visible' });
-  Object.assign(coach.style, { visibility: 'visible' });
-  const wipe = () => {
-    // (the dock goes to its resting state with no transition, then the pieces let go of their frames)
-    const held = [dock, box, coach, other, veil, ...parts].filter(Boolean);
-    for (const el of held) el.style.transition = 'none';
-    app.classList.remove('choreo', 'cm-dock', 'cm-box');
-    aura?.classList.remove('run');
-    anims.forEach(a => a.cancel());
-    timers.forEach(clearTimeout);
-    dockBtn.style.visibility = '';
-    for (const el of [other, coach]) if (el) el.style.visibility = '';
-    for (const m of document.querySelectorAll('#s-coach .msg')) m.classList.add('seen');
-    void dock.offsetWidth;
-    requestAnimationFrame(() => { for (const el of held) el.style.transition = ''; });
-  };
-  coachFx = wipe;
-  const end = ms => timers.push(setTimeout(settleCoachFx, ms));
-  const fadeIn = (el, late = 0) => go(el, calm ? [{ opacity: 0.005 }, { opacity: 1 }] : [{ opacity: 0.005, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }],
-    { duration: calm ? 150 : 200, delay: calm ? 0 : 60 + late, easing: calm ? 'linear' : 'cubic-bezier(.2,.8,.2,1)' });
-  const fadeOut = el => go(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'none' }], { duration: calm ? 150 : 90, easing: calm ? 'linear' : 'ease-out' });
-  if (open) coach.scrollTop = coach.scrollHeight; // (it arrives already at its latest message)
-  fadeOut(open ? other : coach);
-  fadeIn(open ? coach : other, open ? 0 : 15); // (back: the Coach's words are all but gone before Home's show)
-  go(veil, [{ opacity: open ? 0 : 1 }, { opacity: open ? 1 : 0 }], open ? { duration: calm ? 150 : 200, delay: calm ? 0 : 60, easing: 'ease-out' } : { duration: calm ? 150 : 90, easing: 'ease-out' });
-  if (calm) {
-    // the dock and the box simply cross-fade in place
-    go(dock, [{ opacity: open ? 1 : 0 }, { opacity: open ? 0 : 1 }], { duration: 150, easing: 'linear' });
-    go(box, [{ opacity: open ? 0 : 1 }, { opacity: open ? 1 : 0 }], { duration: 150, easing: 'linear' });
-    if (open) handOrb(dockOrb, boxOrb); else handOrb(boxOrb, dockOrb);
-    end(170);
-    return;
-  }
-  // (measured once show() has put the Coach's classes on or off: before this frame is painted)
-  queueMicrotask(() => {
-    const C = rectIn(box), O = rectIn(obub), S = rectIn(spot);
-    const circle = insetOf(O, C), whole = 'inset(0px 0px 0px 0px round 36px)';
-    // the orb's spot starts (or ends) exactly on the dock's orb, which is the same place unless the dock
-    // is collapsed on a scrolled page
-    const dx = (O.l + O.w / 2) - (S.l + S.w / 2), dy = (O.t + O.h / 2) - (S.t + S.h / 2), k = O.w / S.w;
-    const at = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${k.toFixed(3)})`, home = Math.hypot(dx, dy) > 1 || Math.abs(k - 1) > 0.01;
-    dockBtn.style.visibility = 'hidden';
-    if (open) {
-      handOrb(dockOrb, boxOrb);
-      const press = parseFloat(new DOMMatrix(getComputedStyle(dockBtn).transform).a) || 1; // (where the finger's press left it)
-      for (const p of parts) go(p, [{ opacity: 1 }, { opacity: 0 }], { duration: p.matches('.dcap') ? 70 : 90, easing: 'ease-out' });
-      go(cbg, [{ clipPath: circle }, { clipPath: whole }], { duration: GROW_MS, easing: GROW_EASE });
-      go(spot, [{ transform: home ? at : 'none', scale: Math.min(press, 0.94) }, { transform: 'none', scale: 1 }], { duration: 420, easing: 'cubic-bezier(.3,1.25,.5,1)' });
-      for (const f of fields) go(f, [{ opacity: 0 }, { opacity: 1 }], { duration: 120, delay: Math.round(GROW_MS * 0.7), easing: 'ease-out' }); // (once the box is wide enough to hold them)
-      end(GROW_MS + 140);
-    } else {
-      box.dataset.spot = 'orb'; // (it closes on the orb, whatever the field held)
-      for (const f of fields) go(f, [{ opacity: 1 }, { opacity: 0 }], { duration: 60, easing: 'ease-out' });
-      go(cbg, [{ clipPath: whole }, { clipPath: circle }], { duration: GROW_MS - 20, easing: GROW_EASE });
-      if (home) go(spot, [{ transform: 'none' }, { transform: at }], { duration: GROW_MS - 20, easing: GROW_EASE });
-      for (const p of parts) go(p, [{ opacity: 0 }, { opacity: 1 }], { duration: 140, delay: 170, easing: 'ease-out' });
-      timers.push(setTimeout(() => { handOrb(boxOrb, dockOrb); settleCoachFx(); }, GROW_MS - 10));
-    }
-  });
+  morphCoach(open, under);
 }
 
 // Up next becomes the workout: the card's surface opens out into the page while the workout's cards
@@ -389,11 +310,11 @@ function warmCoach(on) {
 // with nothing animated here (the voice code runs the whole transition). It gets back the page that was
 // on screen, to fade it out, and entry(), which gives the Coach its history entry once the voice
 // screen's own entry has been popped.
-function coachHandin() {
+function coachHandin({ animate = false } = {}) {
   if (view.screen === 'coach') return { under: null, entry: () => {} };
   const from = TABS.includes(view.screen) ? view.screen : 'today', under = $('#s-' + view.screen);
   coachFrom = from;
-  show('coach', { still: true });
+  show('coach', { still: !animate });
   return { under, entry: () => { if (view.screen === 'coach' && history.state?.screen !== 'coach') history.pushState({ screen: 'coach', from }, ''); } };
 }
 

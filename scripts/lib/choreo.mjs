@@ -112,7 +112,9 @@ export const FLOWS = {
   'mini-to-coach': async (page, k = 1, hooks = {}) => {
     const o = await orbCenter(page); await page.mouse.move(o.x, o.y); await page.mouse.down();
     await page.waitForSelector('#ofloat[data-phase=listening]', { timeout: 6000 * k }); await settle(page, 900 * k);
-    await hooks.before?.(); await page.mouse.up();
+    await page.mouse.up();
+    await page.waitForSelector('#ofloat.reviewing #vrtext:not(:empty)', { timeout: 6000 * k });
+    await hooks.before?.(); await page.click('#ofloat .vrsend');
     await page.waitForSelector('#s-coach.screen.on', { state: 'attached', timeout: 8000 * k }); await settle(page, 1300 * k);
   },
   'close-voice': async (page, k = 1, hooks = {}) => {
@@ -175,7 +177,7 @@ export function judge(fr, lum, { flow, reduced = false }) {
   const both = fr.filter(f => Object.values(f.screens).filter(a => a > 0.2).length > 1);
   if (both.length) bad.push(`${both.length} frame(s) with two screens' content over 20 % (${JSON.stringify(both[0].screens)})`);
   // landing: an orb reaching the message box's orb slot finds the box already there
-  const early = fr.filter(f => f.slot && f.orbs.some(o => o.id !== 'box' && Math.hypot(o.x - f.slot.x, o.y - f.slot.y) < 16) && f.box < 0.9);
+  const early = fr.filter(f => f.slot && f.orbs.some(o => o.id === 'flight' && Math.hypot(o.x - f.slot.x, o.y - f.slot.y) < 16) && f.box < 0.9);
   if (/^(mini|send)-/.test(flow) && early.length) bad.push(`the orb reached the message box before it was there (${early.length} frame(s), box at ${early[0].box})`);
   // the orb never passes over your words
   const over = fr.filter(f => f.gap != null && f.gap < 0);
