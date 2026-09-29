@@ -1,6 +1,6 @@
 # Setline plan
 
-All five phases from SPEC.md section 7 are done. Work now happens as fixes and polish the user asks for. The current version is in `js/version.js` (1.62.3). The release log, including releases that were later undone, is in `docs/HISTORY.md`; read it only when you need the story behind something.
+All five phases from SPEC.md section 7 are done. Work now happens as fixes and polish the user asks for. The current version is in `js/version.js` (1.62.4). The release log, including releases that were later undone, is in `docs/HISTORY.md`; read it only when you need the story behind something.
 
 ## What's in the app now
 
@@ -40,4 +40,4 @@ The brief (28 Sep 2026): keep 1.59.1's look, make it fast, fix its flow bugs, ad
 - **Phase 3, flow bugs (1.62.2): done.** Voice → Coach under the screen (no Home), floating orb → Coach in one flight, Home ↔ Coach one screen at a time, chat patched in place (1.60's syncThread/finalize, keeping 1.59.1's look), pending bubble with dots, label order, delayed "Working it out", rings fade. Golden flows voice-to-coach, home-coach, spoken-reply, chat-stream all blocking (checked to fail on 1.62.0, except spoken-reply: headless has no real voice, so the reading can't reproduce the doubling there). Not done: transcript word gaps (couldn't reproduce).
 - **Phase 4, review-before-send and voice-reactive dots (1.62.3): done.** Review UI in js/ui/voice.js (`showReview`/`reviewSend`/`reviewMore`, armed by a pull-up while holding), 4 s mic watchdog, drag-down cancel; eight bands from a 256-point analyser (`bands8` in js/voice.js) into js/ui/dotorb.js (envelopes, noise field, rim shimmer, speaking bands, `?orbtest=1`). Golden flows voice-gestures and mic-stuck. Remaining hot spot: Send → Coach (docs/PERF.md).
 
-All four phases are done (28–29 Sep 2026).
+All four phases are done (28–29 Sep 2026). 1.62.4 fixed the Coach reply doubling (docs/HISTORY.md).

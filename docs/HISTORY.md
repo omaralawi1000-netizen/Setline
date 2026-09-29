@@ -795,3 +795,19 @@ Fixes the flashes, lag and half-drawn frames in the voice → Coach recording, i
 - Golden flows voice-gestures (hold → listening within 1 s; hold + release → one send; pull up +
   release → none until Send, then one; drag down → none; tap → the Coach; nothing left over) and
   mic-stuck.
+
+## 1.62.4: the Coach's reply no longer doubles
+
+- Root cause: the hidden lines at the end of a reply (ACTION:, REMEMBER:, CHANGE:) were hidden only once
+  "ACT…" / "REM…" / "CHA…" had arrived, so a chunk ending in "\nA" briefly made the reply's last
+  paragraph a finished line; when the next chunk hid it again the line count went back, and the
+  streamed words were drawn a second time below (blurring in), until the final text redrew the bubble.
+  Now a last line that could still become a hidden one waits a chunk, and a finished line is never
+  drawn twice. Messages are matched by id only: thinking, streaming, final and chips all in one node.
+- The thread no longer jumps when a reply ends: the streaming cursor takes no room in the line (it
+  could wrap onto a line of its own that vanished).
+- The action chips rise out of the reply on a soft spring (staggered 60 ms) while the thread glides
+  up to make room; a chip is pressed on the frame your finger lands, and its check draws in.
+- New golden flow reply-real-stream: replies streamed chunk by chunk through a real SSE body (plain,
+  ending in a chip, ending in a memory, 200 chunks), checked on every frame. It failed on 1.62.3
+  (the reply twice in 41 and 47 frames, 3 jumps).

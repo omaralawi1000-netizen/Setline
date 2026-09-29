@@ -433,7 +433,7 @@ const FLOWS = {
       const twice = seen.filter(x => x.copies > 1).length, maxAi = Math.max(...seen.map(x => x.ai));
       // a jump: the thread moved back (up) by itself while it was following the end
       let jumps = 0;
-      for (let k = 1; k < seen.length; k++) if (seen[k - 1].gap < 80 && seen[k].top < seen[k - 1].top - 2) jumps++;
+      for (let k = 1; k < seen.length; k++) if (seen[k - 1].gap < 80 && seen[k].top < seen[k - 1].top - 2) { jumps++; if (process.env.JUMPS) console.log('      jump', JSON.stringify(seen.slice(Math.max(0, k - 3), k + 3).map(x => [Math.round(x.t), Math.round(x.top), Math.round(x.gap), x.copies]))); }
       const line = `${c.name}: ${seen.length} frames, ${twice} with the reply twice, up to ${maxAi - aiBefore} new Coach message node(s), ${jumps} jump(s)`;
       console.log('    ' + line + (c.chip ? `, chip: ${r.chips.join(', ') || 'none'}` : ''));
       if (from < 0) bad.push(`${c.name}: the reply never showed`);

@@ -42,7 +42,9 @@ export const streamReplies = (page, replies) => page.addInitScript(list => {
 // has, and whether the thread jumped (scrollTop moving up while near the end).
 export const probeReply = (page, firstSentence) => page.evaluate(s => {
   window.__probe = [];
+  const run = window.__probeRun = (window.__probeRun || 0) + 1; // (a probe for an earlier reply stops)
   const tick = () => {
+    if (run !== window.__probeRun) return;
     const ol = document.getElementById('thread'), root = document.getElementById('s-coach');
     const txt = document.body.innerText;
     let count = 0, at = 0;

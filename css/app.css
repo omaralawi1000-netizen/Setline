@@ -491,7 +491,7 @@ button.mini:active,button.pr:active{transform:scale(.98)}
 .msg.ai .bub b{color:var(--accent)}
 .msg.is-err .bub{color:var(--muted)}
 .msg.is-err .chip{margin-top:10px}
-.msg.is-streaming .bub > :last-child::after{content:"";display:inline-block;width:7px;height:15px;margin-left:3px;border-radius:2px;background:var(--accent);vertical-align:-2px;animation:blink .8s ease-in-out infinite alternate}
+.msg.is-streaming .bub > :last-child::after{content:"";display:inline-block;width:7px;height:15px;margin-left:3px;margin-right:-10px;border-radius:2px;background:var(--accent);vertical-align:-2px;animation:blink .8s ease-in-out infinite alternate} /* (-10px: the cursor takes no room in the line, so it never wraps onto a line of its own that vanishes, jumping the thread, when the reply ends) */
 .dots{display:inline-flex;gap:4px;padding:4px 0}
 .dots i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:dot 1.1s ease-in-out infinite}
 .dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
