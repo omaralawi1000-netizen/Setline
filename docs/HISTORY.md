@@ -962,3 +962,11 @@ From Omar's four recordings of 1.65.2 (29–30 Sep). The 1.59.1 look stays; how 
   asked a few times a second). The flying orb's clone no longer copies the floating orb's id.
 - Golden: `home-coach`, `voice-to-coach`, `voice-screen-to-coach`, `mic-hold-twice` (with stand-ins in
   `scripts/lib/voicemock.mjs`); each fails on 1.65.2.
+
+## 1.66.1: Revert to 1.56.0
+
+Omar asked for the app as 1.56.0 (4b84bee, 27 Sep). Every app file, test and script is 1.56.0's again;
+only the version number is new, so phones update. 1.57.0–1.66.0 are undone (the redesign, the rollbacks
+and the motion passes). Kept from the latest version: this history, PLAN.md's version line, CLAUDE.md,
+AGENTS.md and `.claude/`. The database is untouched (schema 4, the storage code is identical). Backup of
+1.66.0: branch `backup-before-revert-1.56.0`.

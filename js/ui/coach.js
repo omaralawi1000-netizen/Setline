@@ -40,7 +40,7 @@ const errorText = (code, t) => ({
 function thinkingHTML(m) {
   const { t } = state;
   const steps = [t('coach.step1'), t('coach.step2'), t('coach.step3'), t('coach.step4')];
-  return `<span class="think"><span class="tsteps">${steps.map((x, i) => `<span class="tl" style="--i:${i}">${esc(x)}</span>`).join('')}</span></span>`;
+  return `<span class="think"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span><span class="tsteps">${steps.map((x, i) => `<span class="tl" style="--i:${i}">${esc(x)}</span>`).join('')}</span></span>`;
 }
 
 function bubble(m) {
@@ -77,34 +77,6 @@ function planCard(m) {
         <button class="btn2 solid" data-coach="saveplan" data-mode="add" data-id="${m.id}">${I.plus}<span>${t('plan.add')}</span></button></div>`}</div>`;
 }
 
-// One node per message: kept while its drawing is the same, redrawn in place when it changes, and the
-// reply being typed out is never touched (its words are written into it as they arrive).
-function patchThread(ol, chat) {
-  const have = new Map([...ol.children].map(li => [li.dataset.id, li]));
-  let prev = null;
-  for (const m of chat) {
-    let li = have.get(m.id);
-    have.delete(m.id);
-    const seen = shown.has(m.id);
-    shown.add(m.id);
-    if (li && !(m.streaming && li._streaming)) {
-      const h = bubble(m);
-      if (li._h !== h) { const n = make(h, true); li.replaceWith(n); li = n; }
-    } else if (!li) li = make(bubble(m), seen);
-    li._streaming = !!m.streaming;
-    if (li.previousElementSibling !== prev || li.parentNode !== ol) (prev ? prev.after(li) : ol.prepend(li));
-    prev = li;
-  }
-  for (const li of have.values()) li.remove();
-}
-function make(h, seen) {
-  const t = document.createElement('template');
-  t.innerHTML = seen ? h.replace('<li class="msg', '<li class="msg seen') : h;
-  const li = t.content.firstElementChild;
-  li._h = h;
-  return li;
-}
-
 export function renderCoach(root) {
   const { t } = state;
   const key = getKey('google');
@@ -117,24 +89,16 @@ export function renderCoach(root) {
     body = `<div class="coachhero glass"><span class="orb" aria-hidden="true"><i class="core"><b></b><b></b><b></b></i></span>
       <h2>${t('coach.empty')}</h2><p>${t('coach.emptySub')}</p>
       <div class="exq">${['coach.ex1', 'coach.ex2', 'coach.ex3'].map(k => `<button class="chip" data-coach="ask" data-q="${esc(t(k))}">${esc(t(k))}</button>`).join('')}</div></div>`;
+  } else {
+    // messages already on screen don't slide in again when the thread re-renders
+    body = `<ol class="thread" id="thread">${chat.map(m => { const h = bubble(m); const seen = shown.has(m.id); shown.add(m.id); return seen ? h.replace('<li class="msg', '<li class="msg seen') : h; }).join('')}</ol>`;
   }
-  const top = `<div class="tabtop"></div>
+  root.innerHTML = `<div class="tabtop"></div>
     <button class="iconbtn cclose" data-coach="close" aria-label="${t('common.close')}">${I.back.replace('d="M14.5 6 8.5 12l6 6"', 'd="M6 9.5l6 6 6-6"')}</button>
     <header class="coachhead"><div><h1 class="h1">${t('coach.title')}</h1><p class="sub">${t('coach.sub')}</p></div>
       ${chat.length ? `<button class="iconbtn" data-coach="clear" aria-label="${t('coach.clear')}">${I.trash}</button>` : ''}</header>
-    ${key ? pinHTML('coach') : ''}`;
-  // The conversation is patched, never rebuilt: a message keeps its node for its whole life, so
-  // nothing on screen flickers, restarts its entrance or jumps when a new one comes in or a reply
-  // finishes (only the messages that changed are redrawn, the one being typed is left to the typer).
-  const ol = chat.length && body === undefined ? root.querySelector(':scope > #thread') : null;
-  if (ol && root._top === top) patchThread(ol, chat);
-  else {
-    if (body === undefined) body = '<ol class="thread" id="thread"></ol>';
-    root.innerHTML = top + body;
-    root._top = top;
-    const fresh = root.querySelector(':scope > #thread');
-    if (fresh) patchThread(fresh, chat);
-  }
+    ${key ? pinHTML('coach') : ''}
+    ${body}`;
   const composer = $('#composer');
   if (!composer.dataset.talk) composer.querySelector('input').placeholder = t('coach.ph'); // talking: the box shows what's happening
   composer.querySelector('.csend').setAttribute('aria-label', t('coach.send'));
@@ -202,17 +166,8 @@ function sendFly(root) {
   };
   frame(t0);
   // …and the conversation above makes room for it by gliding up, instead of jumping
-  // (only the messages on screen move: lifting the whole thread, however long, onto its own layer made
-  // the phone draw it afresh, and it showed nothing at all for a moment)
-  const moved = root.scrollTop - (p.scroll || 0);
-  if (moved > 2) {
-    const view = root.getBoundingClientRect();
-    for (const m of root.querySelectorAll('#thread > .msg:not(.sending)')) {
-      const r = m.getBoundingClientRect();
-      if (r.bottom < view.top - moved || r.top > view.bottom) continue;
-      m.animate([{ transform: `translateY(${moved}px)` }, { transform: 'none' }], { duration: dur, easing: token('--e-out') });
-    }
-  }
+  const moved = root.scrollTop - (p.scroll || 0), thread = root.querySelector('#thread');
+  if (thread && moved > 2) thread.animate([{ transform: `translateY(${moved}px)` }, { transform: 'none' }], { duration: dur, easing: token('--e-out') });
   $('#composer .csend')?.animate([{ scale: 1 }, { scale: 0.86, offset: 0.3 }, { scale: 1 }], { duration: token('--m-base'), easing: token('--e-spring') });
   setTimeout(done, dur + 400); // (no frames while the page is hidden)
 }
@@ -305,8 +260,6 @@ function wordsHTML(bub, text, births, now, st) {
   st.live = place(bub, el);
   if (newUl) st.liveUl = el;
 }
-// the answer has started: a spoken conversation stops thinking and speaks (set by the talk loop)
-let answering = null;
 function typewriter(root, id) {
   let words = [], shown = 0, raf = 0, last = 0, rate = 16, acc = 0, waiters = [];
   const births = [], st = {};
@@ -329,7 +282,7 @@ function typewriter(root, id) {
       if (bub) {
         const msg = bub.closest('.msg');
         // the answer starts: the box's orb gives one pulse and the first line rises out of it
-        if (msg?.classList.contains('is-thinking')) { msg.classList.add('arrive'); pulseOrb(); answering?.(); }
+        if (msg?.classList.contains('is-thinking')) { msg.classList.add('arrive'); pulseOrb(); }
         msg?.classList.remove('is-thinking');
         syncThinking();
         wordsHTML(bub, words.slice(0, shown).join(''), births, now, st);
@@ -381,8 +334,7 @@ function thinkWords(on) {
   const phrases = [t('coach.thinking'), t('coach.step1'), t('coach.step2'), t('coach.step4')];
   thinkN = 0;
   const show = () => {
-    const n = thinkN < phrases.length ? thinkN : 1 + ((thinkN - 1) % (phrases.length - 1)); // then round the steps again
-    const text = phrases[n];
+    const text = phrases[thinkN < phrases.length ? thinkN : 1 + ((thinkN - 1) % (phrases.length - 1))]; // then round the steps again
     thinkN++;
     const old = el.querySelector('.tp:not(.out)');
     if (old) { old.classList.add('out'); setTimeout(() => old.remove(), 420); }
@@ -783,7 +735,6 @@ export function initCoach(n) {
     input.placeholder = phase ? state.t('coach.talk.' + phase) : state.t('coach.ph');
     input.disabled = !!phase;
   };
-  answering = () => { if (talk.on && composer.dataset.talk === 'thinking') setTalk('speaking'); };
   const stopTalk = () => { talk.on = false; talk.l?.cancel(); talk.l = null; tts.stop(); setTalk(null); orbBtn.style.removeProperty('--lv'); };
   const listenTurn = async () => {
     if (!talk.on) return;

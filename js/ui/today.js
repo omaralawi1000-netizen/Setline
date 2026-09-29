@@ -1,5 +1,4 @@
 // Today: the hub. Streak, what's next, cardio, the week, body, last week's review, routines.
-import { beamHTML } from './beam.js';
 import { state } from '../store.js';
 import { todayOrderOf } from '../settings.js';
 import { foodTargets } from './food.js';
@@ -88,7 +87,7 @@ function resumeHTML() {
   const w = state.active;
   if (w) {
     const cur = w.exercises[w.current];
-    return `<div class="upcoming glass">${beamHTML()}
+    return `<div class="upcoming glass">
       <span class="live"><i></i><span data-elapsed>${esc(clock(elapsedSec(w)))}</span></span>
       <h2>${esc(workoutTitle(w))}</h2>
       <p>${t('today.resumeSub', { sets: doneSetCount(w) })}${cur ? ` · ${esc(state.catalog.name(cur.exerciseId, lang))}` : ''}</p>
@@ -96,7 +95,7 @@ function resumeHTML() {
     </div>`;
   }
   const a = state.activeCardio;
-  return `<div class="upcoming glass">${a.pausedAt ? '' : beamHTML()}
+  return `<div class="upcoming glass">
       <span class="live${a.pausedAt ? ' paused' : ''}"><i></i><span data-cclock>${esc(clock(cardioElapsed(a)))}</span></span>
       <h2>${esc(cardioName(a.type, lang))}</h2>
       <p>${t(a.pausedAt ? 'cardio.paused' : 'cardio.running')}</p>

@@ -13,9 +13,10 @@ Follow `AGENTS.md`. It's short on purpose; don't read more than the task needs.
 - For design and animation work, follow `docs/DESIGN_SYSTEM.md`. Omar wants the app as beautiful and premium as possible: be ambitious, change the look, layout and motion of any screen, use `impeccable`, `emil-design-eng` and `frontend-design` freely. Keep every feature and `data-act`/`data-k`/`#s-<screen>` hook.
 - Keep chat replies short.
 - Use the `impeccable` skill for UI work and `emil-design-eng` for motion.
-- Before and after any visual change, screenshot the main screens and the voice orb and look at them (`npm run screens`; `scripts/snap.mjs` was part of the undone 1.62–1.65 releases and is not in the repo now). Never commit screenshots.
+- Before and after any visual change, screenshot the main screens and the voice orb and look at them (`npm run screens`). Never commit screenshots.
 
 ## Motion & performance rules
+30 Sep 2026: reverted to 1.56.0 exactly (released as 1.66.1). Don't reapply 1.57.0–1.66.0 unless Omar asks; the backup is branch `backup-before-revert-1.56.0`. The notes below describe 1.66.0 (springs.js, handToCoach, voicemock golden flows, the 1.59.1 design); they don't exist in this version.
 29 Sep 2026: rolled back to 1.59.1 (released as 1.65.2), then 1.66.0 polished its motion. Don't reapply 1.62.0–1.65.1 unless Omar asks (backup: branch `backup-before-rollback-1.59.1`). Keep the 1.59.1 design: floating orb, pull-up voice screen, frosted glass, sea light, the message box's orb on the left. Omar wants iOS-quality motion: springs, depth, soft light; be creative.
 - Springs come from `js/ui/springs.js` (`spring(response, damping)` → a CSS `linear()` easing the compositor runs; `SMOOTH`, `SNAPPY`, `LIVELY`; `--e-spring` and `--sp-card` in CSS). Use them for anything that arrives or settles.
 - Animate anything except layout (width, height, top, left, margin, padding, `all`). Glows are radial gradients, never big `filter: blur` or masked layers (Android clips those into hard rectangles). If an effect stutters on the phone, simplify it and check `?perf=1`.
