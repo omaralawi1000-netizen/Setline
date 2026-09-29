@@ -3072,3 +3072,24 @@ html[data-motion=off] .tab.on svg.ti{animation:none!important}
 /* set every frame from the voice loop (already eased there): a transition on it restarted each frame */
 .ofloat .orb.lift::before{transition:none}
 .ofloat.handoff .oscrim{opacity:1;transition:none}
+/* one label at a time in the message box: "Thinking…" fades out (80 ms), then the placeholder fades in (120 ms) */
+.thinkline.gone{transition:opacity 80ms var(--e-out)}
+.composer input::placeholder{transition:color 120ms var(--e-out) 80ms}
+.composer:has(> .thinkline:not(.gone)) input::placeholder{color:transparent;transition:color 80ms var(--e-out)}
+.obubble{bottom:calc(var(--ob) + 188px)} /* a little air between the status pill and "Pull up for more" */
+/* your spoken question, before its words are back: three dots shimmer in your bubble */
+.msg.me.pending .bub{min-width:64px;text-align:center}
+.pdots{display:inline-flex;gap:5px;padding:4px 2px}
+.pdots i{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.35;animation:pdot 1.1s var(--e-soft) infinite}
+.pdots i:nth-child(2){animation-delay:.15s}.pdots i:nth-child(3){animation-delay:.3s}
+@keyframes pdot{40%{opacity:.95;transform:translateY(-2px)}}
+@media (prefers-reduced-motion: reduce){ .pdots i{animation:none;opacity:.6} }
+html[data-motion=off] .pdots i{animation:none;opacity:.6}
+/* the listening rings fade out when you let go instead of cutting off: they keep rippling into
+   "working it out" while their layer fades */
+.vlayer[data-phase=thinking] .ripples b{animation:ripple 2.8s var(--ease) infinite}
+.vlayer[data-phase=thinking] .ripples b:nth-child(2){animation-delay:.9s}
+.vlayer[data-phase=thinking] .ripples b:nth-child(3){animation-delay:1.8s}
+.ofloat .owrap::before,.ofloat .owrap::after{transition:filter .3s var(--e-out)}
+.ofloat[data-phase=thinking] .owrap::before{animation:ripple 2.4s var(--ease) infinite;filter:opacity(0)}
+.ofloat[data-phase=thinking] .owrap::after{animation:ripple 2.4s var(--ease) 1.2s infinite;filter:opacity(0)}

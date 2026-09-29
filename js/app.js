@@ -235,6 +235,7 @@ function impact() {
   setTimeout(() => { box.style.transformOrigin = ''; }, 700);
 }
 
+let flyFrom = null; // an orb the next Coach opening flies from instead of the bar's
 function coachMorph(open, under) {
   settleCoachFx();
   const aura = $('.aura'), bloom = aura?.querySelector('.bloom'), veil = aura?.querySelector('.veil'), orb = $('#dock .orbbtn');
@@ -255,11 +256,14 @@ function coachMorph(open, under) {
   if (open) {
     if (other) Object.assign(other.style, { transition: 'none', opacity: '1', visibility: 'visible', transform: 'none' });
     // the orb leaves the bar and lands in the message box (once the Coach's layout is in place)
-    const from = dockOrb ? relRect(dockOrb) : null;
+    // (from the floating orb when a question asked there opens the Coach: it flies straight in)
+    const src = flyFrom?.isConnected ? flyFrom : dockOrb;
+    flyFrom = null;
+    const from = src ? relRect(src) : null;
     let flying = null;
     queueMicrotask(() => {
       const corb = $('#composer .corb .orb');
-      flying = from && corb && flyOrb(from, layRect(corb), { duration: 440, easing: 'cubic-bezier(.2,.75,.2,1)', go, fromEl: dockOrb, toEl: corb, onland: () => { app.classList.remove('orbtravel'); impact(); } });
+      flying = from && corb && flyOrb(from, layRect(corb), { duration: 440, easing: 'cubic-bezier(.2,.75,.2,1)', go, fromEl: src, toEl: corb, onland: () => { app.classList.remove('orbtravel'); impact(); } });
       if (flying) { app.classList.add('orbtravel', 'orbflown'); go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 900, fill: 'forwards' }); return; }
       go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
       setTimeout(() => haptic('land'), 560);
@@ -267,7 +271,9 @@ function coachMorph(open, under) {
     // held (fill both) until everything settles together: an animation ending on its own mid-way let
     // the page underneath show through for a frame or two on the phone
     const last = go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: 560, delay: 90, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'both' });
-    go(other, [{ scale: 1, opacity: 1 }, { scale: 0.94, opacity: 0.3 }], { duration: 640, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'forwards' });
+    // one screen readable at a time: the page shrinks back and is gone before the Coach's words come up
+    go(other, [{ scale: 1, opacity: 1 }, { scale: 0.97, opacity: 0, offset: 0.4 }, { scale: 0.94, opacity: 0 }], { duration: 640, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'forwards' });
+    go(coach, [{ opacity: 0 }, { opacity: 0, offset: 0.35 }, { opacity: 1 }], { duration: 520, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'backwards' });
     app.classList.add('coach-in');
     last.onfinish = settleCoachFx;
     coachFx = () => {
@@ -288,7 +294,8 @@ function coachMorph(open, under) {
     // orb and the page comes forward; the orb takes the light in last
     go(coach, [{ opacity: 1, transform: 'none', visibility: 'visible' }, { opacity: 0, transform: 'translateY(20px) scale(.97)', visibility: 'visible' }], { duration: 220, easing: 'cubic-bezier(.4,0,.6,1)' });
     const last = go(veil, [{ opacity: 1 }, { opacity: 0 }], { duration: 480, delay: 60, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'backwards' });
-    go(other, [{ scale: 0.95, opacity: 0.25 }, { scale: 1, opacity: 1 }], { duration: 560, delay: 80, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' });
+    // (the page comes forward only once the conversation has gone: never both readable at once)
+    go(other, [{ scale: 0.95, opacity: 0 }, { scale: 1, opacity: 1 }], { duration: 480, delay: 200, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' });
     // the orb leaves the message box and flies home into the bar, which takes it with a small pulse
     const corb = $('#composer .corb .orb');
     let hold = null;
@@ -420,6 +427,16 @@ function go(name, { quiet = false } = {}) {
   show(name);
 }
 
+// The Coach laid out under the voice screen while that still covers everything: it appears in place
+// (no light, no flight: the voice screen's own orb flies into the message box as it fades away), so
+// the page you were on never shows in between.
+function coachUnder() {
+  if (view.screen === 'coach') return;
+  coachFrom = TABS.includes(view.screen) ? view.screen : 'today';
+  history.pushState({ screen: 'coach', from: coachFrom }, '');
+  show('coach', { still: true });
+}
+
 let coachFrom = 'today';
 function closeCoach() {
   if (view.screen !== 'coach') return;
@@ -549,7 +566,7 @@ setOnboardNav({ go: name => go(name), ask: q => askCoach(q) });
 initWorkout($('#s-workout'), actions);
 initSettings(actions, $('#s-settings'));
 setWorkoutNav({ go, showDetail });
-initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings'), openCoach: () => go('coach') });
+initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings'), openCoach: () => go('coach'), coachUnder, impact, coachFromOrb: el => { flyFrom = el; go('coach'); } });
 initCoach({ openSettings: () => pushSub('settings'), closeCoach: () => closeCoach(), go: name => go(name, { quiet: true }), open: name => pushSub(name) });
 setCardioNav({ go, showDetail });
 initCardio();

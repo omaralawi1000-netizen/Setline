@@ -9,7 +9,7 @@ import { STAND_IN, mockServices, installSampler, mark, samples, between } from '
 
 // chat-stream is 1.60's in-place chat, which the master fix's phase 3 brings to this design: until then
 // it reports without failing.
-const ADVISORY = new Set(['chat-stream']);
+const ADVISORY = new Set();
 const ONLY = process.argv.find(a => a.startsWith('--only='))?.slice(7).split(',').filter(Boolean);
 
 const countWorkouts = page => page.evaluate(() => new Promise((resolve, reject) => {
@@ -124,6 +124,8 @@ const FLOWS = {
     for (let dy = 10; dy <= 180; dy += 10) await page.mouse.move(x, y - dy);
     await page.waitForSelector('#voice.on[data-phase=listening]', { timeout: 4000 });
     await settle(page, 900);
+    await installSampler(page);
+    await mark(page, 'release');
     const relAt = await page.evaluate(() => performance.now());
     await page.mouse.up();
     await onScreen(page, 'coach', 10000);
@@ -137,6 +139,77 @@ const FLOWS = {
     if (thin.length) throw new Error(`the page showed through in ${thin.length} of ${open.length} frames (cover ${Math.min(...thin.map(f => f.cover)).toFixed(2)})`);
     const users = await page.locator('#s-coach .msg.me').count();
     if (users !== 1) throw new Error(`expected the question once in the chat, found ${users}`);
+    // from release into the Coach: one orb on screen at every frame, and Home never shows
+    const after = between(await samples(page), 'release');
+    const two = after.filter(x => x.orbs > 1);
+    if (two.length) throw new Error(`${two.length} frame(s) with ${Math.max(...two.map(x => x.orbs))} orbs on screen (${two[0].orbIds})`);
+    const coachAt = after.find(x => x.coaching)?.t;
+    const home = after.filter(x => coachAt && x.t >= coachAt && x.todayOp > 0.02);
+    if (home.length) throw new Error(`Home showed in ${home.length} frame(s) on the way into the Coach`);
+    await context.close();
+    return errors;
+  },
+
+  // Tap the orb: the Coach opens (the orb flies into the message box); Back: Home again. One orb on
+  // screen at every frame, and never two full screens readable at once.
+  'home-coach': async (browser, base) => {
+    const { context, page, errors } = await newPage(browser, base);
+    await page.goto(base + '?seed=1');
+    await onScreen(page, 'today');
+    await page.evaluate(async () => { const s = await import('./js/store.js'); s.setSettings({ weeklyCheckin: false }); s.addChat('user', 'How was last week?'); s.addChat('model', 'Four sessions and a record on the bench.'); });
+    await settle(page, 1000);
+    await installSampler(page);
+    await mark(page, 'open');
+    await page.click('#dock .orbbtn');
+    await onScreen(page, 'coach');
+    await settle(page, 1300);
+    await mark(page, 'back');
+    await page.goBack();
+    await onScreen(page, 'today');
+    await settle(page, 1300);
+    await mark(page, 'end');
+    const rec = between(await samples(page), 'open', 'end');
+    const two = rec.filter(x => x.orbs > 1);
+    if (two.length) throw new Error(`${two.length} frame(s) with ${Math.max(...two.map(x => x.orbs))} orbs on screen (${two[0].orbIds})`);
+    const both = rec.filter(x => x.todayOp > 0.35 && x.coachOp > 0.35);
+    if (both.length) throw new Error(`${both.length} frame(s) with Home and the Coach both readable (${both[0].todayOp.toFixed(2)} / ${both[0].coachOp.toFixed(2)})`);
+    await context.close();
+    return errors;
+  },
+
+  // A reply read out loud: from its first word to the end of the reading it is one message, its words
+  // shown once (the reading marks its sentences in place, never a second copy), at one width.
+  'spoken-reply': async (browser, base) => {
+    const { context, page, errors } = await newPage(browser, base);
+    await mockServices(page, { delay: 200 });
+    await page.addInitScript(k => { localStorage.setItem('setline.keys', JSON.stringify(k)); }, STAND_IN);
+    await page.goto(base + '?seed=1');
+    await onScreen(page, 'today');
+    await page.evaluate(async () => { const s = await import('./js/store.js'); window.__s = s; s.setSettings({ spoken: 'on', weeklyCheckin: false }); });
+    await settle(page, 600);
+    await page.click('#dock .orbbtn');
+    await onScreen(page, 'coach');
+    await settle(page, 1200);
+    await page.fill('#composer input', 'How is my bench going?');
+    await page.press('#composer input', 'Enter');
+    await page.waitForFunction(() => { const m = [...window.__s.state.chat].reverse().find(x => x.role === 'model' && x.q); if (m) window.__replyId = m.id; return !!m; }, null, { timeout: 5000 });
+    await page.evaluate(() => {
+      window.__f = [];
+      const tick = () => {
+        const nodes = document.querySelectorAll(`#thread .msg[data-id="${window.__replyId}"]`);
+        const txt = document.getElementById('thread')?.textContent || '';
+        window.__f.push({ n: nodes.length, twice: (txt.match(/Your bench is moving well/g) || []).length, w: nodes[0]?.querySelector('.bub')?.getBoundingClientRect().width || 0, streaming: !!nodes[0]?.classList.contains('is-streaming') });
+        if (window.__f.length < 1500) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    await page.waitForFunction(() => window.__s.state.chat.find(m => m.id === window.__replyId)?.streaming === false, null, { timeout: 15000 });
+    await settle(page, 3000); // the reading (or the phone's voice falling back) marks its sentences
+    const f = await page.evaluate(() => window.__f);
+    if (f.some(x => x.n > 1)) throw new Error('the reply was drawn twice');
+    if (f.some(x => x.twice > 1)) throw new Error('the reply\'s words showed twice');
+    const done = f.filter(x => !x.streaming && x.w), ws = new Set(done.map(x => Math.round(x.w)));
+    if (ws.size > 1) throw new Error(`the finished reply changed width while being read (${[...ws].join(', ')} px)`);
     await context.close();
     return errors;
   },

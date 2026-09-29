@@ -37,7 +37,7 @@ import { createVoiceGlow } from './voiceglow.js';
 import { ask as askCoach, ensureModels } from './coach.js';
 import { cmdModels } from '../settings.js';
 import { createEndpointer, looksUnfinished } from '../endpoint.js';
-import { onFrame } from './frame.js';
+import { onFrame, nextFrame } from './frame.js';
 
 const endpoint = createEndpointer({ pauseMs: 850 });
 const WAIT_MS = 3000; // sounded unfinished: still send after this much quiet
@@ -297,6 +297,7 @@ export function openMini() {
   el.osay.innerHTML = '';
   el.osay.classList.remove('over');
   el.owrap.style.translate = '';
+  el.owrap.style.visibility = '';
   el.opull.style.opacity = '';
   el.opull.querySelector('span').textContent = state.t('voice.pullUp');
   setPhase('idle');
@@ -676,9 +677,82 @@ export const speakCue = (text, lang = state.lang) => speak(text, lang);
 // Questions land in the Coach thread; the answer is streamed there and spoken when complete.
 async function toCoach(text) {
   dismissCard();
+  if (v.open && v.mode === 'full' && !reduced()) return handoffToCoach(text);
+  if (v.open && v.mode === 'mini' && !reduced()) return miniToCoach(text);
   if (v.open) { setPhase('result'); await new Promise(r => setTimeout(r, 380)); await closeVoice(); }
   nav.go('coach');
   askCoach(text);
+}
+
+// Asked over the floating orb: the Coach opens as it does from the bar, but its orb is the floating
+// one, flying straight into the message box (not back into the bar and out again).
+async function miniToCoach(text) {
+  const app = document.getElementById('app');
+  setPhase('result');
+  v.open = false; v.token++; v.press = null; v.toggle = false;
+  mic.cancel();
+  if (history.state?.voice) await new Promise(res => { v.popWaiting++; v.popResolve = res; history.back(); });
+  nav.coachFromOrb(el.oorb);
+  askCoach(text);
+  // the flight has taken the orb's look: the floating orb goes at once, its scrim fades as the
+  // Coach's background comes up
+  setTimeout(() => {
+    el.owrap.style.visibility = 'hidden';
+    el.mini.classList.remove('on');
+    app.classList.remove('voice-mini', 'orbaway');
+    stopLoop();
+  });
+  setTimeout(() => {
+    if (v.open) return;
+    el.mini.hidden = true;
+    el.owrap.style.visibility = ''; el.owrap.style.transform = ''; el.owrap.style.translate = '';
+  }, 480);
+}
+
+// The voice screen hands over to the Coach without passing through the page under it: the Coach is laid
+// out beneath it (scrolled to the end) while it still covers everything, then it fades away while its
+// orb, the one orb on screen, flies into the message box, which gives under it and springs back.
+async function handoffToCoach(text) {
+  const app = document.getElementById('app');
+  setPhase('result');
+  v.open = false; v.token++; v.press = null; v.toggle = false;
+  mic.cancel();
+  coverPage(false);
+  // off our own history entry first (the screen stays up meanwhile), so Back from the Coach goes home
+  if (history.state?.voice) await new Promise(res => { v.popWaiting++; v.popResolve = res; history.back(); });
+  app.classList.add('orbtravel');
+  nav.coachUnder();
+  askCoach(text);
+  await new Promise(r => nextFrame(r));        // the Coach is laid out and at the end of the thread
+  app.classList.remove('voice');                // the message box comes in as the screen fades
+  const corb = document.querySelector('#composer .corb .orb');
+  const a = el.orb.getBoundingClientRect(), b = corb?.getBoundingClientRect();
+  el.layer.inert = true;
+  el.layer.classList.remove('on', 'carded');
+  const finish = () => {
+    el.orbwrap.style.visibility = 'hidden';
+    app.classList.remove('orbtravel', 'orbaway');
+    if (corb) { handOrb(el.orb, corb); nav.impact?.(); }
+  };
+  if (!b?.width || !a.width) finish();
+  else {
+    const k = scaleOf(el.stage) || 1;
+    const dx = (b.left + b.width / 2 - (a.left + a.width / 2)) / k, dy = (b.top + b.height / 2 - (a.top + a.height / 2)) / k;
+    el.orbwrap.style.willChange = 'transform';
+    const fly = el.orbwrap.animate([{ transform: 'none' }, { transform: `translate(${dx}px, ${dy}px) scale(${b.width / a.width})` }],
+      { duration: 460, easing: 'cubic-bezier(.3,.7,.2,1)', fill: 'forwards' });
+    await new Promise(r => { fly.onfinish = r; fly.oncancel = r; setTimeout(r, 700); });
+    finish();
+    fly.cancel();
+    el.orbwrap.style.willChange = '';
+  }
+  setTimeout(() => {
+    if (v.open) return;
+    el.layer.hidden = true;
+    el.orbwrap.style.visibility = '';
+    el.orbwrap.style.transform = '';
+    stopLoop();
+  }, 120);
 }
 
 // What the parser couldn't read goes to Flash-Lite. Never blocks local commands:
@@ -694,8 +768,15 @@ async function aiFallback(text, parsed, { typed }) {
   const lang = langFor(parsed);
   const t = tFor(lang);
   if (v.open) setPhase('thinking');
-  if (v.open && v.mode === 'mini') el.ostatus.textContent = t('voice.thinkingAi');
-  else showCard({ kind: 'wait', icon: 'info', title: t('voice.thinkingAi'), sub: t('voice.heard', { text }), lang, intent: parsed });
+  // "Working it out" only if it takes a while (over 0.6 s), and then for at least 0.8 s, so a quick
+  // answer never flashes it
+  let waitAt = 0;
+  const waitT = setTimeout(() => {
+    if (mine !== aiSeq) return;
+    waitAt = performance.now();
+    if (v.open && v.mode === 'mini') el.ostatus.textContent = t('voice.thinkingAi');
+    else showCard({ kind: 'wait', icon: 'info', title: t('voice.thinkingAi'), sub: t('voice.heard', { text }), lang, intent: parsed });
+  }, 600);
   let intent;
   try {
     await ensureModels();
@@ -706,6 +787,8 @@ async function aiFallback(text, parsed, { typed }) {
   } catch {
     intent = null;
   }
+  clearTimeout(waitT);
+  if (waitAt) await new Promise(r => setTimeout(r, Math.max(0, 800 - (performance.now() - waitAt))));
   if (mine !== aiSeq) return; // a newer AI request superseded this one
   if (intent?.type === 'question') return toCoach(text);
   const full = intent ? { ...intent, heard: text, lang: parsed.lang } : parsed;

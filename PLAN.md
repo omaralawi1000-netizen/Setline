@@ -1,6 +1,6 @@
 # Setline plan
 
-All five phases from SPEC.md section 7 are done. Work now happens as fixes and polish the user asks for. The current version is in `js/version.js` (1.62.1). The release log, including releases that were later undone, is in `docs/HISTORY.md`; read it only when you need the story behind something.
+All five phases from SPEC.md section 7 are done. Work now happens as fixes and polish the user asks for. The current version is in `js/version.js` (1.62.2). The release log, including releases that were later undone, is in `docs/HISTORY.md`; read it only when you need the story behind something.
 
 ## What's in the app now
 
@@ -37,5 +37,5 @@ The brief (28 Sep 2026): keep 1.59.1's look, make it fast, fix its flow bugs, ad
 
 - **Phase 1, restore 1.59.1 (1.62.0): done.** App files are 2e5ef25's; tooling kept; DB schema 4 (no migration); backup branch `backup-before-restore-1.59.1`; release tag `design-1.59.1`. `tests/motion-rules.test.js` (budget part) is skipped and the golden flows voice-to-coach and chat-stream are advisory (`ADVISORY` in scripts/golden.mjs) until phase 2.
 - **Phase 2, black flashes and stutter (1.62.1): done.** docs/PERF.md has the before/after table, root causes and the blur audit (`node scripts/perf.mjs` measures, `node scripts/snap.mjs` films the 1.59.1 flow). Motion-rules test blocking again; `voice-to-coach` golden flow rewritten for 1.59.1 and blocking; `chat-stream` stays advisory until phase 3 (it needs the in-place chat). Not reached: a steady 60 fps in the sandbox (software rendering, 4× slower CPU: judge on the phone with `?perf=1`). Note: on 28 Sep Omar's other session loosened CLAUDE.md's motion rules after this brief (blur, trails and ambient motion allowed); the newer CLAUDE.md is followed, so no effect was removed.
-- Phase 3, flow bugs (1.62.2): not started.
+- **Phase 3, flow bugs (1.62.2): done.** Voice → Coach under the screen (no Home), floating orb → Coach in one flight, Home ↔ Coach one screen at a time, chat patched in place (1.60's syncThread/finalize, keeping 1.59.1's look), pending bubble with dots, label order, delayed "Working it out", rings fade. Golden flows voice-to-coach, home-coach, spoken-reply, chat-stream all blocking (checked to fail on 1.62.0, except spoken-reply: headless has no real voice, so the reading can't reproduce the doubling there). Not done: transcript word gaps (couldn't reproduce).
 - Phase 4, review-before-send and voice-reactive dots (1.62.3): not started.

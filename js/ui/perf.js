@@ -4,6 +4,11 @@
 // default; never shown otherwise.
 import { onFrame } from './frame.js';
 
+let note = '';
+let noteBox = null;
+// a line of diagnosis under the meter (e.g. why the mic didn't start)
+export function perfNote(text) { note = String(text || ''); if (noteBox) noteBox.dataset.note = note; }
+
 export function initPerf() {
   const q = new URLSearchParams(location.search).get('perf');
   try {
@@ -19,6 +24,7 @@ export function initPerf() {
     font: '600 11px/1.3 ui-monospace, monospace', color: '#9ff5c8', background: 'rgba(0,0,0,.72)', padding: '3px 6px', borderRadius: '6px', whiteSpace: 'pre'
   });
   document.body.appendChild(box);
+  noteBox = box;
   let frames = 0, long = 0, tasks = 0, since = performance.now(), prev = 0, fps = 0, worst = 0;
   try { new PerformanceObserver(list => { tasks += list.getEntries().length; }).observe({ type: 'longtask', buffered: false }); } catch {}
   onFrame(now => {
@@ -27,7 +33,7 @@ export function initPerf() {
     prev = now;
     if (now - since >= 1000) {
       fps = Math.round((frames * 1000) / (now - since));
-      box.textContent = `${fps} fps  worst ${Math.round(worst)}ms\nlong frames ${long}  long tasks ${tasks}`;
+      box.textContent = `${fps} fps  worst ${Math.round(worst)}ms\nlong frames ${long}  long tasks ${tasks}` + (note ? `\n${note}` : '');
       frames = 0; worst = 0; since = now;
     }
   });

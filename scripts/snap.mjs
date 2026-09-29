@@ -56,7 +56,7 @@ async function main() {
     await page.evaluate(k => localStorage.setItem('setline.keys', JSON.stringify(k)), STAND_IN);
     const box = await page.locator('#dock .orbbtn').boundingBox();
     const x = box.x + box.width / 2, y = box.y + box.height / 2;
-    let n = 0;
+    let n = 0, frameDir = 'orb-frames';
     const frame = async () => {
       const where = await page.evaluate(() => {
         const app = document.getElementById('app'), v = document.getElementById('voice'), o = document.getElementById('ofloat');
@@ -65,7 +65,7 @@ async function main() {
         if (o && !o.hidden) return 'mini-' + (o.dataset.phase || 'idle');
         return 'home';
       });
-      await page.screenshot({ path: join(OUT, `orb-frames/${String(++n).padStart(2, '0')}-${where}.png`) });
+      await page.screenshot({ path: join(OUT, `${frameDir}/${String(++n).padStart(2, '0')}-${where}.png`) });
     };
     const film = async ms => { const end = Date.now() + ms; while (Date.now() < end) { const t0 = Date.now(); await frame(); await page.waitForTimeout(Math.max(0, FRAME_MS - (Date.now() - t0))); } };
     await page.mouse.move(x, y);
@@ -77,6 +77,13 @@ async function main() {
     await film(4500);                                               // → Coach, the reply streams in
     console.log(`  orb-frames/ (${n} frames, ~${FRAME_MS} ms apart plus screenshot time)`);
     await shot('05-coach-after-voice');
+    // the other two flows, each in its own folder: a quick release over the floating orb, and the orb
+    // tapped (Home → Coach) then Back
+    const flow = async (dir, steps) => { await mkdir(join(OUT, dir), { recursive: true }); const was = n; n = 0; const keep = frame; frameDir = dir; await steps(); frameDir = 'orb-frames'; console.log(`  ${dir}/ (${n} frames)`); n = was; void keep; };
+    await page.goBack(); await onScreen(page, 'today'); await settle(page, 1200);
+    await flow('quick-frames', async () => { await page.mouse.move(x, y); await page.mouse.down(); await film(1300); await page.mouse.up(); await film(3000); });
+    await page.goBack(); await onScreen(page, 'today'); await settle(page, 1200);
+    await flow('coach-frames', async () => { await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.up(); await film(1400); await page.goBack(); await film(1400); });
     if (errors.length) { failed = true; console.error('  page errors:\n   ' + errors.join('\n   ')); }
     await context.close();
   } finally {

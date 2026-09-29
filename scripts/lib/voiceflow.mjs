@@ -28,11 +28,16 @@ export const installSampler = page => page.evaluate(() => {
   window.__mark = name => window.__marks.push({ name, t: performance.now() });
   window.__samples = [];
   const tick = t => {
-    const orbs = [...document.querySelectorAll('.orb')].filter(shown);
+    // (a flight's stand-in carries two looks of one orb, melting from one into the other: one orb)
+    const shownOrbs = [...document.querySelectorAll('.orb')].filter(shown);
+    const orbs = [...shownOrbs.filter(o => !o.closest('.orbghost')), ...(shownOrbs.some(o => o.closest('.orbghost')) ? [document.querySelector('.orbghost')] : [])];
     const top = document.querySelector('#voice .top'), hold = document.querySelector('#vhold');
     window.__samples.push({
       t, orbs: orbs.length, orbIds: orbs.map(o => o.id || o.parentElement?.className || 'orb').join(','),
       home: shown(document.getElementById('s-today')),
+      // how readable each full screen is (its opacity with its ancestors'): never two at once
+      todayOp: (() => { const el = document.getElementById('s-today'); if (!vis(el)) return 0; let o = 1; for (let n = el; n; n = n.parentElement) o *= +getComputedStyle(n).opacity; return o; })(),
+      coachOp: (() => { const el = document.getElementById('thread'); if (!el || !vis(el)) return 0; let o = 1; for (let n = el; n; n = n.parentElement) o *= +getComputedStyle(n).opacity; return o; })(),
       chrome: !!top && !!hold && shown(top) && shown(hold) && +getComputedStyle(top).opacity > 0.99 && +getComputedStyle(hold).opacity > 0.5, // (dimmed while it works it out is still there)
       why: !top || !hold ? 'unmounted' : `top ${(+getComputedStyle(top).opacity).toFixed(2)} hold ${(+getComputedStyle(hold).opacity).toFixed(2)} ${document.getElementById('voice').dataset.phase}`,
       sheet: !document.getElementById('voice').hidden,

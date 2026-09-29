@@ -758,3 +758,23 @@ Fixes the flashes, lag and half-drawn frames in the voice → Coach recording, i
   page showed through at the pull-up).
 - `tests/motion-rules.test.js` is blocking again (no layout animation except a documented few), and the
   `voice-to-coach` golden flow follows 1.59.1's flow (floating orb → pull up → voice screen → Coach).
+
+## 1.62.2: voice and Coach flows (master fix, phase 3)
+
+- Asking from the voice screen goes straight into the Coach: it is laid out under the screen (at the end
+  of the thread) while that still covers everything, then the screen fades while its orb, the only
+  orb, flies into the message box, which gives under it and springs back. Home never shows. Asked over
+  the floating orb, the Coach opens with that orb flying straight in (not back into the bar first).
+- Tap the orb / Back: the page is gone before the Coach's words come up, and back again only once the
+  conversation has gone: never two screens readable at once. (The Android back swipe already skipped
+  the app's own animation.)
+- The chat is patched in place: one node per message for its whole life, a streamed reply finishes in
+  the node it streamed into (no second copy, same width), the thread keeps to the end only within 80 px
+  and is at the end before the first paint. At most about ten words blur in at once.
+- Talking to the Coach: your bubble appears with shimmering dots the moment you stop and fills in when
+  the words arrive. `?perf=1` shows how long hearing and the first words took.
+- Labels: "Thinking…" fades out before "Ask your coach" fades in; a gap between the floating orb's
+  status and "Pull up for more". "Working it out" only after 0.6 s, then for at least 0.8 s. The
+  listening rings fade out on release.
+- Golden flows: voice-to-coach (one orb per frame, no Home frame), home-coach, spoken-reply, and
+  chat-stream blocking again. `node scripts/snap.mjs` films all three voice/Coach flows.

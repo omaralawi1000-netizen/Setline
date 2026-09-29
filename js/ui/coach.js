@@ -27,7 +27,8 @@ import { toast } from './toast.js';
 import { pinHTML } from './pins.js';
 import { openQuickReport, FLAG } from './report.js';
 import { token } from './fx.js';
-import { onFrame } from './frame.js';
+import { onFrame, nextFrame } from './frame.js';
+import { perfNote } from './perf.js';
 
 let nav = { openSettings: () => {} };
 let inflight = null; // {ctl, id}
@@ -44,7 +45,7 @@ function thinkingHTML(m) {
   return `<span class="think"><span class="tsteps">${steps.map((x, i) => `<span class="tl" style="--i:${i}">${esc(x)}</span>`).join('')}</span></span>`;
 }
 
-function bubble(m) {
+function bubble(m, partsOnly = false) {
   const { t } = state;
   if (m.role === 'user') return `<li class="msg me" data-id="${m.id}"><div class="bub">${esc(m.text)}</div></li>`;
   if (m.error) {
@@ -64,6 +65,7 @@ function bubble(m) {
   const offers = m.actions?.length && !m.streaming ? `<div class="dochips">${m.actions.map((a, i) => `<button class="dochip" data-coach="act" data-id="${esc(m.id)}" data-i="${i}" style="--i:${i}"><span class="dox">${I.check}</span><span>${esc(a.label)}</span></button>`).join('')}</div>` : '';
   // didn't get you, or got it wrong: the flag reports it in one tap
   const flag = !m.streaming && m.text ? `<button class="mflag" data-coach="report" data-id="${esc(m.id)}" aria-label="${esc(t('qr.wrong'))}">${FLAG}</button>` : '';
+  if (partsOnly) return { cls: `msg ai${m.streaming ? ' is-streaming' : ''}${m.streaming && !m.text ? ' is-thinking' : ''}${m.weekly || m.debrief ? ' weekly' : ''}`, head: head + dhead, extras: kept + changed + acted, after: offers + flag };
   return `<li class="msg ai${m.streaming ? ' is-streaming' : ''}${m.streaming && !m.text ? ' is-thinking' : ''}${m.weekly || m.debrief ? ' weekly' : ''}" data-id="${m.id}"><div class="bub">${head}${dhead}${m.text ? formatAnswer(hideMemoryTail(m.text)) : thinkingHTML(m)}${kept}${changed}${acted}</div>${offers}${flag}</li>`;
 }
 
@@ -82,33 +84,114 @@ export function renderCoach(root) {
   const { t } = state;
   const key = getKey('google');
   const chat = state.chat;
-  let body;
-  if (!key && !chat.length) {
-    body = `<div class="empty solid"><div class="emptyglyph">${I.chat}</div><h2>${t('coach.noKey')}</h2><p>${t('coach.noKeySub')}</p>
-      <button class="log" data-coach="settings"><span>${t('voice.openSettings')}</span></button></div>`;
-  } else if (!chat.length) {
-    body = `<div class="coachhero glass"><span class="orb" aria-hidden="true"><i class="core"><b></b><b></b><b></b></i></span>
-      <h2>${t('coach.empty')}</h2><p>${t('coach.emptySub')}</p>
-      <div class="exq">${['coach.ex1', 'coach.ex2', 'coach.ex3'].map(k => `<button class="chip" data-coach="ask" data-q="${esc(t(k))}">${esc(t(k))}</button>`).join('')}</div></div>`;
-  } else {
-    // messages already on screen don't slide in again when the thread re-renders
-    body = `<ol class="thread" id="thread">${chat.map(m => { const h = bubble(m); const seen = shown.has(m.id); shown.add(m.id); return seen ? h.replace('<li class="msg', '<li class="msg seen') : h; }).join('')}</ol>`;
-  }
-  root.innerHTML = `<div class="tabtop"></div>
+  const kind = !key && !chat.length ? 'nokey' : !chat.length ? 'empty' : 'thread';
+  const head = `<div class="tabtop"></div>
     <button class="iconbtn cclose" data-coach="close" aria-label="${t('common.close')}">${I.back.replace('d="M14.5 6 8.5 12l6 6"', 'd="M6 9.5l6 6 6-6"')}</button>
     <header class="coachhead"><div><h1 class="h1">${t('coach.title')}</h1><p class="sub">${t('coach.sub')}</p></div>
       ${chat.length ? `<button class="iconbtn" data-coach="clear" aria-label="${t('coach.clear')}">${I.trash}</button>` : ''}</header>
-    ${key ? pinHTML('coach') : ''}
-    ${body}`;
+    ${key ? pinHTML('coach') : ''}`;
+  let ol = root.querySelector(':scope > #thread');
+  if (kind !== 'thread') {
+    const body = kind === 'nokey'
+      ? `<div class="empty solid"><div class="emptyglyph">${I.chat}</div><h2>${t('coach.noKey')}</h2><p>${t('coach.noKeySub')}</p>
+        <button class="log" data-coach="settings"><span>${t('voice.openSettings')}</span></button></div>`
+      : `<div class="coachhero glass"><span class="orb" aria-hidden="true"><i class="core"><b></b><b></b><b></b></i></span>
+        <h2>${t('coach.empty')}</h2><p>${t('coach.emptySub')}</p>
+        <div class="exq">${['coach.ex1', 'coach.ex2', 'coach.ex3'].map(k => `<button class="chip" data-coach="ask" data-q="${esc(t(k))}">${esc(t(k))}</button>`).join('')}</div></div>`;
+    if (root._html !== head + body) { root.innerHTML = head + body; root._html = head + body; root._head = null; }
+  } else {
+    // the header and pin are small and redrawn only when they change; the conversation itself is
+    // kept: messages already there stay the same nodes, new ones are added, changed ones patched
+    if (root._head !== head || !ol) {
+      for (const n of [...root.childNodes]) if (n !== ol) n.remove();
+      root.insertAdjacentHTML('afterbegin', head);
+      root._head = head;
+      root._html = null;
+      if (!ol) { ol = document.createElement('ol'); ol.className = 'thread'; ol.id = 'thread'; root.append(ol); }
+    }
+    const atEnd = nearEnd(root);
+    const grew = syncThread(ol);
+    // new messages keep the view at the bottom (in the same frame, before anything is painted) if
+    // you were there, or if it's your own new question
+    if (grew && (atEnd || grew.mine)) root.scrollTop = root.scrollHeight;
+  }
   const composer = $('#composer');
   if (!composer.dataset.talk) composer.querySelector('input').placeholder = t('coach.ph'); // talking: the box shows what's happening
   composer.querySelector('.csend').setAttribute('aria-label', t('coach.send'));
-  composer.querySelector('.csend').innerHTML = inflight ? I.stop : I.fwd;
-  // a message just sent from the box stays hidden until it flies up from there (sendFly)
+  const send = composer.querySelector('.csend'), icon = inflight ? 'stop' : 'fwd';
+  if (send.dataset.icon !== icon) { send.innerHTML = inflight ? I.stop : I.fwd; send.dataset.icon = icon; }
   syncThinking();
+  // a message just sent from the box stays hidden until it flies up from there (sendFly)
   const hold = pendingSend || sending;
   if (hold) { const mine = [...root.querySelectorAll('.msg.me')].pop(); if (mine && mine.textContent.trim() === hold.text) mine.classList.add('sending', 'seen'); }
-  requestAnimationFrame(() => { (followers.get(root)?.raf ? follow(root) : scrollDown(root, false)); if (pendingSend) sendFly(root); });
+  if (pendingSend) nextFrame(() => { if (pendingSend) sendFly(root); });
+}
+
+// what a message looks like, apart from the words a streaming reply is still typing
+const sigOf = m => m.streaming
+  ? `S|${m.role}|${!!m.text}|${m.weekly || ''}|${m.debrief || ''}`
+  : JSON.stringify([m.role, m.text, m.error, m.q, !!m.plan, m.saved, m.remembered, m.changed, m.undone, m.acted, m.actions?.map(a => a.label), m.weekly, m.debrief, m.dname,
+    undoable.has(m.id), (m.acted || []).map(a => undoable.has(a.key))]);
+function makeLi(m) {
+  const tpl = document.createElement('template');
+  const seen = shown.has(m.id);
+  shown.add(m.id);
+  tpl.innerHTML = seen ? bubble(m).replace('<li class="msg', '<li class="msg seen') : bubble(m);
+  const li = tpl.content.firstElementChild;
+  li._sig = sigOf(m);
+  li._text = m.streaming ? null : m.text;
+  return li;
+}
+const plainOf = html => { const d = document.createElement('div'); d.innerHTML = html; return d.textContent.replace(/\s+/g, ' ').trim(); };
+// A reply that finished streaming becomes the final message in place: the same node, the words it
+// typed kept as they are (only unwrapped from their fade-in spans, which doesn't move a single
+// line), then its notes, offers and flag added. Nothing is drawn twice.
+function finalize(li, m) {
+  const p = bubble(m, true);
+  if (typeof p !== 'object') return null;
+  const bub = li.querySelector(':scope > .bub');
+  if (!bub) return null;
+  for (const w of bub.querySelectorAll('span')) if (w._wd) w.replaceWith(document.createTextNode(w.textContent));
+  bub.normalize();
+  for (const x of bub.querySelectorAll(':scope > .memnote, :scope > .chgnote, :scope > .chgfail')) x.remove();
+  const want = plainOf(p.head + formatAnswer(hideMemoryTail(m.text)));
+  if (bub.textContent.replace(/\s+/g, ' ').trim() !== want) bub.innerHTML = p.head + formatAnswer(hideMemoryTail(m.text)); // (only if the words really differ)
+  if (p.extras) bub.insertAdjacentHTML('beforeend', p.extras);
+  for (const x of li.querySelectorAll(':scope > .dochips, :scope > .mflag')) x.remove();
+  if (p.after) { bub.insertAdjacentHTML('afterend', p.after); li.querySelector(':scope > .dochips')?.classList.add('fresh'); }
+  li.className = p.cls + ' seen';
+  li._sig = sigOf(m);
+  li._text = m.text;
+  return li;
+}
+// Bring the list in line with the chat: returns {mine} if messages were added (mine: your own).
+function syncThread(ol) {
+  const have = new Map();
+  for (const li of ol.children) if (li.dataset.id) have.set(li.dataset.id, li);
+  let prev = null, grew = null;
+  for (const m of state.chat) {
+    let li = have.get(m.id);
+    have.delete(m.id);
+    if (li && li._sig !== sigOf(m)) {
+      const inPlace = m.role !== 'user' && !m.streaming && !m.error && !m.plan && m.text &&
+        (li.classList.contains('is-streaming') || li._text === m.text) && !li.classList.contains('is-thinking');
+      const done = inPlace && finalize(li, m);
+      if (!done) { const fresh = makeLi(m); li.replaceWith(fresh); li = fresh; }
+    }
+    // your spoken question: the bubble that appeared with dots when you stopped talking becomes it
+    if (!li && m.role === 'user') {
+      const p = ol.querySelector(':scope > .msg.me.pending');
+      if (p) { p.dataset.id = m.id; p.classList.remove('pending'); p.querySelector('.bub').textContent = m.text; p._sig = sigOf(m); p._text = m.text; shown.add(m.id); li = p; grew = { mine: true }; }
+    }
+    if (!li) { li = makeLi(m); grew = { mine: grew?.mine || m.role === 'user' }; }
+    const next = prev ? prev.nextElementSibling : ol.firstElementChild;
+    if (li !== next) ol.insertBefore(li, next);
+    prev = li;
+  }
+  for (const li of have.values()) li.remove();
+  const pend = ol.querySelector(':scope > .msg.me.pending');
+  if (pend && pend !== ol.lastElementChild) ol.append(pend); // (always last, where your words will be)
+  return grew;
 }
 
 // iOS-style send: the words you typed lift out of the message box as a bubble and glide up into the
@@ -185,6 +268,9 @@ function sendFly(root) {
 // Streamed words don't appear in lumps: they flow in at a steady pace, each fading in.
 // The text on screen glides after what has arrived, faster the further behind it is.
 const WORD_MS = 460; // the same as --m-slow: a word is left alone only once its fade-in has finished
+// At most about ten words are still blurring in at once: when the reply flows fast, each word's
+// blur-in is shortened to fit (the words themselves arrive at the same pace).
+let wordMs = WORD_MS;
 // Words are wrapped so each can blur in on its own clock (a negative delay says how far along it is).
 function wordify(el, births, start, now) {
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
@@ -197,11 +283,12 @@ function wordify(el, births, start, now) {
       if (!part) continue;
       if (/^\s+$/.test(part)) { frag.append(part); continue; }
       births[i] ??= now;
+      const d = ((births.d ||= [])[i] ??= wordMs); // (each word keeps the length it started with)
       const age = now - births[i];
       const w = document.createElement('span');
       w.textContent = part;
       w._wd = true;
-      if (age < WORD_MS) { w.className = 'w'; w.style.animationDelay = `${-age}ms`; }
+      if (age < d) { w.className = 'w'; w.style.animationDelay = `${-age}ms`; if (d !== WORD_MS) w.style.animationDuration = `${d}ms`; }
       frag.append(w);
       i++;
     }
@@ -244,7 +331,7 @@ function merge(a, b) {
 // being written only gains its new words (it used to be redrawn on every step, restarting the fade of
 // every word still settling).
 function wordsHTML(bub, text, births, now, st) {
-  if (bub._st !== st) { bub.innerHTML = ''; bub._st = st; Object.assign(st, { n: 0, w: 0, live: null, liveUl: null }); }
+  if (bub._st !== st) { for (const c of [...bub.childNodes]) if (!c.classList?.contains('wkhead')) c.remove(); bub._st = st; Object.assign(st, { n: 0, w: 0, live: null, liveUl: null }); }
   const lines = hideMemoryTail(text).split('\n'), tail = lines.pop();
   const drop = () => { st.live?.remove(); if (st.liveUl && !st.liveUl.children.length) st.liveUl.remove(); st.live = st.liveUl = null; };
   // the line on screen takes the new drawing of itself, if it has the same shape
@@ -270,6 +357,17 @@ function wordsHTML(bub, text, births, now, st) {
   st.live = place(bub, el);
   if (newUl) st.liveUl = el;
 }
+// Whether the thread sits at (or within 80 px of) its end: measured once, then kept up to date by its
+// scroll events (which come when it's laid out anyway), so a frame that adds words never has to lay
+// the page out before writing to it. Only then does the answer keep the thread scrolled to its end.
+function nearEnd(root) {
+  if (!root._end) {
+    const at = () => root.scrollHeight - root.clientHeight - root.scrollTop < 80;
+    root._end = { v: at() };
+    root.addEventListener('scroll', () => { root._end.v = at(); }, { passive: true });
+  }
+  return root._end.v;
+}
 // the answer has started: a spoken conversation stops thinking and speaks (set by the talk loop)
 let answering = null;
 function typewriter(root, id) {
@@ -285,21 +383,23 @@ function typewriter(root, id) {
     const pending = words.length - shown;
     const target = Math.max(14, Math.min(70, pending / 0.9));
     rate += (target - rate) * Math.min(1, dt / 300);
+    wordMs = Math.round(Math.max(200, Math.min(WORD_MS, 10000 / Math.max(1, rate))));
     acc = Math.min(acc + (rate * dt) / 1000, pending);
     const n = Math.floor(acc);
     if (n > 0) {
       acc -= n;
       shown += n;
       const bub = root.querySelector(`[data-id="${id}"] .bub`);
+      const stick = nearEnd(root); // (known from its scroll events: nothing is measured before the write)
       if (bub) {
         const msg = bub.closest('.msg');
         // the answer starts: the box's orb gives one pulse and the first line rises out of it
-        if (msg?.classList.contains('is-thinking')) { msg.classList.add('arrive'); pulseOrb(); answering?.(); }
+        if (msg?.classList.contains('is-thinking')) { msg.classList.add('arrive'); pulseOrb(); answering?.(); perfNote(`first words ${Math.round(performance.now() - askedAt)} ms after asking`); }
         msg?.classList.remove('is-thinking');
         syncThinking();
         wordsHTML(bub, words.slice(0, shown).join(''), births, now, st);
       }
-      follow(root);
+      if (stick) root.scrollTop = root.scrollHeight; // same frame as the words
     }
     if (done()) {
       // let the last words finish settling before anything re-renders the bubble
@@ -364,8 +464,8 @@ function thinkWords(on) {
 function pulseOrb() {
   const btn = $('#composer .corb');
   if (!btn || stillMotion()) return;
-  btn.classList.remove('answer'); void btn.offsetWidth; btn.classList.add('answer');
-  setTimeout(() => btn.classList.remove('answer'), 900);
+  btn.classList.remove('answer');
+  nextFrame(() => { btn.classList.add('answer'); setTimeout(() => btn.classList.remove('answer'), 900); }); // (no forced layout)
 }
 
 // Following along: while a reply is read out, the sentence being spoken stays bright and the rest of
@@ -441,42 +541,25 @@ function voiceLight(composer) {
   });
 }
 
-function scrollDown(root, smooth = true) {
-  if (smooth) return follow(root);
-  root.scrollTop = root.scrollHeight;
-}
-
-// While a reply comes in, the thread glides after it: every frame it closes part of the gap to the
-// bottom (one continuous motion, instead of a new smooth-scroll starting every few words). Touching
-// or scrolling the thread yourself lets go; it picks up again once you're back near the bottom or ask
-// something new.
-const followers = new WeakMap();
+// The thread keeps to the end of a reply only while you're within about 80 px of it (scrollTop, set
+// in the same frame as the words; never a smooth scroll that fights your finger).
+function scrollDown(root) { if (nearEnd(root)) root.scrollTop = root.scrollHeight; }
 const stillMotion = () => document.documentElement.dataset.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches;
-function follow(root, fresh = false) {
-  let f = followers.get(root);
-  if (!f) {
-    f = { raf: 0, t: 0, held: false };
-    const hold = () => { f.held = true; f.raf?.(); f.raf = 0; };
-    root.addEventListener('touchstart', hold, { passive: true });
-    root.addEventListener('wheel', hold, { passive: true });
-    followers.set(root, f);
-  }
-  const gap = () => root.scrollHeight - root.clientHeight - root.scrollTop;
-  if (fresh) f.held = false;
-  else if (f.held) { if (gap() > 90) return; f.held = false; }
-  if (stillMotion()) { root.scrollTop = root.scrollHeight; return; }
-  if (f.raf) return;
-  f.t = 0;
-  const step = now => {
-    const dt = f.t ? Math.min(50, now - f.t) : 16;
-    f.t = now;
-    const g = gap();
-    if (g < 1 || f.held) { f.raf?.(); f.raf = 0; return; }
-    const was = root.scrollTop;
-    root.scrollTop = was + Math.max(g * (1 - Math.exp(-dt / 150)), Math.min(g, 1));
-    if (root.scrollTop === was) root.scrollTop = root.scrollHeight; // the last sub-pixel
-  };
-  f.raf = onFrame(step);
+
+// Your own bubble, the moment you stop talking: dots shimmer in it until the words are back from
+// speech-to-text, then they fill in (the same node becomes the message: see syncThread).
+let heardAt = 0, askedAt = 0;
+function pendingMine(root, on) {
+  const ol = root.querySelector(':scope > #thread');
+  const cur = ol?.querySelector(':scope > .msg.me.pending');
+  if (!on) { cur?.remove(); return; }
+  if (!ol || cur) return;
+  heardAt = performance.now();
+  const li = document.createElement('li');
+  li.className = 'msg me pending';
+  li.innerHTML = '<div class="bub"><span class="pdots" aria-label="…"><i></i><i></i><i></i></span></div>';
+  ol.append(li);
+  scrollDown(root);
 }
 
 // Pick coach/command models once, from the key's model list.
@@ -602,8 +685,8 @@ export async function ask(question, { root = $('#s-coach'), voice = false } = {}
   const lang = /[æøå]|\b(hvad|hvordan|jeg|min|mit|skal|træning)\b/i.test(question) ? 'da' : state.lang;
   const history = state.chat.filter(m => !m.error);
   store.addChat('user', question);
+  askedAt = performance.now();
   const reply = store.addChat('model', '', { streaming: true, q: question });
-  requestAnimationFrame(() => follow(root, true)); // a new question: the thread follows again
   const key = getKey('google');
   if (!key) { store.updateChat(reply.id, { streaming: false, error: 'nokey' }, { persist: true }); return; }
   const ctl = new AbortController();
@@ -691,7 +774,7 @@ async function buildPlan(question, reply, { key, lang, ctl, root, copy = false }
   } finally {
     if (inflight?.id === reply.id) inflight = null;
     syncButton();
-    requestAnimationFrame(() => scrollDown(root));
+    nextFrame(() => scrollDown(root));
   }
 }
 
@@ -753,13 +836,15 @@ export function initCoach(n) {
     const l = talk.l = listenSmart({
       stt: { key: getKey('groq'), model: sttModelId(state.settings), language: state.settings.voiceLang },
       onLevel: v => orbBtn.style.setProperty('--lv', v.toFixed(3)),
-      onState: k => { if (talk.l === l && (k === 'hearing' || k === 'check')) setTalk('hearing'); }
+      onState: k => { if (talk.l === l && (k === 'hearing' || k === 'check')) { setTalk('hearing'); if (k === 'hearing') pendingMine(root, true); } }
     });
     let text = '';
     try { text = (await l.done).trim(); } catch { toast({ title: esc(state.t('voice.micDenied')), error: true }); return stopTalk(); }
     if (talk.l !== l) return;
     talk.l = null;
     orbBtn.style.removeProperty('--lv');
+    if (!talk.on || !text || isNoise(text)) pendingMine(root, false);
+    else perfNote(`heard in ${Math.round(performance.now() - (heardAt || performance.now()))} ms`);
     if (!talk.on) return;
     if (!text) return stopTalk(); // nothing said: the conversation rests
     if (isNoise(text)) { // a stray noise ("L", "Jd"): never sent; keep listening, and rest after a few
