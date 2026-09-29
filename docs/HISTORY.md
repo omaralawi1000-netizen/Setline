@@ -881,3 +881,27 @@ the frame checks are only a safety net.
   speed (0–560 ms), timed from the event; `CHOREO_LONG=1` for a long conversation. The frame checks
   (`scripts/choreo.mjs`, golden `move-*`) now also cover ✕, typing and the keyboard, and check that the
   orb stays put on Home ↔ Coach, never passes over your words, and that exactly one new message appears.
+
+## 1.64.0: Bug pass (mic, voice → Coach, glow, streaming)
+
+From Omar's phone recording of 1.63.0.
+- The mic sometimes didn't start (the pill said "Ready"): a second hold landed on the floating orb's frost,
+  which covers the dock, so it never reached the orb, and the first hold's late "stop" closed the mic as it
+  opened. Presses on the dock orb now go through the frost; a new hold drops any pending stop; opening the
+  mic is serialised (one getUserMedia at a time, a cancelled opening closes its stream). The voice state
+  machine keeps a trail of its last 40 steps, logged with any error; the "Something went wrong" toast waits
+  until the voice UI has closed; an error message never closes a new hold.
+- The pull-up shows one orb: the floating orb is hidden the moment its flight to the voice screen starts.
+- The floating orb no longer slides sideways as it rises (its x eases without overshoot; only y springs).
+- Voice → Coach (release or Send) rebuilt: on the tap's frame your message's node is placed at the end of
+  the Coach and the conversation glides up to make room; your words fly straight to it, shrinking smoothly
+  the whole way, and hand over to the message as its glass forms (timed together on the compositor). The
+  conversation stays dim until they land, so they're never over its text. The orb sets off on the same frame
+  (after a short wait when needed) on the shortest curve that keeps clear of the words (planned against their flight) and lands within
+  ~380 ms. The tap's own work is a few ms (the orb's path search is plain precomputed arithmetic).
+- Glow: the pink bloom rising from the bottom while you talk is gone (voiceglow.js removed); the message
+  box's orb pulse is small and soft, within ~20 % of its edge.
+- Streaming: the thread no longer jumps as a reply grows: messages glide up by the new line's height, and
+  the view follows once per frame only within ~80 px of the end.
+- Checks: golden `mic-hold-twice`, `mic-after-reply`, `mic-pullup-starting` (with a slow mic);
+  `strips.mjs --cpu=4` (phone pace) and `--long` with the new `stream-reply` flow.

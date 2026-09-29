@@ -32,11 +32,19 @@ export function noteMixup({ heard, did, type }) {
 let errToast = false;
 export function installErrorLog() {
   const add = (msg, where) => {
-    save(ERRS, pushError(load(ERRS), { msg, where }));
-    // once a session: a quiet way to report it
+    // (with the voice's last steps, when it was in use: what it was doing when this happened)
+    const trail = globalThis.__voiceTrail?.() || '';
+    save(ERRS, pushError(load(ERRS), { msg: trail ? `${msg} [voice: ${trail.slice(-600)}]` : msg, where }));
+    // once a session: a quiet way to report it. Never over the voice screen or the floating orb (it sat
+    // over the dock orb for 6 s and got in the way of the next hold): it waits until they've closed.
     if (errToast) return;
     errToast = true;
-    setTimeout(() => toast({ title: esc(state.t('report.errToast')), action: state.t('report.report'), ms: 6000, onAction: () => openReport({ kind: 'bug' }) }), 600);
+    const app = document.getElementById('app');
+    const show = () => {
+      if (app?.classList.contains('voice') || app?.classList.contains('voice-mini')) return setTimeout(show, 800);
+      toast({ title: esc(state.t('report.errToast')), action: state.t('report.report'), ms: 6000, onAction: () => openReport({ kind: 'bug' }) });
+    };
+    setTimeout(show, 600);
   };
   window.addEventListener('error', e => { if (e.message && !/ResizeObserver|Script error/i.test(e.message)) add(e.message, `${String(e.filename || '').split('/').pop()}:${e.lineno || ''}`); });
   window.addEventListener('unhandledrejection', e => { const r = e.reason; const m = r?.message || String(r || ''); if (m && !/AbortError|aborted/i.test(m + (r?.name || ''))) add(m, (r?.stack || '').split('\n')[1]?.trim().replace(/^at /, '').split('/').pop() || ''); });

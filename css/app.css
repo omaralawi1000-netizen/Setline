@@ -2851,26 +2851,6 @@ html[data-motion=off] .screen.enter :is(.greet .gw,.tw){animation:none}
 .prtile{animation-fill-mode:backwards}
 
 /* ======================= 1.57: thinking orbs, voice glow, border beam ======================= */
-/* the voice glow (voice-glow, see js/ui/voiceglow.js): the bottom of the voice screen and of the floating
-   orb. Every lobe is a soft ellipse moved by transform only; the layers fade by opacity. */
-.vglow{position:absolute;inset:0;pointer-events:none;overflow:hidden;opacity:0;transition:opacity var(--m-slow) var(--e-out)}
-.vglow.on{opacity:1}
-.vg-l{position:absolute;inset:0;opacity:0}
-.vg-m{position:absolute;left:50%;bottom:0;transform-origin:50% 100%;will-change:transform}
-.vg-m > i,.vg-m > .vg-core{position:absolute;left:50%;bottom:0;display:block;will-change:transform}
-/* the inner light hugs the edges (a band in from each side), as in the original */
-.vg-inner{
-  -webkit-mask-image:linear-gradient(to top,#fff,transparent var(--vg-edge)),linear-gradient(to right,#fff,transparent var(--vg-edge),transparent calc(100% - var(--vg-edge)),#fff);
-  mask-image:linear-gradient(to top,#fff,transparent var(--vg-edge)),linear-gradient(to right,#fff,transparent var(--vg-edge),transparent calc(100% - var(--vg-edge)),#fff);
-  -webkit-mask-composite:source-over;mask-composite:add}
-/* the stroke: the colours in the 1px edge ring, with the hot white core at the centre */
-.vg-stroke{padding:1px;
-  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;
-  mask:linear-gradient(#fff 0 0) content-box exclude,linear-gradient(#fff 0 0)}
-.vg-core{background:radial-gradient(closest-side,rgba(255,255,255,.45) 0%,rgba(255,255,255,.14) 30%,transparent 65%)}
-@media (prefers-reduced-motion: reduce){ .vglow{transition:none} }
-html[data-motion=off] .vglow{transition:none}
-.vlayer > .vglow{z-index:-1}
 /* the border beam (border-beam `md`, ocean, see js/ui/beam.js): round the live workout's card on Today.
    A mask window on a turning square (the colours on a child turning back, so they stay put); the
    phone only composites. It stands still off screen, on another tab, and with reduced motion. */
@@ -3059,9 +3039,6 @@ html[data-motion=off] .tab.on svg.ti{animation:none!important}
 .ambient i{will-change:auto}
 .wave i{will-change:auto}
 .vlayer:not([data-phase=idle]) .wave{will-change:transform}
-.vg-m > i,.vg-m > .vg-core{will-change:auto}
-.vg-m{will-change:auto}
-.vglow.on .vg-m{will-change:transform}
 .aura .clouds i{will-change:auto}
 .app.thinking .aura .clouds i{will-change:transform}
 .cglow i,.cglow::after{will-change:auto}
@@ -3074,7 +3051,6 @@ html[data-motion=off] .tab.on svg.ti{animation:none!important}
    screen: its backdrop isn't quite opaque, which is part of the look), but it holds still */
 .app.voice-mini > .screen.on *,.app.voice-covered > .screen.on *{animation-play-state:paused!important}
 /* the voice glow is one canvas along the bottom (js/ui/voiceglow.js) */
-.vg-canvas{position:absolute;left:0;right:0;bottom:0;width:100%;height:min(480px,100%);display:block}
 /* set every frame from the voice loop (already eased there): a transition on it restarted each frame */
 .ofloat .orb.lift::before{transition:none}
 .ofloat.handoff .oscrim{opacity:1;transition:none}
@@ -3182,7 +3158,6 @@ html[data-motion=off] #composer .cspot > button{transition:opacity 150ms linear;
 .app.cm-box #composer{opacity:1;transform:none;pointer-events:none}
 /* a voice handoff: the Coach sits over the frost / the voice screen, so your words fly into their
    bubble in plain sight; everything else in it is faded in from js (never an old message on top) */
-.app.handin #s-coach{z-index:9}
 
 /* your words becoming your message: the bubble's glass grows in under them as they land (a layer of
    its own, so only it fades and scales, never the words) */
@@ -3198,3 +3173,18 @@ html[data-duo] .msg.me .bub{--mebg:linear-gradient(135deg,rgba(var(--a-rgb),.2),
 /* the dock takes its orb back with a settle only: no ring of light */
 .orbbtn.pulse-land::after{animation:none}
 .vlayer.closing > *{transition:none!important} /* (closing: faded from js/ui/voice.js closeVoice) */
+
+/* ======================= 1.64.0: the light stays on the orb ======================= */
+/* Every orb's halo: soft, and never more than about a fifth past the orb's edge (inset -12 %, and at
+   most 6 % bigger with the voice); the message box's orb only nods when a reply starts (it used to
+   swell to 1.2× in a big pink pulse). The voice glow along the bottom of the screen is gone. */
+.orb::before{inset:-12%}
+.orb::before,.app.coaching .composer.speaking .corb .orb::before,.composer:is([data-talk=listening],[data-talk=hearing]) .corb .orb::before,.ofloat .orb.lift::before{
+  transform:scale(calc(.96 + min(var(--sv, 0), 1) * .06 + min(var(--l, var(--lv, 0)), 1) * .06));max-width:none}
+.app.coaching .composer.speaking .corb .orb::before{opacity:calc(.2 + var(--sv, 0) * .35)}
+.app.thinking .composer .corb .orb::before{animation:none;opacity:.35}
+@keyframes orbanswer{0%{scale:1}35%{scale:1.05}100%{scale:1}}
+@keyframes orbhalo{0%,100%{opacity:.3;scale:.96}50%{opacity:.5;scale:1.02}}
+/* the floating orb's light when it starts listening: a small breath, within its fifth */
+@keyframes bloom{0%{scale:.9;opacity:.3}45%{scale:1.04;opacity:1}100%{scale:1}}
+.msg.me.pending.handed .bub{min-width:0;text-align:inherit} /* (your spoken message, placed ahead: exactly as it will be) */

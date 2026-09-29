@@ -45,6 +45,7 @@ export function listenSmart({ stt, onLevel = () => {}, onState = () => {}, pause
 
   mic.start({ maxMs, onMaxed: () => finish() }).then(() => {
     if (over) { mic.cancel(); return; }
+    if (!mic.isRecording()) return end(() => resolve('')); // (closed again while it opened: nothing heard)
     onState('listening');
     raf = onFrame(tick);
   }, e => end(() => reject(e)));

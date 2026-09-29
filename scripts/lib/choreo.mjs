@@ -38,9 +38,16 @@ export const installProbe = page => page.evaluate(() => {
     const slot = corb ? mid(corb.getBoundingClientRect()) : null;
     const dcap = document.querySelector('#dock .dcap');
     // the flying orb against the flying words (your new message): how far apart they are, in px (< 0: over them)
-    const gh = document.querySelector('.orbghost'), wd = document.querySelector('#thread > .msg.me.wordsin .bub');
+    const gh = document.querySelector('.orbghost');
+    // (the words are what you said, flying from where they were, until your message shows under them)
+    const bub = document.querySelector('#thread > .msg.me.wordsin .bub');
+    const fly = [...document.querySelectorAll('#vrtext, #osay, #vsay')].find(x => x.getAnimations().length && op(x) > 0.3);
+    const wd = bub && op(bub) >= 0.5 ? bub : fly || null;
+    const letters = el => { const rg = document.createRange(), w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let L = 1e9, T = 1e9, R = -1e9, B = -1e9;
+      for (let n; (n = w.nextNode());) { if (!n.data.trim()) continue; rg.selectNodeContents(n); for (const q of rg.getClientRects()) if (q.width) { L = Math.min(L, q.left); T = Math.min(T, q.top); R = Math.max(R, q.right); B = Math.max(B, q.bottom); } }
+      return L < 1e9 ? { left: L, top: T, right: R, bottom: B } : el.getBoundingClientRect(); };
     let gap = null;
-    if (gh && wd) { const a = gh.getBoundingClientRect(), b = wd.getBoundingClientRect(), r = a.width / 2, cx = a.left + r, cy = a.top + r;
+    if (gh && wd) { const a = gh.getBoundingClientRect(), b = letters(wd), r = a.width / 2, cx = a.left + r, cy = a.top + r;
       gap = Math.round(Math.hypot(cx - Math.max(b.left, Math.min(cx, b.right)), cy - Math.max(b.top, Math.min(cy, b.bottom))) - r); }
     window.__cf.push({ t: performance.now(), gap, orbs, screens, box: box ? +op(box).toFixed(2) : 0, slot, dock: dcap ? +op(dcap).toFixed(2) : 0,
       spot: box?.dataset.spot || '', send: box ? +op(box.querySelector('.csend')).toFixed(2) : 0, mine: [...document.querySelectorAll('#thread > .msg.me')].pop() || null, msgs: document.querySelectorAll('#thread > .msg.me').length });
@@ -128,6 +135,13 @@ export const FLOWS = {
     await hooks.before?.(); await page.evaluate(() => document.getElementById('app')._setKb(300)); await settle(page, 600 * k);
     await page.evaluate(() => document.getElementById('app')._setKb(0)); await settle(page, 600 * k);
   },
+  // in the Coach: a question typed and sent, and the reply streaming in (the thread grows, the view follows)
+  'stream-reply': async (page, k = 1, hooks = {}) => {
+    await page.fill('#composer input', 'How was my bench?'); await settle(page, 300 * k);
+    await hooks.before?.(); await page.press('#composer input', 'Enter');
+    await page.waitForFunction(() => document.getElementById('app').classList.contains('coaching') && !document.querySelector('#composer[data-spot=stop]'), null, { timeout: 12000 * k }).catch(() => {});
+    await settle(page, 600 * k);
+  },
   'send-to-coach': async (page, k = 1, hooks = {}) => {
     const o = await orbCenter(page); await page.mouse.move(o.x, o.y); await page.mouse.down();
     await page.waitForSelector('#ofloat[data-phase=listening]', { timeout: 6000 * k }); await settle(page, 400 * k);
@@ -187,7 +201,7 @@ export function judge(fr, lum, { flow, reduced = false }) {
 }
 
 // each flow needs the one before it (Coach → Home starts in the Coach)
-export const PRE = { 'coach-to-home': 'home-to-coach', typing: 'home-to-coach', keyboard: 'home-to-coach' };
+export const PRE = { 'coach-to-home': 'home-to-coach', typing: 'home-to-coach', keyboard: 'home-to-coach', 'stream-reply': 'home-to-coach' };
 
 // One flow at full speed with the probe and the compositor's frames, judged from the gesture that
 // starts it (the tap, Back, the release, Send). With {reduced}, under prefers-reduced-motion.

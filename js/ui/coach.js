@@ -129,54 +129,6 @@ export function renderCoach(root) {
   const hold = pendingSend || sending;
   if (hold) { const mine = [...root.querySelectorAll('.msg.me')].pop(); if (mine && mine.textContent.trim() === hold.text) mine.classList.add('sending', 'seen'); }
   if (pendingSend) nextFrame(() => { if (pendingSend) sendFly(root); });
-  // your spoken words, becoming your bubble: it's inverted onto them before this frame is painted
-  if (pendingWords) { const mine = [...root.querySelectorAll('#thread > .msg.me')].pop(); if (mine && mine.textContent.trim() === pendingWords.text) wordsFly(mine); }
-}
-
-// Words said to the floating orb or on the voice screen become your message: the bubble's own node
-// starts exactly over them (same place, their size), flies home into the thread, and its glass fades in
-// under the words as they land. (One node the whole way: the words ARE the bubble.)
-let pendingWords = null;
-export function wordsFrom(el, text) {
-  if (!el) { pendingWords = null; return; }
-  const r = document.createRange();
-  r.selectNodeContents(el);
-  const box = r.getBoundingClientRect();
-  if (!box.width) return;
-  pendingWords = { el, text: String(text || '').replace(/\s+/g, ' ').trim(), box, size: parseFloat(getComputedStyle(el).fontSize) || 21 };
-}
-function wordsFly(li) {
-  const p = pendingWords;
-  pendingWords = null;
-  const bub = li.querySelector('.bub');
-  if (!bub) return;
-  const b = bub.getBoundingClientRect(), W = document.getElementById('app').clientWidth;
-  if (!b.width) return;
-  p.el.style.visibility = 'hidden'; // (the words themselves are this bubble now; their screen restores their old place once it has gone)
-  li.classList.add('seen', 'wordsin');
-  if (stillMotion()) { li.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: 'linear' }); return; } // (reduced motion: they simply appear as your message)
-  // as big as they were, but never wider than the screen (so never clipped), centred where they were
-  const k = Math.max(1, Math.min(p.size / (parseFloat(getComputedStyle(bub).fontSize) || 16), (W - 24) / b.width));
-  const half = b.width * k / 2;
-  const sx = Math.min(W - 12 - half, Math.max(12 + half, p.box.left + p.box.width / 2)), sy = p.box.top + p.box.height / 2;
-  const ex = b.left + b.width / 2, ey = b.top + b.height / 2;
-  // one gentle curve down and to the right (out first, then down: the orb comes in underneath)
-  const cx = (sx + ex) / 2 + ((ex - (sx + ex) / 2) * 0.4), cy = (sy + ey) / 2 + ((sy - (sy + ey) / 2) * 0.4);
-  const frames = [];
-  for (let i = 0, N = 16; i <= N; i++) {
-    const u = i / N, v = 1 - u;
-    const x = v * v * sx + 2 * v * u * cx + u * u * ex - ex, y = v * v * sy + 2 * v * u * cy + u * u * ey - ey;
-    const sc = k + (1 - k) * (1 - (1 - u) ** 2.4); // (they shrink early: small enough to read as a message well before they arrive)
-    frames.push({ offset: u, transform: `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${sc.toFixed(4)})` });
-  }
-  const l = li.getBoundingClientRect();
-  li.style.transformOrigin = `${(ex - l.left).toFixed(1)}px ${(ey - l.top).toFixed(1)}px`;
-  li.classList.add('flyglass');
-  const T = 480;
-  const a = li.animate(frames, { duration: T, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'backwards' }); // (the orb's own curve: they travel together)
-  // the bubble's glass grows in under the words over the last 40 % of the way
-  const g = bub.animate([{ opacity: 0, transform: 'scale(.86)' }, { opacity: 1, transform: 'none' }], { duration: T * 0.4, delay: T * 0.6, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'both', pseudoElement: '::before' });
-  a.onfinish = a.oncancel = () => { li.style.transformOrigin = ''; li.classList.remove('flyglass'); g.cancel(); };
 }
 
 // what a message looks like, apart from the words a streaming reply is still typing
@@ -447,6 +399,18 @@ function nearEnd(root) {
   }
   return root._end.v;
 }
+// The thread followed its newest line up by dy px: the messages on screen are drawn back where they
+// were and glide the rest of the way (added to any glide still running, so a quick stream is one
+// continuous movement). Only what's on screen moves.
+function glideUp(root, dy) {
+  if (dy < 1 || stillMotion()) return;
+  const v = root.getBoundingClientRect();
+  for (const m of root.querySelectorAll('#thread > .msg')) {
+    const r = m.getBoundingClientRect();
+    if (r.bottom < v.top || r.top > v.bottom + dy) continue;
+    m.animate([{ transform: `translateY(${dy.toFixed(1)}px)` }, { transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.2,.8,.2,1)', composite: 'add' });
+  }
+}
 // the answer has started: a spoken conversation stops thinking and speaks (set by the talk loop)
 let answering = null;
 function typewriter(root, id) {
@@ -470,6 +434,7 @@ function typewriter(root, id) {
       shown += n;
       const bub = root.querySelector(`[data-id="${id}"] .bub`);
       const stick = nearEnd(root); // (known from its scroll events: nothing is measured before the write)
+      const top0 = stick ? root.scrollTop : 0; // (the frame's layout is still clean here: free)
       if (bub) {
         const msg = bub.closest('.msg');
         // the answer starts: the box's orb gives one pulse and the first line rises out of it
@@ -478,7 +443,9 @@ function typewriter(root, id) {
         syncThinking();
         wordsHTML(bub, words.slice(0, shown).join(''), births, now, st);
       }
-      if (stick) root.scrollTop = root.scrollHeight; // same frame as the words
+      // same frame as the words: and when a new line has pushed it up, what's on screen glides up by that
+      // line instead of stepping (a line at a time used to read as the thread jumping)
+      if (stick) { root.scrollTop = root.scrollHeight; glideUp(root, root.scrollTop - top0); }
     }
     if (done()) {
       // let the last words finish settling before anything re-renders the bubble
@@ -629,6 +596,67 @@ const stillMotion = () => document.documentElement.dataset.motion === 'off' || m
 // Your own bubble, the moment you stop talking: dots shimmer in it until the words are back from
 // speech-to-text, then they fill in (the same node becomes the message: see syncThread).
 let heardAt = 0, askedAt = 0;
+// A voice handoff (the floating orb, or Send): your message's own node goes in now, at the end of the
+// conversation (painted in advance, still hidden), so the words you said can fly straight to where
+// they'll be. The messages on screen glide up to make the room for it at once; when the message is
+// added to the chat a moment later, this node simply becomes it (as the talking orb's pending bubble
+// does), so nothing moves again. Returns where its words sit and how big they are.
+export function placeMine(text) {
+  const root = $('#s-coach'), ol = root?.querySelector(':scope > #thread');
+  if (!ol) return null;
+  ol.querySelector(':scope > .msg.me.pending')?.remove();
+  const seen = [...ol.querySelectorAll(':scope > .msg')].map(m => [m, m.getBoundingClientRect().top]);
+  const li = document.createElement('li');
+  li.className = 'msg me pending handed seen';
+  li.style.visibility = 'hidden';
+  li.innerHTML = `<div class="bub">${esc(text)}</div>`;
+  ol.append(li);
+  root.scrollTop = root.scrollHeight;
+  const bub = li.querySelector('.bub');
+  const box = textBox(bub), at = bub.getBoundingClientRect();
+  // the room: what was on screen moved up by the new message's height; it's drawn back and glides up
+  if (!stillMotion()) for (const [m, top] of seen) {
+    const d = top - m.getBoundingClientRect().top;
+    if (d > 1 && top < innerHeight && top > -200) m.animate([{ transform: `translateY(${d.toFixed(1)}px)` }, { transform: 'none' }], { duration: 240, easing: 'cubic-bezier(.3,.1,.2,1)' });
+  }
+  return { li, bub, box, at, size: parseFloat(getComputedStyle(bub).fontSize) || 15.5 };
+}
+// Where an element's letters are: the union of its text's own boxes (not its line boxes, nor any
+// inline-block around a word), so two texts of different sizes line up by their letters.
+export function textBox(el) {
+  const r = document.createRange(), w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let L = Infinity, T = Infinity, R = -Infinity, B = -Infinity;
+  for (let n; (n = w.nextNode());) {
+    if (!n.data.trim()) continue;
+    r.selectNodeContents(n);
+    for (const q of r.getClientRects()) { if (!q.width) continue; L = Math.min(L, q.left); T = Math.min(T, q.top); R = Math.max(R, q.right); B = Math.max(B, q.bottom); }
+  }
+  return L === Infinity ? el.getBoundingClientRect() : new DOMRect(L, T, R - L, B - T);
+}
+// The message shows, its glass forming, `delay` ms from the first frame drawn from now: set going on the
+// same frame as the words' flight, so the two keep time on the compositor whatever the page is doing.
+export function revealMine(li, delay) {
+  if (!li?.isConnected || stillMotion()) return [];
+  li.style.visibility = '';
+  li.classList.add('wordsin', 'flyglass');
+  const bub = li.querySelector('.bub');
+  return [
+    li.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 1, delay, fill: 'both' }),
+    bub.animate([{ opacity: 0, transform: 'scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 180, delay, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'both', pseudoElement: '::before' })
+  ];
+}
+// the words have landed: the message is there, its glass forming under them
+export function showMine(li) {
+  if (!li?.isConnected || li.classList.contains('wordsin')) return; // (once)
+  li.style.visibility = '';
+  li.classList.add('wordsin');
+  if (stillMotion()) return;
+  const bub = li.querySelector('.bub');
+  li.classList.add('flyglass');
+  const g = bub.animate([{ opacity: 0, transform: 'scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 180, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'both', pseudoElement: '::before' });
+  g.onfinish = g.oncancel = () => li.classList.remove('flyglass');
+}
+
 function pendingMine(root, on) {
   const ol = root.querySelector(':scope > #thread');
   const cur = ol?.querySelector(':scope > .msg.me.pending');

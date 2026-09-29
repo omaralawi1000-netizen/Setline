@@ -7,7 +7,7 @@
 import { launch, newPage, serve, settle, onScreen } from './lib/harness.mjs';
 import { STAND_IN, mockServices, installSampler, mark, samples, between } from './lib/voiceflow.mjs';
 import { streamReplies, probeReply } from './lib/sse.mjs';
-import { FLOWS as MOVES, checkFlow } from './lib/choreo.mjs';
+import { FLOWS as MOVES, checkFlow, setupCoachPage } from './lib/choreo.mjs';
 
 // chat-stream is 1.60's in-place chat, which the master fix's phase 3 brings to this design: until then
 // it reports without failing.
@@ -458,6 +458,31 @@ const FLOWS = {
     return r.errors;
   }]))),
 
+  // The mic, held in the awkward moments (1.64.0): it always opens, the pull-up shows one orb, and
+  // nothing throws. The mic is made slow to open (getUserMedia 350 ms) so the races really happen.
+  'mic-hold-twice': (browser, base) => micCase(browser, base, async (page, o, see) => {
+    await page.mouse.move(o.x, o.y); await page.mouse.down(); await page.waitForTimeout(250); await page.mouse.up(); await page.waitForTimeout(80);
+    await page.mouse.down(); await page.waitForTimeout(900);
+    await see('the second hold', { phase: 'listening' });
+    await page.mouse.up(); await page.waitForTimeout(900);
+  }),
+  'mic-after-reply': (browser, base) => micCase(browser, base, async (page, o, see) => {
+    await MOVES['mini-to-coach'](page); await settle(page, 1200);
+    await page.goBack(); await onScreen(page, 'today'); await settle(page, 900);
+    await page.mouse.move(o.x, o.y); await page.mouse.down(); await page.waitForTimeout(900);
+    await see('a hold right after a reply', { phase: 'listening' });
+    await page.mouse.up(); await page.waitForTimeout(900);
+  }),
+  'mic-pullup-starting': (browser, base) => micCase(browser, base, async (page, o, see) => {
+    await page.mouse.move(o.x, o.y); await page.mouse.down(); await page.waitForTimeout(200);
+    for (let dy = 10; dy <= 180; dy += 15) await page.mouse.move(o.x, o.y - dy);
+    await page.waitForSelector('#voice.on', { timeout: 4000 }); await page.waitForTimeout(120);
+    await see('the pull-up while the mic opens', { orbs: 1 });
+    await page.waitForTimeout(900);
+    await see('the voice screen a moment later', { phase: 'listening', orbs: 1, full: true });
+    await page.mouse.up(); await page.waitForTimeout(900);
+  }),
+
   'tabs-open': async (browser, base) => {
     const { context, page, errors } = await newPage(browser, base);
     await page.goto(base + '?seed=1');
@@ -474,6 +499,34 @@ const FLOWS = {
     return errors;
   }
 };
+
+// (a mic case: the Coach page set up, a slow mic, and see(what, want) checking the voice UI's state)
+async function micCase(browser, base, fn) {
+  const { context, page, errors } = await newPage(browser, base);
+  await page.addInitScript(() => {
+    addEventListener('unhandledrejection', e => console.error('unhandled rejection: ' + (e.reason?.message || e.reason)));
+    const md = navigator.mediaDevices, g = md.getUserMedia.bind(md);
+    md.getUserMedia = c => new Promise(r => setTimeout(r, 350)).then(() => g(c));
+  });
+  await setupCoachPage(page, base);
+  const b = await page.locator('#dock .orbbtn').boundingBox(), o = { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  const see = async (what, want) => {
+    const st = await page.evaluate(() => {
+      const op = el => { let a = 1; for (let n = el; n && n.nodeType === 1; n = n.parentElement) { const cs = getComputedStyle(n); if (cs.display === 'none' || cs.visibility === 'hidden') return 0; a *= +cs.opacity; } return a; };
+      const mini = document.getElementById('ofloat'), full = document.getElementById('voice');
+      const orbs = [...document.querySelectorAll('.orb')].filter(x => { const r = x.getBoundingClientRect(); return r.width > 4 && r.bottom > 0 && r.top < innerHeight && op(x) > 0.05; }).map(x => x.id || x.parentElement?.id || x.parentElement?.className || 'orb');
+      return { phase: !full.hidden ? full.dataset.phase : mini?.dataset.phase, full: !full.hidden, orbs };
+    });
+    const bad = [];
+    if (want.phase && st.phase !== want.phase) bad.push(`phase ${st.phase}, not ${want.phase}`);
+    if (want.full && !st.full) bad.push('the voice screen is not up');
+    if (want.orbs && st.orbs.length !== want.orbs) bad.push(`${st.orbs.length} orbs (${st.orbs.join(', ')})`);
+    if (bad.length) throw new Error(`${what}: ${bad.join(', ')} · ${await page.evaluate(() => globalThis.__voiceTrail?.())}`);
+  };
+  await fn(page, o, see);
+  await context.close();
+  return errors;
+}
 
 async function main() {
   const server = await serve();

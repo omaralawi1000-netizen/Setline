@@ -13,9 +13,20 @@ function pickMime() {
   return opts.find(m => globalThis.MediaRecorder?.isTypeSupported?.(m)) || '';
 }
 
-// Start recording. Resolves once the mic is open. Throws {code:'denied'|'nomic'|'unsupported'|'busy'}.
-export async function start({ onMaxed, maxMs = MAX_MS } = {}) {
-  if (rec) return;
+// Start recording. Resolves once the mic is open (or, cancelled meanwhile, once it has been closed
+// again: isRecording() says which). Throws {code:'denied'|'nomic'|'unsupported'|'busy'}.
+// One opening at a time: a second start() while the first is still waiting for the mic gets the same
+// promise (it used to open a second stream, and whichever opened last overwrote the other: one stream
+// left open for good, the other cancelled under the hold that wanted it).
+let starting = null, gen = 0;
+export function start(opts = {}) {
+  if (rec) return Promise.resolve();
+  if (!starting) starting = open(opts).finally(() => { starting = null; });
+  return starting;
+}
+export const isStarting = () => !!starting;
+async function open({ onMaxed, maxMs = MAX_MS } = {}) {
+  const mine = ++gen;
   if (!navigator.mediaDevices?.getUserMedia || !globalThis.MediaRecorder) throw Object.assign(new Error('unsupported'), { code: 'unsupported' });
   let stream;
   try {
@@ -26,6 +37,8 @@ export async function start({ onMaxed, maxMs = MAX_MS } = {}) {
     const code = e?.name === 'NotAllowedError' || e?.name === 'SecurityError' ? 'denied' : e?.name === 'NotFoundError' ? 'nomic' : 'busy';
     throw Object.assign(new Error(code), { code });
   }
+  // cancelled while the mic was opening: it's closed again at once, never kept
+  if (mine !== gen || rec) { for (const tr of stream.getTracks()) tr.stop(); return; }
   const mimeType = pickMime();
   const recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 32000 } : undefined);
   const r = { stream, recorder, chunks: [], analyser: null, source: null, startedAt: performance.now(), peak: 0, buf: null, timer: 0, frames: 0 };
@@ -140,6 +153,7 @@ export function snapshot() {
 }
 
 export function cancel() {
+  if (starting) gen++; // (an opening in flight closes its stream as soon as it arrives)
   const r = rec;
   rec = null;
   if (!r) return;

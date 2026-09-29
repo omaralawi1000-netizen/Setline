@@ -12,6 +12,11 @@ import { handOrb } from './dotorb.js';
 export const EASE = 'cubic-bezier(0.32, 0.72, 0, 1)';
 // a flight: off the mark at once but unhurried, then a long soft landing (no dart-and-creep)
 export const FLY = 'cubic-bezier(.3,0,.2,1)';
+// cubic-bezier(x1, y1, x2, y2) as a function of time → progress (to plan a flight ahead of time)
+export function bezier(x1, y1, x2, y2) {
+  const f = (a, b, t) => 3 * a * t * (1 - t) ** 2 + 3 * b * t * t * (1 - t) + t ** 3;
+  return x => { if (x <= 0) return 0; if (x >= 1) return 1; let lo = 0, hi = 1, t = x; for (let i = 0; i < 20; i++) { t = (lo + hi) / 2; if (f(x1, x2, t) < x) lo = t; else hi = t; } return f(y1, y2, t); };
+}
 export const reduced = () => document.documentElement.dataset.motion === 'off' ||
   (document.documentElement.dataset.motion !== 'on' && matchMedia('(prefers-reduced-motion: reduce)').matches);
 
@@ -33,7 +38,7 @@ function arc(a, b, bow = 0.12) {
 // (to: where the target will be, when it isn't there yet; keepFrom: the source stays hidden until its
 // owner lets go of it with releaseOrb(), for a source whose screen is still fading out)
 export const releaseOrb = el => el && show(el);
-export function arcFly(fromEl, toEl, { delay = 0, onland, ctrl = null, disc = true, from = null, to = null, keepFrom = false } = {}) {
+export function arcFly(fromEl, toEl, { delay = 0, onland, ctrl = null, disc = true, from = null, to = null, keepFrom = false, duration: ms = 0 } = {}) {
   if (!fromEl?.isConnected || !toEl?.isConnected) { onland?.(); return Promise.resolve(); }
   const a = from?.w ? from : centre(fromEl), b = to || centre(toEl);
   if (!a.w || !b.w || reduced()) {
@@ -71,7 +76,7 @@ export function arcFly(fromEl, toEl, { delay = 0, onland, ctrl = null, disc = tr
     const k = s0 + (s1 - s0) * (1 - (1 - u) ** 3); // (it takes its new size early in the flight, and travels at it)
     frames.push({ offset: u, transform: `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${k.toFixed(4)})` });
   }
-  const duration = Math.round(Math.max(380, Math.min(520, 340 + d * 0.45)));
+  const duration = ms || Math.round(Math.max(380, Math.min(520, 340 + d * 0.45)));
   ghost.style.willChange = 'transform';
   const fly = ghost.animate(frames, { duration, delay, easing: FLY, fill: 'both' });
   let swap0 = null;
