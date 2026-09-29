@@ -491,7 +491,7 @@ button.mini:active,button.pr:active{transform:scale(.98)}
 .msg.ai .bub b{color:var(--accent)}
 .msg.is-err .bub{color:var(--muted)}
 .msg.is-err .chip{margin-top:10px}
-.msg.is-streaming .bub > :last-child::after{content:"";display:inline-block;width:7px;height:15px;margin-left:3px;margin-right:-10px;border-radius:2px;background:var(--accent);vertical-align:-2px;animation:blink .8s ease-in-out infinite alternate} /* (-10px: the cursor takes no room in the line, so it never wraps onto a line of its own that vanishes, jumping the thread, when the reply ends) */
+.msg.is-streaming .bub > :last-child::after{content:"";display:inline-block;width:7px;height:15px;margin-left:3px;border-radius:2px;background:var(--accent);vertical-align:-2px;animation:blink .8s ease-in-out infinite alternate}
 .dots{display:inline-flex;gap:4px;padding:4px 0}
 .dots i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:dot 1.1s ease-in-out infinite}
 .dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
@@ -1825,6 +1825,7 @@ html[data-dock=icons] .dock .tab span{display:none}
 .msg.ai:not(.is-streaming):not(.seen) .bub{animation:settle .9s ease-out}
 @keyframes settle{0%{box-shadow:0 0 0 1px rgba(var(--a-rgb),.45),0 0 24px -6px rgba(var(--a-rgb),.55)}100%{box-shadow:0 0 0 1px transparent,0 0 0 0 transparent}}
 .msg.ai .bub{backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%)}
+.msg.is-streaming .bub{transition:height .2s}
 
 /* targets that add up: the numbers that followed your change glow for a moment */
 .stepper b.synced{animation:synced .8s ease-out}
@@ -2428,17 +2429,6 @@ html[data-motion=off] .orbghost{display:none}
 .dochip:nth-child(2) .dox{background:rgba(var(--a-rgb),.16);color:var(--accent)}
 .dochip .dox svg{width:15px;height:15px;stroke-width:2.8}
 .dochip.going{opacity:.55;transform:scale(.97);transition:opacity var(--m-fast) var(--e-out),transform var(--m-fast) var(--e-out)}
-/* 1.62.4: once the reply's last word has settled, its chips rise out of it on a soft spring (one
-   gentle overshoot), staggered 60 ms; the thread makes room by gliding (coach.js roomFor). Pressed on
-   the frame the finger lands; taken: the check draws in. */
-.msg .dochips.fresh .dochip{animation:chiprise 450ms cubic-bezier(.34,1.32,.64,1) both;animation-delay:calc(var(--i, 0) * 60ms)}
-@keyframes chiprise{from{opacity:0;transform:translateY(10px) scale(.96)}}
-.dochip.pressed{transform:scale(.97);transition:transform 60ms var(--e-out)}
-.dochip.going .dox svg path{stroke-dasharray:24;stroke-dashoffset:24;animation:ckdraw 320ms var(--e-out) 60ms forwards}
-@media (prefers-reduced-motion: reduce){ .msg .dochips.fresh .dochip{animation:chipfade 150ms linear both} .dochip.going .dox svg path{animation:none;stroke-dashoffset:0} }
-html[data-motion=off] .msg .dochips.fresh .dochip{animation:chipfade 150ms linear both}
-html[data-motion=off] .dochip.going .dox svg path{animation:none;stroke-dashoffset:0}
-@keyframes chipfade{from{opacity:0}}
 @keyframes dochipin{from{opacity:0;transform:translateY(8px) scale(.94)}}
 .msg:has(~ .msg.me) .dochips{display:none}
 .app.typing .dochips{opacity:0;transform:translateY(4px);pointer-events:none}
@@ -2721,6 +2711,11 @@ html[data-motion=off] .bub .w{animation:none;will-change:auto}
 .intent.flagged{grid-template-columns:36px 1fr auto auto;column-gap:6px}
 
 /* ======================= 1.54: the orb, polished ======================= */
+/* its trail while it flies: the orb stays sharp and leaves a soft comet of its own light behind it,
+   brightest under the orb, fading and narrowing towards the tail (see orbStreak) */
+.orbstreak{position:absolute;z-index:7;pointer-events:none;transform-origin:0 50%;opacity:0;will-change:transform,opacity;
+  background:radial-gradient(farthest-side at 100% 50%,rgba(255,255,255,.6),rgba(255,255,255,0) 30%),
+    radial-gradient(farthest-side at 100% 50%,rgba(var(--a-rgb),.9),rgba(var(--v-rgb),.5) 45%,rgba(var(--v-rgb),0))}
 /* a voice-logged set: the spark on its way from the orb to the row */
 .orbspark{position:absolute;z-index:30;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;pointer-events:none;opacity:0;will-change:translate,scale,opacity;
   background:radial-gradient(circle,#fff 0,var(--accent-hi) 30%,rgba(var(--a-rgb),.55) 55%,rgba(var(--a-rgb),0) 72%)}
@@ -2771,13 +2766,13 @@ html[data-motion=off] .bub .w{animation:none;will-change:auto}
 @keyframes orbswirl{to{rotate:360deg}}
 
 @media (prefers-reduced-motion: reduce){
-  .orbspark{display:none}
+  .orbstreak,.orbspark{display:none}
   #dock .orbbtn .orb .core::after,#app .orb.shake{animation:none}
   .orbbtn:is(.pulse-land,.pulse-warm,.pulse-go) .orb,.orbbtn:is(.pulse-land,.pulse-warm,.pulse-go) .orb::before,.orbbtn:is(.pulse-land,.pulse-warm,.pulse-go) .orb .core::after,.orbbtn:is(.pulse-land,.pulse-warm,.pulse-go)::after{animation:none}
   .vlayer[data-phase=thinking] .orb .core,.ofloat[data-phase=thinking] .orb .core,.app.thinking .composer .corb .orb .core{animation:none}
   .orb.big::after,.orb.lift::after{transform:none}
 }
-html[data-motion=off] .orbspark{display:none}
+html[data-motion=off] :is(.orbstreak,.orbspark){display:none}
 html[data-motion=off] #dock .orbbtn .orb .core::after,html[data-motion=off] #app .orb.shake{animation:none}
 html[data-motion=off] :is(.vlayer[data-phase=thinking] .orb .core,.ofloat[data-phase=thinking] .orb .core,.app.thinking .composer .corb .orb .core){animation:none}
 
@@ -2851,6 +2846,26 @@ html[data-motion=off] .screen.enter :is(.greet .gw,.tw){animation:none}
 .prtile{animation-fill-mode:backwards}
 
 /* ======================= 1.57: thinking orbs, voice glow, border beam ======================= */
+/* the voice glow (voice-glow, see js/ui/voiceglow.js): the bottom of the voice screen and of the floating
+   orb. Every lobe is a soft ellipse moved by transform only; the layers fade by opacity. */
+.vglow{position:absolute;inset:0;pointer-events:none;overflow:hidden;opacity:0;transition:opacity var(--m-slow) var(--e-out)}
+.vglow.on{opacity:1}
+.vg-l{position:absolute;inset:0;opacity:0}
+.vg-m{position:absolute;left:50%;bottom:0;transform-origin:50% 100%;will-change:transform}
+.vg-m > i,.vg-m > .vg-core{position:absolute;left:50%;bottom:0;display:block;will-change:transform}
+/* the inner light hugs the edges (a band in from each side), as in the original */
+.vg-inner{
+  -webkit-mask-image:linear-gradient(to top,#fff,transparent var(--vg-edge)),linear-gradient(to right,#fff,transparent var(--vg-edge),transparent calc(100% - var(--vg-edge)),#fff);
+  mask-image:linear-gradient(to top,#fff,transparent var(--vg-edge)),linear-gradient(to right,#fff,transparent var(--vg-edge),transparent calc(100% - var(--vg-edge)),#fff);
+  -webkit-mask-composite:source-over;mask-composite:add}
+/* the stroke: the colours in the 1px edge ring, with the hot white core at the centre */
+.vg-stroke{padding:1px;
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;
+  mask:linear-gradient(#fff 0 0) content-box exclude,linear-gradient(#fff 0 0)}
+.vg-core{background:radial-gradient(closest-side,rgba(255,255,255,.45) 0%,rgba(255,255,255,.14) 30%,transparent 65%)}
+@media (prefers-reduced-motion: reduce){ .vglow{transition:none} }
+html[data-motion=off] .vglow{transition:none}
+.vlayer > .vglow{z-index:-1}
 /* the border beam (border-beam `md`, ocean, see js/ui/beam.js): round the live workout's card on Today.
    A mask window on a turning square (the colours on a child turning back, so they stay put); the
    phone only composites. It stands still off screen, on another tab, and with reduced motion. */
@@ -3028,224 +3043,3 @@ html[data-motion=off] .tab.on svg.ti{animation:none!important}
 .composer:is([data-talk=listening],[data-talk=hearing]) .corb::after{animation:none;opacity:0}
 .composer.talking,.composer.dictating{box-shadow:0 0 0 1px rgba(var(--a-rgb),.35),0 18px 40px -18px rgba(var(--v-rgb),.6)}
 .dock .ind.moving{animation:none}
-
-/* ======================= 1.62.1: the same look, drawn for less ======================= */
-/* No layer is kept around "just in case": the browser lifts what animates while it animates, and
-   script-driven parts are lifted only while their screen is open (.vlayer/.ofloat are display:none
-   when closed). Keyframes that end on a filter end on `none`, so a finished word or letter carries no
-   filter. The sea, the clouds and the Coach's glow hold still (paused, not reset) while the page
-   scrolls, a screen or sheet moves, or the voice UI covers the page: .app.bg-still, set in app.js. */
-.dock{will-change:auto}
-.ambient i{will-change:auto}
-.wave i{will-change:auto}
-.vlayer:not([data-phase=idle]) .wave{will-change:transform}
-.aura .clouds i{will-change:auto}
-.app.thinking .aura .clouds i{will-change:transform}
-.cglow i,.cglow::after{will-change:auto}
-.app.coaching .cglow i,.app.coaching .cglow::after{will-change:transform}
-.orb .core b{mix-blend-mode:normal;will-change:auto}
-@keyframes wordrise{0%{opacity:0;filter:blur(5px);transform:translateY(.28em)}55%{opacity:.85;filter:blur(1.2px)}100%{opacity:1;filter:none;transform:none}}
-@keyframes thinkin{to{opacity:.95;filter:none;transform:none}}
-.app.bg-still :is(.aura .clouds i,.aura .glow,.cglow i,.cglow::after,.ambient i){animation-play-state:paused!important}
-/* under the floating orb and the voice screen the page still shows through (faintly under the voice
-   screen: its backdrop isn't quite opaque, which is part of the look), but it holds still */
-.app.voice-mini > .screen.on *,.app.voice-covered > .screen.on *{animation-play-state:paused!important}
-/* the voice glow is one canvas along the bottom (js/ui/voiceglow.js) */
-/* set every frame from the voice loop (already eased there): a transition on it restarted each frame */
-.ofloat .orb.lift::before{transition:none}
-.ofloat.handoff .oscrim{opacity:1;transition:none}
-/* one label at a time in the message box: "Thinking…" fades out (80 ms), then the placeholder fades in (120 ms) */
-.thinkline.gone{transition:opacity 80ms var(--e-out)}
-.composer input::placeholder{transition:color 120ms var(--e-out) 80ms}
-.composer:has(> .thinkline:not(.gone)) input::placeholder{color:transparent;transition:color 80ms var(--e-out)}
-.obubble{bottom:calc(var(--ob) + 188px)} /* a little air between the status pill and "Pull up for more" */
-/* your spoken question, before its words are back: three dots shimmer in your bubble */
-.msg.me.pending .bub{min-width:64px;text-align:center}
-.pdots{display:inline-flex;gap:5px;padding:4px 2px}
-.pdots i{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.35;animation:pdot 1.1s var(--e-soft) infinite}
-.pdots i:nth-child(2){animation-delay:.15s}.pdots i:nth-child(3){animation-delay:.3s}
-@keyframes pdot{40%{opacity:.95;transform:translateY(-2px)}}
-@media (prefers-reduced-motion: reduce){ .pdots i{animation:none;opacity:.6} }
-html[data-motion=off] .pdots i{animation:none;opacity:.6}
-/* the listening rings fade out when you let go instead of cutting off: they keep rippling into
-   "working it out" while their layer fades */
-.vlayer[data-phase=thinking] .ripples b{animation:ripple 2.8s var(--ease) infinite}
-.vlayer[data-phase=thinking] .ripples b:nth-child(2){animation-delay:.9s}
-.vlayer[data-phase=thinking] .ripples b:nth-child(3){animation-delay:1.8s}
-.ofloat .owrap::before,.ofloat .owrap::after{transition:filter .3s var(--e-out)}
-.ofloat[data-phase=thinking] .owrap::before{animation:ripple 2.4s var(--ease) infinite;filter:opacity(0)}
-.ofloat[data-phase=thinking] .owrap::after{animation:ripple 2.4s var(--ease) 1.2s infinite;filter:opacity(0)}
-
-/* ======================= 1.62.3: review before it's sent ======================= */
-/* pulled up while holding: what you said, big in the middle (tap to change it), Send, "Say more" (it
-   adds to it) and the top ✕ to throw it away */
-.vreview{position:absolute;left:20px;right:20px;top:calc(var(--safe-top) + 230px);bottom:calc(46px + var(--safe-bottom));display:flex;flex-direction:column;
-  animation:vrin var(--m-base) var(--e-out) both}
-@keyframes vrin{from{opacity:0;transform:translateY(10px)}}
-.vrtext{flex:1;min-height:0;overflow:auto;display:flex;align-items:center;justify-content:center;text-align:center;font-size:29px;line-height:1.25;font-weight:700;letter-spacing:-.02em;
-  overflow-wrap:anywhere;outline:none;border-radius:20px;padding:8px 6px;-webkit-user-select:text;user-select:text;caret-color:var(--accent)}
-.vrtext:focus{background:rgba(255,255,255,.04)}
-.vrhint{text-align:center;font-size:13px;color:var(--muted);margin:6px 0 16px}
-.vracts{display:flex;gap:12px;align-items:center}
-.vrmic{flex:none;width:68px;height:68px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.08);border:1px solid var(--line);color:var(--ink);position:relative}
-.vrmic span{position:absolute;top:100%;margin-top:6px;font-size:12px;color:var(--muted);white-space:nowrap}
-.vrmic svg.i{width:26px;height:26px}
-.vrsend{flex:1;height:68px;border-radius:34px;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:800;font-size:18px;background:var(--accent);color:var(--accent-ink);
-  box-shadow:0 16px 40px -10px rgba(var(--a-rgb),.6),inset 0 1px 0 rgba(255,255,255,.65);transition:opacity var(--m-fast) var(--e-out),transform var(--m-fast) var(--e-out)}
-.vrsend svg.i{width:20px;height:20px}
-.vrsend:disabled{opacity:.4}
-.vrsend:not(:disabled):active,.vrmic:active{transform:scale(.97)}
-.vlayer.reviewing .stagev{transform:translateY(-30px) scale(.62)}
-.vlayer.reviewing :is(.wave,.hints,.hold,.holdnote,.say){opacity:0!important;pointer-events:none}
-.vlayer[data-phase=stuck] .live{color:var(--warm)}
-@media (prefers-reduced-motion: reduce){ .vreview{animation:none} }
-html[data-motion=off] .vreview{animation:none}
-
-/* ======================= 1.63.0: the orb lives in the bottom-right corner ======================= */
-/* The Coach's message box is the dock grown: one pill of the dock's own glass (.cbg), as tall as the
-   dock, with the orb at its right end in exactly the dock orb's place and size. That one spot has three
-   faces: the orb (an empty field), the send arrow (while you type), the stop button (a reply streaming
-   in). No light of its own: plain frosted glass at every moment. */
-#composer{left:16px;right:16px;bottom:var(--dock-bottom);height:var(--dock-h);border-radius:36px;padding:0 0 0 24px;gap:4px;
-  background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;isolation:isolate}
-#composer::before,#composer::after{display:none}
-#composer > .cbg{position:absolute;inset:0;z-index:0;border-radius:inherit;pointer-events:none;
-  background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.02) 50%,rgba(255,255,255,.04)),rgba(10,18,28,.5);
-  -webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 0 0 1px rgba(255,255,255,.07),0 18px 36px -18px rgba(0,0,0,.85)}
-html[data-glass=off] #composer > .cbg{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(10,20,30,.94)}
-#composer > :not(.cbg){position:relative;z-index:1}
-#composer input{padding:0;height:100%}
-#composer > .thinkline{position:absolute;z-index:2;left:24px;right:80px}
-#composer .cspot{flex:none;width:72px;height:72px}
-#composer .cspot > button{position:absolute;inset:0;margin:auto;transition:opacity 150ms var(--e-out),scale 150ms var(--e-out),transform .3s var(--e-out)}
-#composer .corb{width:72px;height:72px;border-radius:50%}
-#composer .corb .orb{--s:60px}
-#composer .corb::before,#composer .corb::after{display:none}
-#composer .csend,#composer .csend.stop{width:48px;height:48px;border-radius:50%;transform:none;opacity:1;pointer-events:auto}
-#composer .csend svg{width:22px;height:22px}
-#composer .csend:active{transform:scale(.9)}
-/* orb ↔ arrow ↔ stop: one cross-fades and scales into the other */
-#composer:not([data-spot=send]):not([data-spot=stop]) .csend{opacity:0;scale:1.25;pointer-events:none}
-#composer:is([data-spot=send],[data-spot=stop]) .corb{opacity:0;scale:.8;pointer-events:none}
-@media (prefers-reduced-motion: reduce){ #composer .cspot > button{transition:opacity 150ms linear} #composer .cspot > button{scale:1!important} }
-html[data-motion=off] #composer .cspot > button{transition:opacity 150ms linear;scale:1!important}
-/* the keyboard (js/ui/keyboard.js): the box glides up with it, and the thread keeps the same room
-   below its newest message at every moment (no step when the field is focused) */
-#composer{transition:opacity .3s var(--e-out),transform 280ms cubic-bezier(.2,.8,.2,1)}
-.app.coaching.kbup:not(.is-sub):not(.voice) #composer{transform:translateY(calc(var(--dock-bottom) - 10px - var(--kbh, 0px)))}
-#app.coaching #s-coach.screen{padding-bottom:calc(max(var(--kbh, 0px) + 10px, var(--dock-bottom)) + var(--dock-h) + 20px)}
-/* no glow reaches more than about a fifth past the orb's edge, and none covers text */
-.orb::before{inset:-18%}
-.composer:is([data-talk=listening],[data-talk=hearing]) .corb .orb::before,.ofloat .orb.lift::before{transform:scale(calc(.94 + var(--l, var(--lv, 0)) * .1))}
-.oglow{width:176px;height:176px;margin:-88px 0 0 -88px;transform:scale(calc(.94 + var(--l, 0) * .08))}
-.app.thinking .composer .corb .orb::before{animation:none;opacity:.6}
-
-/* the flying orb carries a drop of the dock's glass under its dots (faded in and out by js/ui/choreo.js) */
-.orbghost.disc::before{content:"";position:absolute;inset:-9%;border-radius:50%;opacity:0;pointer-events:none;
-  background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.02) 50%,rgba(255,255,255,.04)),rgba(10,18,28,.82);
-  -webkit-backdrop-filter:blur(20px) saturate(160%);backdrop-filter:blur(20px) saturate(160%);box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 0 0 1px rgba(255,255,255,.07)}
-/* the Coach painted in advance, invisibly (app.js warmCoach) */
-.app.warmcoach #s-coach:not(.on){visibility:visible;opacity:.005;transition:none;pointer-events:none}
-.app.warmcoach:not(.coaching) #composer{opacity:.005;transition:none}
-.app.warmcoach .aura{visibility:visible}
-.app.warmcoach:not(.coaching) .aura .veil{opacity:.005;transition:none}
-/* While a transition runs (.app.choreo, js/ui/choreo.js), nothing else animates the pieces it drives. */
-.app.choreo :is(.dock,.composer,.screen,.aura .veil,.dock .tab,.dock .ind,.dock .dcap,.dock .orbbtn){transition:none!important}
-.app.choreo #s-coach > *,.app.choreo #s-coach .msg{animation:none!important}
-/* Home ↔ Coach: the dock stays where it is (its parts fade) while the message box grows out of its orb */
-.app.cm-dock #dock{opacity:1;transform:none;pointer-events:none}
-.app.cm-box #composer{opacity:1;transform:none;pointer-events:none}
-/* a voice handoff: the Coach sits over the frost / the voice screen, so your words fly into their
-   bubble in plain sight; everything else in it is faded in from js (never an old message on top) */
-
-/* your words becoming your message: the bubble's glass grows in under them as they land (a layer of
-   its own, so only it fades and scales, never the words) */
-.msg.me .bub{--mebg:rgba(var(--a-rgb),.16);--mebd:rgba(var(--a-rgb),.22)}
-html[data-duo] .msg.me .bub{--mebg:linear-gradient(135deg,rgba(var(--a-rgb),.2),color-mix(in srgb,var(--accent2) 16%,transparent));--mebd:rgba(var(--a-rgb),.26)}
-.msg.me.flyglass .bub{background:none!important;border-color:transparent!important;isolation:isolate}
-.msg.me.flyglass .bub::before{content:"";position:absolute;inset:-1px;z-index:-1;border-radius:inherit;background:var(--mebg);border:1px solid var(--mebd);transform-origin:100% 100%;opacity:0}
-.msg.me .bub{position:relative}
-/* the Coach's "Thinking" words in the box wait until the orb has landed (about 120 ms after) */
-.app.awaitland .composer .thinkline{opacity:0}
-.app.awaitland.thinking #composer input::placeholder{color:var(--dim)} /* (never an empty bar while the orb is on its way) */
-.composer .thinkline{transition:opacity .18s}
-/* the dock takes its orb back with a settle only: no ring of light */
-.orbbtn.pulse-land::after{animation:none}
-.vlayer.closing > *{transition:none!important} /* (closing: faded from js/ui/voice.js closeVoice) */
-
-/* ======================= 1.64.0: the light stays on the orb ======================= */
-/* Every orb's halo: soft, and never more than about a fifth past the orb's edge (inset -12 %, and at
-   most 6 % bigger with the voice); the message box's orb only nods when a reply starts (it used to
-   swell to 1.2× in a big pink pulse). The voice glow along the bottom of the screen is gone. */
-.orb::before{inset:-12%}
-.orb::before,.app.coaching .composer.speaking .corb .orb::before,.composer:is([data-talk=listening],[data-talk=hearing]) .corb .orb::before,.ofloat .orb.lift::before{
-  transform:scale(calc(.96 + min(var(--sv, 0), 1) * .06 + min(var(--l, var(--lv, 0)), 1) * .06));max-width:none}
-.app.coaching .composer.speaking .corb .orb::before{opacity:calc(.2 + var(--sv, 0) * .35)}
-.app.thinking .composer .corb .orb::before{animation:none;opacity:.35}
-@keyframes orbanswer{0%{scale:1}35%{scale:1.05}100%{scale:1}}
-@keyframes orbhalo{0%,100%{opacity:.3;scale:.96}50%{opacity:.5;scale:1.02}}
-/* the floating orb's light when it starts listening: a small breath, within its fifth */
-@keyframes bloom{0%{scale:.9;opacity:.3}45%{scale:1.04;opacity:1}100%{scale:1}}
-.msg.me.pending.handed .bub{min-width:0;text-align:inherit} /* (your spoken message, placed ahead: exactly as it will be) */
-
-/* Connected controls: one material silhouette, with a small travelling edge light. */
-.cm-skin{position:absolute;z-index:6;pointer-events:none;isolation:isolate;overflow:hidden;
-  background:linear-gradient(165deg,rgba(255,255,255,.13),rgba(255,255,255,.025) 50%,rgba(var(--a-rgb),.06)),rgba(10,18,28,.72);
-  backdrop-filter:blur(20px) saturate(155%);-webkit-backdrop-filter:blur(20px) saturate(155%);
-  box-shadow:inset 0 1px 1px rgba(255,255,255,.28),inset 0 -1px 1px rgba(255,255,255,.06)}
-.cm-light{position:absolute;left:0;top:0;width:64px;height:2px;border-radius:50%;pointer-events:none;
-  background:linear-gradient(90deg,transparent,var(--accent-hi),transparent);transform-origin:center}
-.cm-orb{z-index:7;pointer-events:none;overflow:visible}
-.app.cm-ready #composer{pointer-events:auto}
-.app.cm-box #composer > :not(.cbg){z-index:8}
-.app.cm-box #composer{z-index:7}
-html[data-glass=off] .cm-skin{backdrop-filter:none;-webkit-backdrop-filter:none;background:#111B28}
-@supports not (backdrop-filter:blur(1px)){.cm-skin{background:#111B28}}
-@media (prefers-reduced-transparency:reduce){.cm-skin,#composer>.cbg{backdrop-filter:none;-webkit-backdrop-filter:none;background:#111B28}}
-
-/* The compact dock keeps its orb anchor while the tab capsule contracts. */
-.app.compact:not(.is-sub):not(.voice):not(.kb) .dock{--ow:80px;left:calc(100% - 166px);right:16px;height:72px}
-.app.compact .dock .orbbtn{width:72px;height:72px}
-.app.compact .dock .orbbtn .orb{transform:none}
-.dock .orbbtn.pressing{transform:scale(.95)}
-
-/* Quick voice: the original thumb target, a joined capsule and one honest meter. */
-.app.voice-mini:not(.voice) .dock{opacity:1;transform:none;pointer-events:none}
-.app.voice-mini:not(.voice) .dock :is(.tab,.ind,.dcap,.obub){opacity:0}
-.ofloat .oscrim{background:linear-gradient(to top,rgba(6,11,19,.3),transparent 180px)}
-.ofloat .owrap{left:auto;right:16px;top:auto;bottom:var(--dock-bottom);width:72px;height:72px;margin:0;display:grid;place-items:center;will-change:auto;transition:translate var(--m-voice) var(--e-out),opacity var(--m-fast) var(--e-out)}
-.ofloat .owrap .orb.lift{--s:60px;width:var(--s);height:var(--s);padding:0;border-radius:50%;will-change:auto}
-.ofloat .owrap::before,.ofloat .owrap::after,.ofloat .oglow{display:none}
-.omini-skin{position:absolute;left:16px;right:16px;bottom:var(--dock-bottom);height:72px;pointer-events:none;opacity:0;
-  background:linear-gradient(165deg,rgba(255,255,255,.13),rgba(255,255,255,.025) 50%,rgba(var(--a-rgb),.06)),rgba(10,18,28,.85);
-  backdrop-filter:blur(20px) saturate(155%);-webkit-backdrop-filter:blur(20px) saturate(155%);
-  box-shadow:inset 0 1px 1px rgba(255,255,255,.28);transition:opacity var(--m-voice) var(--e-out)}
-.ofloat.on .omini-skin{opacity:1}
-.ofloat .obubble{left:32px;right:108px;bottom:var(--dock-bottom);height:72px;display:flex;flex-direction:row;justify-content:space-between;gap:8px;text-align:left}
-.ofloat .obubble{transition:opacity var(--m-fast) var(--e-out),transform var(--m-voice) var(--e-out)}
-.ofloat .ostatus{padding:0;height:auto;line-height:1.35;background:none;color:var(--ink);font-weight:650;letter-spacing:0}
-.ofloat[data-phase=listening] .ostatus{background:none;color:var(--accent-hi)}
-.ofloat .osay{display:none}
-.ofloat .opull{left:auto;right:26px;bottom:calc(var(--dock-bottom) + 84px);transform:none;letter-spacing:0;text-transform:none;display:none}
-.ometer{height:24px;display:flex;align-items:center;gap:3px;flex:none;color:var(--accent)}
-.ometer i{width:3px;height:24px;border-radius:3px;background:currentColor;transform:scaleY(.18)}
-.ofloat .vreview{top:auto;bottom:calc(var(--dock-bottom) + 86px);left:16px;right:16px;max-height:min(54vh,380px);padding:20px;border-radius:28px;
-  background:#101B29;box-shadow:0 18px 48px -16px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.14);gap:8px;animation:compact-review var(--m-voice) var(--e-out) both}
-@keyframes compact-review{from{clip-path:inset(100% 0 0 0 round 28px)}to{clip-path:inset(0 0 0 0 round 28px)}}
-.ofloat .vrtext{font-size:20px;line-height:1.45;display:block;text-align:left;padding:0;min-height:56px;max-height:220px;overflow:auto}
-.ofloat .vrhint{font-size:12px;text-align:left;margin:0 0 4px;color:var(--muted)}
-.ofloat .vrmic{width:48px;height:48px}
-.ofloat .vrmic span{display:none}
-.ofloat .vrsend{height:48px;font-size:15px;box-shadow:inset 0 1px 0 rgba(255,255,255,.4);gap:8px}
-.ofloat.reviewing .ometer{opacity:0}
-.ofloat.reviewing .owrap{transform:none!important}
-html[data-glass=off] .omini-skin{backdrop-filter:none;-webkit-backdrop-filter:none;background:#111B28}
-@media (prefers-reduced-transparency:reduce){.omini-skin{backdrop-filter:none;-webkit-backdrop-filter:none;background:#111B28}}
-@media (prefers-reduced-motion:reduce){.ofloat .vreview{animation:none}.ofloat .obubble{transform:none;transition:opacity var(--m-fast) linear}}
-html[data-motion=off] .ofloat .vreview{animation:none}
-/* Editing a compact transcript keeps its actions above the Android keyboard. */
-.ofloat.reviewing :is(.omini-skin,.obubble){bottom:calc(var(--dock-bottom) + max(var(--kb,0px),var(--kbh,0px)))}
-.ofloat.reviewing .owrap{top:auto!important;bottom:calc(var(--dock-bottom) + max(var(--kb,0px),var(--kbh,0px)))}
-.ofloat.reviewing .vreview{bottom:calc(var(--dock-bottom) + 86px + max(var(--kb,0px),var(--kbh,0px)));max-height:min(54vh,380px,calc(100% - var(--dock-bottom) - 110px - max(var(--kb,0px),var(--kbh,0px))))}
-.app.voice-mini .intent[data-kind=error] .undo{min-height:44px}

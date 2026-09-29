@@ -18,7 +18,6 @@ import { openFoodSearch } from './foodsearch.js';
 import { talkNow } from './voice.js';
 import { mealKey, makeTemplate, templateTotals, usualMeals } from '../meals.js';
 import { openFoodCustomize } from './customize.js';
-import { onFrame } from './frame.js';
 
 const view = { date: null };
 const prev = new Map();     // what the ring, bars and numbers showed last time, by date
@@ -210,9 +209,9 @@ function countBetween(el, from, to, ms = 900) {
     const k = Math.min(1, (now - t0) / ms);
     const v = nf().format(Math.round(from + (to - from) * ease(k)));
     if (el.textContent !== v) el.textContent = v;
-    if (k >= 1) stop();
+    if (k < 1) requestAnimationFrame(step);
   };
-  const stop = onFrame(step);
+  requestAnimationFrame(step);
 }
 
 // ---------- sheets ----------

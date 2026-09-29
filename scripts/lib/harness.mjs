@@ -62,8 +62,8 @@ export async function newPage(browser, base, { reducedMotion = 'no-preference' }
   });
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', e => { errors.push(String(e.stack || e.message).split('\n').slice(0, 2).join(' ')); if (process.env.STACKS) console.error(e.stack); });
-  page.on('console', m => { if (m.type() === 'error' && !/net::ERR_|Failed to load resource/.test(m.text())) { errors.push(m.text().split('\n')[0]); if (process.env.STACKS) console.error(m.text()); } });
+  page.on('pageerror', e => errors.push(String(e.stack || e.message).split('\n').slice(0, 2).join(' ')));
+  page.on('console', m => { if (m.type() === 'error' && !/net::ERR_|Failed to load resource/.test(m.text())) errors.push(m.text()); });
   return { context, page, errors };
 }
 

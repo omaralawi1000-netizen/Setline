@@ -2,18 +2,19 @@
 
 How Setline looks and moves, for every AI and every tool. The brand values (colours, font, themes, surfaces, navigation) are in `SPEC.md` §2; this file is how to work with them. The running app is the visual source of truth.
 
-## Direction
+## Two modes
 
-Omar wants Setline as beautiful and premium as it can be. Any screen may be redesigned: layout, hierarchy, colour, type, surfaces, motion, even the orb's look. Show a big change on one screen first, tag the version before a wide rollout (`git tag pre-redesign-x.y.z`), keep every feature and every `data-act` / `data-k` hook, and update `SPEC.md` §2 and the `npm run visual` baselines when the result is approved. Use the `impeccable`, `emil-design-eng` and `frontend-design` skills.
+**POLISH (the default).** The direction is locked. Improve execution only: spacing, alignment, hierarchy, density, legibility, touch feedback, motion curves, loading/empty/error states, consistency between screens. Don't change the navigation model, the orb concept, the brand colours or font, the theme philosophy or the information architecture.
 
-The latest motion brief authorizes refining the dock, composer, Coach and voice surfaces together. Keep the dark identity, theme palette and dotted orb; old specifications of flight paths, plain glass or absent highlights are historical, not quality ceilings. Changes to safety, storage and real voice state remain outside visual discretion.
+**REDESIGN (only when Omar says so in the session: "redesign", "new look", "new design for …").** Direction may change for the scope Omar named. Before building: tag the current version (`git tag pre-redesign-x.y.z`), show the new direction on one screen, and get Omar's yes before rolling it out. Keep every feature and every `data-act` / `data-k` hook. When he approves the result, update `SPEC.md` §2 and approve new baselines with `npm run visual -- --approve`. The `frontend-design` skill is for this mode only.
 
-## Rules
+## Rules (both modes)
 
 - All motion values come from the motion tokens in `css/tokens.css` (`--m-*` durations, `--e-*` easings). No hardcoded durations or easings anywhere else.
-- Never animate layout (width, height, top, left, margin, padding). Everything else may animate; if it stutters on the phone, shrink the effect rather than drop it.
+- Animate only `transform` and `opacity` (`filter` and `backdrop-filter` sparingly). Never animate width, height, top, left, margin or box-shadow directly.
 - Every animation has a `prefers-reduced-motion` fallback and respects the in-app motion setting. Decorative motion never delays a state update.
-- Use the existing screen navigation and shared-element tooling. The signature Coach transition uses one reversible progress value for connected glass, an upward content mask and a synchronized orb. Never require a framework or a new API solely for animation.
+- Screen changes use the View Transitions API with a fallback.
+- Backdrop blur only on the dock, sheets, the Coach and one hero card per screen.
 - Tabular numerals for every number.
 - Nothing in the UI unless it works.
 - Work one screen at a time. Never refactor working logic just to restyle it.

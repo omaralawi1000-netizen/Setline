@@ -13,20 +13,9 @@ function pickMime() {
   return opts.find(m => globalThis.MediaRecorder?.isTypeSupported?.(m)) || '';
 }
 
-// Start recording. Resolves once the mic is open (or, cancelled meanwhile, once it has been closed
-// again: isRecording() says which). Throws {code:'denied'|'nomic'|'unsupported'|'busy'}.
-// One opening at a time: a second start() while the first is still waiting for the mic gets the same
-// promise (it used to open a second stream, and whichever opened last overwrote the other: one stream
-// left open for good, the other cancelled under the hold that wanted it).
-let starting = null, gen = 0;
-export function start(opts = {}) {
-  if (rec) return Promise.resolve();
-  if (!starting) starting = open(opts).finally(() => { starting = null; });
-  return starting;
-}
-export const isStarting = () => !!starting;
-async function open({ onMaxed, maxMs = MAX_MS } = {}) {
-  const mine = ++gen;
+// Start recording. Resolves once the mic is open. Throws {code:'denied'|'nomic'|'unsupported'|'busy'}.
+export async function start({ onMaxed, maxMs = MAX_MS } = {}) {
+  if (rec) return;
   if (!navigator.mediaDevices?.getUserMedia || !globalThis.MediaRecorder) throw Object.assign(new Error('unsupported'), { code: 'unsupported' });
   let stream;
   try {
@@ -37,8 +26,6 @@ async function open({ onMaxed, maxMs = MAX_MS } = {}) {
     const code = e?.name === 'NotAllowedError' || e?.name === 'SecurityError' ? 'denied' : e?.name === 'NotFoundError' ? 'nomic' : 'busy';
     throw Object.assign(new Error(code), { code });
   }
-  // cancelled while the mic was opening: it's closed again at once, never kept
-  if (mine !== gen || rec) { for (const tr of stream.getTracks()) tr.stop(); return; }
   const mimeType = pickMime();
   const recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 32000 } : undefined);
   const r = { stream, recorder, chunks: [], analyser: null, source: null, startedAt: performance.now(), peak: 0, buf: null, timer: 0, frames: 0 };
@@ -52,13 +39,6 @@ async function open({ onMaxed, maxMs = MAX_MS } = {}) {
       r.analyser.smoothingTimeConstant = 0.2;
       r.source.connect(r.analyser);
       r.buf = new Float32Array(r.analyser.fftSize);
-      // a small second analyser for the orb's eight bands (its own window: short, so the dots answer
-      // each syllable, with no smoothing of its own: the orb keeps its own envelope per band)
-      r.a8 = ac.createAnalyser();
-      r.a8.fftSize = 256;
-      r.a8.smoothingTimeConstant = 0;
-      r.source.connect(r.a8);
-      r.f8 = new Uint8Array(r.a8.frequencyBinCount);
       hold('mic');
     } catch { r.analyser = null; }
   }
@@ -87,7 +67,7 @@ export function level() {
 // RMS and voice-glow's own three bands (fundamentals and chest, vowels and presence, sibilance),
 // as the average spectrum share: it shapes them itself.
 let fbuf = null;
-const QUIET = { low: 0, high: 0, rms: 0, voice: [0, 0, 0] }, BANDS = { low: 0, high: 0, rms: 0, voice: [0, 0, 0] };
+const QUIET = { low: 0, high: 0, rms: 0, voice: [0, 0, 0] };
 export function bands() {
   if (!rec?.analyser || audioContext()?.state !== 'running') return QUIET;
   const n = rec.analyser.frequencyBinCount, hz = audioContext().sampleRate / 2 / n;
@@ -95,29 +75,7 @@ export function bands() {
   rec.analyser.getByteFrequencyData(fbuf);
   const avg = (a, b) => { const i0 = Math.max(1, Math.round(a / hz)), i1 = Math.min(n - 1, Math.round(b / hz)); let s = 0; for (let i = i0; i <= i1; i++) s += fbuf[i]; return s / Math.max(1, i1 - i0 + 1); };
   const shape = x => Math.max(0, Math.min(1, (x - 70) / 120));
-  // (one object, refilled: read once a frame by the voice loop, never kept)
-  const o = BANDS;
-  o.low = shape(avg(90, 500)); o.high = shape(avg(2000, 6000) * 1.35); o.rms = rec.rms || 0;
-  o.voice[0] = avg(80, 300) / 255; o.voice[1] = avg(300, 2000) / 255; o.voice[2] = avg(2000, 6000) / 255;
-  return o;
-}
-
-// The voice in eight bands for the orb, 0..1 each, log-spaced from about 90 Hz to 7 kHz: the lows
-// swell it, the middle ripples it, the highs shimmer at its rim. Fills `out`; false while silent.
-const EDGES8 = [90, 180, 330, 560, 900, 1500, 2600, 4200, 7000];
-export function bands8(out) {
-  const r = rec;
-  if (!r?.a8 || audioContext()?.state !== 'running') { out.fill(0); return false; }
-  r.a8.getByteFrequencyData(r.f8);
-  const n = r.f8.length, hz = audioContext().sampleRate / 2 / n;
-  for (let b = 0; b < 8; b++) {
-    const i0 = Math.max(1, Math.floor(EDGES8[b] / hz)), i1 = Math.max(i0, Math.min(n - 1, Math.ceil(EDGES8[b + 1] / hz)));
-    let m = 0;
-    for (let i = i0; i <= i1; i++) if (r.f8[i] > m) m = r.f8[i];
-    const x = (m - 60) / 150; // (the quiet room floor, then soft-limited)
-    out[b] = x <= 0 ? 0 : x >= 1 ? 1 : x;
-  }
-  return true;
+  return { low: shape(avg(90, 500)), high: shape(avg(2000, 6000) * 1.35), rms: rec.rms || 0, voice: [avg(80, 300) / 255, avg(300, 2000) / 255, avg(2000, 6000) / 255] };
 }
 
 function release(r) {
@@ -153,7 +111,6 @@ export function snapshot() {
 }
 
 export function cancel() {
-  if (starting) gen++; // (an opening in flight closes its stream as soon as it arrives)
   const r = rec;
   rec = null;
   if (!r) return;

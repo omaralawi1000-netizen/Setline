@@ -14,7 +14,6 @@ import { toast } from './toast.js';
 import { burst } from './fx.js';
 import { openSheet, closeTop } from './sheet.js';
 import { prepImage } from './meal.js';
-import { nextFrame } from './frame.js';
 
 const FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e'];
 const BARCODE = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6v12M7 6v12M10.5 6v12M13 6v12M16.5 6v12M20 6v12" stroke-width="1.6"/><path d="M3 4h3M18 4h3M3 20h3M18 20h3" /></svg>';
@@ -104,7 +103,7 @@ export function openScanner({ product = null } = {}) {
       } catch {}
       if (!s.stream || s.done) return;
       if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(() => loop(video));
-      else nextFrame(() => loop(video));
+      else s.timer = requestAnimationFrame(() => loop(video));
     }
     // start looking the product up (and its photo) as soon as we have a code
     function prefetch(code) {

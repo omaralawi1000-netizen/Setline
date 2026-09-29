@@ -13,9 +13,10 @@ Follow `AGENTS.md`. It's short on purpose; don't read more than the task needs.
 - For design and animation work, follow `docs/DESIGN_SYSTEM.md`. Omar wants the app as beautiful and premium as possible: be ambitious, change the look, layout and motion of any screen, use `impeccable`, `emil-design-eng` and `frontend-design` freely. Keep every feature and `data-act`/`data-k`/`#s-<screen>` hook.
 - Keep chat replies short.
 - Use the `impeccable` skill for UI work and `emil-design-eng` for motion.
-- Before and after any visual change, run `node scripts/snap.mjs` and look at the pictures in `/tmp/snaps` (main screens, plus `orb-frames/`: the voice orb, about 4 frames a second). Never commit them.
+- Before and after any visual change, screenshot the main screens and the voice orb and look at them (`npm run screens`; `scripts/snap.mjs` was part of the undone 1.62–1.65 releases and is not in the repo now). Never commit screenshots.
 
 ## Motion & performance rules
+29 Sep 2026: rolled back to 1.59.1 exactly (released as 1.65.2). Don't reapply 1.62.0–1.65.1 unless Omar asks; the backup is branch `backup-before-rollback-1.59.1`. Notes below that name `choreo.js`, `strips.mjs`, `choreo.mjs` or the bottom-right orb describe those undone releases.
 28 Sep 2026: Omar restored the 1.59.1 design (floating orb, pull-up voice screen, frosted glass, sea light). Keep those; make them move as well as possible. Omar wants the best animation: springs, blur, glow, parallax, richer transitions are all welcome.
 - Animate anything except layout (width, height, top, left, margin, padding, `all`). If a heavy effect (big or animated blur, many blurred layers, large shadows) stutters on the phone, shrink or simplify it and check `?perf=1`; don't drop the idea.
 - Ambient motion (clouds, sea) may keep running; if it costs frames during scrolling or a transition, pause just that part.

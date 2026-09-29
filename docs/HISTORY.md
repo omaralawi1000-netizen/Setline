@@ -922,3 +922,10 @@ From Omar's Apple motion references and Setline brief (29 Sep 2026).
 
 - Expanded voice's AI classification card belongs to its voice-session token. Cancelling clears it immediately; a late classification cannot leave a permanent spinner or navigate back to the Coach.
 - `scripts/connected-motion.mjs` now delays classification, cancels after the waiting card appears and checks both immediate dismissal and the late response. Motion and data behavior otherwise unchanged.
+
+## 1.65.2: Rollback to 1.59.1
+
+Omar asked for the app exactly as 1.59.1 (2e5ef25). Every app file, test and script is 1.59.1's again;
+only the version number is new, so phones update. 1.62.0–1.65.1 are undone. Kept from the latest version:
+this history, PLAN.md's version line, CLAUDE.md, AGENTS.md and `.claude/`. The database is untouched
+(schema 4 in both; no stored format changed). Backup of 1.65.1: branch `backup-before-rollback-1.59.1`.

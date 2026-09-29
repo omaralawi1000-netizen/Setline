@@ -4,17 +4,16 @@
 import * as mic from '../voice.js';
 import { transcribe } from '../stt.js';
 import { createEndpointer, looksUnfinished } from '../endpoint.js';
-import { onFrame } from './frame.js';
 
 export function listenSmart({ stt, onLevel = () => {}, onState = () => {}, pauseMs = 900, waitMs = 3500, maxMs = 90_000 } = {}) {
   const ep = createEndpointer({ pauseMs });
-  let resolve, reject, over = false, raf = () => {}, last = 0, spec = null, waiting = false;
+  let resolve, reject, over = false, raf = 0, last = 0, spec = null, waiting = false;
   const done = new Promise((res, rej) => { resolve = res; reject = rej; });
-  const end = fn => { if (over) return false; over = true; raf(); onLevel(0); fn(); return true; };
+  const end = fn => { if (over) return false; over = true; cancelAnimationFrame(raf); onLevel(0); fn(); return true; };
 
   async function finish() {
     if (over) return;
-    over = true; raf(); onLevel(0);
+    over = true; cancelAnimationFrame(raf); onLevel(0);
     onState('hearing');
     const r = await mic.stop();
     if (!r || r.ms < 500 || (r.measured && r.peak < 0.03)) return resolve('');
@@ -40,14 +39,14 @@ export function listenSmart({ stt, onLevel = () => {}, onState = () => {}, pause
     last = now;
     if (ev === 'pause') speculate();
     else if (ev === 'resume') { spec = null; waiting = false; onState('listening'); }
-    if (waiting && ep.quietMs >= waitMs) { waiting = false; finish(); }
+    if (waiting && ep.quietMs >= waitMs) { waiting = false; finish(); return; }
+    raf = requestAnimationFrame(tick);
   };
 
   mic.start({ maxMs, onMaxed: () => finish() }).then(() => {
     if (over) { mic.cancel(); return; }
-    if (!mic.isRecording()) return end(() => resolve('')); // (closed again while it opened: nothing heard)
     onState('listening');
-    raf = onFrame(tick);
+    raf = requestAnimationFrame(tick);
   }, e => end(() => reject(e)));
 
   return {
