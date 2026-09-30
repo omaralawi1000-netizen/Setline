@@ -970,3 +970,13 @@ only the version number is new, so phones update. 1.57.0–1.66.0 are undone (th
 and the motion passes). Kept from the latest version: this history, PLAN.md's version line, CLAUDE.md,
 AGENTS.md and `.claude/`. The database is untouched (schema 4, the storage code is identical). Backup of
 1.66.0: branch `backup-before-revert-1.56.0`.
+
+## 1.67.0: the dotted orb, and it reacts to his voice
+The pearl orb is replaced by the dotted orb (js/ui/dotorb.js, from 1.58.0, rewritten for the voice)
+everywhere it showed; flows, screens, transitions, colours and behaviour are 1.56.0's. The dots
+separate and jump instead of the orb swelling: per-band automatic gain (~2 s window, noise floor),
+radius up to ~15% with constant dot size, a springy radial offset per dot (~180 ms), soft lobes, a swirl
+that speeds up with speech, a ripple per syllable, a calm breath in silence, and a small calm glow.
+The Coach's playback drives the same system; thinking is a soft brightness wave. The pearl's CSS and
+markup are gone, and so is the whole-orb scaling with the voice. Presets and the ?tune=1 panel are not
+built yet (one "Lively" setting in code).

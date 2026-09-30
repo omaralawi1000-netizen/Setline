@@ -31,6 +31,7 @@ import { startCardioSession, finishSheet as cardioFinishSheet } from './cardio.j
 import { dateKey } from '../body.js';
 import { planFor } from './routine.js';
 import { orbPulse, orbShake, orbSpark, orbStreak } from './fx.js';
+import { setOrb, handOrb } from './dotorb.js';
 import { livePRSets } from '../pr.js';
 import { ask as askCoach, ensureModels } from './coach.js';
 import { cmdModels } from '../settings.js';
@@ -105,7 +106,7 @@ function build() {
     <div class="stagev" id="vstage">
       <div class="halo" id="vhalo"></div>
       <div class="ripples" id="vripples"><b></b><b></b><b></b></div>
-      <span class="orbwrap" id="vorbwrap"><span class="orb big" id="vorb"><i class="core"><b></b><b></b><b></b></i><i class="spin"></i></span></span>
+      <span class="orbwrap" id="vorbwrap"><span class="orb big" id="vorb"></span></span>
     </div>
     <div class="wave" id="vwave" aria-hidden="true">${'<i></i>'.repeat(BARS)}</div>
     <p class="say" id="vsay" aria-live="polite"></p>
@@ -123,7 +124,7 @@ function build() {
   mini.innerHTML = `<div class="oscrim" data-o="cancel"></div>
     <div class="obubble"><span class="ostatus" id="ostatus"></span><p class="osay" id="osay"></p></div>
     <div class="opull" id="opull" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M6 14.5l6-6 6 6"/></svg><span></span></div>
-    <span class="owrap" id="owrap" data-o="orb"><span class="orb lift" id="oorb"><i class="core"><b></b><b></b><b></b></i><i class="spin"></i></span><span class="oglow"></span></span>`;
+    <span class="owrap" id="owrap" data-o="orb"><span class="orb lift" id="oorb"></span><span class="oglow"></span></span>`;
   document.getElementById('app').appendChild(mini);
   Object.assign(el, {
     mini, owrap: mini.querySelector('#owrap'), oorb: mini.querySelector('#oorb'), ostatus: mini.querySelector('#ostatus'), osay: mini.querySelector('#osay'), opull: mini.querySelector('#opull'),
@@ -172,16 +173,12 @@ function setPhase(phase) {
 const translateY = node => { const t = getComputedStyle(node).transform; return t && t !== 'none' ? new DOMMatrix(t).m42 : 0; };
 const scaleOf = node => { const t = getComputedStyle(node).transform; return t && t !== 'none' ? new DOMMatrix(t).a : 1; };
 
-// The dock orb and the flying orbs are separate elements running the same blob animations. Line
-// their clocks up before one hands over to the other, so the swap is invisible.
+// The dock orb and the flying orbs are separate elements; the dotted ones turn on one clock, and
+// handOrb passes on how busy the old one was before one hands over to the other.
 const dockOrb = () => document.querySelector('#dock .orbbtn .orb');
 function syncOrb(src, dst) {
   if (!src || !dst) return;
-  const a = src.querySelectorAll('.core, .core b'), b = dst.querySelectorAll('.core, .core b');
-  b.forEach((d, i) => {
-    const from = a[i]?.getAnimations?.() || [], to = d.getAnimations?.() || [];
-    to.forEach((anim, j) => { if (from[j] && from[j].currentTime != null) anim.currentTime = from[j].currentTime; });
-  });
+  handOrb(src, dst);
 }
 // land: the flying orb and the dock orb swap in the same frame
 function landOrb(src, after) {
@@ -422,25 +419,15 @@ function startLoop() {
     }
     if (reduced()) return;
     const l = v.lvl;
-    // the body of the voice swells the orb's core, its edge (s, t, k) lights the rim
-    const b = listening ? mic.bands() : { low: 0, high: 0 };
-    v.lo += (b.low - v.lo) * (b.low > v.lo ? 0.4 : 0.12);
-    v.hi += (b.high - v.hi) * (b.high > v.hi ? 0.55 : 0.18);
-    const fq = v.mode === 'mini' ? el.oorb : el.orb;
-    fq.style.setProperty('--lo', v.lo.toFixed(3));
-    fq.style.setProperty('--hi', v.hi.toFixed(3));
-    // alive, not mechanical: a slow breath, and a soft squash and stretch that follows the voice
-    const breath = v.phase === 'thinking' ? 0 : 0.012 * Math.sin(now / 700);
-    const sx = 1 + breath + l * 0.16 + l * 0.05 * Math.sin(now / 95);
-    const sy = 1 + breath + l * 0.2 + l * 0.05 * Math.cos(now / 110);
+    // the dotted orb answers the voice itself (its dots separate and jump, see dotorb.js); the orb
+    // as a whole never grows
+    setOrb(v.mode === 'mini' ? el.oorb : el.orb, { state: !v.open ? 'idle' : listening ? 'listening' : v.phase === 'thinking' ? 'thinking' : 'idle' });
     if (v.mode === 'mini') {
-      el.oorb.style.transform = `scale(${sx.toFixed(4)}, ${sy.toFixed(4)})`;
       el.owrap.style.setProperty('--l', l.toFixed(3));
       return;
     }
-    el.orb.style.transform = `scale(${(1 + (sx - 1) * 0.7).toFixed(4)}, ${(1 + (sy - 1) * 0.7).toFixed(4)})`;
-    el.halo.style.opacity = String(listening ? 0.35 + l * 0.65 : v.phase === 'thinking' ? 0.5 : 0.22);
-    el.halo.style.transform = `scale(${1 + l * 0.3})`;
+    el.halo.style.opacity = String(listening ? 0.3 + l * 0.15 : v.phase === 'thinking' ? 0.3 : 0.2);
+    el.halo.style.transform = `scale(${1 + l * 0.04})`;
     el.ripples.style.opacity = listening ? String(0.35 + l * 0.65) : '0';
     for (let i = 0; i < BARS; i++) {
       const d = Math.abs(i - (BARS - 1) / 2);
@@ -1169,5 +1156,5 @@ export function initVoice(n) {
   store.subscribe(reason => { if (reason === 'settings' && v.open) paintStatic(); });
 }
 
-export const orbHTML = () => `<button class="orbbtn" aria-label="${esc(state.t('voice.talk'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span><span class="orest" aria-hidden="true"><i><b></b></i><i><b></b></i></span></button>`;
+export const orbHTML = () => `<button class="orbbtn" aria-label="${esc(state.t('voice.talk'))}"><span class="orb"></span><span class="orest" aria-hidden="true"><i><b></b></i><i><b></b></i></span></button>`;
 export const isVoiceOpen = () => v.open;

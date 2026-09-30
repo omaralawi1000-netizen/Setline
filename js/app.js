@@ -29,6 +29,7 @@ import { initRoutine, setRoutineNav, renderRoutine, editRoutine, editRoutineFrom
 import { setHistoryFilter } from './ui/history.js';
 import { renderProgress, renderExercise, setRange } from './ui/progress.js';
 import { countAll, burst, orbStreak, orbPulse } from './ui/fx.js';
+import { startDotOrbs, handOrb } from './ui/dotorb.js';
 import { initPress } from './ui/press.js';
 import { initChrome, refreshChrome } from './ui/chrome.js';
 import { openCustomize } from './ui/customize.js';
@@ -187,6 +188,7 @@ function flyOrb(from, to, { duration, delay = 0, go, onland, easing, fromEl, toE
   b.style.opacity = '0';
   ghost.append(a, b);
   app.append(ghost);
+  handOrb(fromEl, a); handOrb(toEl, b); // each look exactly as its orb is right now
   const dx = to.x - from.x, dy = to.y - from.y, s0 = from.w / W;
   // one straight line, no hop: it shoots off, eases, and still has some speed left when it hits
   const path = [{ translate: '0 0', scale: s0 }, { scale: 1 + (s0 - 1) * 0.45, offset: 0.5 }, { translate: `${dx}px ${dy}px`, scale: 1 }];
@@ -521,6 +523,7 @@ Object.assign(actions, {
 });
 initPress(document);
 initChrome();
+startDotOrbs();
 app.addEventListener('dockopen', () => renderDock());
 initHandsFree();
 initBodyScreen($('#s-body'));

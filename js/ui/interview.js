@@ -27,12 +27,12 @@ export function mountInterview(root, a, { onChange = () => {}, onDone = () => {}
   root.innerHTML = `<div class="iv">
       <ol class="ivthread" aria-live="polite"></ol>
       <div class="ivbar">
-        ${canTalk ? `<button class="ivorb" data-iv="orb" aria-label="${esc(t('iv.talk'))}"><span class="orb" id="ivorb"><i class="core"><b></b><b></b><b></b></i><i class="spin"></i></span></button>` : ''}
+        ${canTalk ? `<button class="ivorb" data-iv="orb" aria-label="${esc(t('iv.talk'))}"><span class="orb" id="ivorb"></span></button>` : ''}
         <span class="ivstatus"></span>
         <form class="ivtype"><input enterkeyhint="send" autocomplete="off" maxlength="400" placeholder="${esc(t('iv.typePh'))}"><button type="submit" aria-label="${esc(t('iv.send'))}">${I.fwd}</button></form>
       </div>
     </div>`;
-  const thread = root.querySelector('.ivthread'), status = root.querySelector('.ivstatus'), orb = root.querySelector('#ivorb');
+  const thread = root.querySelector('.ivthread'), status = root.querySelector('.ivstatus');
   const input = root.querySelector('.ivtype input');
 
   const paint = () => {
@@ -70,7 +70,6 @@ export function mountInterview(root, a, { onChange = () => {}, onDone = () => {}
     haptic('tap');
     const l = c.listener = listenSmart({
       stt: { key: getKey('groq'), model: sttModelId(state.settings), language: state.settings.voiceLang },
-      onLevel: v => { if (orb) orb.style.transform = `scale(${(1 + v * 0.22).toFixed(3)})`; },
       onState: k => { if (c.listener === l) { c.phase = k === 'check' ? 'listening' : k; setStatus(k); } }
     });
     let text = '';

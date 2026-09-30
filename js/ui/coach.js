@@ -40,7 +40,7 @@ const errorText = (code, t) => ({
 function thinkingHTML(m) {
   const { t } = state;
   const steps = [t('coach.step1'), t('coach.step2'), t('coach.step3'), t('coach.step4')];
-  return `<span class="think"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span><span class="tsteps">${steps.map((x, i) => `<span class="tl" style="--i:${i}">${esc(x)}</span>`).join('')}</span></span>`;
+  return `<span class="think"><span class="orb"></span><span class="tsteps">${steps.map((x, i) => `<span class="tl" style="--i:${i}">${esc(x)}</span>`).join('')}</span></span>`;
 }
 
 function bubble(m) {
@@ -86,7 +86,7 @@ export function renderCoach(root) {
     body = `<div class="empty solid"><div class="emptyglyph">${I.chat}</div><h2>${t('coach.noKey')}</h2><p>${t('coach.noKeySub')}</p>
       <button class="log" data-coach="settings"><span>${t('voice.openSettings')}</span></button></div>`;
   } else if (!chat.length) {
-    body = `<div class="coachhero glass"><span class="orb" aria-hidden="true"><i class="core"><b></b><b></b><b></b></i></span>
+    body = `<div class="coachhero glass"><span class="orb" aria-hidden="true"></span>
       <h2>${t('coach.empty')}</h2><p>${t('coach.emptySub')}</p>
       <div class="exq">${['coach.ex1', 'coach.ex2', 'coach.ex3'].map(k => `<button class="chip" data-coach="ask" data-q="${esc(t(k))}">${esc(t(k))}</button>`).join('')}</div></div>`;
   } else {
@@ -720,7 +720,7 @@ export function initCoach(n) {
   nav = n;
   const root = $('#s-coach');
   const composer = $('#composer');
-  composer.innerHTML = `<span class="cglow" aria-hidden="true"><i></i></span><span class="chit" aria-hidden="true"></span><button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span></button><input enterkeyhint="send" autocomplete="off" maxlength="5000"><button type="submit" class="csend">${I.fwd}</button>`;
+  composer.innerHTML = `<span class="cglow" aria-hidden="true"><i></i></span><span class="chit" aria-hidden="true"></span><button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"></span></button><input enterkeyhint="send" autocomplete="off" maxlength="5000"><button type="submit" class="csend">${I.fwd}</button>`;
   // The composer's orb: talk to your coach. What you say is sent when you pause, the answer is
   // spoken, then it listens again, so it's a conversation. Tap while it listens to send at once;
   // tap while it thinks or speaks (or say nothing) to end it.
