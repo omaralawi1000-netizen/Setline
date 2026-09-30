@@ -2806,3 +2806,19 @@ html[data-motion=off] .screen.enter :is(.greet .gw,.tw){animation:none}
    element itself stays, so every flight, press, pulse and landing moves the dots as it moved the
    old ball. The voice separates the dots; nothing here grows with it. */
 .orb > canvas.dots{position:absolute;display:block;pointer-events:none}
+
+/* ======================= 1.67.3: smoother voice screen ======================= */
+/* The backdrop is a deep solid gradient that simply fades: blurring the whole page behind it every frame
+   (and fading that blur) was what made opening and closing stutter on the phone. */
+.vlayer .vbg{-webkit-backdrop-filter:none;backdrop-filter:none;background:radial-gradient(120% 70% at 50% 28%,#181628,#090a0f 60%);
+  transition:opacity .34s cubic-bezier(.25,.1,.25,1)}
+/* the controls arrive together on one smooth ease, a beat after the backdrop, and leave quickly */
+.vlayer > *:not(.stagev):not(.vbg){transition:opacity .32s cubic-bezier(.22,1,.36,1),transform .5s cubic-bezier(.22,1,.36,1)}
+.vlayer:not(.on) > *:not(.stagev):not(.vbg){transition:opacity .16s ease-out,transform .22s ease-in;transform:translateY(10px)}
+/* the orb's flight between the dock and the screen: leaves briskly, eases fully into place, no overshoot */
+.orbwrap{transition:transform .56s cubic-bezier(.22,1,.36,1)}
+/* the floating orb: a gentle settle instead of a big bounce, and the pull follows the finger softly */
+.owrap{transition:transform .56s cubic-bezier(.3,1.18,.4,1),translate .4s cubic-bezier(.22,1,.36,1),opacity .25s}
+/* your words rise in with opacity and position only (an animated blur on every word cost frames) */
+@keyframes wordin{0%{opacity:0;transform:translateY(.28em);color:var(--accent-hi)}60%{opacity:1;color:var(--accent-hi)}100%{opacity:1;transform:none}}
+.say .w,.osay .w{animation-duration:.42s;animation-timing-function:cubic-bezier(.22,1,.36,1)}

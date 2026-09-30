@@ -1001,3 +1001,14 @@ left goes in 170–200 ms, before the other comes in (overlapping frames: 27 →
   asked for every dot. At phone speed, a typical frame while listening went from 33 ms to 17 ms.
 - Flights between the dock and the message box glide: a steady size change and a full ease into place
   (520 ms), instead of arriving with speed left and a kink in size mid-way.
+
+## 1.67.3: Smoother voice screen
+
+- The voice screen's backdrop is a deep, fully opaque gradient that fades in. It used to blur the whole
+  page behind it (30 px) while fading that blur, which stuttered on the phone.
+- The controls arrive together on one smooth ease and leave quickly.
+- The orb's flight between the dock and the voice screen eases fully into place, with no overshoot.
+- The floating orb settles gently instead of bouncing.
+- Your words rise in with opacity and position only; there is no longer an animated blur on every word.
+- The level bars ease toward each reading (quick up, softer down) with less jitter, so they flow
+  instead of flickering.

@@ -411,6 +411,7 @@ function startLoop() {
     // tapped to talk: a pause sends it, but only once what you said sounds finished
     const dt = v.lastTick ? now - v.lastTick : 0;
     v.lastTick = now;
+    v.barDt = dt || 16;
     if (listening && v.toggle) {
       const ev = endpoint.push(target, dt);
       if (ev === 'pause') speculate();
@@ -436,10 +437,14 @@ function startLoop() {
       else if (listening) {
         const past = v.hist[(v.histAt - Math.round(d * 1.6) + v.hist.length) % v.hist.length];
         const env = 1 - (d / ((BARS - 1) / 2)) * 0.55;
-        const jitter = 0.85 + 0.15 * Math.sin(now / 90 + i * 1.7);
+        const jitter = 0.92 + 0.08 * Math.sin(now / 160 + i * 1.7);
         h = 0.14 + 0.86 * Math.min(1, past * 1.35) * env * jitter;
       } else h = 0.14;
-      el.bars[i].style.transform = `scaleY(${h.toFixed(3)})`;
+      // each bar eases toward its reading (quick up, softer down), so it flows instead of flickering
+      const bh = v.barH || (v.barH = new Float32Array(BARS).fill(0.14));
+      const kdt = Math.min(1, (v.barDt || 16) / 1000);
+      bh[i] += (h - bh[i]) * (1 - Math.exp(-kdt / (h > bh[i] ? 0.045 : 0.12)));
+      el.bars[i].style.transform = `scaleY(${bh[i].toFixed(3)})`;
     }
   };
   v.raf = requestAnimationFrame(tick);
