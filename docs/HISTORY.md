@@ -1022,3 +1022,9 @@ left goes in 170–200 ms, before the other comes in (overlapping frames: 27 →
 - A reply's words and the "thinking" line rise in with opacity and position only. There is no longer an
   animated blur on every word, which stuttered while a reply streamed.
 - Messages glide into place on one smooth ease with no bounce.
+
+## 1.67.5: The blur is back
+
+Omar wanted the blur. Words blur in again: the Coach's reply, the "thinking" line and your words on the
+voice screen, from a softer 4 px (was 9–10 px). The voice screen frosts the page behind it again with a
+20 px blur under a deep tint (was 30 px).
