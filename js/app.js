@@ -193,12 +193,7 @@ function flyOrb(from, to, { duration, delay = 0, go, onland, easing, fromEl, toE
   // one straight line, no hop: it shoots off, eases, and still has some speed left when it hits
   const path = [{ translate: '0 0', scale: s0 }, { scale: 1 + (s0 - 1) * 0.45, offset: 0.5 }, { translate: `${dx}px ${dy}px`, scale: 1 }];
   const fly = go(ghost, path, { duration, delay, easing, fill: 'both' });
-  // the orb stays sharp (a blur only made it look out of focus): the speed is in the light it leaves
-  // behind, and in a barely-there stretch along the way it flies while it's fastest
-  const ang = Math.atan2(dy, dx) * 180 / Math.PI, st = (x, y) => `rotate(${ang}deg) scale(${x}, ${y}) rotate(${-ang}deg)`;
-  go(ghost, [{ transform: st(1, 1) }, { transform: st(1.07, 0.95), offset: 0.2 }, { transform: st(1.03, 0.98), offset: 0.6 }, { transform: st(1, 1), offset: 0.9 }, { transform: st(1, 1) }],
-    { duration, delay, easing: 'linear' });
-  orbStreak(app, from, to, { duration, delay, easing, size: Math.min(from.w, to.w), lag: duration * 0.28, go, before: ghost, z: '8' });
+  // one solid orb the whole way: no trail of light, no stretch
   // its glow comes up while it travels and settles as it lands
   go(a, [{ opacity: 0 }, { opacity: 0.8, offset: 0.35 }, { opacity: 0 }], { duration, delay, easing: 'linear', pseudoElement: '::before' });
   go(b, [{ opacity: 0 }, { opacity: 0.8, offset: 0.35 }, { opacity: 0 }], { duration, delay, easing: 'linear', pseudoElement: '::before' });
@@ -254,7 +249,7 @@ function coachMorph(open, under) {
     // held (fill both) until everything settles together: an animation ending on its own mid-way let
     // the page underneath show through for a frame or two on the phone
     go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: 560, delay: 90, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'both' });
-    go(other, [{ scale: 1, opacity: 1 }, { scale: 0.94, opacity: 0.3 }], { duration: 640, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'forwards' });
+    go(other, [{ scale: 1, opacity: 1 }, { scale: 0.95, opacity: 0 }], { duration: 200, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
     app.classList.add('coach-in');
     last.onfinish = settleCoachFx;
     coachFx = () => {
@@ -273,10 +268,10 @@ function coachMorph(open, under) {
   } else {
     // the conversation sinks away, the Coach's background fades, the light gathers back into the
     // orb and the page comes forward; the orb takes the light in last
-    go(coach, [{ opacity: 1, transform: 'none', visibility: 'visible' }, { opacity: 0, transform: 'translateY(20px) scale(.97)', visibility: 'visible' }], { duration: 220, easing: 'cubic-bezier(.4,0,.6,1)' });
+    go(coach, [{ opacity: 1, transform: 'none', visibility: 'visible' }, { opacity: 0, transform: 'translateY(20px) scale(.97)', visibility: 'visible' }], { duration: 170, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
     go(veil, [{ opacity: 1 }, { opacity: 0 }], { duration: 480, delay: 60, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'backwards' });
     const last = go(bloom, [{ scale: 1.3, opacity: 0 }, { scale: 0.6, opacity: 0.85, offset: 0.5 }, { scale: 0.08, opacity: 0 }], { duration: 680, easing: 'cubic-bezier(.4,0,.25,1)' });
-    go(other, [{ scale: 0.95, opacity: 0.25 }, { scale: 1, opacity: 1 }], { duration: 560, delay: 80, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' });
+    go(other, [{ scale: 0.95, opacity: 0 }, { scale: 1, opacity: 1 }], { duration: 480, delay: 170, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
     // the orb leaves the message box and flies home into the bar, which takes it with a small pulse
     const corb = $('#composer .corb .orb');
     let hold = null;
@@ -286,7 +281,7 @@ function coachMorph(open, under) {
       orbPulse('pulse-land');
       haptic('land');
     } });
-    if (flying) { app.classList.add('orbtravel'); hold = go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 700, fill: 'forwards' }); }
+    if (flying) { app.classList.add('orbtravel'); hold = go(dockOrb, [{ opacity: 0 }, { opacity: 0, offset: 0.7 }, { opacity: 1 }], { duration: 500, fill: 'backwards', easing: 'linear' }); }
     else {
       go(dockOrb, [{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 460, delay: 380, easing: 'cubic-bezier(.3,1.25,.5,1)', fill: 'backwards' });
       setTimeout(() => haptic('land'), 520);

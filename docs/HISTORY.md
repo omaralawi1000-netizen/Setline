@@ -980,3 +980,10 @@ that speeds up with speech, a ripple per syllable, a calm breath in silence, and
 The Coach's playback drives the same system; thinking is a soft brightness wave. The pearl's CSS and
 markup are gone, and so is the whole-orb scaling with the voice. Presets and the ?tune=1 panel are not
 built yet (one "Lively" setting in code).
+
+## 1.67.1: Orb and Coach transition fixes
+
+From Omar's recordings of 1.67.0 (30 Sep). The orb flies as one solid thing: no comet streak or stretch.
+When it flies home from the Coach, the dock's orb fades in under it as it arrives, so the dock never
+shows an empty circle on a slow frame. Home ↔ Coach no longer shows both pages at once: the page being
+left goes in 170–200 ms, before the other comes in (overlapping frames: 27 → 1, 7 at phone speed).

@@ -112,6 +112,7 @@ export function bezier(css) {
 // the tail is longest when the orb is fastest and is drawn back into it as it lands. from/to are
 // centres in parent's coordinates; timing is the orb's own. Transform and opacity only.
 export function orbStreak(parent, from, to, { duration, delay = 0, easing, size = 40, lag = 64, go, before = null, z = '0' } = {}) {
+  return null; // (no trails: the orb is one solid thing wherever it flies)
   if (!parent || reduced()) return null;
   const dx = to.x - from.x, dy = to.y - from.y, D = Math.hypot(dx, dy);
   if (D < 24) return null;
