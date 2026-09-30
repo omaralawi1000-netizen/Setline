@@ -2822,3 +2822,18 @@ html[data-motion=off] .screen.enter :is(.greet .gw,.tw){animation:none}
 /* your words rise in with opacity and position only (an animated blur on every word cost frames) */
 @keyframes wordin{0%{opacity:0;transform:translateY(.28em);color:var(--accent-hi)}60%{opacity:1;color:var(--accent-hi)}100%{opacity:1;transform:none}}
 .say .w,.osay .w{animation-duration:.42s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+
+/* ======================= 1.67.4: smoother, seamless Coach ======================= */
+/* A reply's words and the "thinking" line rise in with opacity and position only: an animated blur on
+   every word is what made a streaming reply stutter on the phone. */
+@keyframes wordblur{0%{opacity:0;transform:translateY(.22em);color:var(--accent-hi)}55%{opacity:.9;color:color-mix(in srgb,var(--accent-hi) 60%,var(--ink))}100%{opacity:1;transform:none}}
+@keyframes wordrise{0%{opacity:0;transform:translateY(.22em)}100%{opacity:1;transform:none}}
+@keyframes thinkin{to{opacity:.95;transform:none}}
+@keyframes thinkout{from{opacity:.95;transform:none}to{opacity:0;transform:translateY(-.25em)}}
+@keyframes stepcycle{0%{opacity:0;transform:translateY(7px)}5%,21%{opacity:1;transform:none}26%,100%{opacity:0;transform:translateY(-7px)}}
+.thinkline .tc{filter:none}
+/* messages glide up into place on one smooth ease, no bounce; ones already on screen never replay */
+.msg{animation:msgin .46s cubic-bezier(.22,1,.36,1) both}
+@keyframes msgin{from{opacity:0;transform:translateY(12px) scale(.985)}}
+.msg.seen{animation:none}
+.app.coach-in #s-coach .msg:not(.seen){animation:coachmsg .5s cubic-bezier(.22,1,.36,1) both}

@@ -1012,3 +1012,13 @@ left goes in 170–200 ms, before the other comes in (overlapping frames: 27 →
 - Your words rise in with opacity and position only; there is no longer an animated blur on every word.
 - The level bars ease toward each reading (quick up, softer down) with less jitter, so they flow
   instead of flickering.
+
+## 1.67.4: Smoother, seamless Coach
+
+- The conversation is patched, never rebuilt. Each message keeps its node, so nothing flickers or replays
+  its entrance when a message comes in or a reply finishes.
+- A new message at the end makes room by gliding the conversation up. It used to jump up to 211 px in
+  one frame; the biggest step is now 30 px.
+- A reply's words and the "thinking" line rise in with opacity and position only. There is no longer an
+  animated blur on every word, which stuttered while a reply streamed.
+- Messages glide into place on one smooth ease with no bounce.
