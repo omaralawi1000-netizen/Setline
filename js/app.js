@@ -190,8 +190,8 @@ function flyOrb(from, to, { duration, delay = 0, go, onland, easing, fromEl, toE
   app.append(ghost);
   handOrb(fromEl, a); handOrb(toEl, b); // each look exactly as its orb is right now
   const dx = to.x - from.x, dy = to.y - from.y, s0 = from.w / W;
-  // one straight line, no hop: it shoots off, eases, and still has some speed left when it hits
-  const path = [{ translate: '0 0', scale: s0 }, { scale: 1 + (s0 - 1) * 0.45, offset: 0.5 }, { translate: `${dx}px ${dy}px`, scale: 1 }];
+  // one straight line, no hop: it leaves briskly and eases all the way into place
+  const path = [{ translate: '0 0', scale: s0 }, { translate: `${dx}px ${dy}px`, scale: 1 }]; // (one steady glide: no mid-way kink in its size)
   const fly = go(ghost, path, { duration, delay, easing, fill: 'both' });
   // one solid orb the whole way: no trail of light, no stretch
   // its glow comes up while it travels and settles as it lands
@@ -238,7 +238,7 @@ function coachMorph(open, under) {
     let flying = null;
     queueMicrotask(() => {
       const corb = $('#composer .corb .orb');
-      flying = from && corb && flyOrb(from, layRect(corb), { duration: 440, easing: 'cubic-bezier(.2,.75,.2,1)', go, fromEl: dockOrb, toEl: corb, onland: () => { app.classList.remove('orbtravel'); impact(); } });
+      flying = from && corb && flyOrb(from, layRect(corb), { duration: 520, easing: 'cubic-bezier(.22,1,.36,1)', go, fromEl: dockOrb, toEl: corb, onland: () => { app.classList.remove('orbtravel'); impact(); } });
       if (flying) { app.classList.add('orbtravel', 'orbflown'); go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 900, fill: 'forwards' }); return; }
       go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
       setTimeout(() => haptic('land'), 560);
@@ -275,7 +275,7 @@ function coachMorph(open, under) {
     // the orb leaves the message box and flies home into the bar, which takes it with a small pulse
     const corb = $('#composer .corb .orb');
     let hold = null;
-    const flying = corb && dockOrb && flyOrb(relRect(corb), layRect(dockOrb), { duration: 460, delay: 40, easing: 'cubic-bezier(.25,.75,.2,1)', go, fromEl: corb, toEl: dockOrb, onland: () => {
+    const flying = corb && dockOrb && flyOrb(relRect(corb), layRect(dockOrb), { duration: 520, delay: 30, easing: 'cubic-bezier(.22,1,.36,1)', go, fromEl: corb, toEl: dockOrb, onland: () => {
       hold?.cancel();
       app.classList.remove('orbtravel');
       orbPulse('pulse-land');

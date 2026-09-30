@@ -12,7 +12,7 @@
 // Every `.orb` in the app becomes one of these on its own (a watcher mounts a canvas in each one as
 // it appears, the flying stand-ins included). They all turn on one clock and one spin, so whenever
 // one orb hands over to another the two are in the same pose. One animation frame paints every orb;
-// an orb at rest is painted at half rate and one that's hidden only now and then. Dots are stamped
+// every orb that can be seen is painted every frame, one that's hidden only now and then. Dots are stamped
 // from pre-drawn sprites and nothing is allocated while it runs.
 //
 //   setOrb(orbEl, { state: 'listening' | 'thinking' | 'speaking' | 'idle' })   (null: work it out)
@@ -21,8 +21,11 @@ import * as mic from '../voice.js';
 import * as tts from '../tts.js';
 
 const TAU = Math.PI * 2;
-const still = () => document.documentElement.dataset.motion === 'off' ||
-  (document.documentElement.dataset.motion !== 'on' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+// (the reduced-motion query is asked once and then followed, not asked for every dot of every frame)
+const rmq = matchMedia('(prefers-reduced-motion: reduce)');
+let rm = rmq.matches;
+rmq.addEventListener?.('change', e => { rm = e.matches; });
+const still = () => document.documentElement.dataset.motion === 'off' || (document.documentElement.dataset.motion !== 'on' && rm);
 
 // "Lively" (the default): every knob in one place.
 const TUNE = {
@@ -52,7 +55,7 @@ function rgbOf(cs, name, fallback) {
 const mix = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
 
 // Dots are drawn far to near, one sprite per (how near, how high up, how lit by the thinking sweep).
-const DB = 8, VB = 4, SB = 3, SWEEP = [0, 0.35, 0.85], SP = 24;
+const DB = 16, VB = 6, SB = 3, SWEEP = [0, 0.35, 0.85], SP = 24;
 let sprites = null;
 function buildSprites() {
   const cs = getComputedStyle(document.documentElement);
@@ -247,15 +250,15 @@ function paint(o, now) {
     ra.front[r] = age * 3.6;
     ra.amp[r] = RIP[r].str * TUNE.ripple * (1 - age / 1.2) * m;
   }
-  const sdt = dt;
+  const subN = Math.max(1, Math.ceil(dt / 0.004)), subDt = dt / subN;
   for (let b = 0; b < bk.length; b++) bk[b].length = 0;
   for (let i = 0; i < pts.length; i++) {
     const p = pts[i];
     // its own springy offset: pulled out by its band's energy (and its own flutter), it settles back
     const nz = 0.5 + 0.5 * Math.sin(T * p.spd + p.ph * 3);
     const tg = TUNE.jump * F.e[p.bd] * (0.3 + 0.7 * nz) * m;
-    vel[i] += ((tg - off[i]) * K - vel[i] * C) * sdt;
-    off[i] += vel[i] * sdt;
+    // (in small steps: the spring is stiff, and one big step per frame made it jitter)
+    for (let q = 0; q < subN; q++) { vel[i] += ((tg - off[i]) * K - vel[i] * C) * subDt; off[i] += vel[i] * subDt; }
     let k = base + off[i];
     for (let j = 0; j < 3; j++) k += lb.h[j] * Math.exp((p.x * lb.x[j] + p.y * lb.y[j] + p.z * lb.z[j] - 1) * 4);
     for (let r = 0; r < 3; r++) {
@@ -302,7 +305,7 @@ const io = 'IntersectionObserver' in window ? new IntersectionObserver(es => {
 // (asked a few times a second, not every frame: each ask makes the browser work out every style on the
 // page first, which cost frames in the middle of transitions)
 const shown = o => {
-  if (o.visTick == null || tick - o.visTick >= 12) { o.visTick = tick; o.vis = o.canvas.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) ?? true; }
+  if (o.visTick == null || tick - o.visTick >= 30) { o.visTick = tick; o.vis = o.canvas.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) ?? true; }
   return o.vis;
 };
 function frame(now) {
@@ -331,8 +334,7 @@ function frame(now) {
     const o = orbs[i];
     if (!o.seen) continue;
     const odt = o.at ? Math.min(0.1, (now - o.at) / 1000) : dt;
-    const active = o.cur !== 'idle' || o.s.listen + o.s.think + o.s.speak > 0.004 || F.A > 0.004;
-    if (tick % (!shown(o) ? 8 : active ? 1 : 2)) continue;
+    if (!shown(o) && tick % 8) continue; // (every frame while it can be seen: half rate showed as a stutter in its turn)
     settle(o, o.cur, odt);
     paint(o, now);
   }
@@ -347,8 +349,9 @@ document.addEventListener('visibilitychange', wake);
 export function setOrb(orb, want) {
   const o = orb && byEl.get(orb);
   if (!o) return;
-  o.want = want?.state ?? want ?? null;
-  o.visTick = null;
+  const next = want?.state ?? want ?? null;
+  if (next !== o.want) o.visTick = null; // (only when it changes: this is called every frame)
+  o.want = next;
   if (!o.seen) { o.seen = true; paint(o, performance.now()); } // on its way into view: in step already
   if (still()) { settle(o, o.want || autoState(o), 0); paint(o, performance.now()); }
   wake();

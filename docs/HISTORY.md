@@ -987,3 +987,17 @@ From Omar's recordings of 1.67.0 (30 Sep). The orb flies as one solid thing: no 
 When it flies home from the Coach, the dock's orb fades in under it as it arrives, so the dock never
 shows an empty circle on a slow frame. Home ↔ Coach no longer shows both pages at once: the page being
 left goes in 170–200 ms, before the other comes in (overlapping frames: 27 → 1, 7 at phone speed).
+
+## 1.67.2: Smoother orb
+
+- Every orb that can be seen is now painted on every frame. Idle orbs used to be painted every other
+  frame, so their slow turn stepped at 30 fps.
+- The stiff spring that pops each dot out is worked out in small steps. One big step per frame made it
+  jitter on slower frames.
+- The dots' shading comes in 16 depth steps (was 8) and 6 height steps (was 4), so dots no longer pop
+  between shades as the sphere turns.
+- The orb no longer asks the browser for a fresh style calculation every frame. The voice screen told
+  it its state on every frame, which reset its visibility check, and the reduced-motion media query was
+  asked for every dot. At phone speed, a typical frame while listening went from 33 ms to 17 ms.
+- Flights between the dock and the message box glide: a steady size change and a full ease into place
+  (520 ms), instead of arriving with speed left and a kink in size mid-way.
