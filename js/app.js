@@ -191,8 +191,14 @@ function flyOrb(from, to, { duration, delay = 0, go, onland, easing, fromEl, toE
   handOrb(fromEl, a); handOrb(toEl, b); // each look exactly as its orb is right now
   const dx = to.x - from.x, dy = to.y - from.y, s0 = from.w / W;
   // one straight line, no hop: it leaves briskly and eases all the way into place
-  const path = [{ translate: '0 0', scale: s0 }, { translate: `${dx}px ${dy}px`, scale: 1 }]; // (one steady glide: no mid-way kink in its size)
-  const fly = go(ghost, path, { duration, delay, easing, fill: 'both' });
+  // a gentle arc (it lifts a little on the way, like something picked up and set down), sampled so the
+  // easing runs along the curve itself; the size changes steadily
+  const E = t => 1 - Math.pow(1 - t, 3.2), lift = -Math.min(70, Math.hypot(dx, dy) * 0.24), path = [];
+  for (let i = 0; i <= 24; i++) {
+    const u = i / 24, p = E(u);
+    path.push({ offset: u, translate: `${(dx * p).toFixed(1)}px ${(dy * p + lift * 4 * p * (1 - p)).toFixed(1)}px`, scale: (s0 + (1 - s0) * p).toFixed(4) });
+  }
+  const fly = go(ghost, path, { duration, delay, easing: 'linear', fill: 'both' });
   // one solid orb the whole way: no trail of light, no stretch
   // its glow comes up while it travels and settles as it lands
   go(a, [{ opacity: 0 }, { opacity: 0.8, offset: 0.35 }, { opacity: 0 }], { duration, delay, easing: 'linear', pseudoElement: '::before' });
@@ -202,7 +208,12 @@ function flyOrb(from, to, { duration, delay = 0, go, onland, easing, fromEl, toE
   go(b, [{ opacity: 0 }, { opacity: 1 }], { duration: duration * 0.55, delay: delay + duration * 0.3, easing: 'linear', fill: 'both' });
   const done = () => ghost.remove();
   fly.addEventListener('cancel', done);
-  fly.onfinish = () => { done(); onland?.(); };
+  // it lands: a soft squash and one small bounce, like iOS (the orb it became takes the hit)
+  fly.onfinish = () => {
+    done();
+    if (!stillMotion()) toEl.animate([{ scale: '1.12 0.9' }, { scale: '0.95 1.06', offset: 0.35 }, { scale: '1.02 0.98', offset: 0.65 }, { scale: '1 1' }], { duration: 460, easing: 'cubic-bezier(.3,.7,.4,1)' });
+    onland?.();
+  };
   return ghost;
 }
 
@@ -243,15 +254,14 @@ function coachMorph(open, under) {
       go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
       setTimeout(() => haptic('land'), 560);
     });
-    const last = go(bloom, [{ scale: 0.1, opacity: 0 }, { scale: 0.55, opacity: 1, offset: 0.3 }, { scale: 1.5, opacity: 0 }], { duration: 820, easing: 'cubic-bezier(.33,.1,.25,1)' });
+    // (no growing light or ring of light: its edge showed as a hard arc over an empty screen)
     // a ring of light ripples out of the orb with the bloom
-    go(aura.querySelector('.wave'), [{ transform: 'translate(-50%, -50%) scale(.35)', opacity: 0 }, { opacity: 1, offset: 0.15 }, { transform: 'translate(-50%, -50%) scale(7)', opacity: 0 }], { duration: 900, easing: 'cubic-bezier(.2,.7,.2,1)' });
     // held (fill both) until everything settles together: an animation ending on its own mid-way let
     // the page underneath show through for a frame or two on the phone
-    go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: 560, delay: 90, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'both' });
-    go(other, [{ scale: 1, opacity: 1 }, { scale: 0.95, opacity: 0 }], { duration: 200, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
+    const last = go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: 420, easing: 'cubic-bezier(.25,.1,.25,1)', fill: 'both' });
+    go(other, [{ scale: 1, opacity: 1 }, { scale: 0.95, opacity: 0 }], { duration: 170, easing: 'cubic-bezier(.2,0,.4,1)', fill: 'forwards' });
     app.classList.add('coach-in');
-    last.onfinish = settleCoachFx;
+    last.onfinish = () => setTimeout(settleCoachFx, 420);
     coachFx = () => {
       anims.forEach(a => a.cancel());
       aura.classList.remove('run');

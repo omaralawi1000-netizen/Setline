@@ -626,7 +626,7 @@ export const speakCue = (text, lang = state.lang) => speak(text, lang);
 // Questions land in the Coach thread; the answer is streamed there and spoken when complete.
 async function toCoach(text) {
   dismissCard();
-  if (v.open) { setPhase('result'); await new Promise(r => setTimeout(r, 380)); await closeVoice(); }
+  if (v.open) { setPhase('result'); await new Promise(r => setTimeout(r, 160)); await closeVoice(); } // (a beat to see your words, then straight on)
   nav.go('coach');
   askCoach(text);
 }

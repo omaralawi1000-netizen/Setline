@@ -1038,3 +1038,17 @@ voice screen, from a softer 4 px (was 9–10 px). The voice screen frosts the pa
   bar is no longer resized with it.
 - The page's cards arrive on one smooth ease (a full fade and a 10 px rise). The greeting's words blur
   in from a softer 4 px.
+
+## 1.67.7: The reply no longer doubles; the orb lands; Home ↔ Coach is seamless
+
+From Omar's recording of 1.67.6 (30 Sep).
+- The Coach's reply no longer shows twice. A last line that could still turn out to be a hidden
+  ACTION/REMEMBER/CHANGE note now waits a chunk, and a line already on screen is never drawn a second
+  time. This is the 1.62.4 fix, lost in the revert; on a real-speed stream the doubling went 32 frames
+  → 0.
+- The orb flies on a gentle arc and lands with an iOS-style squash and one small bounce, in the dock
+  and in the message box.
+- Home ↔ Coach: the growing light and ring of light out of the orb are gone (their edge showed as a hard
+  arc over an empty screen). The Coach's background comes up at once, and its header and newest
+  messages rise in while Home is still leaving, so there's no empty beat.
+- Voice → Coach: the pause before the voice screen hands over is 160 ms (was 380 ms).

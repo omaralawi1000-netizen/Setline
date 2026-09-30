@@ -2868,3 +2868,18 @@ html[data-glass=liquid] .app.compact:not(.is-sub):not(.voice):not(.kb) .edge.eb{
 @keyframes titleword{from{opacity:0;filter:blur(4px);transform:translateY(.28em)}}
 .screen.enter > *{animation:enterglide .5s cubic-bezier(.22,1,.36,1) both}
 @keyframes enterglide{from{opacity:0;transform:translateY(10px)}}
+
+/* ======================= 1.67.7: seamless Home ↔ Coach ======================= */
+/* no light or ring grows out of the orb (its edge showed as a hard arc over an empty screen): the Coach's
+   background comes up at once, and its header and newest messages rise in while Home is still leaving,
+   so there's never an empty beat */
+.aura .bloom,.aura .wave{display:none}
+.app.coach-in #s-coach > *{animation:coachin .5s cubic-bezier(.22,1,.36,1) both;animation-delay:.1s}
+.app.coach-in #s-coach > *:nth-child(2){animation-delay:.12s}
+.app.coach-in #s-coach > *:nth-child(n+3){animation-delay:.14s}
+.app.coach-in #s-coach .msg,.app.coach-in #s-coach .msg:not(.seen){animation:coachmsg .5s cubic-bezier(.22,1,.36,1) both}
+.app.coach-in #s-coach .msg:nth-last-child(1){animation-delay:.22s}
+.app.coach-in #s-coach .msg:nth-last-child(2){animation-delay:.19s}
+.app.coach-in #s-coach .msg:nth-last-child(3){animation-delay:.16s}
+.app.coach-in #s-coach .msg:nth-last-child(n+4){animation-delay:.13s}
+#s-coach.screen.on{transition:opacity .2s cubic-bezier(.2,.8,.2,1) .05s,transform .45s cubic-bezier(.22,1,.36,1)}

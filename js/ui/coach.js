@@ -273,7 +273,13 @@ function merge(a, b) {
 // every word still settling).
 function wordsHTML(bub, text, births, now, st) {
   if (bub._st !== st) { bub.innerHTML = ''; bub._st = st; Object.assign(st, { n: 0, w: 0, live: null, liveUl: null }); }
-  const lines = hideMemoryTail(text).split('\n'), tail = lines.pop();
+  // A hidden line (ACTION: …, REMEMBER: …, CHANGE: …) can't be told from a real one by its first letter
+  // or two, so a last line that could still become one waits a chunk before it shows.
+  const lines = hideMemoryTail(text).replace(/\n[ \t]*(?:A|AC|R|RE|C|CH|CHA)$/, '').split('\n');
+  let tail = lines.pop();
+  // the text can lose its last line again (it turned out to be a hidden line, taking its newline with
+  // it): a line already finished and on screen is never drawn a second time
+  if (lines.length < st.n) tail = '';
   const drop = () => { st.live?.remove(); if (st.liveUl && !st.liveUl.children.length) st.liveUl.remove(); st.live = st.liveUl = null; };
   // the line on screen takes the new drawing of itself, if it has the same shape
   const keep = el => {
