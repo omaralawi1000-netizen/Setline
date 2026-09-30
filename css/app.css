@@ -2883,3 +2883,12 @@ html[data-glass=liquid] .app.compact:not(.is-sub):not(.voice):not(.kb) .edge.eb{
 .app.coach-in #s-coach .msg:nth-last-child(3){animation-delay:.16s}
 .app.coach-in #s-coach .msg:nth-last-child(n+4){animation-delay:.13s}
 #s-coach.screen.on{transition:opacity .2s cubic-bezier(.2,.8,.2,1) .05s,transform .45s cubic-bezier(.22,1,.36,1)}
+
+/* ======================= 1.68.0: instant, seamless Coach ======================= */
+/* the Coach, drawn in advance while a finger is on the orb: there and laid out, but invisible */
+.app.warmcoach #s-coach:not(.on){visibility:visible;opacity:.001;transition:none;pointer-events:none}
+/* (its background light and the message box are drawn in advance too: their first paint on the tap
+   held the first two frames back) */
+.app.warmcoach .aura{visibility:visible}
+.app.warmcoach .aura .veil{opacity:.001}
+.app.warmcoach .composer{opacity:.001!important;visibility:visible;pointer-events:none!important}

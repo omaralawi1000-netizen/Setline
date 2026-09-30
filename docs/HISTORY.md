@@ -1052,3 +1052,12 @@ From Omar's recording of 1.67.6 (30 Sep).
   arc over an empty screen). The Coach's background comes up at once, and its header and newest
   messages rise in while Home is still leaving, so there's no empty beat.
 - Voice → Coach: the pause before the voice screen hands over is 160 ms (was 380 ms).
+
+## 1.68.0: Instant, seamless Coach (step 1 of the polish plan)
+
+- Tapping the orb answers on the first frame. The Coach, its background and the message box are drawn
+  in advance, invisibly, while your finger is still on the orb, and Home starts leaving with a fast
+  ease-out. Home used to sit still for about 120 ms after the tap.
+- A question said to the floating orb or on the voice screen goes straight into the Coach, never back
+  to Home first. After a beat to see your words, the Coach opens under the voice layer, which clears
+  over it, and the voice's own orb flies into the message box and lands there (only ever one orb).

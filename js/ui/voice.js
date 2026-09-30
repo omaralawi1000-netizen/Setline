@@ -275,6 +275,7 @@ export function openMini() {
   v.mode = 'mini';
   el.osay.innerHTML = '';
   el.owrap.style.translate = '';
+  el.owrap.style.visibility = '';
   el.opull.style.opacity = '';
   el.opull.querySelector('span').textContent = state.t('voice.pullUp');
   setPhase('idle');
@@ -626,9 +627,39 @@ export const speakCue = (text, lang = state.lang) => speak(text, lang);
 // Questions land in the Coach thread; the answer is streamed there and spoken when complete.
 async function toCoach(text) {
   dismissCard();
+  if (v.open && nav.coachHandin) return handToCoach(text);
   if (v.open) { setPhase('result'); await new Promise(r => setTimeout(r, 160)); await closeVoice(); } // (a beat to see your words, then straight on)
   nav.go('coach');
   askCoach(text);
+}
+
+// A question said to the floating orb or on the voice screen goes straight into the Coach: after a beat
+// to see your words, the Coach opens under the voice layer, which clears over it, and the voice's own
+// orb flies into the message box. Never back to Home first, and only ever one orb.
+async function handToCoach(text) {
+  const app = document.getElementById('app'), mini = v.mode === 'mini';
+  const src = mini ? el.oorb : el.orb, wrap = mini ? el.owrap : el.orbwrap;
+  const token = ++v.token;
+  setPhase('result');
+  await new Promise(r => setTimeout(r, reduced() ? 0 : 160));
+  if (token !== v.token || !v.open) return;
+  v.open = false; v.press = null; v.toggle = false;
+  mic.cancel();
+  // the voice's history entry is stepped back over; the Coach gets its own after that
+  const popped = history.state?.voice ? new Promise(res => { v.popWaiting++; v.popResolve = res; history.back(); }) : Promise.resolve();
+  app.classList.remove('voice-mini', 'voice');
+  if (mini) el.mini.classList.remove('on');
+  else { el.layer.classList.remove('on', 'carded'); el.layer.inert = true; el.input.blur(); v.typing = false; el.layer.classList.remove('typing'); }
+  nav.coachHandin(src, popped);
+  wrap.style.visibility = 'hidden'; // (the flying orb is it now)
+  askCoach(text);
+  setTimeout(() => {
+    if (v.open) return;
+    el.mini.hidden = true; el.layer.hidden = true;
+    for (const x of [el.owrap, el.orbwrap]) { x.style.visibility = ''; x.style.transform = ''; x.style.transition = ''; x.style.translate = ''; }
+    app.classList.remove('orbaway');
+    stopLoop();
+  }, reduced() ? 200 : 650);
 }
 
 // What the parser couldn't read goes to Flash-Lite. Never blocks local commands:

@@ -59,6 +59,18 @@ setHapticsGate(() => state.settings.haptics);
 
 // ---------- rendering ----------
 
+// The Coach drawn in advance, invisibly, the moment a finger touches the orb: its conversation is built
+// and laid out while the finger is still down, so on the tap the Coach only has to move (building it on
+// the tap held the first frame back by a good part of a second on the phone).
+function warmCoach(on) {
+  clearTimeout(warmCoach.t);
+  if (!on || view.screen === 'coach' || SUB.includes(view.screen)) { app.classList.remove('warmcoach'); return; }
+  renderScreen('coach');
+  app.classList.add('warmcoach');
+  void $('#s-coach').offsetHeight; // (laid out now, not on the tap)
+  warmCoach.t = setTimeout(() => app.classList.remove('warmcoach'), 1500);
+}
+
 function renderScreen(name = view.screen) {
   const root = $('#s-' + name);
   if (name === 'today') renderToday(root);
@@ -174,6 +186,7 @@ function flyOrb(from, to, { duration, delay = 0, go, onland, easing, fromEl, toE
   const W = to.w;
   const ghost = document.createElement('div');
   ghost.className = 'orbghost';
+  ghost.style.zIndex = '30';
   ghost.setAttribute('aria-hidden', 'true');
   Object.assign(ghost.style, { left: `${from.x - W / 2}px`, top: `${from.y - W / 2}px`, width: `${W}px`, height: `${W}px` });
   const look = (el, w) => {
@@ -225,6 +238,7 @@ function impact() {
   if (box) { box.classList.remove('hit'); void box.offsetWidth; box.classList.add('hit'); setTimeout(() => box.classList.remove('hit'), 1000); }
 }
 
+let handin = null; // (the voice's orb, when a spoken question hands over to the Coach)
 function coachMorph(open, under) {
   settleCoachFx();
   const aura = $('.aura'), bloom = aura?.querySelector('.bloom'), veil = aura?.querySelector('.veil'), orb = $('#dock .orbbtn');
@@ -244,13 +258,13 @@ function coachMorph(open, under) {
   const go = (el, frames, opts) => { if (!el) return null; const a = el.animate(frames, opts); anims.push(a); return a; };
   if (open) {
     if (other) Object.assign(other.style, { transition: 'none', opacity: '1', visibility: 'visible', transform: 'none' });
-    // the orb leaves the bar and lands in the message box (once the Coach's layout is in place)
-    const from = dockOrb ? relRect(dockOrb) : null;
+    // the orb leaves the bar (or the voice screen, handing a question over) and lands in the message box
+    const src = handin || dockOrb, from = src ? relRect(src) : null;
     let flying = null;
     queueMicrotask(() => {
       const corb = $('#composer .corb .orb');
-      flying = from && corb && flyOrb(from, layRect(corb), { duration: 520, easing: 'cubic-bezier(.22,1,.36,1)', go, fromEl: dockOrb, toEl: corb, onland: () => { app.classList.remove('orbtravel'); impact(); } });
-      if (flying) { app.classList.add('orbtravel', 'orbflown'); go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 900, fill: 'forwards' }); return; }
+      flying = from && corb && flyOrb(from, layRect(corb), { duration: 520, easing: 'cubic-bezier(.22,1,.36,1)', go, fromEl: src, toEl: corb, onland: () => { app.classList.remove('orbtravel'); impact(); } });
+      if (flying) { app.classList.add('orbtravel', 'orbflown'); if (!handin) go(dockOrb, [{ opacity: 0 }, { opacity: 0 }], { duration: 900, fill: 'forwards' }); return; }
       go(dockOrb, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.3)', opacity: 0 }], { duration: 340, easing: 'cubic-bezier(.3,0,.3,1)', fill: 'forwards' });
       setTimeout(() => haptic('land'), 560);
     });
@@ -259,7 +273,7 @@ function coachMorph(open, under) {
     // held (fill both) until everything settles together: an animation ending on its own mid-way let
     // the page underneath show through for a frame or two on the phone
     const last = go(veil, [{ opacity: 0 }, { opacity: 1 }], { duration: 420, easing: 'cubic-bezier(.25,.1,.25,1)', fill: 'both' });
-    go(other, [{ scale: 1, opacity: 1 }, { scale: 0.95, opacity: 0 }], { duration: 170, easing: 'cubic-bezier(.2,0,.4,1)', fill: 'forwards' });
+    go(other, [{ scale: 1, opacity: 1 }, { scale: 0.95, opacity: 0 }], { duration: 190, easing: 'cubic-bezier(0,0,.2,1)', fill: 'forwards' }); // (answers on the first frame)
     app.classList.add('coach-in');
     last.onfinish = () => setTimeout(settleCoachFx, 420);
     coachFx = () => {
@@ -336,6 +350,7 @@ function growInto() {
 // Direction for the transition: tabs by position, sub screens push in from the right.
 const ORDER = { today: 0, workout: 1, food: 2, you: 3, coach: 4, history: 4, detail: 5, settings: 4, routine: 4, progress: 5, body: 4, exercise: 6 };
 function show(name, { back = false, still = false } = {}) {
+  app.classList.remove('warmcoach');
   const prev = view.screen;
   view.screen = name;
   // the Coach opening over a tab or closing back to one: the light does the moving, so the two
@@ -411,6 +426,18 @@ function go(name, { quiet = false } = {}) {
 }
 
 let coachFrom = 'today';
+// A question from the voice screen or the floating orb: the Coach opens straight away under the voice
+// layer, which clears over it, and the voice's own orb flies into the message box (never back to Home
+// first). Its history entry goes in once the voice's own has been stepped back over.
+function coachHandin(orbEl, popped) {
+  if (view.screen === 'coach') return;
+  if (!TABS.includes(view.screen)) { popped.then(() => go('coach')); return; }
+  coachFrom = view.screen;
+  handin = orbEl;
+  show('coach');
+  handin = null;
+  popped.then(() => { if (view.screen === 'coach' && history.state?.screen !== 'coach') history.pushState({ screen: 'coach', from: coachFrom }, ''); });
+}
 function closeCoach() {
   if (view.screen !== 'coach') return;
   if (history.state?.screen === 'coach') history.back(); else go(coachFrom || 'today');
@@ -527,6 +554,7 @@ Object.assign(actions, {
   }
 });
 initPress(document);
+$('#dock').addEventListener('pointerdown', e => { if (e.target.closest('.orbbtn') && !e.button) warmCoach(true); }, { capture: true, passive: true });
 initChrome();
 startDotOrbs();
 app.addEventListener('dockopen', () => renderDock());
@@ -538,7 +566,7 @@ setOnboardNav({ go: name => go(name), ask: q => askCoach(q) });
 initWorkout($('#s-workout'), actions);
 initSettings(actions, $('#s-settings'));
 setWorkoutNav({ go, showDetail });
-initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings'), openCoach: () => go('coach') });
+initVoice({ go: name => go(name, { quiet: true }), showDetail, openSettings: () => pushSub('settings'), openCoach: () => go('coach'), coachHandin });
 initCoach({ openSettings: () => pushSub('settings'), closeCoach: () => closeCoach(), go: name => go(name, { quiet: true }), open: name => pushSub(name) });
 setCardioNav({ go, showDetail });
 initCardio();
