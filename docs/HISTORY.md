@@ -1028,3 +1028,13 @@ left goes in 170–200 ms, before the other comes in (overlapping frames: 27 →
 Omar wanted the blur. Words blur in again: the Coach's reply, the "thinking" line and your words on the
 voice screen, from a softer 4 px (was 9–10 px). The voice screen frosts the page behind it again with a
 20 px blur under a deep tint (was 30 px).
+
+## 1.67.6: Smoother Home
+
+- The dock shrinking into the small pill as you scroll no longer changes its layout. It used to animate
+  its width, height, padding and grid columns, which meant a new layout and a fresh frosted-glass redraw
+  on every frame. Now the pill is a rounded clip of the bar, the other tabs fade, and the tab you're on
+  and the orb slide together into the pill: clip, opacity and transform only. The soft blur behind the
+  bar is no longer resized with it.
+- The page's cards arrive on one smooth ease (a full fade and a 10 px rise). The greeting's words blur
+  in from a softer 4 px.
