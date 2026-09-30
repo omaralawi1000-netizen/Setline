@@ -87,7 +87,7 @@ export function openOnboarding({ edit = false } = {}) {
       const q = `<h1>${esc(t(`ob.${st.id}.q`, { name: a.name }))}</h1>${t(`ob.${st.id}.sub`) !== `ob.${st.id}.sub` ? `<p class="obsub">${esc(t(`ob.${st.id}.sub`))}</p>` : ''}`;
       const next = (label = t('ob.next'), dis = false) => `<button class="log obnext" data-ob="next" ${dis ? 'disabled' : ''}><span>${label}</span>${I.fwd}</button>`;
       if (st.kind === 'welcome') {
-        return `<div class="obhero"><span class="orb big obglow"></span></div>${q}
+        return `<div class="obhero"><span class="orb big obglow"><i class="core"><b></b><b></b><b></b></i></span></div>${q}
           <ul class="obwhy"><li>${I.check}<span>${t('ob.why1')}</span></li><li>${I.check}<span>${t('ob.why2')}</span></li><li>${I.check}<span>${t('ob.why3')}</span></li></ul>
           ${next(t('ob.start'))}`;
       }

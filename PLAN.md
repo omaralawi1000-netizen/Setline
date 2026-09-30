@@ -1,12 +1,10 @@
 # Setline plan
 
-All five phases from SPEC.md section 7 are done. Work now happens as fixes and polish the user asks for. The current version is in `js/version.js` (1.68.0: 1.56.0 with the dotted orb). The release log, including releases that were later undone, is in `docs/HISTORY.md`; read it only when you need the story behind something.
+All five phases from SPEC.md section 7 are done. Work now happens as fixes and polish the user asks for. The current version is in `js/version.js` (1.68.1, which is 1.56.0 released again). The release log, including releases that were later undone, is in `docs/HISTORY.md`; read it only when you need the story behind something.
 
 ## What's in the app now
 
 **Look.** Headlines in two weights (the Today greeting's first word bold, the rest lighter and softer); page titles arrive word by word, each blurring in and rising a touch; buttons are full pills. Records on Progress carry a glossy medal (gold for one set in the last week), and a record tile tilts towards your finger with a shine sliding across it when pressed.
-
-**The Orb.** A sphere of lit dots on a canvas (`js/ui/dotorb.js`), everywhere the orb shows (dock, floating hold mode, voice screen, Coach message box, thinking, interview). Silence: a tight sphere breathing slowly. A voice (mic, or the Coach's playback) is normalised per band to its recent peak, then the dots separate (radius up to ~15%, dot size constant), pop out on their own springy offsets on every syllable, soft lobes and a swirl move, and each syllable sends a ripple across. Thinking: a soft brightness wave. Glow is a small halo, never more than ~20% past the edge. Tuning knobs are the `TUNE` object at the top of the file ("Lively").
 
 **Navigation.** A floating glass dock: Today, Train, the orb in the middle, Food, You. Tapping the orb blooms the Coach open over the whole screen; holding it is hold-to-talk for a voice command. Settings opens from the icon on Today and from You. The status bar is the app's own colour; when content scrolls under it, a short gradient just below it (barely noticeable) blends it into the page; it also takes the Coach's, the voice screen's and an open sheet's colour. The bar at the bottom is clear, bright-rimmed live glass with a wide, soft gradient blur that feathers out around the bar (and follows it when it shrinks to the pill); its indicator slides with a liquid stretch and the chosen icon springs (Customize → Glass: Liquid / Soft / Off; Background glow: On / Soft / Off). Pages and sheets animate in; sheets are iOS-style (the page behind shrinks back) and close with a swipe down. The Android back swipe is respected.
 

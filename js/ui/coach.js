@@ -40,7 +40,7 @@ const errorText = (code, t) => ({
 function thinkingHTML(m) {
   const { t } = state;
   const steps = [t('coach.step1'), t('coach.step2'), t('coach.step3'), t('coach.step4')];
-  return `<span class="think"><span class="orb"></span><span class="tsteps">${steps.map((x, i) => `<span class="tl" style="--i:${i}">${esc(x)}</span>`).join('')}</span></span>`;
+  return `<span class="think"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span><span class="tsteps">${steps.map((x, i) => `<span class="tl" style="--i:${i}">${esc(x)}</span>`).join('')}</span></span>`;
 }
 
 function bubble(m) {
@@ -77,34 +77,6 @@ function planCard(m) {
         <button class="btn2 solid" data-coach="saveplan" data-mode="add" data-id="${m.id}">${I.plus}<span>${t('plan.add')}</span></button></div>`}</div>`;
 }
 
-function patchThread(ol, chat) {
-  let added = 0;
-  const have = new Map([...ol.children].map(li => [li.dataset.id, li]));
-  let prev = null;
-  for (const m of chat) {
-    let li = have.get(m.id);
-    have.delete(m.id);
-    const seen = shown.has(m.id);
-    shown.add(m.id);
-    if (li && !(m.streaming && li._streaming)) {
-      const h = bubble(m);
-      if (li._h !== h) { const n = liFrom(h, true); li.replaceWith(n); li = n; }
-    } else if (!li) { li = liFrom(bubble(m), seen); added++; }
-    li._streaming = !!m.streaming;
-    if (li.previousElementSibling !== prev || li.parentNode !== ol) (prev ? prev.after(li) : ol.prepend(li));
-    prev = li;
-  }
-  for (const li of have.values()) li.remove();
-  return added;
-}
-function liFrom(h, seen) {
-  const t = document.createElement('template');
-  t.innerHTML = seen ? h.replace('<li class="msg', '<li class="msg seen') : h;
-  const li = t.content.firstElementChild;
-  li._h = h;
-  return li;
-}
-
 export function renderCoach(root) {
   const { t } = state;
   const key = getKey('google');
@@ -114,28 +86,19 @@ export function renderCoach(root) {
     body = `<div class="empty solid"><div class="emptyglyph">${I.chat}</div><h2>${t('coach.noKey')}</h2><p>${t('coach.noKeySub')}</p>
       <button class="log" data-coach="settings"><span>${t('voice.openSettings')}</span></button></div>`;
   } else if (!chat.length) {
-    body = `<div class="coachhero glass"><span class="orb" aria-hidden="true"></span>
+    body = `<div class="coachhero glass"><span class="orb" aria-hidden="true"><i class="core"><b></b><b></b><b></b></i></span>
       <h2>${t('coach.empty')}</h2><p>${t('coach.emptySub')}</p>
       <div class="exq">${['coach.ex1', 'coach.ex2', 'coach.ex3'].map(k => `<button class="chip" data-coach="ask" data-q="${esc(t(k))}">${esc(t(k))}</button>`).join('')}</div></div>`;
+  } else {
+    // messages already on screen don't slide in again when the thread re-renders
+    body = `<ol class="thread" id="thread">${chat.map(m => { const h = bubble(m); const seen = shown.has(m.id); shown.add(m.id); return seen ? h.replace('<li class="msg', '<li class="msg seen') : h; }).join('')}</ol>`;
   }
-  const top = `<div class="tabtop"></div>
+  root.innerHTML = `<div class="tabtop"></div>
     <button class="iconbtn cclose" data-coach="close" aria-label="${t('common.close')}">${I.back.replace('d="M14.5 6 8.5 12l6 6"', 'd="M6 9.5l6 6 6-6"')}</button>
     <header class="coachhead"><div><h1 class="h1">${t('coach.title')}</h1><p class="sub">${t('coach.sub')}</p></div>
       ${chat.length ? `<button class="iconbtn" data-coach="clear" aria-label="${t('coach.clear')}">${I.trash}</button>` : ''}</header>
-    ${key ? pinHTML('coach') : ''}`;
-  // The conversation is patched, never rebuilt: each message keeps its node for its whole life, so
-  // nothing on screen flickers, restarts its entrance or jumps when a message comes in or a reply
-  // finishes (only a message whose drawing changed is redrawn; the one being typed is left to the typer).
-  const ol = chat.length && body === undefined ? root.querySelector(':scope > #thread') : null;
-  let added = 0;
-  if (ol && root._top === top) added = patchThread(ol, chat);
-  else {
-    if (body === undefined) body = '<ol class="thread" id="thread"></ol>';
-    root.innerHTML = top + body;
-    root._top = top;
-    const fresh = root.querySelector(':scope > #thread');
-    if (fresh) patchThread(fresh, chat);
-  }
+    ${key ? pinHTML('coach') : ''}
+    ${body}`;
   const composer = $('#composer');
   if (!composer.dataset.talk) composer.querySelector('input').placeholder = t('coach.ph'); // talking: the box shows what's happening
   composer.querySelector('.csend').setAttribute('aria-label', t('coach.send'));
@@ -144,8 +107,7 @@ export function renderCoach(root) {
   syncThinking();
   const hold = pendingSend || sending;
   if (hold) { const mine = [...root.querySelectorAll('.msg.me')].pop(); if (mine && mine.textContent.trim() === hold.text) mine.classList.add('sending', 'seen'); }
-  // a new message at the end: the conversation glides up to make room for it (never a jump)
-  requestAnimationFrame(() => { (followers.get(root)?.raf || added ? follow(root, !!added) : scrollDown(root, false)); if (pendingSend) sendFly(root); });
+  requestAnimationFrame(() => { (followers.get(root)?.raf ? follow(root) : scrollDown(root, false)); if (pendingSend) sendFly(root); });
 }
 
 // iOS-style send: the words you typed lift out of the message box as a bubble and glide up into the
@@ -273,13 +235,7 @@ function merge(a, b) {
 // every word still settling).
 function wordsHTML(bub, text, births, now, st) {
   if (bub._st !== st) { bub.innerHTML = ''; bub._st = st; Object.assign(st, { n: 0, w: 0, live: null, liveUl: null }); }
-  // A hidden line (ACTION: …, REMEMBER: …, CHANGE: …) can't be told from a real one by its first letter
-  // or two, so a last line that could still become one waits a chunk before it shows.
-  const lines = hideMemoryTail(text).replace(/\n[ \t]*(?:A|AC|R|RE|C|CH|CHA)$/, '').split('\n');
-  let tail = lines.pop();
-  // the text can lose its last line again (it turned out to be a hidden line, taking its newline with
-  // it): a line already finished and on screen is never drawn a second time
-  if (lines.length < st.n) tail = '';
+  const lines = hideMemoryTail(text).split('\n'), tail = lines.pop();
   const drop = () => { st.live?.remove(); if (st.liveUl && !st.liveUl.children.length) st.liveUl.remove(); st.live = st.liveUl = null; };
   // the line on screen takes the new drawing of itself, if it has the same shape
   const keep = el => {
@@ -764,7 +720,7 @@ export function initCoach(n) {
   nav = n;
   const root = $('#s-coach');
   const composer = $('#composer');
-  composer.innerHTML = `<span class="cglow" aria-hidden="true"><i></i></span><span class="chit" aria-hidden="true"></span><button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"></span></button><input enterkeyhint="send" autocomplete="off" maxlength="5000"><button type="submit" class="csend">${I.fwd}</button>`;
+  composer.innerHTML = `<span class="cglow" aria-hidden="true"><i></i></span><span class="chit" aria-hidden="true"></span><button type="button" class="corb" data-dictate aria-label="${esc(state.t('coach.dictate'))}"><span class="orb"><i class="core"><b></b><b></b><b></b></i></span></button><input enterkeyhint="send" autocomplete="off" maxlength="5000"><button type="submit" class="csend">${I.fwd}</button>`;
   // The composer's orb: talk to your coach. What you say is sent when you pause, the answer is
   // spoken, then it listens again, so it's a conversation. Tap while it listens to send at once;
   // tap while it thinks or speaks (or say nothing) to end it.

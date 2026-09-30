@@ -61,23 +61,17 @@ export function level() {
   return v;
 }
 
+// The voice split in two, 0..1 each, for the orb: the body of it (roughly 90–500 Hz) and its edge
+// (the consonants, roughly 2–6 kHz).
 let fbuf = null;
-// The voice in a few bands, 0..1 each (raw: the orb's own automatic gain and noise floor work on
-// these). Log-spaced edges from the low body of a voice up to its consonants. False when not live.
-const SPEC_HZ = [90, 180, 350, 700, 1400, 2800, 6000];
-export function spectrum(out) {
-  if (!rec?.analyser || audioContext()?.state !== 'running') return false;
+export function bands() {
+  if (!rec?.analyser || audioContext()?.state !== 'running') return { low: 0, high: 0 };
   const n = rec.analyser.frequencyBinCount, hz = audioContext().sampleRate / 2 / n;
   if (!fbuf || fbuf.length !== n) fbuf = new Uint8Array(n);
   rec.analyser.getByteFrequencyData(fbuf);
-  for (let b = 0; b < out.length; b++) {
-    const i0 = Math.max(1, Math.round(SPEC_HZ[b] / hz)), i1 = Math.min(n - 1, Math.max(i0, Math.round(SPEC_HZ[b + 1] / hz)));
-    let s = 0;
-    for (let i = i0; i <= i1; i++) s += fbuf[i];
-    const x = (s / (i1 - i0 + 1) - 40) / 160;
-    out[b] = x < 0 ? 0 : x > 1 ? 1 : x;
-  }
-  return true;
+  const avg = (a, b) => { const i0 = Math.max(1, Math.round(a / hz)), i1 = Math.min(n - 1, Math.round(b / hz)); let s = 0; for (let i = i0; i <= i1; i++) s += fbuf[i]; return s / Math.max(1, i1 - i0 + 1); };
+  const shape = x => Math.max(0, Math.min(1, (x - 70) / 120));
+  return { low: shape(avg(90, 500)), high: shape(avg(2000, 6000) * 1.35) };
 }
 
 function release(r) {

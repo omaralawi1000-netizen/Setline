@@ -60,20 +60,6 @@ export function initChrome() {
     });
   };
   app.addEventListener('scroll', onScroll, { capture: true, passive: true });
-  // where the tab you're on and the orb slide to inside the pill (measured from the bar's own layout,
-  // which never changes, so it's worked out once per tab)
-  const place = () => {
-    const dock = document.getElementById('dock'), tab = dock?.querySelector('.tab.on'), orb = dock?.querySelector('.orbbtn');
-    if (!dock || !orb) return;
-    const mid = dock.offsetWidth / 2;
-    if (!tab) { orb.style.setProperty('--cox', '0px'); return; }
-    const tc = tab.offsetLeft + tab.offsetWidth / 2, left = tc < mid;
-    dock.style.setProperty('--ctx', `${((left ? mid - 32 : mid + 32) - tc).toFixed(1)}px`);
-    orb.style.setProperty('--cox', `${left ? 28 : -28}px`);
-  };
-  let wasCompact = false;
-  new MutationObserver(() => { const c = app.classList.contains('compact'); if (c && !wasCompact) place(); wasCompact = c; }).observe(app, { attributes: true, attributeFilter: ['class'] });
-  addEventListener('resize', place);
   // a new screen starts at its own scroll position
   app.addEventListener('screenchange', () => {
     const s = app.querySelector('.screen.on');

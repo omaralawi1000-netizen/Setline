@@ -1061,3 +1061,10 @@ From Omar's recording of 1.67.6 (30 Sep).
 - A question said to the floating orb or on the voice screen goes straight into the Coach, never back
   to Home first. After a beat to see your words, the Coach opens under the voice layer, which clears
   over it, and the voice's own orb flies into the message box and lands there (only ever one orb).
+
+## 1.68.1: Back to 1.56.0
+
+Omar asked for the most stable and beautiful version. Every app file, test and script is 1.56.0's again
+(4b84bee); only the version number is new, so phones update. 1.67.0–1.68.0 (the dotted orb and the
+polish passes on it) are undone. The database is untouched (schema 4, identical storage code). Backup
+of 1.68.0: branch `backup-before-revert-1.56.0-b`.
